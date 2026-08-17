@@ -6,7 +6,9 @@ export default defineConfig([
     entry: { index: "src/index.ts" },
     format: ["esm"],
     dts: true,
-    clean: true,
+    // Cleaning is done once by scripts/clean-dist.mjs. A per-config clean races
+    // the other config's output.
+    clean: false,
     sourcemap: true,
     target: "es2022",
     platform: "browser",

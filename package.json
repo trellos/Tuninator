@@ -24,7 +24,7 @@
   "module": "./dist/index.js",
   "sideEffects": false,
   "scripts": {
-    "build": "tsup && node scripts/assert-worklet-bundle.mjs",
+    "build": "node scripts/clean-dist.mjs && tsup && node scripts/assert-worklet-bundle.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
