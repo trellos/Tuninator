@@ -1,20 +1,30 @@
 /**
  * Block-in -> PitchFrame-out. Drives YIN, onset, and chroma at the hop.
  *
- * CONTRACT FILE — signatures fixed; implementation owned by the integration
- * workstream.
- *
  * Window and hop are decoupled: a ring buffer accumulates input, and every hop
  * the detector analyses the most recent N samples. That is what gives a 12ms
- * update rate without breaking low E (one period of 82.4Hz is ~582 samples).
+ * update rate without breaking low E (one period of 82.4Hz is ~582 samples, and
+ * YIN needs roughly two, so the long window is 2048 even though the hop is 576).
  *
- * Part of `src/core/` — no DOM, no globals, no npm imports. This exact code
- * runs in the AudioWorklet, in Node, and in Vitest; the offline eval is
- * trustworthy only because there is no separate offline detector.
+ * The dual-window trick is what makes fast passages tractable. In the fixtures
+ * the timing pressure and the pitch range are inversely correlated: the slow
+ * quarter notes are low (123-220Hz) and need the long window, while the 125ms
+ * sixteenths are high (440-554Hz), where two periods is ~200 samples. So both
+ * windows run every hop and the short one wins whenever it is confident and
+ * high enough to be trustworthy.
+ *
+ * Part of `src/core/` — no DOM, no globals, no npm imports. This exact code runs
+ * in the AudioWorklet, in Node, and in Vitest; the offline eval is trustworthy
+ * only because there is no separate offline detector.
  */
 
 import type { PitchFrame } from "../types.js";
 import type { Policy } from "./policy.js";
+import { YinDetector, zeroCrossingRateHz, rms as windowRms, peak as windowPeak } from "./yin.js";
+import { OnsetDetector } from "./onset.js";
+import { ChromaAnalyzer } from "./chroma.js";
+import { matchChord } from "./chords.js";
+import { describeFrequency, frequencyToMidiFloat } from "./notes.js";
 import type { ChordMatch } from "./chords.js";
 import type { ChromaResult } from "./chroma.js";
 
@@ -29,33 +39,359 @@ export type EngineFrame = {
   chord: ChordMatch | null;
 };
 
+/** Matches the AudioWorklet render quantum. */
+const RENDER_QUANTUM = 128;
+
+/** Ring capacity. Power of two, and >= the largest analysis window (4096). */
+const RING_CAPACITY = 8192;
+
+/** Run the (expensive) 4096-point chroma path once every N hops. */
+const CHORD_HOP_DIVISOR = 4;
+
 export class PitchEngine {
   readonly sampleRate: number;
   /** Hop in samples, snapped to a whole number of 128-sample render quanta. */
   readonly hopSamples: number;
 
-  constructor(_sampleRate: number, _policy: Policy) {
-    this.sampleRate = _sampleRate;
-    this.hopSamples = 0;
-    throw new Error("PitchEngine: not implemented");
-  }
+  private policy: Policy;
 
-  /** Swaps policy in place. Never reallocates the audio graph or ring buffer. */
-  setPolicy(_policy: Policy): void {
-    throw new Error("PitchEngine.setPolicy: not implemented");
+  private readonly ring = new Float32Array(RING_CAPACITY);
+  private writeIndex = 0;
+  private samplesWritten = 0;
+  private samplesSinceHop = 0;
+
+  private longWindow: Float32Array;
+  private shortWindow: Float32Array;
+  private onsetWindow: Float32Array;
+  private chromaWindow: Float32Array;
+
+  private yinLong: YinDetector;
+  private yinShort: YinDetector;
+  private onsetDetector: OnsetDetector;
+  private chromaAnalyzer: ChromaAnalyzer | null = null;
+
+  /** Circular buffer of recent voiced frequencies, for the temporal median. */
+  private readonly medianBuf: number[] = [];
+  private hopCounter = 0;
+
+  /** Cached across hops so every frame carries the most recent chord estimate. */
+  private lastChroma: ChromaResult | null = null;
+  private lastChord: ChordMatch | null = null;
+
+  constructor(sampleRate: number, policy: Policy) {
+    this.sampleRate = sampleRate;
+    this.policy = policy;
+
+    this.hopSamples = snapHop(policy.analysis.pitchHopMs, sampleRate);
+
+    this.longWindow = new Float32Array(policy.pitch.longWindow);
+    this.shortWindow = new Float32Array(policy.pitch.shortWindow);
+    this.onsetWindow = new Float32Array(policy.onset.fftSize);
+    this.chromaWindow = new Float32Array(policy.chords.fftSize);
+
+    this.yinLong = new YinDetector({
+      sampleRate,
+      windowSize: policy.pitch.longWindow,
+      minFrequencyHz: policy.analysis.minFrequencyHz,
+      maxFrequencyHz: policy.analysis.maxFrequencyHz,
+      threshold: policy.pitch.yinThreshold,
+    });
+
+    // The short window physically cannot resolve two periods of a low note, so
+    // its search is bounded below. Asking it for low E would only produce
+    // confident nonsense.
+    this.yinShort = new YinDetector({
+      sampleRate,
+      windowSize: policy.pitch.shortWindow,
+      minFrequencyHz: Math.max(
+        policy.analysis.minFrequencyHz,
+        (2 * sampleRate) / policy.pitch.shortWindow
+      ),
+      maxFrequencyHz: policy.analysis.maxFrequencyHz,
+      threshold: policy.pitch.yinThreshold,
+    });
+
+    this.onsetDetector = new OnsetDetector({
+      sampleRate,
+      fftSize: policy.onset.fftSize,
+      minIntervalMs: policy.onset.minIntervalMs,
+      medianWindow: policy.onset.medianWindow,
+      sensitivity: policy.onset.sensitivity,
+    });
+
+    if (policy.chords.enabled) {
+      this.chromaAnalyzer = new ChromaAnalyzer({
+        sampleRate,
+        fftSize: policy.chords.fftSize,
+        minFrequencyHz: policy.analysis.minFrequencyHz,
+        maxFrequencyHz: policy.analysis.maxFrequencyHz,
+      });
+    }
   }
 
   /**
-   * Push one render quantum (128 samples in the browser; the offline analyzer
-   * uses the same size deliberately). Returns a frame only on hop boundaries.
-   *
+   * Swaps policy in place. `setMode()` must never restart the audio graph, so
+   * this only rebuilds the pieces whose *shape* changed; the ring buffer and
+   * accumulated audio survive untouched.
+   */
+  setPolicy(policy: Policy): void {
+    const prev = this.policy;
+    this.policy = policy;
+
+    const pitchShapeChanged =
+      policy.pitch.longWindow !== prev.pitch.longWindow ||
+      policy.pitch.shortWindow !== prev.pitch.shortWindow ||
+      policy.pitch.yinThreshold !== prev.pitch.yinThreshold ||
+      policy.analysis.minFrequencyHz !== prev.analysis.minFrequencyHz ||
+      policy.analysis.maxFrequencyHz !== prev.analysis.maxFrequencyHz;
+
+    if (pitchShapeChanged) {
+      this.longWindow = new Float32Array(policy.pitch.longWindow);
+      this.shortWindow = new Float32Array(policy.pitch.shortWindow);
+      this.yinLong = new YinDetector({
+        sampleRate: this.sampleRate,
+        windowSize: policy.pitch.longWindow,
+        minFrequencyHz: policy.analysis.minFrequencyHz,
+        maxFrequencyHz: policy.analysis.maxFrequencyHz,
+        threshold: policy.pitch.yinThreshold,
+      });
+      this.yinShort = new YinDetector({
+        sampleRate: this.sampleRate,
+        windowSize: policy.pitch.shortWindow,
+        minFrequencyHz: Math.max(
+          policy.analysis.minFrequencyHz,
+          (2 * this.sampleRate) / policy.pitch.shortWindow
+        ),
+        maxFrequencyHz: policy.analysis.maxFrequencyHz,
+        threshold: policy.pitch.yinThreshold,
+      });
+    }
+
+    const onsetShapeChanged =
+      policy.onset.fftSize !== prev.onset.fftSize ||
+      policy.onset.minIntervalMs !== prev.onset.minIntervalMs ||
+      policy.onset.medianWindow !== prev.onset.medianWindow ||
+      policy.onset.sensitivity !== prev.onset.sensitivity;
+
+    if (onsetShapeChanged) {
+      this.onsetWindow = new Float32Array(policy.onset.fftSize);
+      this.onsetDetector = new OnsetDetector({
+        sampleRate: this.sampleRate,
+        fftSize: policy.onset.fftSize,
+        minIntervalMs: policy.onset.minIntervalMs,
+        medianWindow: policy.onset.medianWindow,
+        sensitivity: policy.onset.sensitivity,
+      });
+    }
+
+    if (policy.chords.enabled) {
+      const chromaShapeChanged =
+        !this.chromaAnalyzer || policy.chords.fftSize !== prev.chords.fftSize;
+      if (chromaShapeChanged) {
+        this.chromaWindow = new Float32Array(policy.chords.fftSize);
+        this.chromaAnalyzer = new ChromaAnalyzer({
+          sampleRate: this.sampleRate,
+          fftSize: policy.chords.fftSize,
+          minFrequencyHz: policy.analysis.minFrequencyHz,
+          maxFrequencyHz: policy.analysis.maxFrequencyHz,
+        });
+      }
+    } else {
+      this.chromaAnalyzer = null;
+      this.lastChroma = null;
+      this.lastChord = null;
+    }
+
+    if (policy.pitch.medianFrames < this.medianBuf.length) {
+      this.medianBuf.length = policy.pitch.medianFrames;
+    }
+  }
+
+  /**
+   * Push one render quantum. Returns a frame only on hop boundaries.
    * `timestampMs` is the time of the *first* sample in `block`.
    */
-  push(_block: Float32Array, _timestampMs: number): EngineFrame | null {
-    throw new Error("PitchEngine.push: not implemented");
+  push(block: Float32Array, timestampMs: number): EngineFrame | null {
+    const n = block.length;
+    const mask = RING_CAPACITY - 1;
+    for (let i = 0; i < n; i++) {
+      this.ring[this.writeIndex] = block[i]!;
+      this.writeIndex = (this.writeIndex + 1) & mask;
+    }
+    this.samplesWritten += n;
+    this.samplesSinceHop += n;
+
+    if (this.samplesSinceHop < this.hopSamples) return null;
+    this.samplesSinceHop -= this.hopSamples;
+
+    // Timestamp the END of the analysed audio: that is the moment the frame
+    // describes, and it keeps frame times comparable with event times.
+    const hopTimestamp = timestampMs + (n / this.sampleRate) * 1000;
+    return this.analyze(hopTimestamp);
   }
 
   reset(): void {
-    throw new Error("PitchEngine.reset: not implemented");
+    this.ring.fill(0);
+    this.writeIndex = 0;
+    this.samplesWritten = 0;
+    this.samplesSinceHop = 0;
+    this.medianBuf.length = 0;
+    this.hopCounter = 0;
+    this.lastChroma = null;
+    this.lastChord = null;
+    this.onsetDetector.reset();
   }
+
+  /** Copies the most recent `count` samples out of the ring, oldest first. */
+  private readRecent(out: Float32Array, count: number): void {
+    const mask = RING_CAPACITY - 1;
+    let read = (this.writeIndex - count) & mask;
+    for (let i = 0; i < count; i++) {
+      out[i] = this.ring[read]!;
+      read = (read + 1) & mask;
+    }
+  }
+
+  private analyze(timestamp: number): EngineFrame {
+    const policy = this.policy;
+    this.hopCounter++;
+
+    this.readRecent(this.longWindow, this.longWindow.length);
+    const rms = windowRms(this.longWindow);
+    const peak = windowPeak(this.longWindow);
+
+    const gatedByAmplitude = rms < policy.analysis.rmsGate;
+    // Until the ring holds a full long window the detector would be analysing
+    // zeros, which reads as a confident low pitch. Suppress rather than lie.
+    const warmedUp = this.samplesWritten >= this.longWindow.length;
+
+    let frequencyHz: number | null = null;
+    let confidence = 0;
+    let tau: number | null = null;
+    let cmnd: number | null = null;
+    let zeroCrossingHz: number | null = null;
+
+    if (!gatedByAmplitude && warmedUp) {
+      const long = this.yinLong.detect(this.longWindow);
+
+      this.readRecent(this.shortWindow, this.shortWindow.length);
+      const short = this.yinShort.detect(this.shortWindow);
+
+      // Prefer the short window when it is confident and high enough that its
+      // window really does span two periods: ~7x better time resolution, which
+      // is what makes 125ms sixteenths resolvable.
+      const shortUsable =
+        short.frequencyHz !== null &&
+        short.frequencyHz >= policy.pitch.shortWindowMinHz &&
+        short.confidence >= policy.analysis.confidenceGate;
+
+      const chosen = shortUsable ? short : long;
+      frequencyHz = chosen.frequencyHz;
+      confidence = chosen.confidence;
+      tau = chosen.tau;
+      cmnd = chosen.cmnd;
+
+      zeroCrossingHz = zeroCrossingRateHz(this.longWindow, this.sampleRate);
+
+      // Octave sanity. ZCR is crude but it fails in different ways than YIN, so
+      // a ~2x disagreement is real evidence that YIN halved or doubled.
+      if (frequencyHz !== null && zeroCrossingHz > 0) {
+        const ratio = Math.log2(frequencyHz / zeroCrossingHz);
+        if (Math.abs(Math.abs(ratio) - 1) < 0.25) {
+          confidence *= 0.5;
+        }
+      }
+
+      if (confidence < policy.analysis.confidenceGate) {
+        frequencyHz = null;
+      }
+    }
+
+    // Temporal median over recent voiced frames. Median (not mean) keeps the
+    // value an actually-observed one, so a single octave-flipped frame is
+    // discarded rather than averaged into a pitch that was never played.
+    if (frequencyHz !== null && policy.pitch.medianFrames > 1) {
+      this.medianBuf.push(frequencyHz);
+      if (this.medianBuf.length > policy.pitch.medianFrames) this.medianBuf.shift();
+      frequencyHz = medianOf(this.medianBuf);
+    } else if (frequencyHz === null) {
+      this.medianBuf.length = 0;
+    }
+
+    const frame: PitchFrame = {
+      timestamp,
+      frequencyHz,
+      confidence,
+      nearest: frequencyHz === null ? null : describeFrequency(frequencyHz),
+      amplitude: { rms, peak },
+      detector: {
+        tau,
+        cmnd,
+        zeroCrossingHz,
+        effectiveSampleRate: this.sampleRate,
+      },
+    };
+
+    let onset = false;
+    let onsetFlux = 0;
+    if (policy.onset.enabled && warmedUp) {
+      this.readRecent(this.onsetWindow, this.onsetWindow.length);
+      const result = this.onsetDetector.process(this.onsetWindow, timestamp);
+      onset = result.isOnset && !gatedByAmplitude;
+      onsetFlux = result.flux;
+    }
+
+    if (
+      this.chromaAnalyzer &&
+      !gatedByAmplitude &&
+      warmedUp &&
+      this.hopCounter % CHORD_HOP_DIVISOR === 0
+    ) {
+      this.readRecent(this.chromaWindow, this.chromaWindow.length);
+      const chroma = this.chromaAnalyzer.analyze(this.chromaWindow);
+      this.lastChroma = chroma;
+      this.lastChord = matchChord(chroma.chroma, {
+        floor: policy.chords.floor,
+        margin: policy.chords.margin,
+        bassPitchClass: chroma.bassPitchClass,
+      });
+    } else if (gatedByAmplitude) {
+      this.lastChroma = null;
+      this.lastChord = null;
+    }
+
+    return {
+      frame,
+      onset,
+      onsetFlux,
+      chroma: this.lastChroma,
+      chord: this.lastChord,
+    };
+  }
+}
+
+/** Snap a requested hop to a whole number of render quanta, minimum one. */
+export function snapHop(pitchHopMs: number, sampleRate: number): number {
+  const requested = (pitchHopMs / 1000) * sampleRate;
+  const quanta = Math.max(1, Math.round(requested / RENDER_QUANTUM));
+  return quanta * RENDER_QUANTUM;
+}
+
+/** Median of a small array. Copies, so it never reorders the caller's buffer. */
+function medianOf(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 === 1
+    ? sorted[mid]!
+    : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+/** Signed cents between two frequencies. Re-exported for the tracker. */
+export function centsBetweenFrequencies(hz: number, refHz: number): number {
+  return 1200 * Math.log2(hz / refHz);
+}
+
+/** Fractional MIDI, used by the tracker for step-vs-glide classification. */
+export function midiOf(hz: number): number {
+  return frequencyToMidiFloat(hz);
 }

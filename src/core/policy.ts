@@ -38,6 +38,14 @@ export type Policy = {
     yinThreshold: number;
     /** Frames of temporal median applied before snapping to a note. */
     medianFrames: number;
+    /**
+     * A single-hop pitch jump this large reads as a new note rather than a bend.
+     * This is what separates "A3 bent up to B3" (one event, gliding through the
+     * intermediate cents over tens of frames) from a legato D5->E5 step (two
+     * events, jumping in one or two frames). Both are 200 cents from the start,
+     * so total displacement cannot distinguish them — only the per-hop rate can.
+     */
+    stepThresholdCents: number;
   };
 
   onset: {
@@ -83,6 +91,7 @@ const BASE: Omit<Policy, "mode"> = {
     shortWindowMinHz: 300,
     yinThreshold: 0.13,
     medianFrames: 3,
+    stepThresholdCents: 70,
   },
   onset: {
     enabled: true,
