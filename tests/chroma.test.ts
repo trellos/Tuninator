@@ -355,13 +355,50 @@ describe("end to end: chroma into matchChord", () => {
     expect(match.isConfident).toBe(true);
   });
 
-  it("abstains on white noise and still offers alternatives", () => {
+  /*
+   * Whitening flattens the spectral envelope, so it flatters noise too: without
+   * the tonality gate, a hiss offers enough peaks to elect six "fundamentals"
+   * and this came out as a confident D#maj9.
+   */
+  it("reads no chroma at all out of white noise", () => {
     const result = analyzer().analyze(whiteNoise());
+    expect(Math.max(...result.chroma)).toBe(0);
+    expect(result.bassPitchClass).toBeNull();
+    expect(result.polyphony).toBe(0);
+    expect(result.salience).toBeLessThan(0.22);
+
     const match = matchChord(result.chroma, { bassPitchClass: result.bassPitchClass });
     expect(match.isConfident).toBe(false);
+    expect(match.best).toBeNull();
+  });
+
+  it("still hears the chord through heavy added noise", () => {
+    const chord = strum(["C3", "E3", "G3", "C4", "E4"]);
+    const hiss = whiteNoise(0.35, 77);
+    const mixed = new Float32Array(FFT_SIZE);
+    for (let i = 0; i < FFT_SIZE; i++) mixed[i] = chord[i]! + hiss[i]!;
+
+    const result = analyzer().analyze(mixed);
+    const match = matchChord(result.chroma, { bassPitchClass: result.bassPitchClass });
+    expect(result.salience).toBeGreaterThan(0.22);
+    expect(match.best?.label).toBe("C");
+    expect(match.isConfident).toBe(true);
+  });
+
+  /*
+   * A diminished seventh is symmetric: every note can be the root, and the
+   * dictionary has no entry for it. There is no right answer, so the margin
+   * rule must refuse to pick one — while still handing the caller the
+   * candidates it was choosing between.
+   */
+  it("abstains on an ambiguous chord and still offers alternatives", () => {
+    const result = analyzer().analyze(strum(["C3", "D#3", "F#3", "A3"]));
+    const match = matchChord(result.chroma, { bassPitchClass: result.bassPitchClass });
+    expect(result.salience).toBeGreaterThan(0.22);
+    expect(match.isConfident).toBe(false);
+    expect(match.margin).toBeLessThan(0.08);
     expect(match.best).not.toBeNull();
     expect(match.alternatives.length).toBeGreaterThan(0);
-    expect(result.salience).toBeLessThan(0.3);
   });
 
   /*

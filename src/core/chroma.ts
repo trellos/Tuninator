@@ -10,11 +10,17 @@
  *   2. Whitening: subtract a proportional-bandwidth moving mean of the *log*
  *      magnitudes (a running geometric-mean envelope) so what survives is each
  *      bin's prominence over its own neighbourhood, not its absolute level.
+ *      After it, a quiet fundamental and a loud overtone are comparable.
  *   3. Peak picking on the raw spectrum with parabolic interpolation (at 4096
  *      points / 48kHz a bin is 11.7Hz, coarser than a semitone below ~200Hz),
  *      weighted by whitened prominence and a compressed amplitude term.
- *   4. Sub-harmonic summation of every peak onto a semitone pitch grid, then
- *      the grid is folded to 12 pitch classes and normalised to max = 1.
+ *   4. Iterative harmonic cancellation over a semitone grid of candidate
+ *      fundamentals: score, take the winner, attenuate the partials it explains,
+ *      repeat. Every partial is spent once, so an overtone cannot also be read
+ *      as a note. A plain fold cannot do this, and on a strummed guitar it turns
+ *      every power chord into a ninth.
+ *   5. The surviving fundamentals are folded to 12 pitch classes, normalised to
+ *      max = 1. The bass is read separately, off the uncancelled peaks.
  *
  * CONTRACT FILE — signatures fixed; implementation owned by the chord
  * workstream. Depends on `RealFFT` and `hannWindow` from `./fft.js`.
@@ -53,27 +59,27 @@ export type ChromaResult = {
 /* -------------------------------------------------------------------------- */
 
 const DEFAULT_MIN_FREQUENCY_HZ = 70;
-const DEFAULT_MAX_FREQUENCY_HZ = 1600;
-const DEFAULT_HARMONICS = 4;
+const DEFAULT_MAX_FREQUENCY_HZ = 1300;
+const DEFAULT_HARMONICS = 5;
 
 /** Input RMS below this counts as silence: all-zero chroma, no bass. */
 const SILENCE_RMS = 1e-6;
 
 /** Whitening window half-width, as a fraction of the bin index (~1/4 octave). */
-const ENVELOPE_RELATIVE_HALF_WIDTH = 0.25;
+const ENVELOPE_RELATIVE_HALF_WIDTH = 0.35;
 /** Floor on that half-width so the low bins still see a usable neighbourhood. */
 const ENVELOPE_MIN_HALF_WIDTH = 8;
 /** Magnitudes below this fraction of the frame peak are clamped before log(). */
 const MAGNITUDE_FLOOR_RATIO = 1e-5;
 
 /** Log-prominence (nepers) a peak must clear over its local geometric mean. */
-const MIN_PEAK_PROMINENCE = 0.45;
+const MIN_PEAK_PROMINENCE = 0.1;
 /** Prominence saturates here, so one freak bin cannot own the whole chroma. */
 const MAX_PEAK_PROMINENCE = 4;
 /** Peaks quieter than this fraction of the loudest peak are dropped outright. */
-const MIN_PEAK_AMPLITUDE_RATIO = 2e-3;
+const MIN_PEAK_AMPLITUDE_RATIO = 0.002;
 /** Compression on a peak's relative amplitude; 0 = pure whitening, 1 = none. */
-const AMPLITUDE_EXPONENT = 0.25;
+const AMPLITUDE_EXPONENT = 0.1;
 /** Per-step decay of the sub-harmonic fold (h = 1 is the peak itself). */
 const HARMONIC_DECAY = 0.6;
 
@@ -81,14 +87,43 @@ const HARMONIC_DECAY = 0.6;
 const GRID_MIN_MIDI = 36; // C2, 65.4Hz
 const GRID_MAX_MIDI = 88; // E6, 1318.5Hz
 
+/** Most fundamentals extracted from one frame. A guitar has six strings. */
+const MAX_FUNDAMENTALS = 6;
+/** Extraction stops once a candidate falls this far below the first one. */
+const FUNDAMENTAL_STOP_RATIO = 0.3;
+/** Fraction of a partial's weight a fundamental claims when it is cancelled. */
+const CANCELLATION_STRENGTH = 0.85;
+/** Harmonics reached by cancellation. Deliberately more than are scored. */
+const CANCELLATION_HARMONICS = 10;
+/**
+ * Window for calling a partial the h-th harmonic of a candidate.
+ *
+ * Two error sources, so two terms. A mistuned string is off by a constant
+ * number of *cents* at every harmonic, which is the second term. Measuring a
+ * peak is off by a constant number of *Hz* — roughly half a bin — which at
+ * 11.7Hz bins is 4 cents up at 2kHz but 80 cents down at low E, and is why the
+ * first term has to exist at all. Matching in cents alone throws away every
+ * bass note on the instrument.
+ */
+const HARMONIC_MATCH_CENTS = 45;
+const HARMONIC_MATCH_BINS = 0.65;
+/** Harmonics a candidate must have before it can be called a fundamental. */
+const MIN_HARMONIC_SUPPORT = 2;
+/** A partial counts as present while it holds this fraction of the peak weight. */
+const PRESENCE_RATIO = 0.05;
+
 /** Bass search is limited to this range; a guitar's lowest string is 82.4Hz. */
-const BASS_MAX_FREQUENCY_HZ = 400;
-/** A bass candidate must carry at least this fraction of the strongest weight. */
-const BASS_MIN_WEIGHT_RATIO = 0.12;
-/** How close (in cents) a partial must sit to h*f to count as harmonic support. */
-const BASS_HARMONIC_TOLERANCE_CENTS = 55;
-/** Harmonics of h = 2..4 that must be present before a peak can be the bass. */
-const BASS_MIN_HARMONIC_SUPPORT = 2;
+const BASS_MAX_FREQUENCY_HZ = 200;
+/**
+ * A bass candidate is accepted as the lowest one holding this fraction of the
+ * best low-register salience. Straight "lowest supported partial" picks up
+ * octave ghosts and body resonance; "strongest" picks the wrong string of a
+ * power chord. The lowest one that is genuinely *comparable* is neither.
+ */
+const BASS_SALIENCE_RATIO = 0.4;
+/** Tighter window for "this peak IS the bass note", vs. merely near a harmonic. */
+const BASS_OWN_PEAK_BINS = 0.45;
+const BASS_OWN_PEAK_CENTS = 40;
 
 /**
  * Exponent of the generalised mean used to fold octaves into a pitch class.
@@ -102,28 +137,40 @@ const BASS_MIN_HARMONIC_SUPPORT = 2;
 const OCTAVE_FOLD_POWER = 2;
 
 /**
- * Contrast exponent applied to the normalised chroma.
+ * Contrast exponent applied to the normalised chroma. Below 1 it *expands* the
+ * quiet bins rather than suppressing them.
  *
- * Sub-harmonic summation leaves a haze of overtone leakage in the non-chord
- * bins (a C5 power chord picks up D from G3's third harmonic and E from C3's
- * fifth). Without this the whole chord dictionary scores within ~0.01 of the
- * right answer and *everything* fails the margin rule. Raising the chroma to a
- * power leaves max = 1 and the ranking intact, but pushes the leakage down so
- * the margin measures something real.
+ * Cancellation has already decided which notes are sounding, so what reaches
+ * this point is presence, not energy — and a note's salience mostly measures how
+ * many strong partials it happened to own. An open Em plays three E's, two B's
+ * and one G: the G is the chord's third and the least of its salience. Left
+ * uncompressed, every triad reads as a power chord.
  */
-const CHROMA_CONTRAST = 2;
+const CHROMA_CONTRAST = 0.4;
 
-/** Chroma bins at or above this fraction of the max count towards polyphony. */
-const POLYPHONY_THRESHOLD = 0.45;
+/**
+ * Below this tonality the frame is noise, and it yields no chroma at all.
+ *
+ * Whitening deliberately flattens the spectral envelope, which means it also
+ * promotes noise: a loud hiss offers a few dozen peaks, and enough of them land
+ * near some candidate's harmonics to elect five or six confident "fundamentals"
+ * that spell a chord nobody played. Peak shape cannot separate the two cases —
+ * peak *prominence* can, and `salience` already measures exactly that.
+ *
+ * Measured over the four fixtures: 866 chord frames run 0.239 to 0.939, first
+ * percentile 0.306; 60 white-noise frames run 0.118 to 0.209. The gate sits in
+ * the gap, and it fails safe — a gated frame reports no chroma, the caller
+ * reports `unknown`.
+ */
+const MIN_TONAL_SALIENCE = 0.22;
 
 const A4_HZ = 440;
 const A4_MIDI = 69;
-const LN2 = Math.LN2;
 
 /* -------------------------------------------------------------------------- */
 
-function midiFromHz(hz: number): number {
-  return A4_MIDI + 12 * (Math.log(hz / A4_HZ) / LN2);
+function hzFromMidi(midi: number): number {
+  return A4_HZ * Math.pow(2, (midi - A4_MIDI) / 12);
 }
 
 export class ChromaAnalyzer {
@@ -150,8 +197,17 @@ export class ChromaAnalyzer {
   private readonly peakWeight: Float64Array;
   private peakCount = 0;
 
-  private readonly grid: Float64Array;
+  /** Peak weights as cancellation eats them; reset from `peakWeight` per frame. */
+  private readonly workingWeight: Float64Array;
+  /** Weight below which a partial no longer counts as present. Per frame. */
+  private presenceThreshold = 0;
+
+  /** Candidate fundamental frequencies, one per semitone of the grid. */
+  private readonly candidateHz: Float64Array;
   private readonly gridSize: number;
+  private readonly bassSalience: Float64Array;
+  private readonly fundamentalGrid: Int32Array;
+  private readonly fundamentalSalience: Float64Array;
   private readonly octaveFold: Float64Array;
   private readonly harmonicWeights: Float64Array;
 
@@ -198,8 +254,15 @@ export class ChromaAnalyzer {
     this.minBin = Math.max(1, Math.floor(this.minFrequencyHz / this.binHz));
     this.maxBin = Math.min(bins - 2, Math.ceil(this.maxFrequencyHz / this.binHz));
 
+    this.workingWeight = new Float64Array(bins);
     this.gridSize = GRID_MAX_MIDI - GRID_MIN_MIDI + 1;
-    this.grid = new Float64Array(this.gridSize);
+    this.candidateHz = new Float64Array(this.gridSize);
+    for (let k = 0; k < this.gridSize; k++) {
+      this.candidateHz[k] = hzFromMidi(GRID_MIN_MIDI + k);
+    }
+    this.bassSalience = new Float64Array(this.gridSize);
+    this.fundamentalGrid = new Int32Array(MAX_FUNDAMENTALS);
+    this.fundamentalSalience = new Float64Array(MAX_FUNDAMENTALS);
     this.octaveFold = new Float64Array(12);
 
     this.harmonicWeights = new Float64Array(this.harmonics);
@@ -235,24 +298,36 @@ export class ChromaAnalyzer {
     if (!(maxMagnitude > 0)) return silentResult();
 
     const salience = this.computeSalience();
+    // Too flat to be an instrument: report the tonality, but no notes.
+    if (salience < MIN_TONAL_SALIENCE) return untonalResult(salience);
+
     this.whiten(maxMagnitude);
     this.collectPeaks();
-    if (this.peakCount === 0) {
-      return { chroma: new Float32Array(12), bassPitchClass: null, bassFrequencyHz: null, salience, polyphony: 0 };
+    if (this.peakCount === 0) return untonalResult(salience);
+
+    // The bass is read off the untouched peaks, before cancellation eats them.
+    this.resetWorkingWeights();
+    const bassGrid = this.findBass();
+    let bassFrequencyHz: number | null = null;
+    let bassPitchClass: number | null = null;
+    if (bassGrid >= 0) {
+      const gridHz = this.candidateHz[bassGrid]!;
+      const own = this.strongestPartialNear(gridHz);
+      // Report what was measured, but name the note from the grid: below ~150Hz
+      // a peak's measured frequency can round to the wrong semitone outright.
+      bassFrequencyHz = own >= 0 ? this.peakHz[own]! : gridHz;
+      bassPitchClass = (((GRID_MIN_MIDI + bassGrid) % 12) + 12) % 12;
     }
 
-    const chroma = this.foldToChroma();
-    const bassIndex = this.findBass();
-    const bassFrequencyHz = bassIndex < 0 ? null : this.peakHz[bassIndex]!;
-    const bassPitchClass =
-      bassFrequencyHz === null ? null : pitchClassOfHz(bassFrequencyHz);
+    const fundamentals = this.estimateFundamentals();
+    const chroma = this.foldToChroma(fundamentals);
 
     return {
       chroma,
       bassPitchClass,
       bassFrequencyHz,
       salience,
-      polyphony: countChromaPeaks(chroma),
+      polyphony: fundamentals,
     };
   }
 
@@ -365,52 +440,157 @@ export class ChromaAnalyzer {
       kept++;
     }
     this.peakCount = kept;
+
+    let maxWeight = 0;
+    for (let p = 0; p < kept; p++) {
+      const w = this.peakWeight[p]!;
+      if (w > maxWeight) maxWeight = w;
+    }
+    this.presenceThreshold = maxWeight * PRESENCE_RATIO;
   }
 
   /**
-   * Sub-harmonic summation: every peak votes for f/h as a fundamental, with a
-   * decaying weight, spread across the two nearest semitones by a cos^2 window
-   * (a partition of unity, so no energy is created or lost). The semitone grid
-   * is then folded to 12 pitch classes.
+   * Iterative harmonic cancellation.
+   *
+   * Every semitone on the grid is scored by summing the whitened partials at
+   * its own harmonics. The winner is recorded, *its* partials are attenuated,
+   * and the grid is rescored — so a partial can only be claimed once. Without
+   * this, a plain sub-harmonic fold reads G3's third harmonic (D5) as a D, and
+   * C3's fifth harmonic (E5) as an E, and a C5 power chord comes out looking
+   * like Cmaj9. Repeats until the field falls away or six strings are used up.
+   *
+   * Octave errors are harmless here: C2 and C3 land in the same pitch class.
+   * Fifth-below ghosts are what cancellation actually buys.
+   *
+   * Returns the number of fundamentals written to `fundamentalGrid`.
    */
-  private foldToChroma(): Float32Array {
-    this.grid.fill(0);
+  private estimateFundamentals(): number {
+    this.resetWorkingWeights();
 
-    for (let p = 0; p < this.peakCount; p++) {
-      const hz = this.peakHz[p]!;
-      const weight = this.peakWeight[p]!;
-      if (!(weight > 0)) continue;
+    let found = 0;
+    let firstSalience = 0;
 
-      for (let h = 1; h <= this.harmonics; h++) {
-        const fundamental = hz / h;
-        if (fundamental < this.minFrequencyHz) break;
-
-        const midi = midiFromHz(fundamental) - GRID_MIN_MIDI;
-        if (midi < -0.5 || midi > this.gridSize - 0.5) continue;
-
-        const contribution = weight * this.harmonicWeights[h - 1]!;
-        const lower = Math.floor(midi);
-        const fraction = midi - lower;
-        // cos^2(pi/2 * d) + cos^2(pi/2 * (1 - d)) === 1.
-        const lowerShare = Math.cos((Math.PI / 2) * fraction) ** 2;
-        if (lower >= 0 && lower < this.gridSize) {
-          this.grid[lower] = this.grid[lower]! + contribution * lowerShare;
-        }
-        const upper = lower + 1;
-        if (upper >= 0 && upper < this.gridSize) {
-          this.grid[upper] = this.grid[upper]! + contribution * (1 - lowerShare);
+    for (let iteration = 0; iteration < MAX_FUNDAMENTALS; iteration++) {
+      let bestIndex = -1;
+      let bestSalience = 0;
+      for (let k = 0; k < this.gridSize; k++) {
+        const salience = this.salienceOf(this.candidateHz[k]!);
+        if (salience > bestSalience) {
+          bestSalience = salience;
+          bestIndex = k;
         }
       }
+      if (bestIndex < 0) break;
+      if (iteration === 0) firstSalience = bestSalience;
+      else if (bestSalience < firstSalience * FUNDAMENTAL_STOP_RATIO) break;
+
+      this.fundamentalGrid[found] = bestIndex;
+      this.fundamentalSalience[found] = bestSalience;
+      found++;
+      this.cancel(this.candidateHz[bestIndex]!);
+    }
+    return found;
+  }
+
+  /**
+   * Harmonic-sum salience of a candidate fundamental: how much surviving
+   * whitened energy sits at f, 2f, 3f... A candidate needs at least
+   * `MIN_HARMONIC_SUPPORT` of its own harmonics before it counts at all, which
+   * is what stops a lone noise peak from becoming a note.
+   */
+  private salienceOf(fundamentalHz: number): number {
+    let sum = 0;
+    let support = 0;
+    for (let h = 1; h <= this.harmonics; h++) {
+      const target = fundamentalHz * h;
+      if (target > this.maxFrequencyHz) break;
+      const index = this.strongestPartialNear(target);
+      if (index < 0) continue;
+      const weight = this.workingWeight[index]!;
+      if (weight < this.presenceThreshold) continue;
+      support++;
+      sum += weight * this.harmonicWeights[h - 1]!;
+    }
+    return support >= MIN_HARMONIC_SUPPORT ? sum : 0;
+  }
+
+  /** Restores every peak's weight, undoing any cancellation. */
+  private resetWorkingWeights(): void {
+    for (let p = 0; p < this.peakCount; p++) {
+      this.workingWeight[p] = this.peakWeight[p]!;
+    }
+  }
+
+  /**
+   * Attenuates the partials a detected fundamental explains.
+   *
+   * Reaches further up the series than `salienceOf` sums: a note explains every
+   * one of its harmonics in band, not just the few that were worth scoring. Cut
+   * this short and the leftovers grow phantoms — G3's sixth harmonic, left
+   * standing, is enough to support a D5 that nobody played.
+   */
+  private cancel(fundamentalHz: number): void {
+    for (let h = 1; h <= CANCELLATION_HARMONICS; h++) {
+      const target = fundamentalHz * h;
+      if (target > this.maxFrequencyHz) break;
+      const index = this.strongestPartialNear(target);
+      if (index < 0) continue;
+      // Flat, not scaled by the harmonic weight: a partial sitting on h*f is
+      // explained by this fundamental whatever the sum happened to pay for it.
+      this.workingWeight[index] = this.workingWeight[index]! * (1 - CANCELLATION_STRENGTH);
+    }
+  }
+
+  /** Half-width of the window that counts as "sitting on" `hz`, in Hz. */
+  private toleranceHz(hz: number): number {
+    return Math.max(
+      this.binHz * HARMONIC_MATCH_BINS,
+      hz * (Math.pow(2, HARMONIC_MATCH_CENTS / 1200) - 1)
+    );
+  }
+
+  /**
+   * Index of the strongest surviving peak sitting on `hz`, or -1. Peaks are
+   * ascending, so the window is found by binary search.
+   */
+  private strongestPartialNear(hz: number): number {
+    const tolerance = this.toleranceHz(hz);
+    return this.strongestPartialInRange(hz - tolerance, hz + tolerance);
+  }
+
+  /** Index of the strongest surviving peak in `[low, high]` Hz, or -1. */
+  private strongestPartialInRange(low: number, high: number): number {
+    let left = 0;
+    let right = this.peakCount;
+    while (left < right) {
+      const mid = (left + right) >> 1;
+      if (this.peakHz[mid]! < low) left = mid + 1;
+      else right = mid;
     }
 
+    let best = -1;
+    let bestWeight = 0;
+    for (let p = left; p < this.peakCount; p++) {
+      if (this.peakHz[p]! > high) break;
+      const weight = this.workingWeight[p]!;
+      if (weight > bestWeight) {
+        bestWeight = weight;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  /** Folds the detected fundamentals into 12 normalised pitch classes. */
+  private foldToChroma(fundamentals: number): Float32Array {
     const chroma = new Float32Array(12);
     this.octaveFold.fill(0);
-    for (let k = 0; k < this.gridSize; k++) {
-      const value = this.grid[k]!;
-      if (value <= 0) continue;
-      const pitchClass = (((GRID_MIN_MIDI + k) % 12) + 12) % 12;
+
+    for (let f = 0; f < fundamentals; f++) {
+      const midi = GRID_MIN_MIDI + this.fundamentalGrid[f]!;
+      const pitchClass = (((midi % 12) + 12) % 12);
       this.octaveFold[pitchClass] =
-        this.octaveFold[pitchClass]! + Math.pow(value, OCTAVE_FOLD_POWER);
+        this.octaveFold[pitchClass]! + Math.pow(this.fundamentalSalience[f]!, OCTAVE_FOLD_POWER);
     }
     for (let i = 0; i < 12; i++) {
       chroma[i] = Math.pow(this.octaveFold[i]!, 1 / OCTAVE_FOLD_POWER);
@@ -430,50 +610,66 @@ export class ChromaAnalyzer {
   }
 
   /**
-   * The lowest peak that is plausibly a fundamental rather than somebody
-   * else's overtone: strong enough, and with at least two of its own harmonics
-   * actually present in the spectrum.
+   * The lowest note actually being played, as a grid index, or -1.
+   *
+   * Scored on grid semitones rather than on raw peak frequencies: a low peak's
+   * measured frequency is off by up to most of a semitone at this resolution,
+   * and predicting its harmonics as h * (that error) misses every one of them.
+   * The grid frequency is exact, so only the *partials* need to be found — and
+   * those sit high enough to be measured well.
+   *
+   * A candidate has to clear three bars: its own fundamental is visible (which
+   * rules out the octave-below ghost, whose partials are all real but whose
+   * fundamental is silent), at least two harmonics support it, and its salience
+   * is comparable to the best in the low register (which rules out body
+   * resonance and string noise). The lowest survivor wins.
    */
   private findBass(): number {
-    let maxWeight = 0;
-    for (let p = 0; p < this.peakCount; p++) {
-      const w = this.peakWeight[p]!;
-      if (w > maxWeight) maxWeight = w;
+    let last = 0;
+    let bestSalience = 0;
+    for (let k = 0; k < this.gridSize; k++) {
+      if (this.candidateHz[k]! > BASS_MAX_FREQUENCY_HZ) break;
+      const salience = this.bassSalienceOf(this.candidateHz[k]!);
+      this.bassSalience[k] = salience;
+      if (salience > bestSalience) bestSalience = salience;
+      last = k;
     }
-    if (maxWeight <= 0) return -1;
+    if (bestSalience <= 0) return -1;
 
-    const minWeight = maxWeight * BASS_MIN_WEIGHT_RATIO;
-    let fallback = -1;
-
-    for (let p = 0; p < this.peakCount; p++) {
-      const hz = this.peakHz[p]!;
-      if (hz > BASS_MAX_FREQUENCY_HZ) break;
-      if (this.peakWeight[p]! < minWeight) continue;
-
-      let support = 0;
-      for (let h = 2; h <= 4; h++) {
-        if (this.hasPartialNear(hz * h)) support++;
-      }
-      if (support >= BASS_MIN_HARMONIC_SUPPORT) return p;
-      if (fallback < 0 && support >= 1 && this.peakWeight[p]! >= maxWeight * 0.35) {
-        fallback = p;
-      }
+    // Lowest *local maximum* over the threshold. Plain "lowest over the
+    // threshold" lands a semitone flat: below ~150Hz a peak's tolerance window
+    // is wider than a semitone, so the grid point below the real note sees the
+    // same partial and, being lower, always won.
+    const threshold = bestSalience * BASS_SALIENCE_RATIO;
+    for (let k = 0; k <= last; k++) {
+      const salience = this.bassSalience[k]!;
+      if (salience < threshold) continue;
+      if (k > 0 && this.bassSalience[k - 1]! > salience) continue;
+      if (k < last && this.bassSalience[k + 1]! > salience) continue;
+      return k;
     }
-    return fallback;
+    return -1;
   }
 
-  /** Is there a surviving peak within `BASS_HARMONIC_TOLERANCE_CENTS` of `hz`? */
-  private hasPartialNear(hz: number): boolean {
-    if (hz > this.maxFrequencyHz) return false;
-    const ratio = Math.pow(2, BASS_HARMONIC_TOLERANCE_CENTS / 1200);
-    const lo = hz / ratio;
-    const hi = hz * ratio;
-    for (let p = 0; p < this.peakCount; p++) {
-      const f = this.peakHz[p]!;
-      if (f > hi) return false;
-      if (f >= lo) return true;
-    }
-    return false;
+  /**
+   * Harmonic salience of a bass candidate; zero unless its own fundamental is
+   * really there.
+   *
+   * The own-note window is tighter than the harmonic window on purpose. "A
+   * partial sits near h*f" is a weak claim and wants slack; "this peak *is* the
+   * note" is a strong one and must not be satisfied by the neighbour. At the
+   * loose width, B2's window reaches C3, so every C chord with a B in it
+   * reported a bass of B.
+   */
+  private bassSalienceOf(fundamentalHz: number): number {
+    if (fundamentalHz < this.minFrequencyHz) return 0;
+    const tolerance = Math.max(
+      this.binHz * BASS_OWN_PEAK_BINS,
+      fundamentalHz * (Math.pow(2, BASS_OWN_PEAK_CENTS / 1200) - 1)
+    );
+    const own = this.strongestPartialInRange(fundamentalHz - tolerance, fundamentalHz + tolerance);
+    if (own < 0 || this.workingWeight[own]! < this.presenceThreshold) return 0;
+    return this.salienceOf(fundamentalHz);
   }
 }
 
@@ -482,29 +678,16 @@ export class ChromaAnalyzer {
 /* -------------------------------------------------------------------------- */
 
 function silentResult(): ChromaResult {
+  return untonalResult(0);
+}
+
+/** No notes found, but the measured tonality is still worth reporting. */
+function untonalResult(salience: number): ChromaResult {
   return {
     chroma: new Float32Array(12),
     bassPitchClass: null,
     bassFrequencyHz: null,
-    salience: 0,
+    salience,
     polyphony: 0,
   };
-}
-
-function pitchClassOfHz(hz: number): number {
-  const midi = Math.round(midiFromHz(hz));
-  return (((midi % 12) + 12) % 12);
-}
-
-/** Circular local maxima of the normalised chroma above `POLYPHONY_THRESHOLD`. */
-function countChromaPeaks(chroma: Float32Array): number {
-  let count = 0;
-  for (let i = 0; i < 12; i++) {
-    const value = chroma[i]!;
-    if (value < POLYPHONY_THRESHOLD) continue;
-    const previous = chroma[(i + 11) % 12]!;
-    const next = chroma[(i + 1) % 12]!;
-    if (value > previous && value >= next) count++;
-  }
-  return count;
 }

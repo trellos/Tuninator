@@ -49,28 +49,45 @@ export type ChordMatch = {
   margin: number;
 };
 
+/*
+ * Template weights, in descending order of importance.
+ *
+ * Scoring is a cosine, so a weight is symmetric: a tone that is *present* in the
+ * chroma earns a candidate that much, and a tone that is *missing* costs it that
+ * much through the template's norm. That symmetry is what actually separates
+ * "C" from "Cmaj7" on a chroma with no B in it, so the shared tones are
+ * deliberately identical across qualities — only the extra tone moves.
+ */
+const W_ROOT = 1;
+const W_THIRD = 0.95;
+const W_FIFTH = 0.8;
+const W_SEVENTH = 0.75;
+/** Ninths and elevenths: real chord tones, but the last ones a player drops. */
+const W_EXTENSION = 0.7;
+/** A power chord's fifth carries more, because it is all there is. */
+const W_POWER_FIFTH = 0.8;
+const W_SUS_TONE = 0.8;
+const W_SUS_FIFTH = 0.85;
+
 /**
  * Weighted pitch-class templates, one entry per quality.
  *
- * Index is semitones above the root, so index 0 is always the root. Weights are
- * importance, not loudness: the triad carries the identity, extensions colour
- * it. Because scoring is a cosine, a heavy weight on a tone that is *absent*
- * from the chroma costs the candidate as much as a present one earns it — so
- * extension weights are deliberately modest, and the "5" template is deliberately
- * bare. A power chord has no third; that absence is the whole identity.
+ * Index is semitones above the root, so index 0 is always the root. The "5"
+ * template is deliberately bare: a power chord has no third, and that absence
+ * is the whole identity.
  */
 export const CHORD_TEMPLATES: Readonly<Record<ChordQuality, readonly number[]>> = {
-  //           1     b2   2     b3    3     4     b5   5     #5   6     b7    7
-  "5":       [1.0,  0,   0,    0,    0,    0,    0,   0.9,  0,   0,    0,    0   ],
-  maj:       [1.0,  0,   0,    0,    0.85, 0,    0,   0.8,  0,   0,    0,    0   ],
-  min:       [1.0,  0,   0,    0.85, 0,    0,    0,   0.8,  0,   0,    0,    0   ],
-  "7":       [1.0,  0,   0,    0,    0.8,  0,    0,   0.7,  0,   0,    0.65, 0   ],
-  m7:        [1.0,  0,   0,    0.8,  0,    0,    0,   0.7,  0,   0,    0.65, 0   ],
-  maj7:      [1.0,  0,   0,    0,    0.8,  0,    0,   0.7,  0,   0,    0,    0.6 ],
-  maj9:      [1.0,  0,   0.55, 0,    0.8,  0,    0,   0.65, 0,   0,    0,    0.6 ],
-  m11:       [1.0,  0,   0,    0.8,  0,    0.55, 0,   0.65, 0,   0,    0.6,  0   ],
-  sus2:      [1.0,  0,   0.8,  0,    0,    0,    0,   0.85, 0,   0,    0,    0   ],
-  sus4:      [1.0,  0,   0,    0,    0,    0.8,  0,   0.85, 0,   0,    0,    0   ],
+  //      1        b2  2             b3       3        4             b5  5              #5  6  b7           7
+  "5":   [W_ROOT,  0,  0,            0,       0,       0,            0,  W_POWER_FIFTH, 0,  0, 0,           0          ],
+  maj:   [W_ROOT,  0,  0,            0,       W_THIRD, 0,            0,  W_FIFTH,       0,  0, 0,           0          ],
+  min:   [W_ROOT,  0,  0,            W_THIRD, 0,       0,            0,  W_FIFTH,       0,  0, 0,           0          ],
+  "7":   [W_ROOT,  0,  0,            0,       W_THIRD, 0,            0,  W_FIFTH,       0,  0, W_SEVENTH,   0          ],
+  m7:    [W_ROOT,  0,  0,            W_THIRD, 0,       0,            0,  W_FIFTH,       0,  0, W_SEVENTH,   0          ],
+  maj7:  [W_ROOT,  0,  0,            0,       W_THIRD, 0,            0,  W_FIFTH,       0,  0, 0,           W_SEVENTH  ],
+  maj9:  [W_ROOT,  0,  W_EXTENSION,  0,       W_THIRD, 0,            0,  W_FIFTH,       0,  0, 0,           W_SEVENTH  ],
+  m11:   [W_ROOT,  0,  0,            W_THIRD, 0,       W_EXTENSION,  0,  W_FIFTH,       0,  0, W_SEVENTH,   0          ],
+  sus2:  [W_ROOT,  0,  W_SUS_TONE,   0,       0,       0,            0,  W_SUS_FIFTH,   0,  0, 0,           0          ],
+  sus4:  [W_ROOT,  0,  0,            0,       0,       W_SUS_TONE,   0,  W_SUS_FIFTH,   0,  0, 0,           0          ],
 };
 
 /** Sharp-spelled, indexed by pitch-class number. 0 = C. */

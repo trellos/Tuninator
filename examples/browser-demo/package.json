@@ -1,0 +1,27 @@
+{
+  "name": "tuninator-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vite browser demo for the tuninator guitar-analysis library: scrolling note timeline, 90bpm metronome, live tuner readout.",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:live": "node scripts/smoke.mjs --live"
+  },
+  "dependencies": {
+    "tuninator": "file:../Tuninator"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "playwright-core": "^1.56.1",
+    "typescript": "^5.7.2",
+    "vite": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
