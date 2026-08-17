@@ -304,6 +304,35 @@ Abstentions are **not** counted as wrong answers; they are reported separately. 
 denominator is labels in scope minus abstentions, so a detector cannot win by staying quiet on the
 hard notes — a missed label still counts against it.
 
+Per-chord, measured across 866 analysis frames of the recorded fixtures — **45.2%
+confident-correct, 9.9% confident-wrong, 44.9% `unknown`**:
+
+| Chord | Result |
+|---|---|
+| A5, E5 | 100%, 97% correct |
+| C5, D5, G5 | 81/69%, 78%, 47% correct (G5 abstains 47% of the time) |
+| Am, Em, C | 100%, 92/75%, 78/72% correct |
+| G | 42% correct, plus 25% read as `G5` |
+| **F#5** | **42% correct, but 44% confidently `E5`** |
+| **D** | **0% — 92% `unknown` on the first pass, 56% confidently `D5` on the second** |
+| Cmaj9 | 100% `unknown` (best score 0.794, margin 0.027 — just inside the abstention rule) |
+| Am11 | 90% `unknown`, 10% `Am` (the parent triad) |
+
+Two of these are real defects rather than honest abstention, and are worth knowing about:
+
+- **F#5 is confidently mislabelled `E5`.** Bass detection splits 47/42 between F# and E, and the
+  chord label follows whichever the bass picked.
+- **D major is never identified.** Its F#4 third — high E string, 2nd fret — decays below the
+  peak floor about 250ms in, so the third is genuinely absent from the spectrum and the chord
+  reads as `D5` or `unknown`.
+
+The `G → G5` and `Em → E5` confusions share that root cause: guitar voicings sound the third once
+while doubling the root and fifth, so a decayed third makes any triad look like a power chord.
+
+`Cmaj9` and `Am11` abstaining is the **expected** outcome, not a defect. The `x32430` voicing
+sounds E twice and never sounds G, so the chroma contains neither a root nor a fifth and the bass
+is the only evidence for C. Abstaining is the correct answer there.
+
 ### The labels are estimates, and the eval says so
 
 The fixture labels state their own uncertainty: *"Octaves are first-pass estimates; pitch-class
