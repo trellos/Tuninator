@@ -33,13 +33,19 @@ export type YinResult = {
 const DEFAULT_THRESHOLD = 0.13;
 
 /**
- * Sub-harmonic (octave-down) guard. If the CMND at half the chosen lag is
- * within this fraction of the CMND at the chosen lag, the half lag describes
- * essentially the same periodicity and is the true period: prefer it.
+ * Sub-harmonic (octave-down) guard tolerance, ~15%.
  *
- * Deliberately a *relative* tolerance. An absolute one (`cmnd[t/2] - cmnd[t] <=
- * 0.15`) fires on lags that are an order of magnitude less periodic and causes
- * exactly the octave-*up* errors this detector is trying to avoid.
+ * The half lag wins if it is either within this fraction of the chosen lag's
+ * CMND, or within this fraction of the absolute threshold — i.e. it is a dip
+ * that only just failed to be accepted. The second clause is the one that
+ * matters in practice: a note whose alternate periods differ slightly (uneven
+ * picking, a beating pair of strings) leaves `cmnd[T]` just above threshold
+ * while `cmnd[2T]` is ~0, so the first dip lands an octave down.
+ *
+ * Both clauses are deliberately bounded near the threshold. A plain absolute
+ * tolerance (`cmnd[t/2] - cmnd[t] <= 0.15`) would also fire on half lags that
+ * are far *less* periodic, causing the octave-*up* errors this detector is
+ * mainly trying to avoid.
  */
 const SUBHARMONIC_TOLERANCE = 0.15;
 
@@ -194,14 +200,28 @@ export class YinDetector {
     }
 
     /* --- 5. Sub-harmonic guard: prefer the higher octave ------------------- */
-    // A strong 2nd harmonic can make the true period's dip merely *good* while
-    // the octave-down lag dips slightly lower. If half the lag is essentially
-    // as periodic, half the lag is the real period.
+    // If half the chosen lag is essentially as periodic, half the lag is the
+    // real period and the dip we landed on is its sub-harmonic.
+    const tolerance = 1 + SUBHARMONIC_TOLERANCE;
     for (let step = 0; step < MAX_SUBHARMONIC_STEPS; step++) {
-      const halfTau = Math.round(tau / 2);
-      if (halfTau < minTau) break;
-      if (cmnd[halfTau]! > cmnd[tau]! * (1 + SUBHARMONIC_TOLERANCE)) break;
-      tau = halfTau;
+      // `tau` is often odd, and a dip one sample wide is easy to miss by
+      // rounding, so take the best of the three lags bracketing tau/2.
+      let candidate = Math.round(tau / 2);
+      if (candidate < minTau) break;
+
+      let candidateCmnd = cmnd[candidate]!;
+      for (let t = Math.max(minTau, candidate - 1); t <= Math.min(maxTau, candidate + 1); t++) {
+        if (cmnd[t]! < candidateCmnd) {
+          candidateCmnd = cmnd[t]!;
+          candidate = t;
+        }
+      }
+
+      const asGoodAsChosen = candidateCmnd <= cmnd[tau]! * tolerance;
+      const nearlyAccepted = candidateCmnd <= threshold * tolerance;
+      if (!asGoodAsChosen && !nearlyAccepted) break;
+
+      tau = candidate;
     }
 
     /* --- 6. Parabolic interpolation ---------------------------------------- */

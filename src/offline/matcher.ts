@@ -520,7 +520,9 @@ export type EvalStats = {
 
   /** Matched detections that said "unknown". Honest abstention, not an error. */
   abstainedCount: number;
-  /** Abstentions as a fraction of matched detections. */
+  /** Every detection that said "unknown", matched or not. */
+  unknownDetectionCount: number;
+  /** `unknownDetectionCount / detectionCount` — the honest-abstention rate. */
   abstentionRate: number | null;
 
   /** Labels that actually got a committed answer — the accuracy denominator. */
@@ -569,6 +571,9 @@ export function scoreMatches(result: MatchResult, options: ScoreOptions = {}): E
   const decided = result.matches.filter((m) => !m.abstained);
   const abstainedCount = result.matches.length - decided.length;
   const scoredLabelCount = labelCount - abstainedCount;
+  const unknownDetectionCount =
+    abstainedCount +
+    result.falsePositives.filter((f) => isAbstentionLabel(f.detection.label.name)).length;
 
   const exactCorrect = decided.filter((m) => m.agreement.exact).length;
   const pitchClassCorrect = decided.filter((m) => m.agreement.pitchClass).length;
@@ -609,9 +614,8 @@ export function scoreMatches(result: MatchResult, options: ScoreOptions = {}): E
     falsePositiveCount: result.falsePositives.length,
 
     abstainedCount,
-    abstentionRate: result.matches.length > 0
-      ? abstainedCount / result.matches.length
-      : null,
+    unknownDetectionCount,
+    abstentionRate: detectionCount > 0 ? unknownDetectionCount / detectionCount : null,
 
     scoredLabelCount,
     exactCorrect,

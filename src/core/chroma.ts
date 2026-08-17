@@ -90,6 +90,29 @@ const BASS_HARMONIC_TOLERANCE_CENTS = 55;
 /** Harmonics of h = 2..4 that must be present before a peak can be the bass. */
 const BASS_MIN_HARMONIC_SUPPORT = 2;
 
+/**
+ * Exponent of the generalised mean used to fold octaves into a pitch class.
+ *
+ * 1 is a plain sum, higher tends towards a max. Guitar voicings double the root
+ * and fifth across strings and play the third once (open Em is E2 B2 E3 G3 B3
+ * E4 — three E's, two B's, one G), so a plain sum makes every triad look like a
+ * power chord. Combining octaves as an L-p norm lets a doubled note count for
+ * more than a single one without counting for twice as much.
+ */
+const OCTAVE_FOLD_POWER = 2;
+
+/**
+ * Contrast exponent applied to the normalised chroma.
+ *
+ * Sub-harmonic summation leaves a haze of overtone leakage in the non-chord
+ * bins (a C5 power chord picks up D from G3's third harmonic and E from C3's
+ * fifth). Without this the whole chord dictionary scores within ~0.01 of the
+ * right answer and *everything* fails the margin rule. Raising the chroma to a
+ * power leaves max = 1 and the ranking intact, but pushes the leakage down so
+ * the margin measures something real.
+ */
+const CHROMA_CONTRAST = 2;
+
 /** Chroma bins at or above this fraction of the max count towards polyphony. */
 const POLYPHONY_THRESHOLD = 0.45;
 
@@ -129,6 +152,7 @@ export class ChromaAnalyzer {
 
   private readonly grid: Float64Array;
   private readonly gridSize: number;
+  private readonly octaveFold: Float64Array;
   private readonly harmonicWeights: Float64Array;
 
   private readonly binHz: number;
@@ -176,6 +200,7 @@ export class ChromaAnalyzer {
 
     this.gridSize = GRID_MAX_MIDI - GRID_MIN_MIDI + 1;
     this.grid = new Float64Array(this.gridSize);
+    this.octaveFold = new Float64Array(12);
 
     this.harmonicWeights = new Float64Array(this.harmonics);
     for (let h = 0; h < this.harmonics; h++) {
@@ -379,11 +404,16 @@ export class ChromaAnalyzer {
     }
 
     const chroma = new Float32Array(12);
+    this.octaveFold.fill(0);
     for (let k = 0; k < this.gridSize; k++) {
       const value = this.grid[k]!;
       if (value <= 0) continue;
       const pitchClass = (((GRID_MIN_MIDI + k) % 12) + 12) % 12;
-      chroma[pitchClass] = chroma[pitchClass]! + value;
+      this.octaveFold[pitchClass] =
+        this.octaveFold[pitchClass]! + Math.pow(value, OCTAVE_FOLD_POWER);
+    }
+    for (let i = 0; i < 12; i++) {
+      chroma[i] = Math.pow(this.octaveFold[i]!, 1 / OCTAVE_FOLD_POWER);
     }
 
     let max = 0;
@@ -392,7 +422,9 @@ export class ChromaAnalyzer {
       if (v > max) max = v;
     }
     if (max > 0) {
-      for (let i = 0; i < 12; i++) chroma[i] = chroma[i]! / max;
+      for (let i = 0; i < 12; i++) {
+        chroma[i] = Math.pow(chroma[i]! / max, CHROMA_CONTRAST);
+      }
     }
     return chroma;
   }
