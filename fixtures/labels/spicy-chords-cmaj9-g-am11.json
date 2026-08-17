@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "title": "Spicy chords Cmaj9 G Am11",
+  "sourceAudio": "../audio/Spicy Chords Cmaj9 G Am11.m4a.mp4",
+  "instrument": "guitar-clean",
+  "timingNotes": "Waveform-estimated chord starts: Cmaj9 at 5180ms, G at 9230ms, Am11 at 13840ms.",
+  "events": [
+    { "id": "sp1", "startMs": 5180, "endMs": 8880, "kind": "chord", "label": "Cmaj9", "pitches": ["C3", "E3", "B3", "D4", "E4"], "voicing": "x32430", "required": true },
+    { "id": "sp2", "startMs": 9230, "endMs": 12930, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "sp3", "startMs": 13840, "endMs": 20550, "kind": "chord", "label": "Am11", "pitches": ["A2", "G3", "C4", "D4", "E4"], "voicing": "x05530", "required": true }
+  ]
+}

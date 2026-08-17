@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "title": "Cowboy chords C D Em G C D Em Am 120bpm",
+  "sourceAudio": "../audio/Cowboy  chords C D Em G C D Em Am 120bpm.m4a.mp4",
+  "instrument": "guitar-clean",
+  "tempoBpm": 120,
+  "timingNotes": "First attack estimated at 4550ms. Chords are labeled as one 4/4 bar each at 120bpm.",
+  "events": [
+    { "id": "c1", "startMs": 4550, "endMs": 6550, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
+    { "id": "c2", "startMs": 6550, "endMs": 8550, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c3", "startMs": 8550, "endMs": 10550, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c4", "startMs": 10550, "endMs": 12550, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c5", "startMs": 12550, "endMs": 14550, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
+    { "id": "c6", "startMs": 14550, "endMs": 16550, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c7", "startMs": 16550, "endMs": 18550, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c8", "startMs": 18550, "endMs": 20550, "kind": "chord", "label": "Am", "pitches": ["A2", "E3", "A3", "C4", "E4"], "required": true }
+  ]
+}

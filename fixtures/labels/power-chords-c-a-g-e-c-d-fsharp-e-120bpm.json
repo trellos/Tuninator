@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "title": "Power chords C A G E C D F# E 120bpm",
+  "sourceAudio": "../audio/Power Cords C A G E C D F# E 120bpm.m4a.mp4",
+  "instrument": "guitar-clean",
+  "tempoBpm": 120,
+  "timingNotes": "First attack estimated at 5100ms. Chords are labeled as one 4/4 bar each at 120bpm.",
+  "events": [
+    { "id": "p1", "startMs": 5100, "endMs": 7100, "kind": "chord", "label": "C5", "pitches": ["C3", "G3", "C4"], "required": true },
+    { "id": "p2", "startMs": 7100, "endMs": 9100, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p3", "startMs": 9100, "endMs": 11100, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p4", "startMs": 11100, "endMs": 13100, "kind": "chord", "label": "E5", "pitches": ["E2", "B2", "E3"], "required": true },
+    { "id": "p5", "startMs": 13100, "endMs": 15100, "kind": "chord", "label": "C5", "pitches": ["C3", "G3", "C4"], "required": true },
+    { "id": "p6", "startMs": 15100, "endMs": 17100, "kind": "chord", "label": "D5", "pitches": ["D3", "A3", "D4"], "required": true },
+    { "id": "p7", "startMs": 17100, "endMs": 19100, "kind": "chord", "label": "F#5", "pitches": ["F#2", "C#3", "F#3"], "required": true },
+    { "id": "p8", "startMs": 19100, "endMs": 20750, "kind": "chord", "label": "E5", "pitches": ["E2", "B2", "E3"], "required": true }
+  ]
+}
