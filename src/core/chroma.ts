@@ -177,7 +177,6 @@ export class ChromaAnalyzer {
   /** Number of samples `analyze()` expects. Equals `fftSize`. */
   readonly windowSize: number;
 
-  private readonly sampleRate: number;
   private readonly minFrequencyHz: number;
   private readonly maxFrequencyHz: number;
   private readonly harmonics: number;
@@ -222,7 +221,6 @@ export class ChromaAnalyzer {
     }
 
     this.windowSize = fftSize;
-    this.sampleRate = sampleRate;
     this.minFrequencyHz = Math.max(1, options.minFrequencyHz ?? DEFAULT_MIN_FREQUENCY_HZ);
     this.maxFrequencyHz = Math.min(
       options.maxFrequencyHz ?? DEFAULT_MAX_FREQUENCY_HZ,
