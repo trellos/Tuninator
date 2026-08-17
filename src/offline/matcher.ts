@@ -256,7 +256,17 @@ export function compareLabels(label: LabeledEvent, detection: DetectedEvent): La
 /** A detection whose onset is within this of a label's onset is a candidate. */
 export const ONSET_WINDOW_MS = 300;
 
-/** Score weights. Onset proximity dominates; label agreement breaks ties. */
+/**
+ * Score weights. Onset proximity dominates; label agreement breaks ties.
+ *
+ * `W_IN_WINDOW` is larger than every other term combined, so a pair whose
+ * onsets actually line up always outranks a pair that merely overlaps. Without
+ * it, a long merged detection gets assigned to whichever label it happens to
+ * agree with — a 5s event covering D, Em and G matches the G three bars away,
+ * and the report claims a 3.8s timing error instead of the merge that really
+ * happened. Overlap-only pairing is the fallback for when nothing lines up.
+ */
+const W_IN_WINDOW = 4.0;
 const W_ONSET = 1.0;
 const W_LABEL = 0.75;
 const W_OVERLAP = 0.25;
@@ -331,7 +341,8 @@ export function matchEvents(
 
       const onsetDeltaMs = detection.startedAt - label.startMs;
       const overlap = overlapMs(label, detection);
-      const isCandidate = overlap > 0 || Math.abs(onsetDeltaMs) <= window;
+      const onsetAligned = Math.abs(onsetDeltaMs) <= window;
+      const isCandidate = overlap > 0 || onsetAligned;
       if (!isCandidate) continue;
 
       const agreement = compareLabels(label, detection);
@@ -350,7 +361,11 @@ export function matchEvents(
       pairs.push({
         labelIndex: li,
         detectionIndex: di,
-        score: W_ONSET * onsetScore + W_LABEL * labelScore + W_OVERLAP * overlapScore,
+        score:
+          (onsetAligned ? W_IN_WINDOW : 0) +
+          W_ONSET * onsetScore +
+          W_LABEL * labelScore +
+          W_OVERLAP * overlapScore,
         onsetDeltaMs,
         agreement,
       });

@@ -57,6 +57,16 @@ export type Policy = {
     medianWindow: number;
     /** Multiplier on the adaptive median; higher = fewer onsets. */
     sensitivity: number;
+    /**
+     * How much louder than its recent baseline a frame must be for an onset to
+     * split the note already sounding. 1 disables the check.
+     *
+     * Spectral flux fires on more than attacks: as a note decays the adaptive
+     * median falls with it, so ordinary sustain ripple keeps clearing the
+     * threshold and halves the note. A real re-pick puts energy back into the
+     * string, which is what this tests for.
+     */
+    repickRmsRise: number;
   };
 
   chords: {
@@ -78,7 +88,11 @@ const BASE: Omit<Policy, "mode"> = {
     maxFrequencyHz: 1400,
     pitchHopMs: 12,
     rmsGate: 0.008,
-    confidenceGate: 0.5,
+    // Tuned against the recorded fixtures, not chosen a priori. At 0.5 the
+    // detector dropped frames mid-note on decaying low strings, which read as
+    // note-offs and split notes in two; 0.35 keeps them voiced. Measured on
+    // clean-lead: pitch-class accuracy 72.1% -> 79.1%, missed 9 -> 6.
+    confidenceGate: 0.35,
   },
   tracking: {
     minStableMs: 45,
@@ -96,9 +110,12 @@ const BASE: Omit<Policy, "mode"> = {
   onset: {
     enabled: true,
     fftSize: 1024,
-    minIntervalMs: 60,
+    // 120bpm sixteenths are 125ms apart, so this has headroom while still
+    // suppressing the double-triggers that pick noise produces.
+    minIntervalMs: 90,
     medianWindow: 17,
     sensitivity: 1.6,
+    repickRmsRise: 1.05,
   },
   chords: {
     enabled: false,

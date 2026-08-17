@@ -48,6 +48,13 @@ const RING_CAPACITY = 8192;
 /** Run the (expensive) 4096-point chroma path once every N hops. */
 const CHORD_HOP_DIVISOR = 4;
 
+/**
+ * How close to a whole number of octaves a disagreement must be before it is
+ * treated as an octave error rather than two detectors seeing different notes.
+ * ~0.12 octaves is a little over a semitone.
+ */
+const OCTAVE_TOLERANCE = 0.12;
+
 export class PitchEngine {
   readonly sampleRate: number;
   /** Hop in samples, snapped to a whole number of 128-sample render quanta. */
@@ -265,6 +272,21 @@ export class PitchEngine {
     // zeros, which reads as a confident low pitch. Suppress rather than lie.
     const warmedUp = this.samplesWritten >= this.longWindow.length;
 
+    // Onset runs BEFORE pitch, because an attack invalidates the pitch history:
+    // the median buffer holds the previous note's frequencies, and letting them
+    // outvote the first frames of a new note delays its identity by up to
+    // `medianFrames` hops. On a 166ms triplet that lag is enough to push the
+    // event's dominant pitch onto the following note.
+    let onset = false;
+    let onsetFlux = 0;
+    if (policy.onset.enabled && warmedUp) {
+      this.readRecent(this.onsetWindow, this.onsetWindow.length);
+      const result = this.onsetDetector.process(this.onsetWindow, timestamp);
+      onset = result.isOnset && !gatedByAmplitude;
+      onsetFlux = result.flux;
+      if (onset) this.medianBuf.length = 0;
+    }
+
     let frequencyHz: number | null = null;
     let confidence = 0;
     let tau: number | null = null;
@@ -277,6 +299,8 @@ export class PitchEngine {
       this.readRecent(this.shortWindow, this.shortWindow.length);
       const short = this.yinShort.detect(this.shortWindow);
 
+      zeroCrossingHz = zeroCrossingRateHz(this.longWindow, this.sampleRate);
+
       // Prefer the short window when it is confident and high enough that its
       // window really does span two periods: ~7x better time resolution, which
       // is what makes 125ms sixteenths resolvable.
@@ -285,20 +309,58 @@ export class PitchEngine {
         short.frequencyHz >= policy.pitch.shortWindowMinHz &&
         short.confidence >= policy.analysis.confidenceGate;
 
-      const chosen = shortUsable ? short : long;
+      let chosen = shortUsable ? short : long;
+
+      // The two windows are independent witnesses, and they fail differently.
+      // The long window searches lags all the way down to minFrequencyHz, so on
+      // a high note its CMND dips at every multiple of the true period and it
+      // can lock onto one — E5 read as E2 is a real observed failure, a clean
+      // 8x. The short window's search range physically excludes those lags, so
+      // when the long window reports an exact octave-multiple BELOW the short
+      // one, the short one is the trustworthy witness.
+      if (
+        short.frequencyHz !== null &&
+        long.frequencyHz !== null &&
+        short.frequencyHz >= policy.pitch.shortWindowMinHz &&
+        chosen === long
+      ) {
+        const octaves = Math.log2(short.frequencyHz / long.frequencyHz);
+        const nearest = Math.round(octaves);
+        if (nearest >= 1 && Math.abs(octaves - nearest) < OCTAVE_TOLERANCE) {
+          chosen = short;
+        }
+      }
+
       frequencyHz = chosen.frequencyHz;
       confidence = chosen.confidence;
       tau = chosen.tau;
       cmnd = chosen.cmnd;
 
-      zeroCrossingHz = zeroCrossingRateHz(this.longWindow, this.sampleRate);
-
-      // Octave sanity. ZCR is crude but it fails in different ways than YIN, so
-      // a ~2x disagreement is real evidence that YIN halved or doubled.
+      // Zero crossing is crude, but it fails in different ways than YIN does,
+      // which is exactly what makes it usable as an arbiter. Rather than merely
+      // distrusting an octave disagreement, correct it: if the reading is an
+      // exact octave multiple away from the ZCR estimate, move it onto the
+      // octave ZCR supports. Halving confidence instead just pushed the frame
+      // under the gate, which read as a dropout and split the note in two.
+      //
+      // Only multi-octave gaps qualify. Zero crossing counts run HIGH on a
+      // harmonic-rich string, so a one-octave disagreement is genuinely
+      // ambiguous — acting on those turned correct readings into octave-up
+      // errors (C#5 reported as B5). A 3-octave gap has no such excuse.
       if (frequencyHz !== null && zeroCrossingHz > 0) {
-        const ratio = Math.log2(frequencyHz / zeroCrossingHz);
-        if (Math.abs(Math.abs(ratio) - 1) < 0.25) {
-          confidence *= 0.5;
+        const octaves = Math.log2(zeroCrossingHz / frequencyHz);
+        const nearest = Math.round(octaves);
+        if (Math.abs(nearest) >= 2 && Math.abs(octaves - nearest) < OCTAVE_TOLERANCE) {
+          const corrected = frequencyHz * Math.pow(2, nearest);
+          if (
+            corrected >= policy.analysis.minFrequencyHz &&
+            corrected <= policy.analysis.maxFrequencyHz
+          ) {
+            frequencyHz = corrected;
+            if (tau !== null) tau /= Math.pow(2, nearest);
+          } else {
+            confidence *= 0.5;
+          }
         }
       }
 
@@ -331,15 +393,6 @@ export class PitchEngine {
         effectiveSampleRate: this.sampleRate,
       },
     };
-
-    let onset = false;
-    let onsetFlux = 0;
-    if (policy.onset.enabled && warmedUp) {
-      this.readRecent(this.onsetWindow, this.onsetWindow.length);
-      const result = this.onsetDetector.process(this.onsetWindow, timestamp);
-      onset = result.isOnset && !gatedByAmplitude;
-      onsetFlux = result.flux;
-    }
 
     if (
       this.chromaAnalyzer &&

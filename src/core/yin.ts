@@ -118,7 +118,14 @@ export class YinDetector {
     this.cmnd = new Float64Array(halfWindow);
   }
 
-  /** `window.length` must equal `windowSize`. Allocation-free. */
+  /**
+   * `window.length` must equal `windowSize`.
+   *
+   * Allocation-free apart from the returned `YinResult`, which the fixed
+   * signature requires. Every buffer is preallocated in the constructor; a
+   * shared, mutated result object was rejected deliberately, because a caller
+   * that holds on to one frame's result would silently see the next frame's.
+   */
   detect(window: Float32Array): YinResult {
     if (window.length !== this.windowSize) {
       throw new Error(

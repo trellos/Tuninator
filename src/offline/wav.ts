@@ -176,9 +176,13 @@ export function writeWav(samples: Float32Array, sampleRate: number): Uint8Array 
   writeAscii(36, "data");
   view.setUint32(40, dataLength, true);
 
+  // Scale by 32768 — the exact inverse of the reader — then clamp into int16.
+  // Scaling by 32767 on the way out would make the round trip lossy by a whole
+  // extra LSB, which would show up as noise in anything this writes back.
   for (let i = 0; i < samples.length; i++) {
     const clamped = Math.max(-1, Math.min(1, samples[i] as number));
-    view.setInt16(44 + i * 2, Math.round(clamped * 32767), true);
+    const scaled = Math.max(-32768, Math.min(32767, Math.round(clamped * 32768)));
+    view.setInt16(44 + i * 2, scaled, true);
   }
 
   return new Uint8Array(buffer);

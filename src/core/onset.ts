@@ -32,16 +32,38 @@ export type OnsetResult = {
 };
 
 /**
- * Absolute lower bound on the threshold, in the same normalised units as
- * `flux`: magnitudes are scaled so that a sinusoid of amplitude A contributes
- * roughly A across its main lobe. So this floor is "a note appearing out of
- * nothing at about -60 dBFS", which is below any real pick attack and above
- * the numerical wobble of a steady tone.
+ * Per-hop decay of the reference spectrum.
  *
- * Without it, a stretch of digital silence drives the adaptive median to zero
- * and the first speck of noise afterwards reads as an onset.
+ * The reference is a per-bin peak hold rather than simply the previous frame.
+ * While the spectrum is steady or rising the two are identical — the hold only
+ * differs when a bin dips and comes back, which at `fftSize` 1024 and 44.1kHz
+ * is mostly an artefact, not music: bin spacing is 43Hz, so the harmonics of a
+ * low E (82.4Hz, 1.9 bins apart) are unresolved and their overlapping main
+ * lobes beat against each other as the frame phase advances. Measured on a
+ * *perfectly steady* synthetic low E, the plain successive-frame flux swings
+ * between 0.003 and 0.68 on alternate hops — as large as a real pick attack.
+ * The peak hold removes that ripple and leaves attacks untouched.
  */
-const FLUX_FLOOR = 1e-3;
+const REFERENCE_DECAY = 0.95;
+
+/**
+ * The decaying reference leaks `1 - REFERENCE_DECAY` of the frame's magnitude
+ * back into the flux every hop even when nothing is happening, so the threshold
+ * floor is that leak times a safety factor. Expressing the floor as a fraction
+ * of the current frame's magnitude is what makes the detector level-independent
+ * — an absolute floor that suppresses a quiet passage would be far below the
+ * steady-state ripple of a loud one.
+ */
+const RIPPLE_FLOOR_FACTOR = 2;
+
+/**
+ * Absolute lower bound, in the same normalised units as `flux`: magnitudes are
+ * scaled so a sinusoid of amplitude A contributes about A across its main lobe.
+ * This is what stops the first speck of dither after a stretch of digital
+ * silence — where the adaptive median and the relative floor are both zero —
+ * from reading as an onset.
+ */
+const ABSOLUTE_FLUX_FLOOR = 1e-3;
 
 export class OnsetDetector {
   /** Number of samples `process()` expects. Equals `fftSize`. */
@@ -57,11 +79,14 @@ export class OnsetDetector {
   private readonly hann: Float32Array;
   /** Scratch for the windowed frame. */
   private readonly windowed: Float32Array;
-  /** Magnitude spectrum of this hop, and of the previous one. */
+  /** Magnitude spectrum of this hop. */
   private readonly magnitude: Float32Array;
-  private readonly previousMagnitude: Float32Array;
+  /** Decaying per-bin peak hold of previous hops; the flux reference. */
+  private readonly reference: Float32Array;
   /** Amplitude-correcting scale for the Hann-windowed magnitudes. */
   private readonly magnitudeScale: number;
+  /** Threshold floor as a fraction of the frame's total magnitude. */
+  private readonly relativeFloor: number;
 
   /** Ring buffer of the last `medianWindow` flux values. */
   private readonly fluxHistory: Float64Array;
@@ -93,11 +118,14 @@ export class OnsetDetector {
     this.hann = hannWindow(fftSize);
     this.windowed = new Float32Array(fftSize);
     this.magnitude = new Float32Array(this.fft.bins);
-    this.previousMagnitude = new Float32Array(this.fft.bins);
+    this.reference = new Float32Array(this.fft.bins);
 
+    // A sinusoid of amplitude A peaks at A*sum(w)/2 in the raw transform.
     let windowSum = 0;
     for (let i = 0; i < fftSize; i++) windowSum += this.hann[i]!;
     this.magnitudeScale = windowSum > 0 ? 2 / windowSum : 1;
+
+    this.relativeFloor = RIPPLE_FLOOR_FACTOR * (1 - REFERENCE_DECAY);
 
     this.fluxHistory = new Float64Array(medianWindow);
     this.medianScratch = new Float64Array(medianWindow);
@@ -114,7 +142,7 @@ export class OnsetDetector {
       );
     }
 
-    const { hann, windowed, magnitude, previousMagnitude, magnitudeScale } = this;
+    const { hann, windowed, magnitude, reference, magnitudeScale } = this;
     const size = this.windowSize;
 
     for (let i = 0; i < size; i++) {
@@ -122,19 +150,26 @@ export class OnsetDetector {
     }
     this.fft.magnitudes(windowed, magnitude);
 
-    // Positive half-wave rectified difference of successive magnitude spectra.
+    // Positive half-wave rectified difference against the reference spectrum.
     // Rectification is the whole point: only energy *appearing* is an attack,
-    // energy decaying is not.
+    // energy decaying is not — which is why this fires on a re-picked note at
+    // the same pitch, where the RMS envelope barely moves.
     let flux = 0;
+    let totalMagnitude = 0;
     const bins = this.fft.bins;
     for (let k = 0; k < bins; k++) {
       const scaled = magnitude[k]! * magnitudeScale;
       magnitude[k] = scaled;
-      const delta = scaled - previousMagnitude[k]!;
+      totalMagnitude += scaled;
+      const delta = scaled - reference[k]!;
       if (delta > 0) flux += delta;
     }
 
-    const threshold = Math.max(this.sensitivity * this.medianFlux(), FLUX_FLOOR);
+    const threshold = Math.max(
+      this.sensitivity * this.medianFlux(),
+      this.relativeFloor * totalMagnitude,
+      ABSOLUTE_FLUX_FLOOR
+    );
 
     let isOnset = flux > threshold;
     if (isOnset && this.lastOnsetMs !== null) {
@@ -143,16 +178,20 @@ export class OnsetDetector {
     }
     if (isOnset) this.lastOnsetMs = timestampMs;
 
-    // History and the previous spectrum advance regardless of suppression, so
-    // the adaptive threshold keeps tracking the signal during the dead time.
+    // History and the reference advance regardless of suppression, so the
+    // adaptive threshold keeps tracking the signal during the dead time.
     this.pushFlux(flux);
-    previousMagnitude.set(magnitude);
+    for (let k = 0; k < bins; k++) {
+      const decayed = reference[k]! * REFERENCE_DECAY;
+      const current = magnitude[k]!;
+      reference[k] = current > decayed ? current : decayed;
+    }
 
     return { isOnset, flux, threshold };
   }
 
   reset(): void {
-    this.previousMagnitude.fill(0);
+    this.reference.fill(0);
     this.fluxHistory.fill(0);
     this.historyCount = 0;
     this.historyIndex = 0;

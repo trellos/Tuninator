@@ -23,7 +23,7 @@
 import type { EventPitch, MusicEvent, MusicEventKind, MusicEventState } from "../types.js";
 import type { Policy } from "./policy.js";
 import type { EngineFrame } from "./pitch-engine.js";
-import { describeFrequency } from "./notes.js";
+import { describeFrequency, midiToFrequency } from "./notes.js";
 
 export type TrackerEmission = {
   type: "start" | "update" | "end";
@@ -43,11 +43,25 @@ type Active = {
   confidenceSum: number;
   maxRms: number;
   maxPeak: number;
+  /** Short rolling mean of rms, the baseline a re-pick has to rise above. */
+  recentRms: number;
+  /**
+   * How many voiced frames landed on each MIDI note. The event's label is the
+   * mode of this, not the most recent frame: an event whose boundary is off by
+   * part of a note bleeds into its neighbour, and labelling from the last frame
+   * hands it the neighbour's name.
+   */
+  noteVotes: Map<number, number>;
   /** Committed chord label, chord mode only. */
   chordLabel: string | null;
   /** A candidate replacement label, held until it proves it is not a flap. */
   pendingLabel: string | null;
   pendingSince: number;
+  /** A candidate new pitch, held until it proves it is not a one-frame blip. */
+  pendingStepHz: number | null;
+  pendingStepFrames: number;
+  /** Timestamp of the first frame showing the candidate pitch. */
+  pendingStepAt: number;
   lastEmitted: { state: MusicEventState; bendCents: number; confidence: number; label: string };
 };
 
@@ -60,10 +74,29 @@ function cents(hz: number, refHz: number): number {
   return CENTS_PER_OCTAVE * Math.log2(hz / refHz);
 }
 
+/**
+ * How long after an attack a new event may still be backdated to it. Wider than
+ * a hop, narrower than the shortest note in the fixtures (125ms).
+ */
+const ONSET_BACKDATE_WINDOW_MS = 120;
+
+/**
+ * Consecutive frames a new pitch must hold before it splits the event. One
+ * frame is a detector wobble; two at 12ms is still well inside a 125ms note.
+ */
+const STEP_CONFIRM_FRAMES = 2;
+
+/** Weight of the newest frame in the rolling rms baseline. */
+const RMS_BASELINE_ALPHA = 0.25;
+
 export class EventTracker {
   private policy: Policy;
   private active: Active | null = null;
   private nextId = 1;
+  /** Timestamp of the most recent attack, for backdating a new event onto it. */
+  private lastOnsetAt: number | null = null;
+  /** End of the most recently closed event, so backdating cannot overlap it. */
+  private lastEndedAt: number | null = null;
 
   constructor(policy: Policy) {
     this.policy = policy;
@@ -82,16 +115,21 @@ export class EventTracker {
 
     const gated = frame.amplitude.rms < policy.analysis.rmsGate;
 
+    if (onset) this.lastOnsetAt = t;
+
     if (policy.chords.enabled) {
       this.processChord(engineFrame, gated, out);
       this.maybeEmitStart(t, out);
       return out;
     }
 
-    // An onset is an unconditional boundary: a re-picked note at the same pitch
-    // must read as two events, not one sustain.
+    // An onset boundary: a genuinely re-picked note at the same pitch must read
+    // as two events, not one sustain — but only if the string was actually
+    // struck again.
     if (onset && this.active !== null) {
-      this.end(t, out);
+      const rearticulated =
+        frame.amplitude.rms >= this.active.recentRms * policy.onset.repickRmsRise;
+      if (rearticulated) this.end(t, out);
     }
 
     if (frame.frequencyHz !== null) {
@@ -102,13 +140,42 @@ export class EventTracker {
         this.begin("note", hz, t, engineFrame);
       } else if (active.lastVoicedHz !== null) {
         const stepCents = Math.abs(cents(hz, active.lastVoicedHz));
+        const ref = active.refFrequencyHz;
 
-        if (stepCents > policy.pitch.stepThresholdCents) {
-          // Jumped in a single hop: a new note, not a bend.
-          this.end(t, out);
-          this.begin("note", hz, t, engineFrame);
-        } else if (active.refFrequencyHz !== null) {
-          const fromStart = cents(hz, active.refFrequencyHz);
+        // Resolve an in-flight step FIRST. `lastVoicedHz` advances every frame,
+        // so by the second frame of a real step the per-hop delta is back to
+        // ~0 — testing that first reads a genuine note change as a wobble and
+        // merges the run into one long event.
+        const stepPending = active.pendingStepHz !== null;
+        const holdsCandidate =
+          stepPending &&
+          Math.abs(cents(hz, active.pendingStepHz!)) <= policy.pitch.stepThresholdCents;
+
+        if (stepPending && !holdsCandidate) {
+          // Fell back toward where it came from: a wobble, not a note change.
+          active.pendingStepHz = null;
+          active.pendingStepFrames = 0;
+        }
+
+        if (holdsCandidate || stepCents > policy.pitch.stepThresholdCents) {
+          if (holdsCandidate) {
+            active.pendingStepFrames++;
+          } else {
+            active.pendingStepHz = hz;
+            active.pendingStepFrames = 1;
+            active.pendingStepAt = t;
+          }
+
+          if (active.pendingStepFrames >= STEP_CONFIRM_FRAMES) {
+            // Jumped and stayed: a new note, not a bend. The new note began at
+            // the first frame that showed the new pitch, not at the frame that
+            // confirmed it — otherwise every note starts one hop late.
+            const stepStart = Math.max(active.pendingStepAt, active.event.startedAt);
+            this.end(stepStart, out);
+            this.begin("note", hz, stepStart, engineFrame);
+          }
+        } else if (ref !== null) {
+          const fromStart = cents(hz, ref);
           if (Math.abs(fromStart) >= policy.tracking.bendThresholdCents) {
             active.event.state = "bend";
             active.event.bend = {
@@ -267,6 +334,21 @@ export class EventTracker {
     const { frame } = engineFrame;
     const nearest = hz === null ? null : describeFrequency(hz);
 
+    // A note begins at its attack, not at the moment the pitch tracker becomes
+    // confident about it. Spectral flux localises the attack far better than
+    // YIN does — YIN has to wait for its window to fill with the new note and
+    // for the median to turn over — so backdate onto the recent onset. Without
+    // this the whole event slides late, and on a 166ms triplet a late event
+    // spends most of its frames on the FOLLOWING note.
+    let startedAt = t;
+    if (this.lastOnsetAt !== null && t - this.lastOnsetAt <= ONSET_BACKDATE_WINDOW_MS) {
+      startedAt = this.lastOnsetAt;
+      // Never reach back past an already-closed event.
+      if (this.lastEndedAt !== null && startedAt < this.lastEndedAt) {
+        startedAt = this.lastEndedAt;
+      }
+    }
+
     const primary: EventPitch | null =
       nearest === null
         ? null
@@ -285,7 +367,7 @@ export class EventTracker {
     const event: MusicEvent = {
       id: `ev${this.nextId++}`,
       kind,
-      startedAt: t,
+      startedAt,
       updatedAt: t,
       endedAt: null,
       state: "attack",
@@ -314,9 +396,14 @@ export class EventTracker {
       confidenceSum: 0,
       maxRms: frame.amplitude.rms,
       maxPeak: frame.amplitude.peak ?? 0,
+      recentRms: frame.amplitude.rms,
+      noteVotes: new Map(nearest === null ? [] : [[nearest.midi, 1]]),
       chordLabel: null,
       pendingLabel: null,
       pendingSince: t,
+      pendingStepHz: null,
+      pendingStepFrames: 0,
+      pendingStepAt: t,
       lastEmitted: { state: "attack", bendCents: 0, confidence: -1, label: "" },
     };
   }
@@ -330,6 +417,8 @@ export class EventTracker {
     active.frames++;
     active.confidenceSum += frame.confidence;
     active.maxRms = Math.max(active.maxRms, frame.amplitude.rms);
+    active.recentRms =
+      active.recentRms * (1 - RMS_BASELINE_ALPHA) + frame.amplitude.rms * RMS_BASELINE_ALPHA;
     active.maxPeak = Math.max(active.maxPeak, frame.amplitude.peak ?? 0);
     active.event.updatedAt = t;
     active.event.amplitude = { rms: frame.amplitude.rms, peak: active.maxPeak };
@@ -354,10 +443,18 @@ export class EventTracker {
         };
         active.event.primaryPitch = primary;
         active.event.pitches = [primary];
+
+        active.noteVotes.set(nearest.midi, (active.noteVotes.get(nearest.midi) ?? 0) + 1);
+
         // The label keeps the ORIGIN note across a bend; the excursion lives in
         // `bend`. Only a non-bending event re-labels itself.
         if (!active.event.bend.isActive) {
-          active.event.label = { name: nearest.name, root: nearest.pitchClass };
+          // Label from the note this event spent the most frames on, not from
+          // the newest frame. A single stray frame — or a boundary that slid
+          // into the next note — must not rename a settled event.
+          const winner = modeOf(active.noteVotes);
+          const label = winner === nearest.midi ? nearest : describeFrequency(midiToFrequency(winner));
+          active.event.label = { name: label.name, root: label.pitchClass };
         }
       }
     }
@@ -421,6 +518,7 @@ export class EventTracker {
     const active = this.active;
     if (active === null) return;
     this.active = null;
+    this.lastEndedAt = t;
 
     const duration = t - active.event.startedAt;
 
@@ -449,6 +547,22 @@ export class EventTracker {
     if (this.active === null || !this.active.emittedStart) return [];
     return [snapshot(this.active.event)];
   }
+}
+
+/**
+ * Most-voted note. Ties break toward the lower MIDI number so the result is
+ * deterministic regardless of Map iteration order.
+ */
+function modeOf(votes: Map<number, number>): number {
+  let bestMidi = 0;
+  let bestCount = -1;
+  for (const [midi, count] of votes) {
+    if (count > bestCount || (count === bestCount && midi < bestMidi)) {
+      bestCount = count;
+      bestMidi = midi;
+    }
+  }
+  return bestMidi;
 }
 
 function blendConfidence(parts: MusicEvent["confidenceParts"]): number {

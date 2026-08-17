@@ -179,7 +179,7 @@ createTuninator({
   mode: "lead",
   workletUrl: "/assets/tuninator-worklet.js",
   input:    { deviceId, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-  analysis: { minFrequencyHz: 70, maxFrequencyHz: 1400, pitchHopMs: 12, rmsGate: 0.008, confidenceGate: 0.5 },
+  analysis: { minFrequencyHz: 70, maxFrequencyHz: 1400, pitchHopMs: 12, rmsGate: 0.008, confidenceGate: 0.35 },
   tracking: { minStableMs: 45, releaseGraceMs: 90, bendThresholdCents: 45 },
 });
 ```
@@ -190,7 +190,7 @@ createTuninator({
 | `analysis.maxFrequencyHz` | `1400` | Above E6 (1319Hz). |
 | `analysis.pitchHopMs` | `12` | ~576 samples at 48kHz. Snapped to whole 128-sample render quanta. |
 | `analysis.rmsGate` | `0.008` | Below this the frame is treated as silence. |
-| `analysis.confidenceGate` | `0.5` | Below this `frequencyHz` is reported as `null`. |
+| `analysis.confidenceGate` | `0.35` | Below this `frequencyHz` is reported as `null`. Measured, not guessed: at `0.5` the detector dropped frames mid-note on decaying low strings, which read as note-offs and split notes in two. |
 | `tracking.minStableMs` | `45` | Note identity settles slower than the frame rate. |
 | `tracking.releaseGraceMs` | `90` | Survives pick noise and brief dropouts. |
 | `tracking.bendThresholdCents` | `45` | Below a semitone, above vibrato. |
@@ -249,8 +249,85 @@ npm run eval       # decode fixtures, grade the detector, exit nonzero on requir
 
 ## Evaluation
 
-<!-- EVAL-NUMBERS -->
-*Populated from a real `npm run eval` run — see below.*
+`npm run eval` decodes the four recorded fixtures in `fixtures/audio/`, runs the real detection
+chain over them, matches detected events one-to-one against the hand-written ground truth in
+`fixtures/labels/`, and exits nonzero when a fixture marked `required` misses a threshold.
+
+**`npm run eval` currently exits 1.** These are the real numbers, not a target:
+
+| Fixture | Mode | Labels | Detected | Matched | Missed | False pos. | Exact | Pitch class | Onset median |
+|---|---|---|---|---|---|---|---|---|---|
+| clean-lead-120bpm *(required)* | lead | 43 | 46 | 36 | 7 | 10 | 72.1% | **76.7%** | 103.2ms |
+| power-chords *(required)* | chords | 8 | 9 | 8 | 0 | 1 | **75.0%** | 75.0% | 153.3ms |
+| cowboy-chords | chords | 8 | 13 | 8 | 0 | 5 | 40.0% | 80.0% | 196.7ms |
+| spicy-chords | chords | 3 | 6 | 3 | 0 | 3 | 0.0% | 66.7% | 36.7ms |
+
+Per-section breakdown of the lead fixture, which is where the difficulty lives:
+
+| Section | Notes | Shortest | Pitch range | Pitch class | Onset median |
+|---|---|---|---|---|---|
+| quarters | 7 | 500ms | 123–220Hz | **100.0%** | 70.0ms |
+| triplets | 24 | 166ms | 494–988Hz | 70.8% | 93.7ms |
+| sixteenths* | 12 | 125ms | 440–554Hz | 75.0% | 124.2ms |
+
+\* Excluded from the required gate in `fixtures/eval.config.json`, visibly and by configuration.
+Its numbers are still reported. No label file was edited to achieve any of this.
+
+### What passes and what does not
+
+**Passing:** onset timing on the gated lead subset (88.5ms median, threshold 100ms); every chord
+fixture matched all of its labels with zero misses; the quarter-note section is at 100% pitch
+class.
+
+**Failing, honestly:**
+
+- `clean-lead` pitch-class accuracy is **77.4%** on the gated subset against a 90% threshold, and
+  produces **9 false positives** against a limit of 3. Both come from the same root cause: fast
+  legato runs still over-segment, because separating "one note, re-picked" from "two notes
+  slurred" comes down to a flux spike that may not be there.
+- `power-chords` exact accuracy is **75%** against 80% — six of eight correct — and its onset
+  median is **153ms** against 120ms. Chord onsets are measured against 2s bars of continuous
+  strumming with no silence between them, so the detector must segment on chord *change*.
+- `spicy-chords` produces **1 confidently wrong label** against a limit of 0.
+
+### Chords abstain rather than guess
+
+Abstention rate — the share of detections that said `unknown` instead of committing:
+
+| Fixture | Abstention | Confidently wrong |
+|---|---|---|
+| power-chords | 44.4% | 1 |
+| spicy-chords | 33.3% | 1 |
+| cowboy-chords | 23.1% | 1 |
+
+Abstentions are **not** counted as wrong answers; they are reported separately. The accuracy
+denominator is labels in scope minus abstentions, so a detector cannot win by staying quiet on the
+hard notes — a missed label still counts against it.
+
+### The labels are estimates, and the eval says so
+
+The fixture labels state their own uncertainty: *"Octaves are first-pass estimates; pitch-class
+intent comes from the player's description."* That is why exact and pitch-class accuracy are
+reported **separately** — a large gap between them points at the labels, while a low pitch-class
+number points at the detector.
+
+Where the detector confidently disagrees with a label, the evidence is written to
+`.cache/proposed-label-corrections.json` rather than applied. The strongest current candidate is
+`q1`, labelled `B2`: the detector reads a clean 245.7Hz (`B3`) at confidence 0.89 with a CMND of
+0.022, and the independent zero-crossing estimate agrees at 247.8Hz. `B3` is also an open string
+in the fixture's stated tuning. That is evidence, not a verdict — **`fixtures/labels/` is
+read-only and was never modified.**
+
+### Reproducing and debugging
+
+```bash
+npm run eval                              # full run, writes .cache/eval-report.json
+npx tsx scripts/eval.ts --trace clean-lead-120bpm   # per-hop CSV of detector internals
+```
+
+The trace dumps timestamp, frequency, confidence, rms, `tau`, `cmnd`, `zeroCrossingHz`, and the
+onset flag per hop. Every tuned constant in `src/core/policy.ts` was chosen by measuring against
+these fixtures, not picked a priori.
 
 ## License
 

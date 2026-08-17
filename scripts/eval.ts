@@ -42,7 +42,12 @@ import {
   sectionForDetection,
   sectionForLabel,
 } from "../src/offline/matcher.js";
-import { analyzeSamplesDetailed, type TraceRow } from "../src/offline/analyzer.js";
+import {
+  analyzeSamples,
+  analyzeSamplesDetailed,
+  type DetailedAnalyzeResult,
+  type TraceRow,
+} from "../src/offline/analyzer.js";
 import { downmixToMono, readWav } from "../src/offline/wav.js";
 import {
   CACHE_DIR,
@@ -157,16 +162,24 @@ function renderChecks(checks: readonly ThresholdCheck[]): string {
     .join("\n");
 }
 
-function isRatioCheck(check: ThresholdCheck): boolean {
-  return check.name.startsWith("minLabelAccuracy");
+type CheckUnit = "ratio" | "ms" | "count";
+
+function checkUnit(check: ThresholdCheck): CheckUnit {
+  if (check.name.startsWith("minLabelAccuracy")) return "ratio";
+  return check.name.endsWith("Ms") ? "ms" : "count";
+}
+
+function formatCheckNumber(value: number | null, unit: CheckUnit): string {
+  if (unit === "ratio") return pct(value);
+  return num(value, unit === "ms" ? 1 : 0);
 }
 
 function formatCheckValue(check: ThresholdCheck): string {
-  return isRatioCheck(check) ? pct(check.actual) : num(check.actual, 1);
+  return formatCheckNumber(check.actual, checkUnit(check));
 }
 
 function formatLimit(check: ThresholdCheck): string {
-  return isRatioCheck(check) ? pct(check.limit) : num(check.limit, 1);
+  return formatCheckNumber(check.limit, checkUnit(check));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -189,7 +202,28 @@ type FixtureReport = {
   checks: ThresholdCheck[];
   passed: boolean;
   corrections: ConfidentDisagreement[];
-  detectionsPreview: Array<{ id: string; label: string; startMs: number; endMs: number | null; confidence: number }>;
+  /** Every matched pair, for eyeballing what the detector actually did. */
+  pairs: Array<{
+    labelId: string;
+    expected: string;
+    detectionId: string;
+    detected: string;
+    onsetDeltaMs: number;
+    endDeltaMs: number | null;
+    exact: boolean;
+    pitchClass: boolean;
+    abstained: boolean;
+    confidence: number;
+  }>;
+  missedLabels: Array<{ id: string; label: string; startMs: number; endMs: number }>;
+  /** Together with `pairs`, this accounts for every detection the engine made. */
+  falsePositiveDetections: Array<{
+    id: string;
+    label: string;
+    startMs: number;
+    endMs: number | null;
+    confidence: number;
+  }>;
 };
 
 function inferMode(labels: readonly LabeledEvent[]): TuninatorMode {
@@ -226,7 +260,9 @@ function evaluateFixture(
     checks: [],
     passed: true,
     corrections: [],
-    detectionsPreview: [],
+    pairs: [],
+    missedLabels: [],
+    falsePositiveDetections: [],
   };
 
   let detections: DetectedEvent[];
@@ -235,13 +271,16 @@ function evaluateFixture(
   try {
     const wav = readWav(readFileSync(fixture.wavPath));
     const mono = downmixToMono(wav.samples, wav.channels);
-    const wantTrace = traceStem !== null && traceStem === fixture.stem;
-    const analysis = analyzeSamplesDetailed(mono, wav.sampleRate, { mode });
+    // Only the traced fixture pays for the per-hop trace array.
+    const wantTrace = traceStem === fixture.stem;
+    const analysis = wantTrace
+      ? analyzeSamplesDetailed(mono, wav.sampleRate, { mode })
+      : analyzeSamples(mono, wav.sampleRate, { mode });
     detections = analysis.events as unknown as DetectedEvent[];
-    if (wantTrace) trace = analysis.trace;
+    if (wantTrace) trace = (analysis as DetailedAnalyzeResult).trace;
   } catch (error) {
     report.error = (error as Error).message;
-    report.passed = !required ? true : false;
+    report.passed = false;
     return report;
   }
 
@@ -257,14 +296,31 @@ function evaluateFixture(
   const result = matchEvents(labels, detections, { onsetWindowMs: config.onsetWindowMs });
 
   report.overall = scoreMatches(result, scoreOptions);
-  report.detectionsPreview = detections.slice(0, 200).map((d) => ({
+  report.pairs = result.matches.map((m) => ({
+    labelId: m.label.id,
+    expected: m.label.label,
+    detectionId: m.detection.id,
+    detected: m.detection.label.name,
+    onsetDeltaMs: m.onsetDeltaMs,
+    endDeltaMs: m.endDeltaMs,
+    exact: m.agreement.exact,
+    pitchClass: m.agreement.pitchClass,
+    abstained: m.abstained,
+    confidence: m.detection.confidence,
+  }));
+  report.missedLabels = result.missed.map(({ label: l }) => ({
+    id: l.id,
+    label: l.label,
+    startMs: l.startMs,
+    endMs: l.endMs,
+  }));
+  report.falsePositiveDetections = result.falsePositives.map(({ detection: d }) => ({
     id: d.id,
     label: d.label.name,
     startMs: d.startedAt,
     endMs: d.endedAt,
     confidence: d.confidence,
   }));
-
   // Corrections are collected on EXACT disagreement so octave-only cases —
   // the likeliest genuine label fixes — are captured regardless of the gate.
   report.corrections = scoreMatches(result, {

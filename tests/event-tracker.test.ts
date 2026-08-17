@@ -83,18 +83,49 @@ describe("EventTracker", () => {
 
   it("splits a re-picked note at the same pitch into two events", () => {
     const tracker = new EventTracker(resolvePolicy({ mode: "lead" }));
+    const emissions: TrackerEmission[] = [];
 
-    const first = feed(tracker, 0, 20, A4, { onset: true });
-    // Same pitch, but the pick attacked again. Without onset-driven splitting
-    // this reads as one long sustain and the eval scores a missed event.
-    const second = feed(tracker, first.nextMs, 20, A4, { onset: true });
+    // A real re-pick puts energy back into the string, so the attack is louder
+    // than the decayed tail it interrupts. Feeding a flat amplitude here would
+    // test a signal no guitar produces.
+    let t = 0;
+    const pluck = (frames: number): void => {
+      for (let i = 0; i < frames; i++) {
+        const rms = 0.09 * Math.exp(-i / 14);
+        emissions.push(...tracker.process(engineFrame(t, A4, { onset: i === 0, rms })));
+        t += HOP_MS;
+      }
+    };
 
-    const all = [...first.emissions, ...second.emissions, ...tracker.flush(second.nextMs)];
-    expect(all.filter((e) => e.type === "start")).toHaveLength(2);
-    expect(all.filter((e) => e.type === "end")).toHaveLength(2);
+    pluck(20);
+    pluck(20);
+    emissions.push(...tracker.flush(t));
 
-    const ids = new Set(all.map((e) => e.event.id));
-    expect(ids.size).toBe(2);
+    expect(emissions.filter((e) => e.type === "start")).toHaveLength(2);
+    expect(emissions.filter((e) => e.type === "end")).toHaveLength(2);
+    expect(new Set(emissions.map((e) => e.event.id)).size).toBe(2);
+  });
+
+  it("ignores a mid-note onset that carries no rise in amplitude", () => {
+    const tracker = new EventTracker(resolvePolicy({ mode: "lead" }));
+    const emissions: TrackerEmission[] = [];
+
+    // Spectral flux fires on more than attacks: as a note decays the adaptive
+    // median falls with it, so sustain ripple keeps clearing the threshold.
+    // Those onsets carry no new energy and must not halve the note.
+    let t = 0;
+    for (let i = 0; i < 40; i++) {
+      const rms = 0.09 * Math.exp(-i / 25);
+      const spuriousOnset = i === 14 || i === 27;
+      emissions.push(
+        ...tracker.process(engineFrame(t, A4, { onset: i === 0 || spuriousOnset, rms }))
+      );
+      t += HOP_MS;
+    }
+    emissions.push(...tracker.flush(t));
+
+    expect(emissions.filter((e) => e.type === "start")).toHaveLength(1);
+    expect(emissions.filter((e) => e.type === "end")).toHaveLength(1);
   });
 
   it("keeps a gradual bend as ONE event and records the excursion", () => {
