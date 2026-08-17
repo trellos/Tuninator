@@ -34,3 +34,6 @@ temp/
 # Audio analysis artifacts
 *.analysis.wav
 *.analysis.json
+
+# Eval + decode cache
+.cache/
