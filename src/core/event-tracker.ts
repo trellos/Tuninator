@@ -45,6 +45,8 @@ type Active = {
   maxPeak: number;
   /** Short rolling mean of rms, the baseline a re-pick has to rise above. */
   recentRms: number;
+  /** Last few voiced frequencies, oldest first. Drives the glide test. */
+  recentHz: number[];
   /**
    * How many voiced frames landed on each MIDI note. The event's label is the
    * mode of this, not the most recent frame: an event whose boundary is off by
@@ -69,6 +71,27 @@ const CENTS_PER_OCTAVE = 1200;
 
 /** Runner-up chord interpretations kept on an event. */
 const MAX_ALTERNATIVES = 4;
+
+/**
+ * Hops of pitch history used to decide whether a bend is in progress.
+ * Five hops is ~60ms at the default 12ms hop — long enough to see a bend move,
+ * short enough not to smear across a genuine note change.
+ */
+const GLIDE_WINDOW = 5;
+
+/**
+ * Total pitch motion across `GLIDE_WINDOW` that counts as an active glide.
+ *
+ * Bending sweeps the whole spectrum, which spikes spectral flux, so the onset
+ * detector fires *during* a bend — measured twice inside the A3->B3 bend on the
+ * lead fixture, at 7707ms and 7987ms. Treating those as attacks chopped one
+ * bent note into four events. An onset only means "new note" when the pitch is
+ * not already moving.
+ *
+ * Well above vibrato (typically +/-15 cents) so a vibratoed sustain still
+ * splits properly on a real re-pick.
+ */
+const GLIDE_MIN_CENTS = 25;
 
 function cents(hz: number, refHz: number): number {
   return CENTS_PER_OCTAVE * Math.log2(hz / refHz);
@@ -129,7 +152,10 @@ export class EventTracker {
     if (onset && this.active !== null) {
       const rearticulated =
         frame.amplitude.rms >= this.active.recentRms * policy.onset.repickRmsRise;
-      if (rearticulated) this.end(t, out);
+      // ...and only if the pitch is not already gliding. A bend sweeps the
+      // spectrum, which spikes spectral flux AND lifts the RMS, so the
+      // amplitude test alone passes and the bend gets chopped into pieces.
+      if (rearticulated && !isGliding(this.active, frame.frequencyHz)) this.end(t, out);
     }
 
     if (frame.frequencyHz !== null) {
@@ -397,6 +423,7 @@ export class EventTracker {
       maxRms: frame.amplitude.rms,
       maxPeak: frame.amplitude.peak ?? 0,
       recentRms: frame.amplitude.rms,
+      recentHz: hz === null ? [] : [hz],
       noteVotes: new Map(nearest === null ? [] : [[nearest.midi, 1]]),
       chordLabel: null,
       pendingLabel: null,
@@ -427,6 +454,9 @@ export class EventTracker {
       active.lastVoicedHz = frame.frequencyHz;
       active.lastVoicedAt = t;
       active.unvoicedSince = null;
+
+      active.recentHz.push(frame.frequencyHz);
+      if (active.recentHz.length > GLIDE_WINDOW) active.recentHz.shift();
 
       if (active.event.kind === "note") {
         const nearest = describeFrequency(frame.frequencyHz);
@@ -563,6 +593,36 @@ function modeOf(votes: Map<number, number>): number {
     }
   }
   return bestMidi;
+}
+
+/**
+ * True when the event's pitch is sweeping — a bend or slide in progress.
+ *
+ * Requires the motion to be both large enough and consistently one-directional
+ * across the window. Vibrato oscillates, so its net displacement stays small
+ * and it does not qualify; a re-picked note holds steady and does not either.
+ * Only a genuine glide moves monotonically, which is what makes this safe to
+ * use for suppressing onset-driven splits.
+ */
+function isGliding(active: Active, currentHz: number | null): boolean {
+  // `recentHz` is appended in observe(), which runs AFTER the onset check, so
+  // the history alone stops one hop short of the frame being judged. Including
+  // the current pitch is what makes this measure motion up to *now*: without
+  // it the A3->B3 bend measured 24.4 cents against a 25-cent gate and split.
+  const recent = currentHz === null ? active.recentHz : [...active.recentHz, currentHz];
+  if (recent.length <= GLIDE_WINDOW) return false;
+
+  const first = recent[0]!;
+  const last = recent[recent.length - 1]!;
+  if (Math.abs(cents(last, first)) < GLIDE_MIN_CENTS) return false;
+
+  const rising = last > first;
+  for (let i = 1; i < recent.length; i++) {
+    // Allow a small backward wobble, but not a reversal.
+    const delta = cents(recent[i]!, recent[i - 1]!);
+    if (rising ? delta < -10 : delta > 10) return false;
+  }
+  return true;
 }
 
 function blendConfidence(parts: MusicEvent["confidenceParts"]): number {
