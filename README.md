@@ -1,0 +1,2 @@
+# Tuninator
+Pitch detection library
