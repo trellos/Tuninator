@@ -118,6 +118,7 @@ One analysis hop, emitted continuously while listening — **including during si
   confidence: number;             // 0..1
   nearest: PitchNote | null;      // snapped to the nearest equal-tempered note
   amplitude: { rms: number; peak?: number };
+  channelRms?: number[];          // level of each INPUT channel, before they are summed
   detector: {                     // internals, exposed for debugging and eval
     tau?: number | null;
     cmnd?: number | null;
@@ -178,7 +179,7 @@ Failures set the state to `error` and emit an `error` event with a `TuninatorErr
 createTuninator({
   mode: "lead",
   workletUrl: "/assets/tuninator-worklet.js",
-  input:    { deviceId, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  input:    { deviceId, channelCount: 2, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   analysis: { minFrequencyHz: 70, maxFrequencyHz: 1400, pitchHopMs: 12, rmsGate: 0.008, confidenceGate: 0.35 },
   tracking: { minStableMs: 45, releaseGraceMs: 90, bendThresholdCents: 45 },
 });
@@ -197,6 +198,27 @@ createTuninator({
 
 The microphone processors default to **off**. `echoCancellation`, `noiseSuppression`, and
 `autoGainControl` are tuned for speech and will chew holes in a sustained guitar note.
+
+### Multi-channel interfaces
+
+A 2-in interface is a single **stereo** device to the browser — macOS and Windows both list the
+Audient iD4 as one input called "Analogue 1/2". A guitar in input 2 therefore exists only on
+channel 1, and nothing on channel 0.
+
+Three things follow, and all three are handled:
+
+- `input.channelCount` defaults to **2**. Chrome opens a capture device in mono unless a channel
+  count is asked for, and a channel that never reaches the page cannot be recovered later. It is
+  requested as an *ideal* constraint, so a genuinely mono microphone still opens and reports `1`.
+- The worklet **sums** every input channel rather than reading channel 0. Summing, not averaging:
+  averaging costs 6dB exactly when one channel is silent, and `analysis.rmsGate` is absolute.
+- `PitchFrame.channelRms` reports the level of each channel *before* the sum, so a UI can show
+  which input is actually carrying signal. `channelRms.length` is the channel count the browser
+  handed over — `1` there means the capture is mono and input 2 never arrived.
+
+If a guitar is inaudible to the detector but audible through the interface's own monitoring,
+`channelRms` is the thing to look at first: direct monitoring is analogue and proves nothing
+about what the browser received.
 
 ## Architecture
 
