@@ -13,9 +13,11 @@ import {
   DEFAULT_SUSTAIN_WINDOWS,
   DEFAULT_WINDOW_MS,
   resolveChannel,
-} from "../src/core/channel-select.js";
-import { PitchEngine } from "../src/core/pitch-engine.js";
-import { resolvePolicy } from "../src/core/policy.js";
+} from "./channel-select.js";
+// The library's PUBLIC entry point. The demo never reaches into its internals,
+// and this test proves the comb-filter claim against the same class a real host
+// would use.
+import { Tuninator } from "tuninator";
 
 /** The real hop: 12ms requested, snapped to 576 samples at 48k. */
 const HOP_MS = 12;
@@ -282,15 +284,17 @@ function sawtooth(
 
 /** Median detected frequency across a whole buffer, or NaN if never voiced. */
 function detect(signal: Float32Array): number {
-  const engine = new PitchEngine(SAMPLE_RATE, resolvePolicy({ mode: "lead" }));
+  const tuninator = new Tuninator({ sampleRate: SAMPLE_RATE, mode: "lead" });
   const voiced: number[] = [];
   const blocks = Math.floor(signal.length / RENDER_QUANTUM);
   for (let b = 0; b < blocks; b++) {
-    const result = engine.push(
+    const results = tuninator.analyze(
       signal.subarray(b * RENDER_QUANTUM, (b + 1) * RENDER_QUANTUM),
       ((b * RENDER_QUANTUM) / SAMPLE_RATE) * 1000
     );
-    if (result && result.frame.frequencyHz !== null) voiced.push(result.frame.frequencyHz);
+    for (const result of results) {
+      if (result.frame.frequencyHz !== null) voiced.push(result.frame.frequencyHz);
+    }
   }
   if (voiced.length === 0) return Number.NaN;
   const sorted = voiced.sort((a, b) => a - b);

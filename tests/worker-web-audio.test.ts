@@ -34,6 +34,7 @@ function installMocks(options: MockOptions = {}): {
   closed: () => boolean;
   audioConstraints: () => Record<string, unknown>;
   nodeOptions: () => NodeOptions | null;
+  node: () => { deliver: (data: unknown) => void } | null;
 } {
   const tracks = [
     {
@@ -91,13 +92,19 @@ function installMocks(options: MockOptions = {}): {
   }
 
   let nodeOptions: NodeOptions | null = null;
+  let lastNode: MockAudioWorkletNode | null = null;
   class MockAudioWorkletNode {
     port = { postMessage: vi.fn(), onmessage: null as unknown };
     onprocessorerror: unknown = null;
     constructor(_context: unknown, _name: string, opts?: NodeOptions) {
       nodeOptions = opts ?? {};
+      lastNode = this;
     }
     disconnect(): void {}
+    /** Delivers a worklet -> main-thread message, as the real port would. */
+    deliver(data: unknown): void {
+      (this.port.onmessage as ((e: { data: unknown }) => void) | null)?.({ data });
+    }
   }
 
   vi.stubGlobal("AudioContext", MockAudioContext);
@@ -107,6 +114,7 @@ function installMocks(options: MockOptions = {}): {
     closed: () => closed,
     audioConstraints: () => audioConstraints,
     nodeOptions: () => nodeOptions,
+    node: () => lastNode,
   };
 }
 
@@ -267,19 +275,19 @@ describe("createWorkerWebAudio", () => {
 /**
  * The stereo path.
  *
- * A 2-in interface is one stereo device to the browser, and an instrument in
- * input 2 exists only on channel 1. Every one of these assertions guards a link
- * where that channel silently disappears with no error and no level.
+ * Analysis input is mono, and choosing the channel belongs to the host. These
+ * assertions pin the seam: what the worker asks the browser for, what it passes
+ * to the worklet, and that a host-supplied graph is used untouched.
  */
 describe("input channels", () => {
-  it("asks getUserMedia for two channels", async () => {
+  it("asks getUserMedia for one channel by default", async () => {
     const mocks = installMocks();
     const tuninator = createWorkerWebAudio({ workletUrl: "/assets/tuninator-worklet.js" });
     await tuninator.start();
 
-    // Chrome opens a capture device in mono unless a channel count is asked
-    // for, and nothing downstream can recover a channel that never arrived.
-    expect(mocks.audioConstraints()["channelCount"]).toBe(2);
+    // The worker does not choose channels, so it does not ask for channels it
+    // would have to choose between. A host that wants to split asks for more.
+    expect(mocks.audioConstraints()["channelCount"]).toBe(1);
   });
 
   it("requests the channel count as ideal, never exact", async () => {
@@ -296,11 +304,13 @@ describe("input channels", () => {
     const mocks = installMocks();
     const tuninator = createWorkerWebAudio({
       workletUrl: "/assets/tuninator-worklet.js",
-      input: { channelCount: 1 },
+      input: { channelCount: 2 },
     });
     await tuninator.start();
 
-    expect(mocks.audioConstraints()["channelCount"]).toBe(1);
+    // How a host reaches input 2 of a 2-in interface: ask for both here, split
+    // the result, and hand one channel back as `input.source`.
+    expect(mocks.audioConstraints()["channelCount"]).toBe(2);
   });
 
   it("leaves the worklet node in the channel mode that preserves every channel", async () => {
@@ -317,7 +327,7 @@ describe("input channels", () => {
     expect(options).not.toHaveProperty("channelCount");
   });
 
-  it("tells the worklet to select the loudest channel by default", async () => {
+  it("sends the worklet a policy and nothing about channels", async () => {
     const mocks = installMocks();
     const tuninator = createWorkerWebAudio({ workletUrl: "/assets/tuninator-worklet.js" });
     await tuninator.start();
@@ -325,23 +335,10 @@ describe("input channels", () => {
     const processorOptions = mocks.nodeOptions()?.["processorOptions"] as
       | Record<string, unknown>
       | undefined;
-    expect(processorOptions?.["channels"]).toBe("auto");
-  });
-
-  it("passes input.channels through to the worklet unchanged", async () => {
-    for (const channels of ["sum", 1] as const) {
-      const mocks = installMocks();
-      const tuninator = createWorkerWebAudio({
-        workletUrl: "/assets/tuninator-worklet.js",
-        input: { channels },
-      });
-      await tuninator.start();
-
-      const processorOptions = mocks.nodeOptions()?.["processorOptions"] as
-        | Record<string, unknown>
-        | undefined;
-      expect(processorOptions?.["channels"]).toBe(channels);
-    }
+    expect(processorOptions).toHaveProperty("policy");
+    // Channel routing is the host's, and the library carries no opinion about
+    // it across the port.
+    expect(processorOptions).not.toHaveProperty("channels");
   });
 
   it("reports the device and its channel count as a status message", async () => {
@@ -366,5 +363,136 @@ describe("input channels", () => {
     await tuninator.start();
 
     expect(statuses.some((s) => s.includes("1 channel(s)"))).toBe(true);
+  });
+});
+
+/*
+ * A host that wires its own graph.
+ *
+ * This is how channel choice leaves the library: the host opens the device,
+ * splits it, and connects the one channel it wants. The worker must then touch
+ * neither the microphone nor the host's AudioContext -- it did not open them,
+ * and closing them would silence the rest of the host's application.
+ */
+describe("host-supplied input", () => {
+  /** A stand-in AudioNode: has a context and connects, which is all that matters. */
+  function fakeNode(context: unknown): AudioNode {
+    return {
+      context,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    } as unknown as AudioNode;
+  }
+
+  it("never opens a microphone when given an AudioNode", async () => {
+    const mocks = installMocks();
+    const context = new (globalThis as unknown as { AudioContext: new () => unknown }).AudioContext();
+    const node = fakeNode(context);
+
+    const tuninator = createWorkerWebAudio({
+      workletUrl: "/assets/tuninator-worklet.js",
+      input: { source: node },
+    });
+    await tuninator.start();
+
+    expect(tuninator.getState()).toBe("listening");
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    // Reused, not replaced: nodes cannot cross AudioContexts.
+    expect(node.connect).toHaveBeenCalled();
+    expect(mocks.closed()).toBe(false);
+  });
+
+  it("does not close a context it did not create", async () => {
+    const mocks = installMocks();
+    const context = new (globalThis as unknown as { AudioContext: new () => unknown }).AudioContext();
+    const tuninator = createWorkerWebAudio({
+      workletUrl: "/assets/tuninator-worklet.js",
+      input: { source: fakeNode(context) },
+    });
+
+    await tuninator.start();
+    tuninator.stop();
+
+    expect(mocks.closed()).toBe(false);
+    expect(stoppedTracks).toHaveLength(0);
+  });
+
+  it("closes the context it created itself", async () => {
+    const mocks = installMocks();
+    const tuninator = createWorkerWebAudio({ workletUrl: "/assets/tuninator-worklet.js" });
+
+    await tuninator.start();
+    tuninator.stop();
+
+    expect(mocks.closed()).toBe(true);
+    expect(stoppedTracks).toEqual(["audio"]);
+  });
+
+  it("does not stop tracks of a host-supplied MediaStream", async () => {
+    installMocks();
+    const tracks = [{ kind: "audio", stop: () => stoppedTracks.push("host") }];
+    const stream = {
+      getTracks: () => tracks,
+      getAudioTracks: () => tracks,
+    } as unknown as MediaStream;
+
+    const tuninator = createWorkerWebAudio({
+      workletUrl: "/assets/tuninator-worklet.js",
+      input: { source: stream },
+    });
+    await tuninator.start();
+    tuninator.stop();
+
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(stoppedTracks).toHaveLength(0);
+  });
+});
+
+describe("stop", () => {
+  /** The shape handleWorkletMessage expects, trimmed to what it reads. */
+  function hop(type: "start" | "update" | "end", id: string): unknown {
+    return {
+      type: "hop",
+      frame: { timestamp: 0, frequencyHz: null, confidence: 0, nearest: null,
+               amplitude: { rms: 0 }, detector: {} },
+      emissions: [
+        { type, event: { id, label: { name: "A4" }, state: "sustain", endedAt: null } },
+      ],
+    };
+  }
+
+  it("ends events that were still sounding", async () => {
+    const mocks = installMocks();
+    const tuninator = createWorkerWebAudio({ workletUrl: "/assets/tuninator-worklet.js" });
+    const ended: string[] = [];
+    tuninator.on("musicEventEnd", (event) => ended.push(event.id));
+
+    await tuninator.start();
+    mocks.node()!.deliver(hop("start", "ev1"));
+    expect(tuninator.getActiveEvents()).toHaveLength(1);
+
+    tuninator.stop();
+
+    // Posting `reset` to the worklet flushes ITS tracker, but the reply is
+    // asynchronous and stop() detaches the port on this very tick -- so without
+    // ending them here, a consumer holding state from musicEventStart would
+    // hold it forever.
+    expect(ended).toEqual(["ev1"]);
+    expect(tuninator.getActiveEvents()).toHaveLength(0);
+  });
+
+  it("does not invent ends for events that already finished", async () => {
+    const mocks = installMocks();
+    const tuninator = createWorkerWebAudio({ workletUrl: "/assets/tuninator-worklet.js" });
+    const ended: string[] = [];
+    tuninator.on("musicEventEnd", (event) => ended.push(event.id));
+
+    await tuninator.start();
+    mocks.node()!.deliver(hop("start", "ev1"));
+    mocks.node()!.deliver(hop("end", "ev1"));
+    expect(ended).toEqual(["ev1"]);
+
+    tuninator.stop();
+    expect(ended).toEqual(["ev1"]);
   });
 });

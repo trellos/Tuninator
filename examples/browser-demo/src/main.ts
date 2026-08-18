@@ -20,6 +20,7 @@ import type {
 
 import { DEFAULT_BPM, Metronome } from "./metronome.js";
 import { createMockTuninator } from "./mock-tuninator.js";
+import { openChannelInput, type ChannelInput } from "./channel-input.js";
 import { Timeline, WINDOW_BEATS } from "./timeline.js";
 import { Ui, type SourceChoice } from "./ui.js";
 
@@ -94,6 +95,11 @@ function isTuninatorError(value: unknown): value is TuninatorError {
  * part of the contract. Anything that escapes is folded into a `TuninatorError`
  * here so the UI always has a code and a readable message, never a raw throw.
  */
+/** "channel 1", or "all channels summed" while no decision has latched. */
+function describeSelection(channel: number | null): string {
+  return channel === null ? "all channels summed" : `channel ${channel}`;
+}
+
 function toTuninatorError(cause: unknown): TuninatorError {
   if (isTuninatorError(cause)) return cause;
 
@@ -178,6 +184,11 @@ class App {
   #timebase = new Timebase();
 
   #tuninator: TuninatorWorker | null = null;
+  /**
+   * The demo's own input stage, when running live. The library is handed one
+   * mono channel out of this; choosing which one is this demo's job.
+   */
+  #input: ChannelInput | null = null;
   #unsubscribes: Array<() => void> = [];
   #effectiveSource: "mock" | "live" = "mock";
   #listening = false;
@@ -361,11 +372,22 @@ class App {
     );
   }
 
+  /** Drops the worker and its subscriptions, leaving the input stage alone. */
+  #teardownWorker(): void {
+    for (const unsubscribe of this.#unsubscribes) unsubscribe();
+    this.#unsubscribes = [];
+    this.#tuninator?.stop();
+    this.#tuninator = null;
+  }
+
   #teardown(): void {
     for (const unsubscribe of this.#unsubscribes) unsubscribe();
     this.#unsubscribes = [];
     this.#tuninator?.stop();
     this.#tuninator = null;
+    // Ours to close: the library never opened it and never will.
+    this.#input?.dispose();
+    this.#input = null;
     this.#listening = false;
     this.#timebase.reset();
   }
@@ -373,7 +395,7 @@ class App {
   /* ---- transport ---- */
 
   async #toggleListen(): Promise<void> {
-    const tuninator = this.#tuninator;
+    let tuninator = this.#tuninator;
     if (!tuninator || this.#busy) return;
 
     if (this.#listening || tuninator.getState() === "listening") {
@@ -388,8 +410,27 @@ class App {
     this.#ui.setListening(false, true);
     this.#ui.setError(null);
     try {
-      // A user gesture is on the stack here, so the metronome's AudioContext
-      // (and the library's) can legally start.
+      // A user gesture is on the stack here, so the AudioContexts can legally
+      // start -- the metronome's, and the one our input stage creates.
+      //
+      // The live worker is built lazily, here rather than in #build(), because
+      // it needs an input node and opening the microphone is async. That is the
+      // whole shape of the split: the demo acquires and chooses, the library
+      // analyses what it is given.
+      if (this.#effectiveSource === "live" && this.#input === null) {
+        this.#input = await openChannelInput({ channelCount: 2 });
+        this.#ui.logNote(
+          `input: ${this.#input.channelCount} channel(s); ` +
+            `analysing ${describeSelection(this.#input.selected())}`
+        );
+        this.#teardownWorker();
+        tuninator = createWorkerWebAudio({
+          ...this.#baseOptions(),
+          input: { source: this.#input.node },
+        });
+        this.#tuninator = tuninator;
+        this.#subscribe(tuninator);
+      }
       await tuninator.start();
       this.#listening = tuninator.getState() === "listening";
     } catch (cause) {

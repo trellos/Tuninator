@@ -56,34 +56,20 @@ export type PitchFrame = {
   };
 
   /**
-   * RMS of each *input* channel over this hop, measured before the channels are
-   * summed into the single signal that `amplitude` and the detector describe.
+   * RMS of each channel that reached the worklet, measured before they are
+   * folded to mono.
    *
-   * `channelRms.length` is the number of channels the browser actually handed
-   * the worklet, so this doubles as the input channel count. It exists because
-   * the alternative diagnosis is invisible: a 2-in interface presents as one
-   * stereo device ("Analogue 1/2"), and an instrument in input 2 lands entirely
-   * on channel 1 — a UI that only sees the mixed level cannot tell "no signal"
-   * from "signal on a channel nobody read".
+   * Analysis input is contractually mono, so this is normally a single value —
+   * it earns its place when the contract is broken. `channelRms.length` is the
+   * channel count actually delivered, so a host that meant to hand over one
+   * channel and finds two here has found its bug; and when a host does connect
+   * a stereo device, this is what distinguishes "no signal" from "signal on a
+   * channel nobody looked at".
    *
-   * Absent outside the worklet (the offline harness feeds mono buffers), so
+   * Absent outside the worklet (the offline worker feeds mono buffers), so
    * always treat it as optional.
    */
   channelRms?: number[];
-
-  /**
-   * Which input channel this frame was actually analysed from.
-   *
-   * - a number — only that channel reached the detector,
-   * - `null` — every channel was summed together,
-   * - absent — no channel information at all (the offline harness).
-   *
-   * `channelRms` alone cannot answer this once selection exists, and its argmax
-   * is *not* the answer: selection is hysteretic on purpose, so the loudest
-   * channel in any one frame is routinely not the selected one. A UI that wants
-   * to show "listening to input 2" has to be told, not left to infer.
-   */
-  selectedChannel?: number | null;
 
   /** Detector internals, exposed for debugging and offline evaluation. */
   detector: {
@@ -203,36 +189,45 @@ export type TuninatorOptions = {
   mode?: TuninatorMode;
   /** URL of the built `tuninator-worklet.js` asset. */
   workletUrl?: string | URL;
+  /**
+   * How the browser worker gets its audio. Ignored by the library itself, which
+   * is handed samples directly.
+   */
   input?: {
+    /**
+     * Audio the host has already wired up. When present the worker opens no
+     * microphone at all, and closes nothing it did not create.
+     *
+     * This is how a host chooses its own input channel. A 2-in interface
+     * presents to the browser as one *stereo* device, so an instrument in input
+     * 2 exists only on channel 1 — and which input it is plugged into is
+     * something only the host can know. Split with a `ChannelSplitterNode`,
+     * connect the channel you want, and pass that node here.
+     *
+     * An `AudioNode` brings its own `AudioContext`, which the worker will use
+     * rather than creating a second one — nodes cannot cross contexts. A
+     * `MediaStream` gets a context created for it.
+     *
+     * Whatever arrives should be mono. Anything wider is summed, and
+     * `PitchFrame.channelRms` reports each channel unmixed so that is visible.
+     */
+    source?: MediaStream | AudioNode;
+
+    /* The rest apply only when the worker opens the microphone itself. */
     deviceId?: string;
     echoCancellation?: boolean;
     noiseSuppression?: boolean;
     autoGainControl?: boolean;
     /**
-     * Channels to ask `getUserMedia` for. Defaults to 2.
+     * Channels to ask `getUserMedia` for. Defaults to 1.
      *
-     * Requested as an *ideal* constraint, never `exact`: a genuinely mono
-     * built-in microphone still opens, it just reports 1. Chrome opens a
-     * capture device in mono unless a channel count is explicitly asked for,
-     * which silently loses whatever is on input 2 of a 2-in interface.
+     * Requested as an *ideal* constraint, never `exact`, so a device that
+     * cannot honour it still opens. Ask for 2 if you intend to split the
+     * result yourself — Chrome opens a capture device in mono unless a channel
+     * count is explicitly requested, and a channel that never reaches the page
+     * cannot be recovered later.
      */
     channelCount?: number;
-    /**
-     * What to do with the channels once they arrive. Defaults to `"auto"`.
-     *
-     * - `"auto"` — analyse the loudest channel, decided over a window and with
-     *   hysteresis so a stereo pair cannot flip back and forth. Until real
-     *   signal has been heard the channels are summed, because summing can be
-     *   wrong but cannot miss an instrument.
-     * - `"sum"` — always sum every channel. Guaranteed to hear whatever is
-     *   plugged in anywhere, at the cost of comb filtering when two channels
-     *   carry the same source (a mic and a DI of one guitar).
-     * - a number — always analyse that channel index, for a host that already
-     *   knows where the instrument is. Out of range falls back to summing.
-     *
-     * Ignored for mono input, where there is nothing to decide.
-     */
-    channels?: "auto" | "sum" | number;
   };
   analysis?: {
     minFrequencyHz?: number;

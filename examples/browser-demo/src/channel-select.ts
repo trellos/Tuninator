@@ -19,11 +19,15 @@
  * Selecting one channel cannot comb-filter, so this picks the loudest channel
  * instead — but "loudest" has to be decided carefully, hence everything below.
  *
- * Part of `src/core/` — no DOM, no globals, no npm imports, and no allocation
- * after construction.
+ * This lives in the DEMO, not in the library. Which physical input an
+ * instrument is plugged into is a property of the host's rig, not of pitch
+ * detection: the library is handed one mono channel and analyses it. Choosing
+ * that channel is the host's job, and this is one reasonable way to do it.
+ *
+ * Allocation-free after construction, so it is safe to drive per analysis hop.
  */
 
-/** How the worklet should combine (or not combine) the input channels. */
+/** How the host should combine (or not combine) the input channels. */
 export type ChannelStrategy = "auto" | "sum" | number;
 
 export type ChannelSelectorConfig = {
@@ -52,7 +56,7 @@ export type ChannelSelectorConfig = {
   /**
    * RMS below which a window is discarded as "nobody is playing".
    *
-   * The worklet passes `analysis.rmsGate`, the same threshold that gates the
+   * Pass the library's `analysis.rmsGate`, the same threshold that gates the
    * detector: under it nothing would be detected on any channel, so the choice
    * is both arbitrary and irrelevant.
    */
@@ -251,9 +255,9 @@ export class ChannelSelector {
  * Resolves the caller's strategy against the channel count the browser actually
  * delivered, returning the channel index to read, or `null` to sum.
  *
- * Kept here rather than in the worklet so the precedence rules — mono wins,
- * an out-of-range explicit index falls back to summing rather than reading
- * `undefined` — are unit-testable without an AudioWorkletGlobalScope.
+ * The precedence rules — mono wins, an out-of-range explicit index falls back
+ * to summing rather than reading `undefined` — are kept here so they are
+ * unit-testable without any audio graph at all.
  */
 export function resolveChannel(
   strategy: ChannelStrategy,

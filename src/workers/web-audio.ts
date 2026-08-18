@@ -38,8 +38,17 @@ class WorkerWebAudio implements TuninatorWorker {
 
   private context: AudioContext | null = null;
   private stream: MediaStream | null = null;
-  private source: MediaStreamAudioSourceNode | null = null;
+  private source: AudioNode | null = null;
   private node: AudioWorkletNode | null = null;
+
+  /**
+   * Whether this worker created the context and opened the stream, and so is
+   * the party allowed to tear them down. A host that passed `input.source` owns
+   * its own graph; closing its `AudioContext` out from under it would silence
+   * the rest of its application.
+   */
+  private ownsContext = false;
+  private ownsStream = false;
 
   /** Events the tracker has started but not yet ended, mirrored main-side. */
   private readonly active = new Map<string, MusicEvent>();
@@ -95,27 +104,46 @@ class WorkerWebAudio implements TuninatorWorker {
 
   private async doStart(): Promise<void> {
     this.setState("starting");
-    this.emitter.emit("status", "requesting microphone");
 
-    let stream: MediaStream;
-    try {
-      stream = await this.requestMicrophone();
-    } catch (error) {
-      this.fail(classifyMicError(error), micErrorMessage(error), error);
-      return;
-    }
-    this.stream = stream;
-    this.emitter.emit("status", this.describeInput(stream));
+    // A host-supplied source is already wired: no permission prompt, no device
+    // to pick, and — when it is an AudioNode — a context that already exists
+    // and must be reused, because nodes cannot cross contexts.
+    const supplied = this.options.input?.source;
 
     let context: AudioContext;
-    try {
-      context = new AudioContext();
-    } catch (error) {
-      this.cleanup();
-      this.fail("audio-context-failed", "Could not create an AudioContext.", error);
-      return;
+    if (isAudioNode(supplied)) {
+      context = supplied.context as AudioContext;
+      this.context = context;
+      this.source = supplied;
+      this.emitter.emit("status", "using host-supplied audio node");
+    } else {
+      let stream: MediaStream;
+      if (supplied) {
+        stream = supplied;
+        this.emitter.emit("status", "using host-supplied media stream");
+      } else {
+        this.emitter.emit("status", "requesting microphone");
+        try {
+          stream = await this.requestMicrophone();
+        } catch (error) {
+          this.fail(classifyMicError(error), micErrorMessage(error), error);
+          return;
+        }
+        this.ownsStream = true;
+      }
+      this.stream = stream;
+      this.emitter.emit("status", this.describeInput(stream));
+
+      try {
+        context = new AudioContext();
+      } catch (error) {
+        this.cleanup();
+        this.fail("audio-context-failed", "Could not create an AudioContext.", error);
+        return;
+      }
+      this.ownsContext = true;
+      this.context = context;
     }
-    this.context = context;
 
     if (!context.audioWorklet) {
       this.cleanup();
@@ -157,27 +185,19 @@ class WorkerWebAudio implements TuninatorWorker {
       this.node = new AudioWorkletNode(context, PROCESSOR_NAME, {
         numberOfInputs: 1,
         numberOfOutputs: 0,
-        // These two are the AudioWorkletNode defaults, restated because getting
-        // them wrong silently destroys a channel and there is no way to see it
-        // from the outside.
+        // The AudioWorkletNode defaults, restated because getting them wrong
+        // silently destroys a channel and there is no way to see it from the
+        // outside.
         //
         // "max" means the node's input carries as many channels as the thing
-        // connected to it, with no mixing at all -- a 2-channel
-        // MediaStreamAudioSourceNode arrives in `process()` as two separate
-        // channels (verified in Chromium, headless). `channelCount` is ignored
-        // in this mode, which is why it is not set: setting
-        // `channelCountMode: "explicit"` with `channelCount: 1` would instead
-        // force a downmix, and `channelInterpretation: "discrete"` would make
-        // any such downmix *discard* the extra channels rather than fold them
-        // in. "speakers" is the survivable failure mode of the two.
+        // connected to it, with no mixing at all. Analysis input is meant to be
+        // mono, but forcing a downmix here would hide a host wiring mistake
+        // instead of letting `channelRms` report it -- and
+        // `channelInterpretation: "discrete"` would make any such downmix
+        // *discard* the extra channels rather than fold them in.
         channelCountMode: "max",
         channelInterpretation: "speakers",
-        processorOptions: {
-          policy: this.policy,
-          // Fixed at construction: unlike the policy, this describes the
-          // wiring, not the detection mode, so `setMode()` never resends it.
-          channels: this.options.input?.channels ?? "auto",
-        },
+        processorOptions: { policy: this.policy },
       });
     } catch (error) {
       this.cleanup();
@@ -192,7 +212,9 @@ class WorkerWebAudio implements TuninatorWorker {
       this.fail("unknown", "The tuninator worklet stopped unexpectedly.", error);
     };
 
-    this.source = context.createMediaStreamSource(stream);
+    if (this.source === null) {
+      this.source = context.createMediaStreamSource(this.stream as MediaStream);
+    }
     this.source.connect(this.node);
 
     // Autoplay policy: a context created outside a user gesture starts
@@ -229,18 +251,19 @@ class WorkerWebAudio implements TuninatorWorker {
         echoCancellation: input.echoCancellation ?? false,
         noiseSuppression: input.noiseSuppression ?? false,
         autoGainControl: input.autoGainControl ?? false,
-        // Ask for stereo explicitly.
+        // Mono by default, because analysis input is mono and this worker does
+        // not choose channels.
         //
-        // A 2-in interface presents as ONE stereo device ("Analogue 1/2"), and
-        // an instrument in input 2 is entirely on channel 1. Chrome opens a
-        // capture device in mono unless a channel count is requested, so
-        // without this the second input never reaches the page at all — no
-        // error, no level, nothing downstream can recover it.
+        // A host that wants a specific input of a multi-channel interface asks
+        // for the channels here, splits the result itself, and passes the one
+        // it wants as `input.source` — Chrome opens a capture device in mono
+        // unless a channel count is requested, so a channel not asked for here
+        // never reaches the page at all and cannot be recovered later.
         //
-        // Plain value, not `{ exact: 2 }`: this is an *ideal* constraint, so a
-        // genuinely mono microphone still opens and simply reports 1 rather
-        // than failing with OverconstrainedError.
-        channelCount: input.channelCount ?? 2,
+        // Plain value, not `{ exact: n }`: an *ideal* constraint, so a device
+        // that cannot honour it still opens rather than failing with
+        // OverconstrainedError.
+        channelCount: input.channelCount ?? 1,
       },
       video: false,
     });
@@ -298,33 +321,63 @@ class WorkerWebAudio implements TuninatorWorker {
   }
 
   stop(): void {
+    // End every event that was still sounding, BEFORE tearing the graph down.
+    //
+    // Posting `reset` to the worklet does flush its tracker, but the reply
+    // comes back asynchronously — and `cleanup()` detaches the port and closes
+    // the context on this very tick, so those emissions could never arrive. A
+    // consumer holding state from `musicEventStart` would keep it forever.
+    this.endActiveEvents();
     this.post({ type: "reset" });
     this.cleanup();
-    this.active.clear();
     this.setState("idle");
     this.emitter.emit("status", "stopped");
   }
 
+  /** Emits `musicEventEnd` for everything still open, then forgets them. */
+  private endActiveEvents(): void {
+    if (this.active.size === 0) return;
+    const now = this.context?.currentTime ?? 0;
+    for (const event of this.active.values()) {
+      this.emitter.emit("musicEventEnd", {
+        ...event,
+        state: "ended",
+        endedAt: event.endedAt ?? now * 1000,
+      });
+    }
+    this.active.clear();
+  }
+
   private cleanup(): void {
-    if (this.node) {
-      this.node.port.onmessage = null;
-      this.node.disconnect();
+    const node = this.node;
+    if (node) {
+      node.port.onmessage = null;
+      node.onprocessorerror = null;
+      node.disconnect();
       this.node = null;
     }
     if (this.source) {
-      this.source.disconnect();
+      // Disconnect only from our own node: a host-supplied source may well be
+      // feeding other things, and a bare `disconnect()` would cut all of them.
+      try {
+        if (node) this.source.disconnect(node);
+      } catch {
+        /* Already disconnected, or never connected. Nothing to undo. */
+      }
       this.source = null;
     }
-    if (this.stream) {
+    if (this.stream && this.ownsStream) {
       // Releasing every track is what turns the browser's recording indicator
       // back off. Disconnecting the graph alone does not.
       for (const track of this.stream.getTracks()) track.stop();
-      this.stream = null;
     }
-    if (this.context) {
+    this.stream = null;
+    if (this.context && this.ownsContext) {
       void this.context.close().catch(() => undefined);
-      this.context = null;
     }
+    this.context = null;
+    this.ownsContext = false;
+    this.ownsStream = false;
   }
 
   private setState(state: TuninatorState): void {
@@ -338,6 +391,23 @@ class WorkerWebAudio implements TuninatorWorker {
     const error: TuninatorError = { code, message, cause };
     this.emitter.emit("error", error);
   }
+}
+
+/**
+ * Duck-typed rather than `instanceof AudioNode`.
+ *
+ * `AudioNode` is not a global outside a browser — a Node test harness that
+ * stubs `AudioContext` has no such constructor — and even in a browser the
+ * check fails across realms, so a node from an iframe would be mistaken for a
+ * MediaStream. Having a `context` and a `connect` is what actually matters.
+ */
+function isAudioNode(value: MediaStream | AudioNode | undefined): value is AudioNode {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "context" in value &&
+    typeof (value as AudioNode).connect === "function"
+  );
 }
 
 function classifyMicError(error: unknown): TuninatorErrorCode {
