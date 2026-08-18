@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "title": "Chords A Bm G D 2x 120bpm two strums each",
+  "sourceAudio": "../audio/Chords A Bm G D 2x 120bpm two strums each.mp4",
+  "instrument": "guitar-clean",
+  "tempoBpm": 120,
+  "timingNotes": "Player's description: downstrum on the beat, let it ring, upstrum on the next beat, then mute. So each chord spans 2 beats (1000ms at 120bpm) and contains TWO strums of the SAME chord -- the second attack sits ~500ms into each event, at roughly 4907, 5973, 6920, 7920, 8920, 9920, 10960 and 11960ms. Each event here is one CHORD, not one strum: the chord identity does not change across its two strums, and the re-strum is an internal re-articulation. Boundaries were measured from the RMS envelope (first frame after the inter-chord trough where energy begins a sustained climb), not from the chord classifier, whose segmentation is the thing under test. Durations run 960-1093ms. The final D decays to genuine silence at 12493ms, ~580ms before the file ends at 13076ms, so its end is a real detectable decay rather than a file cutoff. Timestamps are quantized to the engine's analysis hop (640 samples @48kHz = 13.3ms) so every boundary lands on a frame the engine can actually emit.",
+  "events": [
+    { "id": "s1", "startMs": 4400, "endMs": 5467, "kind": "chord", "label": "A", "pitches": ["A2", "E3", "A3", "C#4", "E4"], "strums": 2, "required": true },
+    { "id": "s2", "startMs": 5467, "endMs": 6427, "kind": "chord", "label": "Bm", "pitches": ["B2", "F#3", "B3", "D4", "F#4"], "strums": 2, "required": true },
+    { "id": "s3", "startMs": 6427, "endMs": 7413, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "strums": 2, "required": true },
+    { "id": "s4", "startMs": 7413, "endMs": 8427, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "strums": 2, "required": true },
+    { "id": "s5", "startMs": 8427, "endMs": 9440, "kind": "chord", "label": "A", "pitches": ["A2", "E3", "A3", "C#4", "E4"], "strums": 2, "required": true },
+    { "id": "s6", "startMs": 9440, "endMs": 10413, "kind": "chord", "label": "Bm", "pitches": ["B2", "F#3", "B3", "D4", "F#4"], "strums": 2, "required": true },
+    { "id": "s7", "startMs": 10413, "endMs": 11507, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "strums": 2, "required": true },
+    { "id": "s8", "startMs": 11507, "endMs": 12493, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "strums": 2, "required": true }
+  ]
+}

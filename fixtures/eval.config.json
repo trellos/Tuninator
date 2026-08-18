@@ -37,6 +37,16 @@
     "minLabelAccuracy": 0.6
   },
 
+  "chords-a-bm-g-d-2x-120bpm": {
+    "required": true,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "The cleanest strummed-chord case in the set: four open chords, twice through, deliberately separated by a mute so every boundary is unambiguous. Major vs minor is the point (A vs Bm), so the gate is on the full label. This fixture was added specifically because strummed chords were not being recognised at all; it is the target the chord path has to hit.",
+    "minLabelAccuracy": 0.75,
+    "maxMedianOnsetErrorMs": 120,
+    "maxFalsePositives": 2
+  },
+
   "spicy-chords-cmaj9-g-am11": {
     "required": false,
     "mode": "chords",
