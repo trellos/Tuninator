@@ -231,9 +231,16 @@ export function matchChord(chroma: Float32Array, options: ChordMatchOptions = {}
   // best is discounted. D7 adds a tone to D, so when D wins it is not in real
   // competition. The reverse is not true and must not be skipped -- if Cmaj
   // wins over C5, the question "was a third played at all?" is exactly the
-  // power-chord distinction, and it has to face the full margin. A symmetric
-  // rule cost power-chord accuracy 75% -> 67% and produced a confidently-wrong
-  // label; this asymmetry is what keeps both cases honest.
+  // power-chord distinction, and it has to face the full margin.
+  //
+  // That asymmetry was originally justified by a measurement that no longer
+  // holds: a symmetric rule used to cost power-chord accuracy 75% -> 67% and
+  // produce a confidently-wrong label, back when the chroma could not see a
+  // strummed third at all. Re-measured against the NNLS transcription, the two
+  // rules name exactly the same 59 of 78 events; the symmetric one just emits
+  // three more fragments. So the asymmetry is kept on its argument rather than
+  // on its old evidence — and the argument is the one above, that a missing
+  // third is a fact about the chord and not a shade of it.
   const rival = candidates.find((c) => !isStrictExtensionOf(c, best));
   const rivalGap = rival ? best.score - rival.score : 0;
 
