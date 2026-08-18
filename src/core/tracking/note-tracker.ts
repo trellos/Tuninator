@@ -51,6 +51,30 @@ const GLIDE_MIN_CENTS = 25;
  */
 const STEP_CONFIRM_FRAMES = 2;
 
+/**
+ * How close to a whole number of octaves a jump must be to be dismissed as a
+ * detector artefact rather than a played interval.
+ */
+const OCTAVE_JUMP_TOLERANCE_CENTS = 60;
+
+/**
+ * True when `hz` is an octave multiple of `fromHz` — the signature of YIN
+ * landing on a harmonic or a sub-harmonic rather than of a new note.
+ *
+ * A step of an octave is 1200 cents against a 70-cent threshold, so before this
+ * every octave flip split the note in two. On the lead fixture's low strings
+ * that is exactly what happened: B2 came out as a B3 event followed by a B2
+ * event, and C#3 as four alternating C#3/C#4 fragments. The engine already
+ * fights octave errors three ways at frame level; this is the same fight at
+ * event level, where the giveaway is that nobody re-articulated.
+ */
+function isOctaveJump(hz: number, fromHz: number): boolean {
+  const octaves = Math.log2(hz / fromHz);
+  const nearest = Math.round(octaves);
+  if (nearest === 0) return false;
+  return Math.abs(octaves - nearest) * 1200 < OCTAVE_JUMP_TOLERANCE_CENTS;
+}
+
 /** Note-mode state, layered onto `ActiveEvent`. */
 type NoteState = {
   /** Last few voiced frequencies, oldest first. Drives the glide test. */
@@ -127,7 +151,15 @@ export class NoteTracker extends BaseTracker<ActiveNote> {
           active.pendingStepFrames = 0;
         }
 
-        if (holdsCandidate || stepCents > policy.pitch.stepThresholdCents) {
+        // An octave leap with no attack behind it is the detector slipping a
+        // harmonic, not the player jumping an octave. Playing one really does
+        // happen -- but it is picked or hammered, and that lands an onset.
+        const octaveSlip = isOctaveJump(hz, active.lastVoicedHz);
+
+        if (octaveSlip) {
+          active.pendingStepHz = null;
+          active.pendingStepFrames = 0;
+        } else if (holdsCandidate || stepCents > policy.pitch.stepThresholdCents) {
           if (holdsCandidate) {
             active.pendingStepFrames++;
           } else {

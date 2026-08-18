@@ -30,7 +30,10 @@ export type Policy = {
   pitch: {
     /** Long YIN window, in samples. Sized for two periods of low E (82.4Hz). */
     longWindow: number;
-    /** Short YIN window, in samples. 4x better time resolution than `longWindow`. */
+    /**
+     * Short YIN window, in samples. ~5x better time resolution than
+     * `longWindow`, and the single biggest lever on fast passages.
+     */
     shortWindow: number;
     /** Above this frequency a confident short-window result is preferred. */
     shortWindowMinHz: number;
@@ -111,17 +114,37 @@ const BASE: Omit<Policy, "mode"> = {
     confidenceGate: 0.35,
   },
   tracking: {
-    minStableMs: 45,
+    // 65, swept 25/45/65/90 on the lead fixture: false positives fall 12/7/5/3
+    // while accuracy holds at 79.1 until 90, where it drops. 65 is the last
+    // value that costs nothing.
+    minStableMs: 65,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
   },
   pitch: {
     longWindow: 2048,
-    shortWindow: 512,
+    // 384, swept against 256/384/512/768. The lead fixture's pitch-class
+    // accuracy runs 69.8 / 79.1 / 72.1 / 67.4 across those: too long and the
+    // detector is still hearing the previous note of a 166ms triplet, too short
+    // and two periods of a 494Hz B4 barely fit. 384 samples is 8ms, and bounds
+    // the short window's own search at 250Hz.
+    shortWindow: 384,
     shortWindowMinHz: 300,
     yinThreshold: 0.13,
-    medianFrames: 3,
-    stepThresholdCents: 70,
+    // 1 -- no temporal median at all.
+    //
+    // It existed to discard a single octave-flipped frame, but a median that
+    // spans 3 hops also delays every genuine note change by one, and on a 166ms
+    // triplet that is most of a note. The octave errors it was covering for are
+    // now caught where they belong: `isOctaveJump` in the note tracker refuses
+    // to split on an octave leap, which is what those frames actually caused.
+    // Measured: 1/2/3/5 frames give 8/8/9/11 missed notes on the lead fixture.
+    medianFrames: 1,
+    // 80 -- just under a semitone, so a real fretted step still clears it while
+    // sub-semitone wobble does not. Swept 50/60/70/80: pitch-class accuracy
+    // barely moves (81.4/79.1/79.1/79.1) but false positives fall 6/6/5/4, and
+    // false positives are what the lead fixture is gated on.
+    stepThresholdCents: 80,
   },
   onset: {
     enabled: true,
