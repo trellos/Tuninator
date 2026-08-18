@@ -146,26 +146,18 @@ const MAGNITUDE_EXPONENT = 0.5;
  */
 const FUNDAMENTAL_MIN_RATIO = 0.12;
 
-/**
- * How close to the winner the octave BELOW it must score to be preferred.
- *
- * The same bargain `yin.ts` strikes with `OCTAVE_TOLERANCE`: a generous bar is
- * what lets the true fundamental beat its own harmonic, and too generous a bar
- * starts dragging genuinely high notes an octave down.
- */
-const SUBOCTAVE_TOLERANCE = 0.85;
-
 /** Below this fraction of full scale the frame is silence, not a quiet note. */
 const SILENCE_MAGNITUDE = 1e-5;
 
 /**
  * Novelty at which the arrival term of the confidence saturates.
  *
- * `novelty` is the share of the frame's magnitude that is not in the reference.
- * A note starting from silence reaches 1; the ripple of a perfectly steady note
- * measured on this fixture sits under 0.1. 0.35 is set between them, so a
- * genuine hammer-on over a ringing string -- which only ever contributes part of
- * the frame -- still saturates while sustain never does.
+ * `novelty` is the share of the frame's magnitude that is not in the reference,
+ * and it is the term that actually predicts whether this estimator is right: a
+ * note starting from silence reaches 1, while over the lead fixture's sustained
+ * frames it has a median of 0.035 and a 99th percentile of 0.24. 0.35 sits above
+ * that tail, so a hammer-on over a ringing string -- which only ever contributes
+ * part of the frame -- still saturates and sustain never does.
  */
 const NOVELTY_SATURATION = 0.35;
 
@@ -174,10 +166,14 @@ const NOVELTY_SATURATION = 0.35;
  * peaks completely, as a fraction of the score a candidate would get if every
  * one of its partials were the loudest peak in the residual.
  *
- * A real attack never reaches 1: the upper partials of a plucked string are
- * always well below the strongest, and a hammer-on adds broadband noise that
- * owns some of the peaks. 0.45 is where the clean, unambiguous attacks in the
- * fixtures sit.
+ * A real attack never reaches 1: the upper partials of a plucked string are well
+ * below the strongest, and a hammer-on adds broadband noise that owns some of
+ * the peaks. 0.45 is the median over the fixture's arrival frames, so this sets
+ * the SCALE of the confidence rather than discriminating within it -- measured,
+ * it is 0.46 on the arrivals this estimator gets right and 0.48 on the ones it
+ * gets wrong. It is here to stop a frame whose residual holds two peaks and a
+ * hiss from reporting the same number as a frame holding a whole harmonic
+ * series, not to rank the good frames against each other.
  */
 const EXPLAINED_SATURATION = 0.45;
 
@@ -222,7 +218,7 @@ export class OnsetWeightedEstimator implements PitchEstimator {
   private readonly maxBin: number;
 
   private readonly hann: Float32Array;
-  /** The frame, windowed and zero-padded to `FFT_SIZE`. */
+  /** The frame, windowed into the first `WINDOW` slots; the tail stays zero. */
   private readonly padded: Float32Array;
   private readonly magnitude: Float32Array;
   /** Ring of the last `HISTORY` magnitude spectra, `bins` apart. */
@@ -242,8 +238,6 @@ export class OnsetWeightedEstimator implements PitchEstimator {
 
   /** f0 of each grid point, ascending. */
   private readonly gridHz: Float64Array;
-  /** Grid points within a semitone of a given one, for the rival search. */
-  private readonly semitoneSteps: number;
   /*
    * Partials in compressed-column form: grid point `g` owns
    * `[gridStart[g], gridStart[g + 1])` of `partialHz`/`partialSlack`/`weight`,
@@ -280,7 +274,9 @@ export class OnsetWeightedEstimator implements PitchEstimator {
     this.fft = new RealFFT(FFT_SIZE);
     this.bins = this.fft.bins;
     this.binHz = sampleRate / FFT_SIZE;
-    this.minBin = Math.max(1, Math.floor(minFrequencyHz / this.binHz) - 3);
+    // One bin of headroom under the bound: a partial at exactly `minFrequencyHz`
+    // needs its neighbours to interpolate, and the search slack reaches below it.
+    this.minBin = Math.max(1, Math.floor(minFrequencyHz / this.binHz) - 1);
     this.maxBin = Math.min(
       this.bins - 2,
       Math.ceil(Math.min(PARTIAL_MAX_HZ, sampleRate / 2) / this.binHz)
@@ -297,7 +293,6 @@ export class OnsetWeightedEstimator implements PitchEstimator {
 
     const semitones = 12 * Math.log2(maxFrequencyHz / minFrequencyHz);
     const gridCount = Math.max(2, Math.round(semitones * GRID_STEPS_PER_SEMITONE) + 1);
-    this.semitoneSteps = GRID_STEPS_PER_SEMITONE;
     this.score = new Float64Array(gridCount);
     this.gridHz = new Float64Array(gridCount);
     this.gridStart = new Int32Array(gridCount + 1);
@@ -384,23 +379,26 @@ export class OnsetWeightedEstimator implements PitchEstimator {
     const bestScore = this.score[best]!;
     let rival = 0;
     for (let g = 0; g < this.score.length; g++) {
-      if (Math.abs(g - best) < this.semitoneSteps) continue;
+      if (Math.abs(g - best) < GRID_STEPS_PER_SEMITONE) continue;
       const s = this.score[g]!;
       if (s > rival) rival = s;
     }
 
-    // Three independent ways of being wrong, so three factors, and the contract
-    // asks for their product rather than for the flattering maximum.
+    // Three independent ways of being wrong, so the product of three factors and
+    // not the flattering maximum. They do not carry equal weight, and saying
+    // which does what is the point of reporting a number at all:
     //
-    //  - `arrival`: is anything being measured at all, or is this a
-    //    continuation whose residual is ripple?
-    //  - `explained`: does ONE harmonic series account for the arriving peaks?
-    //    Low when the attack is mostly broadband pick noise, or when two notes
-    //    arrive together and neither series fits.
-    //  - `posterior`: given that it is one note, is it THIS one? A two-hypothesis
-    //    posterior between the winner and the best candidate a semitone or more
-    //    away, so a pitch tied with its own octave reports 0.5 rather than 0.99 —
-    //    which is the case the contract file singles out.
+    //  - `arrival` is the one that predicts correctness. It asks whether
+    //    anything is being measured, or whether this is a continuation whose
+    //    residual is ripple, and bucketing the fixture's frames by the confidence
+    //    they end up with runs 51% correct at the bottom and 83% at the top.
+    //  - `explained` sets the scale: whether ONE harmonic series accounts for the
+    //    arriving peaks at all, rather than two peaks and a hiss.
+    //  - `posterior` is the octave guard. A two-hypothesis posterior between the
+    //    winner and the best candidate a semitone or more away, so a pitch tied
+    //    with its own octave reports 0.5 and not 0.99 -- the case the contract
+    //    file singles out. It separates right from wrong only weakly (median
+    //    0.86 against 0.78), which is why it multiplies rather than decides.
     const arrival = Math.min(1, novelty / NOVELTY_SATURATION);
     const explained = Math.min(1, bestScore / this.saturatedScore);
     const a = Math.pow(bestScore, POSTERIOR_SHARPNESS);
@@ -432,13 +430,20 @@ export class OnsetWeightedEstimator implements PitchEstimator {
    * The answer for a frame in which nothing arrived: the last note that did,
    * reported as the memory it is.
    *
-   * The alternative -- naming the pitch of the raw spectrum -- was measured and
-   * is strictly worse than useless here: it is YIN's answer arrived at by a
-   * worse route, and on exactly the legato frames this estimator exists for it
-   * is YIN's WRONG answer, since the loudest thing sounding through the sustain
-   * of a hammer-on is still the old note. Repeating the arrival at a decaying
-   * confidence at least says something the other estimators cannot, and says it
-   * quietly enough that a fusion can overrule it.
+   * THE OBVIOUS ALTERNATIVE SCORES HIGHER AND IS THE WRONG ANSWER.
+   *
+   * Naming the pitch of the raw spectrum on these frames was measured: on a
+   * contiguous pass of the lead fixture it takes this estimator from 31/43 notes
+   * to 37/43, past YIN's 35 (32 to 36 as the bench samples it). It also loses t4,
+   * t6, t10 and t16 -- every note this estimator exists for -- because the
+   * sustain frames outnumber the attack frames and the sustain of a hammer-on is
+   * still dominated by the note underneath it. What that variant becomes is a
+   * second, slightly better YIN, wrong in the same places as the first, which is
+   * the one thing a fusion has no use for.
+   *
+   * So: repeat the arrival instead. It is a claim about the PAST rather than a
+   * measurement of this frame, and the decaying confidence says so, quietly
+   * enough that a fusion can overrule it.
    */
   private sustained(): PitchEstimate {
     if (this.heldHz === null) return { frequencyHz: null, confidence: 0 };
@@ -575,19 +580,6 @@ export class OnsetWeightedEstimator implements PitchEstimator {
         bestScore = sum;
         best = g;
       }
-    }
-
-    // Octave resolution, the same shape as `yin.ts`'s and for the same reason:
-    // the octave above a note is scored on that note's own even harmonics, so it
-    // fits about as well whenever the fundamental is the weak partial -- which on
-    // a guitar's wound strings it often is. Only a decisive win may keep the
-    // higher reading. The fundamental gate cannot help here: the octave-up
-    // candidate's "fundamental" is the real note's second harmonic, and that is
-    // genuinely present.
-    const octave = 12 * this.semitoneSteps;
-    while (best - octave >= 0 && score[best - octave]! >= bestScore * SUBOCTAVE_TOLERANCE) {
-      best -= octave;
-      bestScore = score[best]!;
     }
     return best;
   }

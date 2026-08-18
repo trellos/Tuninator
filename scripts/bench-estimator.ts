@@ -91,38 +91,77 @@ export function benchEstimator(
 ): BenchResult {
   const { samples, sampleRate, notes: aligned } = alignFixture(stem);
   const window = new Float32Array(estimator.windowSize);
+  const windowMs = (estimator.windowSize / sampleRate) * 1000;
+  const hopMs = (HOP / sampleRate) * 1000;
+
+  // Every sample point, gathered before any of them is taken, so they can be
+  // visited in TIME order rather than in label order.
+  //
+  // The measured spans overlap -- a note that is still ringing when the next is
+  // plucked genuinely occupies the same milliseconds -- so walking notes one
+  // after another makes the clock jump backwards at note boundaries, by as much
+  // as 160ms on this fixture. A stateless estimator cannot tell; one that keeps
+  // any history across frames has that history drawn from audio it should not
+  // have heard yet, which is precisely the estimator this bench exists to
+  // evaluate. A frame inside two notes is offered to both and estimated once.
+  const points: Array<{ ms: number; note: number }> = [];
+  for (let i = 0; i < aligned.length; i++) {
+    const label = aligned[i]!;
+    for (let ms = label.startMs + windowMs + EDGE_GUARD_MS; ms <= label.endMs; ms += hopMs) {
+      const end = Math.round((ms / 1000) * sampleRate);
+      if (end < estimator.windowSize || end > samples.length) continue;
+      points.push({ ms, note: i });
+    }
+  }
+  points.sort((a, b) => a.ms - b.ms || a.note - b.note);
+
+  type Tally = {
+    counts: Map<string, number>;
+    confidenceSum: number;
+    voiced: number;
+    frames: number;
+    hit: number;
+  };
+  const tallies: Tally[] = aligned.map(() => ({
+    counts: new Map(),
+    confidenceSum: 0,
+    voiced: 0,
+    frames: 0,
+    hit: 0,
+  }));
+
+  let lastMs = Number.NaN;
+  let lastResult: { frequencyHz: number | null; confidence: number } = {
+    frequencyHz: null,
+    confidence: 0,
+  };
+  for (const point of points) {
+    if (point.ms !== lastMs) {
+      const end = Math.round((point.ms / 1000) * sampleRate);
+      window.set(samples.subarray(end - estimator.windowSize, end));
+      lastResult = estimator.estimate(window);
+      lastMs = point.ms;
+    }
+    const tally = tallies[point.note]!;
+    tally.frames++;
+    if (lastResult.frequencyHz === null) continue;
+    tally.voiced++;
+    tally.confidenceSum += lastResult.confidence;
+    const midi = Math.round(69 + 12 * Math.log2(lastResult.frequencyHz / 440));
+    const name = nameOfMidi(midi);
+    tally.counts.set(name, (tally.counts.get(name) ?? 0) + 1);
+    if (midi === midiOfName(aligned[point.note]!.note)) tally.hit++;
+  }
+
   const notes: NoteOutcome[] = [];
   let frameExact = 0;
   let frameTotal = 0;
-
-  for (const label of aligned) {
-    const wantMidi = midiOfName(label.note);
-    const tally = new Map<string, number>();
-    let confidenceSum = 0;
-    let voiced = 0;
-    let frames = 0;
-    let hit = 0;
-
-    // The earliest frame whose window lies entirely inside this note.
-    const windowMs = (estimator.windowSize / sampleRate) * 1000;
-    const from = label.startMs + windowMs + EDGE_GUARD_MS;
-    for (let ms = from; ms <= label.endMs; ms += (HOP / sampleRate) * 1000) {
-      const end = Math.round((ms / 1000) * sampleRate);
-      if (end < estimator.windowSize || end > samples.length) continue;
-      window.set(samples.subarray(end - estimator.windowSize, end));
-      const result = estimator.estimate(window);
-      frames++;
-      if (result.frequencyHz === null) continue;
-      voiced++;
-      confidenceSum += result.confidence;
-      const midi = Math.round(69 + 12 * Math.log2(result.frequencyHz / 440));
-      tally.set(nameOfMidi(midi), (tally.get(nameOfMidi(midi)) ?? 0) + 1);
-      if (midi === wantMidi) hit++;
-    }
-
+  for (let i = 0; i < aligned.length; i++) {
+    const label = aligned[i]!;
+    const tally = tallies[i]!;
     let got = "(none)";
     let best = 0;
-    for (const [name, count] of tally) {
+    for (const [name, count] of tally.counts) {
       if (count > best) {
         best = count;
         got = name;
@@ -132,14 +171,14 @@ export function benchEstimator(
       id: label.id,
       want: label.note,
       got,
-      tooShort: frames === 0,
+      tooShort: tally.frames === 0,
       buried: label.dominance < 1,
-      agreement: frames > 0 ? hit / frames : 0,
-      confidence: voiced > 0 ? confidenceSum / voiced : 0,
-      frames,
+      agreement: tally.frames > 0 ? tally.hit / tally.frames : 0,
+      confidence: tally.voiced > 0 ? tally.confidenceSum / tally.voiced : 0,
+      frames: tally.frames,
     });
-    frameExact += hit;
-    frameTotal += frames;
+    frameExact += tally.hit;
+    frameTotal += tally.frames;
   }
 
   const audible = notes.filter((n) => !n.buried);
