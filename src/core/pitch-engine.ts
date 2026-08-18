@@ -241,7 +241,7 @@ export class PitchEngine {
           harmonicDecay: policy.chords.harmonicDecay,
           envelopes: policy.chords.envelopes,
           fundamentalMinRatio: policy.chords.fundamentalMinRatio,
-          presenceRatio: policy.chords.presenceRatio,
+            presenceRatio: policy.chords.presenceRatio,
           contrast: policy.chords.contrast,
         });
       }

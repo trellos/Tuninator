@@ -94,6 +94,12 @@ export type NoteActivationOptions = {
   /**
    * L1 penalty, as a fraction of the frame's largest correlation. Larger is
    * sparser. Default 0.
+   *
+   * It does what it says — swept on the D bar it takes the phantom E5 from 37%
+   * of peak down to 15% — but it takes the real third down with it, from 25% to
+   * 19%, and across the five fixtures nothing between 0 and 0.1 changes a
+   * single named event. Left available and left off: no policy chooses it,
+   * because on this material there is nothing to choose.
    */
   sparsity?: number;
 };
