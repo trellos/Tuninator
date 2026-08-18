@@ -171,7 +171,7 @@ export function alignFixture(stem: string): Fixture {
 
 /* -------------------------------------------------------------------------- */
 
-async function main(): Promise<void> {
+function main(): void {
   const stem = process.argv[2] ?? "clean-lead-120bpm";
   const { notes } = alignFixture(stem);
   for (const n of notes) {
@@ -191,5 +191,5 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1]?.endsWith("label-alignment.ts")) {
-  await main();
+  main();
 }
