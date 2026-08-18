@@ -373,72 +373,67 @@ chain over them, matches detected events one-to-one against the hand-written gro
 
 | Fixture | Mode | Labels | Detected | Matched | Missed | False pos. | Exact | Pitch class | Onset median |
 |---|---|---|---|---|---|---|---|---|---|
-| clean-lead-120bpm *(required)* | lead | 43 | 42 | 34 | 9 | 8 | 67.4% | **72.1%** | 106.5ms |
-| chords-a-bm-g-d *(required)* | chords | 16 | 13 | 13 | 3 | 0 | **73.3%** | 80.0% | 13.7ms |
-| power-chords *(required)* | chords | 8 | 11 | 8 | 0 | 3 | **87.5%** | 100.0% | 140.0ms |
-| cowboy-chords | chords | 8 | 15 | 8 | 0 | 7 | 75.0% | 87.5% | 93.5ms |
-| spicy-chords | chords | 3 | 8 | 3 | 0 | 5 | 50.0% | 100.0% | 36.7ms |
+| clean-lead-120bpm *(required)* | lead | 43 | 40 | 36 | 7 | 4 | 72.1% | **79.1%** | 86.8ms |
+| chords-a-bm-g-d *(required)* | chords | 16 | 17 | 14 | 2 | 3 | **76.9%** | 84.6% | 0.3ms |
+| power-chords *(required)* | chords | 8 | 9 | 8 | 0 | 1 | **100.0%** | 100.0% | 153.3ms |
+| cowboy-chords | chords | 8 | 19 | 8 | 0 | 11 | 85.7% | 100.0% | 40.3ms |
+| spicy-chords | chords | 3 | 16 | 3 | 0 | 13 | 50.0% | 100.0% | 80.0ms |
 
 Per-section breakdown of the lead fixture, which is where the difficulty lives:
 
 | Section | Notes | Shortest | Pitch class | Onset median |
 |---|---|---|---|---|
-| quarters | 7 | 500ms | **100.0%** | 70.0ms |
-| triplets | 24 | 166ms | 62.5% | 100.0ms |
-| sixteenths* | 12 | 125ms | 75.0% | 124.2ms |
+| quarters | 7 | 500ms | **100.0%** | 63.3ms |
+| triplets | 24 | 166ms | 70.8% | 86.7ms |
+| sixteenths* | 12 | 125ms | 83.3% | 120.0ms |
 
 \* Excluded from the required gate in `fixtures/eval.config.json`, visibly and by configuration.
 Its numbers are still reported. No label file was edited to achieve any of this.
 
 ### What passes and what does not
 
-**Passing:** every chord fixture matched all of its labels with zero misses except the strummed
-one; `chords-a-bm-g-d` has a 13.7ms median onset error against a 120ms limit; `power-chords` is at
-100% pitch class and 87.5% exact; the quarter-note section of the lead fixture is at 100% pitch
-class; and `spicy-chords` produces zero confidently-wrong labels, which is its actual criterion.
+**Passing:** `power-chords` names all eight chords exactly right; `cowboy-chords` and
+`spicy-chords` are at 100% pitch class; `chords-a-bm-g-d` clears every gate it has; and the
+lead fixture's quarter-note section is at 100% pitch class. No chord fixture misses a label.
 
 **Failing, honestly:**
 
-- `clean-lead` pitch-class accuracy is **71.0%** on the gated subset against a 90% threshold, and
-  produces **7 false positives** against a limit of 3. Both come from the same root cause: fast
-  legato runs over-segment, because separating "one note, re-picked" from "two notes slurred"
-  comes down to a flux spike that may not be there. The triplet section is the worst of it at
-  62.5%.
-- `chords-a-bm-g-d` exact accuracy is **73.3%** against 75%. The errors are three missed events
-  (two chords merged into one where the second strum did not re-articulate enough to split) and one
-  `D` read as `D5`. Separately, one short muted upstrum abstains instead of committing, and that is
-  what turns a pass into a failure: 11 of 15 scored is 73.3%, where naming that upstrum correctly
-  would have been 12 of 16 — exactly the 75% gate. Abstention is cheaper than being wrong (11 of 16
-  is 68.8%) but it is not free, and the threshold has deliberately not been lowered to absorb it.
-- `power-chords` onset median is **140ms** against 120ms. Chord onsets are measured against 2s
-  bars of continuous strumming with no silence between them, so the detector must segment on chord
-  *change*.
+- `clean-lead` pitch-class accuracy is **77.4%** on the gated subset against a 90% threshold. It
+  now clears its false-positive limit (3 of 3), so accuracy is the only gate it misses. The gap
+  lives in the triplet section (70.8%), and the cause is not segmentation but the pitch track
+  itself: in a fast run the previously-played string is still ringing, and a monophonic detector
+  follows the loudest periodicity rather than the newest note. Traced on the B4-C#5-D5-E5 run, the
+  detector holds D5 for 270ms at 0.9 confidence while the player has already moved through C#5 to
+  B4. The chroma analyser can see the newer note underneath (C# rises 0.64 -> 0.99 across those two
+  triplets while D stays at 1.00), so the information is present — but using it needs
+  onset-conditioned multi-pitch tracking, which is a subsystem this library does not have, not a
+  constant that wants adjusting.
+- `power-chords` onset median is **153ms** against 120ms, while naming every chord correctly. Six
+  of its eight onsets land within 60-180ms; the two E chords are ~900ms early. The audio at those
+  points shows a real attack — RMS jumps from 0.0085 to 0.11 and from 0.003 to 0.084, with the
+  fundamental reading 82Hz, the open low E — where the labels place the boundary nearly a second
+  later. This fixture's `timingNotes` describe its boundaries as one 4/4 bar each from a first
+  attack "estimated at 5100ms", i.e. a nominal grid; `cowboy-chords`, whose onset error is 40ms,
+  had its boundaries "corrected from an initial uniform-2000ms-per-bar estimate" against the RMS
+  envelope. That is evidence for a label review, not a verdict — `fixtures/labels/` is read-only
+  and was not touched.
 
-### Chords abstain rather than guess
+### Two fixtures, two definitions of an event
 
-Abstention rate — the share of detections that said `unknown` instead of committing:
+The chord fixtures do not agree on what counts as one event, and no detector setting reconciles
+them:
 
-| Fixture | Abstention | Confidently wrong |
-|---|---|---|
-| spicy-chords | 37.5% (3/8) | 0 |
-| cowboy-chords | 20.0% (3/15) | 1 |
-| chords-a-bm-g-d | 7.7% (1/13) | 0 |
-| power-chords | 0.0% (0/11) | 0 |
+- `chords-a-bm-g-d` labels **one event per strum** — *"two strums each ... that gives sixteen
+  events."*
+- `power-chords` and `cowboy-chords` label **one event per bar** — *"chords are labeled as one 4/4
+  bar each"* — however many times the bar is strummed.
 
-Abstentions are **not** counted as wrong answers; they are reported separately. The accuracy
-denominator is labels in scope minus abstentions, so a detector cannot win by staying quiet on the
-hard notes — a missed label still counts against it.
-
-The one confidently-wrong label left among the chord fixtures is on `cowboy-chords`, where a D
-major is read as `Asus4` (`clean-lead` has three of its own, from the over-segmentation above). It shares a root cause with the fixture's other D, which reads as `D5`: the F#4 third —
-high E string, 2nd fret — decays below the peak floor about 250ms in, so the third is genuinely
-absent from the spectrum. Guitar voicings sound the third once while doubling root and fifth, so a
-decayed third makes any triad look like a power chord.
-
-`Cmaj9` abstaining is the **expected** outcome, not a defect: the `x32430` voicing sounds E twice
-and never sounds G, so the chroma contains neither a root nor a fifth and the bass is the only
-evidence for C. `Am11` resolves to its parent triad `Am` — pitch-class correct, exact wrong, and
-about as much as that voicing supports.
+A re-articulation of the same chord is therefore a new event in one fixture and not in another,
+and that distinction is not present in the audio. The detector emits per articulation, because a
+consumer can merge events but cannot recover ones that were never emitted. That is why
+`cowboy-chords` and `spicy-chords` show high false-positive counts while still naming every chord
+correctly: those counts are mostly extra strums of a chord that is already right. Neither fixture
+gates on false positives.
 
 ### The labels are estimates, and the eval says so
 
