@@ -130,6 +130,7 @@ export class PitchEngine {
       minIntervalMs: policy.onset.minIntervalMs,
       medianWindow: policy.onset.medianWindow,
       sensitivity: policy.onset.sensitivity,
+        rippleFloorFactor: policy.onset.rippleFloorFactor,
     });
 
     if (policy.chords.enabled) {
@@ -185,7 +186,8 @@ export class PitchEngine {
       policy.onset.fftSize !== prev.onset.fftSize ||
       policy.onset.minIntervalMs !== prev.onset.minIntervalMs ||
       policy.onset.medianWindow !== prev.onset.medianWindow ||
-      policy.onset.sensitivity !== prev.onset.sensitivity;
+      policy.onset.sensitivity !== prev.onset.sensitivity ||
+      policy.onset.rippleFloorFactor !== prev.onset.rippleFloorFactor;
 
     if (onsetShapeChanged) {
       this.onsetWindow = new Float32Array(policy.onset.fftSize);
@@ -195,6 +197,7 @@ export class PitchEngine {
         minIntervalMs: policy.onset.minIntervalMs,
         medianWindow: policy.onset.medianWindow,
         sensitivity: policy.onset.sensitivity,
+        rippleFloorFactor: policy.onset.rippleFloorFactor,
       });
     }
 

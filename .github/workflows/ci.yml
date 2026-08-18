@@ -36,6 +36,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # `npm test` now includes tests/fixtures.test.ts, which runs the detector
+      # over the recorded guitar and fails if it gets WORSE than it is today.
+      # Before that file existed, every test here was synthetic and the suite
+      # could be green while the detector mis-heard the sample input.
       - name: Test
         run: npm test
 
@@ -67,13 +71,16 @@ jobs:
         working-directory: examples/browser-demo
         run: npx vite build
 
-      # `npm run eval` decodes the fixtures and scores the detector against them.
-      # It EXITS 1 TODAY because 3 required fixtures miss their thresholds
-      # (chords-a-bm-g-d-2x-120bpm, clean-lead-120bpm,
-      # power-chords-c-a-g-e-c-d-fsharp-e-120bpm). That is a known, documented
-      # state, not a regression — so the step is non-blocking for now.
-      # Once those three pass, DROP `continue-on-error` and let eval block CI.
-      - name: Eval (non-blocking — see comment)
+      # `npm run eval` scores the detector against the fixtures' ASPIRATIONAL
+      # thresholds in fixtures/eval.config.json. It still exits 1: clean-lead is
+      # at 77.4% pitch class against a 90% gate, and power-chords misses its
+      # onset budget. Those are open detector problems, not regressions.
+      #
+      # It stays non-blocking ONLY because the ratchet in tests/fixtures.test.ts
+      # now guards the thing that matters day to day -- the detector cannot get
+      # worse without `npm test` going red. Eval is the target; the test is the
+      # floor. Drop `continue-on-error` when the targets are met.
+      - name: Eval (target thresholds — non-blocking, see comment)
         continue-on-error: true
         run: npm run eval
 

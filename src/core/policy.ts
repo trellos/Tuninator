@@ -61,6 +61,20 @@ export type Policy = {
     /** Multiplier on the adaptive median; higher = fewer onsets. */
     sensitivity: number;
     /**
+     * Safety factor on the threshold's level-proportional floor.
+     *
+     * The decaying peak-hold reference leaks `1 - REFERENCE_DECAY` of the
+     * frame's magnitude back into the flux every hop even when nothing is
+     * happening, so the floor has to cover that leak. This multiplies it.
+     *
+     * It matters far more than it looks: the floor competes with the adaptive
+     * median for `max()`, and because it scales with level it WINS in loud
+     * passages — measured at 75% of hops through the lead fixture's triplet run,
+     * where it made `sensitivity` inert and the detector deaf to exactly the
+     * note boundaries it was needed for.
+     */
+    rippleFloorFactor: number;
+    /**
      * How much louder than its recent baseline a frame must be for an onset to
      * split the note already sounding. 1 disables the check.
      *
@@ -154,6 +168,7 @@ const BASE: Omit<Policy, "mode"> = {
     minIntervalMs: 90,
     medianWindow: 17,
     sensitivity: 1.6,
+    rippleFloorFactor: 2,
     repickRmsRise: 1.05,
   },
   chords: {

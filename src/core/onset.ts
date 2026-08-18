@@ -21,6 +21,8 @@ export type OnsetOptions = {
   medianWindow: number;
   /** Multiplier on the adaptive median. Higher = fewer onsets. */
   sensitivity: number;
+  /** Safety factor on the level-proportional floor. Defaults to 2. */
+  rippleFloorFactor?: number;
 };
 
 export type OnsetResult = {
@@ -47,14 +49,11 @@ export type OnsetResult = {
 const REFERENCE_DECAY = 0.95;
 
 /**
- * The decaying reference leaks `1 - REFERENCE_DECAY` of the frame's magnitude
- * back into the flux every hop even when nothing is happening, so the threshold
- * floor is that leak times a safety factor. Expressing the floor as a fraction
- * of the current frame's magnitude is what makes the detector level-independent
- * — an absolute floor that suppresses a quiet passage would be far below the
- * steady-state ripple of a loud one.
+ * Default safety factor on the ripple floor. See `OnsetOptions.rippleFloorFactor`
+ * — this competes with the adaptive median and, being level-proportional, wins
+ * in loud passages.
  */
-const RIPPLE_FLOOR_FACTOR = 2;
+const DEFAULT_RIPPLE_FLOOR_FACTOR = 2;
 
 /**
  * Absolute lower bound, in the same normalised units as `flux`: magnitudes are
@@ -125,7 +124,8 @@ export class OnsetDetector {
     for (let i = 0; i < fftSize; i++) windowSum += this.hann[i]!;
     this.magnitudeScale = windowSum > 0 ? 2 / windowSum : 1;
 
-    this.relativeFloor = RIPPLE_FLOOR_FACTOR * (1 - REFERENCE_DECAY);
+    this.relativeFloor =
+      (options.rippleFloorFactor ?? DEFAULT_RIPPLE_FLOOR_FACTOR) * (1 - REFERENCE_DECAY);
 
     this.fluxHistory = new Float64Array(medianWindow);
     this.medianScratch = new Float64Array(medianWindow);
