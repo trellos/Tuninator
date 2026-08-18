@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "title": "Chords A Bm G D 2x 120bpm two strums each",
+  "sourceAudio": "../audio/Chords A Bm G D 2x 120bpm two strums each.mp4",
+  "instrument": "guitar-clean",
+  "tempoBpm": 120,
+  "timingNotes": "Chord names and structure are the player's: A Bm G D twice, two strums each -- strum on the beat and let it ring, strum again on the next beat and mute it. That gives sixteen events. Everything below is measured from the audio, not assumed. Attacks come from onset firings cross-checked against RMS rises; the attacks at 4400ms and 9440ms were taken from the RMS envelope alone, because the onset detector currently misses them. Each first strum's end is the next attack, since it is still ringing when the string is struck again; each second strum's end is the first frame its tail falls below the engine's own rmsGate (0.008). Measured durations: first strums 453-547ms, essentially a quarter note at 120bpm, running into the next attack with no gap; second strums 267-413ms, followed by 54-280ms of silence from the mute. Voicings are deliberately not recorded -- the specific shapes fretted cannot be read off the audio, and the matcher ignores `pitches` for chord events in any case. s16 is labelled D5, not D: its third (F#) is measured absent from the attack onward (peak 0.000 at +60ms and +150ms, 0.023 at +300ms, against a root at 1.000 throughout), so only the root and fifth sound and the chord genuinely IS a power chord on that strum. Per the player, a strum whose fretting did not sound the third should be labelled as what was actually produced. Every other event keeps its triad label -- measured thirds there run 0.11 to 1.00 at the attack. Borderline for review: s15 (F# 0.275 at +60ms, 0.034 by +300ms) and s3 (D 0.336 at +60ms, 0.008 by +300ms) both sound their third briefly and then lose it. Timestamps are quantized to the engine's analysis hop (640 samples @48kHz = 13.3ms) so every boundary lands on a frame the engine can actually emit.",
+  "events": [
+    { "id": "s1",  "startMs": 4400,  "endMs": 4907,  "kind": "chord", "label": "A",  "required": true },
+    { "id": "s2",  "startMs": 4907,  "endMs": 5280,  "kind": "chord", "label": "A",  "required": true },
+    { "id": "s3",  "startMs": 5467,  "endMs": 5973,  "kind": "chord", "label": "Bm", "required": true },
+    { "id": "s4",  "startMs": 5973,  "endMs": 6373,  "kind": "chord", "label": "Bm", "required": true },
+    { "id": "s5",  "startMs": 6427,  "endMs": 6920,  "kind": "chord", "label": "G",  "required": true },
+    { "id": "s6",  "startMs": 6920,  "endMs": 7200,  "kind": "chord", "label": "G",  "required": true },
+    { "id": "s7",  "startMs": 7413,  "endMs": 7920,  "kind": "chord", "label": "D",  "required": true },
+    { "id": "s8",  "startMs": 7920,  "endMs": 8213,  "kind": "chord", "label": "D",  "required": true },
+    { "id": "s9",  "startMs": 8427,  "endMs": 8920,  "kind": "chord", "label": "A",  "required": true },
+    { "id": "s10", "startMs": 8920,  "endMs": 9267,  "kind": "chord", "label": "A",  "required": true },
+    { "id": "s11", "startMs": 9440,  "endMs": 9920,  "kind": "chord", "label": "Bm", "required": true },
+    { "id": "s12", "startMs": 9920,  "endMs": 10227, "kind": "chord", "label": "Bm", "required": true },
+    { "id": "s13", "startMs": 10413, "endMs": 10960, "kind": "chord", "label": "G",  "required": true },
+    { "id": "s14", "startMs": 10960, "endMs": 11227, "kind": "chord", "label": "G",  "required": true },
+    { "id": "s15", "startMs": 11507, "endMs": 11960, "kind": "chord", "label": "D",  "required": true },
+    { "id": "s16", "startMs": 11960, "endMs": 12373, "kind": "chord", "label": "D5", "required": true }
+  ]
+}

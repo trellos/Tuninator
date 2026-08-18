@@ -89,8 +89,25 @@ const GRID_MAX_MIDI = 88; // E6, 1318.5Hz
 
 /** Most fundamentals extracted from one frame. A guitar has six strings. */
 const MAX_FUNDAMENTALS = 6;
-/** Extraction stops once a candidate falls this far below the first one. */
-const FUNDAMENTAL_STOP_RATIO = 0.3;
+/**
+ * Extraction stops once a candidate falls this far below the first one.
+ *
+ * This is the gate that decided whether a strummed triad keeps its third. A
+ * guitar plays the third once while doubling root and fifth across strings, so
+ * the third's salience is legitimately several times lower -- it is not noise,
+ * it is just outnumbered. Measured on the fixture's first Bm strum: B3 scores
+ * 3.068, F#3 scores 2.679, and the D4 that makes it minor scores 0.703 against
+ * a 0.920 cutoff at the old 0.3. It was pruned on every frame, leaving a chroma
+ * of exactly {B, F#} -- a literal power chord -- so Bm could only ever be read
+ * as B5.
+ *
+ * 0.22 was chosen by sweeping 0.30/0.22/0.15/0.10/0.06 against all four chord
+ * fixtures. It is not simply "lower is better": below 0.20 the extra
+ * fundamentals are ghosts rather than thirds, and spicy-chords collapses from
+ * 50% to 0% exact while a confidently-wrong label appears on the strummed
+ * fixture. 0.22 is the point where real thirds survive and ghosts do not.
+ */
+const FUNDAMENTAL_STOP_RATIO = 0.22;
 /** Fraction of a partial's weight a fundamental claims when it is cancelled. */
 const CANCELLATION_STRENGTH = 0.85;
 /** Harmonics reached by cancellation. Deliberately more than are scored. */

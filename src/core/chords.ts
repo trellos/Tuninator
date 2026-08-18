@@ -212,12 +212,62 @@ export function matchChord(chroma: Float32Array, options: ChordMatchOptions = {}
   const runnerUp = candidates[1];
   const gap = runnerUp ? best.score - runnerUp.score : 0;
 
+  // The margin is measured against the best candidate with a DIFFERENT ROOT,
+  // not the immediate runner-up.
+  //
+  // An extension template sits inescapably close to its parent triad: D7 is D
+  // plus one tone, so on a clean D the two score within a hair of each other no
+  // matter how well the chord was played. Measured on the strummed fixture, the
+  // top two were repeatedly D(0.86)/D7(0.78), G(0.84)/G7(0.76), A(0.99)/A(0.91)
+  // -- gaps right at the 0.08 margin, so a correctly identified chord abstained
+  // on a question nobody was asking. "D or D7" is uncertainty about colour;
+  // "D or Bm" is uncertainty about what was played, and only the second is what
+  // the abstention rule exists to catch.
+  //
+  // The guarantee is unchanged where it matters: a genuine contest between
+  // roots still has to clear the same margin, and the floor still applies to
+  // every result.
+  // The skip is deliberately ONE-WAY: only a rival that strictly *extends* the
+  // best is discounted. D7 adds a tone to D, so when D wins it is not in real
+  // competition. The reverse is not true and must not be skipped -- if Cmaj
+  // wins over C5, the question "was a third played at all?" is exactly the
+  // power-chord distinction, and it has to face the full margin. A symmetric
+  // rule cost power-chord accuracy 75% -> 67% and produced a confidently-wrong
+  // label; this asymmetry is what keeps both cases honest.
+  const rival = candidates.find((c) => !isStrictExtensionOf(c, best));
+  const rivalGap = rival ? best.score - rival.score : 0;
+
   return {
     best,
     alternatives: candidates.slice(1, 1 + MAX_ALTERNATIVES),
-    isConfident: best.score >= floor && (!runnerUp || gap >= margin),
+    isConfident: best.score >= floor && (!rival || rivalGap >= margin),
+    // Still the true top-2 gap: the contract says so, and it is what a consumer
+    // inspecting `alternatives` expects to see.
     margin: gap,
   };
+}
+
+/** Pitch-class offsets a quality's template actually calls for. */
+function toneSet(quality: ChordQuality): number[] {
+  const template = CHORD_TEMPLATES[quality];
+  const tones: number[] = [];
+  for (let i = 0; i < 12; i++) if ((template[i] ?? 0) > 0) tones.push(i);
+  return tones;
+}
+
+/**
+ * True when `candidate` is the same chord as `best` plus at least one extra
+ * tone: same root, every one of `best`'s tones present, and strictly more of
+ * them. That is a colour variant, not a competing interpretation of what was
+ * played.
+ */
+function isStrictExtensionOf(candidate: ChordCandidate, best: ChordCandidate): boolean {
+  if (candidate.root !== best.root) return false;
+  if (candidate.quality === best.quality) return true;
+  const bestTones = toneSet(best.quality);
+  const candidateTones = toneSet(candidate.quality);
+  if (candidateTones.length <= bestTones.length) return false;
+  return bestTones.every((tone) => candidateTones.includes(tone));
 }
 
 function normaliseBass(bass: number | null | undefined): number | null {
