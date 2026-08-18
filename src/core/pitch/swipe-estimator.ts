@@ -81,7 +81,7 @@ const WINDOW = 4096;
  * ~1kHz is finer than the bins and would otherwise be interpolating straight
  * lines between them.
  */
-const FFT_SIZE = WINDOW * 2;
+const FFT_SIZE = 8192;
 
 /** Candidate spacing. 24 = half a semitone of grid per parabolic fit. */
 const CANDIDATES_PER_SEMITONE = 24;
@@ -94,18 +94,22 @@ const CANDIDATES_PER_SEMITONE = 24;
  * up top, so the hundreds of bins above 3kHz — mostly pick noise and hiss —
  * cannot outvote the twenty bins that carry the fundamental.
  */
-const ERB_STEP = 0.1;
+const ERB_STEP = 0.03;
 
 /**
- * Top of the modelled band.
+ * Top of the modelled band. Nyquist, i.e. no band limit — measured, not assumed.
  *
- * Not Nyquist. Above this a guitar has almost no partial energy but plenty of
- * noise, and because the spectrum is normalised to unit length, that noise
- * scales every real correlation down. The kernel's cosine also aliases on the
- * ERB axis once the grid step exceeds half a candidate's spacing, which for the
- * lowest candidates happens around 3kHz.
+ * Capping it looked obviously right: above 5kHz a guitar has little partial
+ * energy and plenty of hiss, the spectrum is normalised to unit length so that
+ * hiss scales every real correlation down, and the kernel's cosine aliases on
+ * the ERB axis once the grid step passes half a candidate's spacing. Every one
+ * of those arguments is true and the cap still loses notes — 3kHz reads 30/43,
+ * 5kHz 35, 8kHz 35, Nyquist 35 with the best frame agreement of the four. The
+ * ERB warp already discounts the top of the spectrum by sampling it sparsely,
+ * and what remains up there is the prime harmonics of the high candidates,
+ * which are exactly the evidence that separates a note from its octave.
  */
-const SPECTRUM_MAX_HZ = 5000;
+const SPECTRUM_MAX_HZ = Infinity;
 
 /** Bins below this are excluded outright: DC offset and rumble, never pitch. */
 const SPECTRUM_MIN_HZ = 25;
@@ -114,33 +118,39 @@ const SPECTRUM_MIN_HZ = 25;
 const SILENCE_RMS = 1e-6;
 
 /**
- * Pitch strength (the winning inner product) that maps to zero confidence, and
- * the one that maps to full confidence before the ambiguity penalty.
+ * Pitch strength that maps to zero confidence, and the one that maps to full
+ * confidence before the ambiguity penalty.
  *
- * Both are unit-norm inner products, so they live on a fixed scale whatever the
- * input level. Measured over the lead fixture's interior frames: correct
- * readings run 0.18..0.42 with a median near 0.29, and frames that read the
- * wrong note sit under 0.20 far more often. The floor is set where the
- * distributions cross rather than at the lowest correct reading, because this
- * number has to mean "probability the note is right", not "how deep my peak
- * was".
+ * Strength is a unit-norm inner product, so it lives on a fixed scale whatever
+ * the input level — but it is NOT an accuracy, and the two ends of the range
+ * are the reason this needs calibrating rather than reporting raw. Measured
+ * over the lead fixture's 488 interior frames, binned by strength: 0.14..0.26
+ * reads the labelled note 30% of the time, 0.30..0.40 65%, and above 0.50 86%.
+ * The band below C4 sits at a median 0.60 and is 82% right; above it the median
+ * is 0.32 and it is 56% right, because a high note has fewer harmonics under
+ * Nyquist for the kernel to find. So the ramp spans the range where the two
+ * populations actually separate, and a low note reading 0.6 says so.
  */
-const STRENGTH_FLOOR = 0.14;
-const STRENGTH_CONFIDENT = 0.34;
+const STRENGTH_FLOOR = 0.15;
+const STRENGTH_CONFIDENT = 0.5;
 
 /**
  * How far clear of its best rival the winner must stand before the ambiguity
  * penalty lifts, as a fraction of the winner's own strength.
  *
- * Two thresholds because two failure modes. A rival an octave or a fifth away
- * is SWIPE guessing between a note and its own harmonic series, which is this
- * method's blind spot and where a confident wrong answer would poison fusion;
- * it gets the wide margin. A rival at some unrelated interval is usually a
- * second note sounding, which is a different problem and one this estimator is
- * not being asked to solve, so it is penalised, but less.
+ * Two ramps because two failure modes, and the numbers are not guesses. When
+ * the rival is an octave or a fifth away — SWIPE guessing between a note and
+ * its own harmonic series, this method's blind spot — frames with a margin
+ * under 0.3 are right 20% of the time and frames over 0.5 are right 81% of the
+ * time. When the rival is at some unrelated interval, usually a second note
+ * still ringing, the cliff is at a much smaller margin: under 0.1 is right 10%
+ * of the time, over 0.1 is right 75%. Reporting a confident answer inside
+ * either cliff is exactly what would poison a fusion of several estimators.
  */
-const HARMONIC_TIE_MARGIN = 0.3;
-const OTHER_TIE_MARGIN = 0.12;
+const HARMONIC_TIE_MIN = 0.2;
+const HARMONIC_TIE_CLEAR = 0.45;
+const OTHER_TIE_MIN = 0.05;
+const OTHER_TIE_CLEAR = 0.15;
 
 /** Intervals at which a rival counts as the harmonic kind, in cents. */
 const HARMONIC_INTERVALS_CENTS = [-2400, -1902, -1200, -702, 702, 1200, 1902, 2400];
@@ -331,13 +341,19 @@ export class SwipeEstimator implements PitchEstimator {
     const frequencyHz = this.candidateHz[bestIndex]! * Math.pow(this.candidateRatio, delta);
 
     /* --- The best rival OUTSIDE the winner's own peak ----------------------- */
-    // Walking downhill from the winner rather than excluding a fixed interval:
-    // where the curve turns back up is exactly where a second explanation of
-    // the frame begins, and that boundary moves with the width of the peak.
+    // Two exclusions, and both are needed. Walking downhill finds where the
+    // curve turns back up, which is where a second explanation of the frame
+    // begins; but on a grid this fine the curve wobbles by a thousandth right
+    // beside the peak, and taking that wobble for a rival reported near-zero
+    // confidence on 107 of 488 frames that were 78% correct. A candidate under
+    // a semitone away is the same note by any reading, so it is never a rival.
+    const ownPeakHalfWidth = CANDIDATES_PER_SEMITONE;
     let lo = bestIndex;
     while (lo > 0 && strength[lo - 1]! <= strength[lo]!) lo--;
+    lo = Math.min(lo, bestIndex - ownPeakHalfWidth);
     let hi = bestIndex;
     while (hi < count - 1 && strength[hi + 1]! <= strength[hi]!) hi++;
+    hi = Math.max(hi, bestIndex + ownPeakHalfWidth);
 
     let rival = 0;
     let rivalIndex = -1;
@@ -370,6 +386,11 @@ export class SwipeEstimator implements PitchEstimator {
    * A fused estimator needs that stated, not hidden behind the argmax.
    */
   private confidenceOf(best: number, rival: number, bestIndex: number, rivalIndex: number): number {
+    // DEBUG
+    (this as unknown as Record<string, number>).dbgBest = best;
+    (this as unknown as Record<string, number>).dbgRival = rival;
+    (this as unknown as Record<string, number>).dbgCents =
+      rivalIndex < 0 ? 0 : 1200 * Math.log2(this.candidateHz[rivalIndex]! / this.candidateHz[bestIndex]!);
     const level = clamp01((best - STRENGTH_FLOOR) / (STRENGTH_CONFIDENT - STRENGTH_FLOOR));
     if (level <= 0 || rivalIndex < 0 || rival <= 0) return level;
 
@@ -384,8 +405,9 @@ export class SwipeEstimator implements PitchEstimator {
     }
 
     const margin = 1 - rival / best;
-    const clarity = clamp01(margin / (harmonic ? HARMONIC_TIE_MARGIN : OTHER_TIE_MARGIN));
-    return level * clarity;
+    const min = harmonic ? HARMONIC_TIE_MIN : OTHER_TIE_MIN;
+    const clear = harmonic ? HARMONIC_TIE_CLEAR : OTHER_TIE_CLEAR;
+    return level * clamp01((margin - min) / (clear - min));
   }
 }
 
