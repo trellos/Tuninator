@@ -13,7 +13,7 @@
     "smoke:live": "node scripts/smoke.mjs --live"
   },
   "dependencies": {
-    "tuninator": "file:../Tuninator"
+    "tuninator": "file:../.."
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

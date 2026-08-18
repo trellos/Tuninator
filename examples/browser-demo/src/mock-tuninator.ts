@@ -1,18 +1,14 @@
 /**
- * A synthetic `Tuninator` implementation.
+ * A synthetic `TuninatorWorker`.
  *
- * The real detector is built by a concurrent workstream and its `dist/` does not
- * exist yet, so the entire demo UI is developed and verified against this. It
- * plays a fixed 16-beat guitar phrase at 90bpm -- single notes, two chords and
- * one bent note -- emitting the same `pitchFrame` / `musicEvent*` streams the
- * real library promises.
+ * It plays a fixed 16-beat guitar phrase at 90bpm -- single notes, two chords
+ * and one bent note -- emitting the same `pitchFrame` / `musicEvent*` streams
+ * the real worker does. That makes it a deterministic UI test harness needing
+ * no microphone, no permission prompt and no audio hardware, which is what the
+ * headless smoke test drives.
  *
- * It stays useful after the detector lands: it is a deterministic UI test
- * harness that needs no microphone, no permission prompt and no audio hardware,
- * which is exactly what the headless smoke test drives.
- *
- * It implements the PUBLIC `Tuninator` type and imports nothing but types from
- * the package entry point.
+ * It implements the PUBLIC `TuninatorWorker` type and imports nothing but types
+ * from the package entry point.
  */
 
 import type {
@@ -22,7 +18,7 @@ import type {
   PitchClass,
   PitchFrame,
   PitchNote,
-  Tuninator,
+  TuninatorWorker,
   TuninatorError,
   TuninatorErrorCode,
   TuninatorEventHandler,
@@ -228,7 +224,7 @@ type EventPayloads = {
   error: TuninatorError;
 };
 
-class MockTuninator implements Tuninator {
+class MockTuninator implements TuninatorWorker {
   #state: TuninatorState = "idle";
   #mode: TuninatorMode;
   #options: MockTuninatorOptions;
@@ -650,8 +646,8 @@ function envelopeAt(progress: number): number {
 /* Factory                                                                     */
 /* -------------------------------------------------------------------------- */
 
-/** Mirrors `createTuninator(options)` from the library. */
-export function createMockTuninator(options: MockTuninatorOptions = {}): Tuninator {
+/** Mirrors `createWorkerWebAudio(options)` from `tuninator/web`. */
+export function createMockTuninator(options: MockTuninatorOptions = {}): TuninatorWorker {
   return new MockTuninator(options);
 }
 

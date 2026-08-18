@@ -6,28 +6,27 @@ import { defineConfig, type Plugin } from "vite";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-/** The sibling checkout of the library. Declared in package.json as `file:../Tuninator`. */
-const LIB_ROOT = path.resolve(here, "..", "Tuninator");
+/** The repository root. This demo lives at `examples/browser-demo`. */
+const LIB_ROOT = path.resolve(here, "..", "..");
 
 /**
- * The library's PUBLIC entry point, in source form.
+ * The library's PUBLIC entry points, in source form.
  *
- * `tuninator` is declared as `file:../Tuninator`, but the library's `dist/` is
- * built by a concurrent workstream and may not exist yet, so resolving the
- * package through its `exports` map would fail. Aliasing straight at
- * `src/index.ts` keeps the demo building today and gives it live reload when
- * the library changes. It is still the public entry point: this alias is the
- * only path into the library, and the demo never imports `tuninator/src/**`.
+ * Aliasing at `src/` rather than resolving `dist/` through the package
+ * `exports` map gives the demo live reload when the library changes, and lets
+ * it build without a prior `npm run build`. These are still the public entry
+ * points: the demo never reaches into `tuninator/src/**` itself.
  */
 const LIB_ENTRY = path.join(LIB_ROOT, "src", "index.ts");
+const LIB_WEB_ENTRY = path.join(LIB_ROOT, "src", "web.ts");
 
-/** Built worklet asset produced by `npm run build` in the library. */
+/** Built worklet asset produced by `npm run build` in the repository root. */
 const WORKLET_SRC = path.join(LIB_ROOT, "dist", "tuninator-worklet.js");
 const WORKLET_DEST_DIR = path.join(here, "public", "assets");
 const WORKLET_DEST = path.join(WORKLET_DEST_DIR, "tuninator-worklet.js");
 
 /**
- * Copies `../Tuninator/dist/tuninator-worklet.js` into `public/assets/` so the
+ * Copies the repository dist/tuninator-worklet.js into `public/assets/` so the
  * demo can hand the library a `workletUrl` of `/assets/tuninator-worklet.js`.
  *
  * The library's `dist/` does not exist until the library has been built, so a
@@ -80,7 +79,12 @@ function copyWorkletPlugin(): Plugin {
 export default defineConfig({
   plugins: [copyWorkletPlugin()],
   resolve: {
-    alias: [{ find: /^tuninator$/, replacement: LIB_ENTRY }],
+    alias: [
+      // Longest specifier first: `/^tuninator$/` would not match `tuninator/web`,
+      // but keeping them ordered makes that independent of regex anchoring.
+      { find: /^tuninator\/web$/, replacement: LIB_WEB_ENTRY },
+      { find: /^tuninator$/, replacement: LIB_ENTRY },
+    ],
   },
   server: {
     fs: {

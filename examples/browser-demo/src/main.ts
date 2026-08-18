@@ -1,16 +1,16 @@
 /**
- * Wiring: build a `Tuninator`, pump its two streams into the timeline and the
+ * Wiring: build a worker, pump its two streams into the timeline and the
  * panels, and keep the metronome running alongside.
  *
  * Only the public API is used. The single import from the library is
- * `createTuninator` plus types, from the package entry point.
+ * `createWorkerWebAudio` plus types, from the package entry points.
  */
 
-import { createTuninator } from "tuninator";
+import { createWorkerWebAudio } from "tuninator/web";
 import type {
   MusicEvent,
   PitchFrame,
-  Tuninator,
+  TuninatorWorker,
   TuninatorError,
   TuninatorErrorCode,
   TuninatorMode,
@@ -90,7 +90,7 @@ function isTuninatorError(value: unknown): value is TuninatorError {
 }
 
 /**
- * `Tuninator.start()` is typed `Promise<void>`, so what it rejects *with* is not
+ * `start()` is typed `Promise<void>`, so what it rejects *with* is not
  * part of the contract. Anything that escapes is folded into a `TuninatorError`
  * here so the UI always has a code and a readable message, never a raw throw.
  */
@@ -177,7 +177,7 @@ class App {
   #metronome: Metronome;
   #timebase = new Timebase();
 
-  #tuninator: Tuninator | null = null;
+  #tuninator: TuninatorWorker | null = null;
   #unsubscribes: Array<() => void> = [];
   #effectiveSource: "mock" | "live" = "mock";
   #listening = false;
@@ -251,17 +251,17 @@ class App {
   /**
    * `auto` prefers the real library and falls back to the mock if it cannot be
    * constructed at all -- which is exactly the situation while the detector is
-   * still being written (`createTuninator` throws "not implemented").
+   * unavailable (`createWorkerWebAudio` throws).
    */
   #build(choice: SourceChoice): void {
     this.#teardown();
 
-    let instance: Tuninator | null = null;
+    let instance: TuninatorWorker | null = null;
     let note: string | undefined;
 
     if (choice !== "mock") {
       try {
-        instance = createTuninator(this.#baseOptions());
+        instance = createWorkerWebAudio(this.#baseOptions());
         this.#effectiveSource = "live";
       } catch (cause) {
         const error = toTuninatorError(cause);
@@ -298,7 +298,7 @@ class App {
     this.#subscribe(instance);
   }
 
-  #subscribe(tuninator: Tuninator): void {
+  #subscribe(tuninator: TuninatorWorker): void {
     this.#unsubscribes.push(
       tuninator.on("stateChange", (state: TuninatorState) => {
         this.#probe.state = state;

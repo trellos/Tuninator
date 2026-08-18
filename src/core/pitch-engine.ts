@@ -89,6 +89,8 @@ export class PitchEngine {
     this.sampleRate = sampleRate;
     this.policy = policy;
 
+    assertWindowsFitRing(policy);
+
     this.hopSamples = snapHop(policy.analysis.pitchHopMs, sampleRate);
 
     this.longWindow = new Float32Array(policy.pitch.longWindow);
@@ -142,6 +144,7 @@ export class PitchEngine {
    * accumulated audio survive untouched.
    */
   setPolicy(policy: Policy): void {
+    assertWindowsFitRing(policy);
     const prev = this.policy;
     this.policy = policy;
 
@@ -420,6 +423,27 @@ export class PitchEngine {
       chroma: this.lastChroma,
       chord: this.lastChord,
     };
+  }
+}
+
+/**
+ * `readRecent` walks backwards from the write head with a wrapping mask, so a
+ * window larger than the ring silently reads samples the same pass just
+ * overwrote — aliased audio, no error, and plausible-looking output. Refuse it
+ * at the point the policy arrives rather than producing nonsense later.
+ */
+function assertWindowsFitRing(policy: Policy): void {
+  const largest = Math.max(
+    policy.pitch.longWindow,
+    policy.pitch.shortWindow,
+    policy.onset.fftSize,
+    policy.chords.fftSize
+  );
+  if (largest > RING_CAPACITY) {
+    throw new Error(
+      `PitchEngine: analysis window of ${largest} samples exceeds the ` +
+        `${RING_CAPACITY}-sample ring buffer`
+    );
   }
 }
 

@@ -1,10 +1,11 @@
 /**
- * AudioWorkletProcessor wrapping `core/pitch-engine` and `core/event-tracker`.
+ * The AudioWorklet half of `WorkerWebAudio`: a processor that pushes render
+ * quanta into a `Tuninator` and posts the results to the main thread.
  *
- * This file is the entry point of the IIFE worklet bundle. Everything it pulls
- * in comes from `src/core/`, which is exactly why core has no DOM and no npm
- * imports: the same modules are bundled into this file, imported by Node for the
- * offline eval, and imported by Vitest.
+ * This file is the entry point of the IIFE worklet bundle. It holds no analysis
+ * of its own — it is a transport. The `Tuninator` running inside it is the same
+ * class a Node caller constructs, which is the only reason the offline eval
+ * predicts live behaviour.
  *
  * The build asserts that the emitted bundle contains no `import`/`export` —
  * AudioWorkletGlobalScope has no module loader on older targets, and a stray
@@ -13,8 +14,7 @@
 
 import type { MusicEvent, PitchFrame } from "../types.js";
 import type { Policy } from "../core/policy.js";
-import { PitchEngine } from "../core/pitch-engine.js";
-import { EventTracker } from "../core/event-tracker.js";
+import { Tuninator } from "../tuninator.js";
 import {
   ChannelSelector,
   resolveChannel,
@@ -44,8 +44,7 @@ export type WorkletMessage = {
 };
 
 class TuninatorProcessor extends AudioWorkletProcessor {
-  private engine: PitchEngine;
-  private tracker: EventTracker;
+  private readonly tuninator: Tuninator;
   private policy: Policy;
   /** Scratch for the multi-channel downmix. Sized to the render quantum. */
   private mixBuffer = new Float32Array(128);
@@ -87,8 +86,7 @@ class TuninatorProcessor extends AudioWorkletProcessor {
     // re-sent on every `setMode()`, whereas the channel strategy is a property
     // of the wiring and is fixed when the node is constructed.
     this.strategy = options?.processorOptions?.channels ?? "auto";
-    this.engine = new PitchEngine(sampleRate, policy);
-    this.tracker = new EventTracker(policy);
+    this.tuninator = new Tuninator({ sampleRate, policy });
 
     this.port.onmessage = (event: MessageEvent<WorkletCommand>) => {
       const command = event.data;
@@ -96,11 +94,9 @@ class TuninatorProcessor extends AudioWorkletProcessor {
         // Mode changes swap parameters in place. The audio graph, the ring
         // buffer, and any in-flight event all survive.
         this.policy = command.policy;
-        this.engine.setPolicy(command.policy);
-        this.tracker.setPolicy(command.policy);
+        this.tuninator.setPolicy(command.policy);
       } else if (command.type === "reset") {
-        const emissions = this.tracker.flush(currentTime * 1000);
-        this.engine.reset();
+        const emissions = this.tuninator.reset(currentTime * 1000);
         this.resetChannelMeters();
         this.selector?.reset();
         this.appliedChannel = -1;
@@ -166,19 +162,20 @@ class TuninatorProcessor extends AudioWorkletProcessor {
 
     this.meterChannels(input, first.length);
 
-    const timestampMs = currentTime * 1000;
-    const engineFrame = this.engine.push(block, timestampMs);
-    if (engineFrame === null) return true;
+    const results = this.tuninator.analyze(block, currentTime * 1000);
+    if (results.length === 0) return true;
 
-    const emissions = this.tracker.process(engineFrame);
     const channelRms = this.readChannelMeters(input.length);
-    engineFrame.frame.channelRms = channelRms;
-    engineFrame.frame.selectedChannel = this.appliedChannel < 0 ? null : this.appliedChannel;
-    this.port.postMessage({
-      type: "hop",
-      frame: engineFrame.frame,
-      emissions,
-    } satisfies WorkletMessage);
+    const selectedChannel = this.appliedChannel < 0 ? null : this.appliedChannel;
+    for (const result of results) {
+      result.frame.channelRms = channelRms;
+      result.frame.selectedChannel = selectedChannel;
+      this.port.postMessage({
+        type: "hop",
+        frame: result.frame,
+        emissions: result.emissions,
+      } satisfies WorkletMessage);
+    }
 
     return true;
   }

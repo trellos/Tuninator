@@ -6,8 +6,8 @@ library's `pitchFrame` and `MusicEvent` streams.
 
 ![The demo running against the mock source](./screenshot.png)
 
-Everything here goes through `tuninator`'s **public API only** — `createTuninator()` plus the types
-exported from the package entry point. Nothing reaches into `tuninator/src/**` internals.
+Everything here goes through `tuninator`'s **public API only** — `createWorkerWebAudio()` from
+`tuninator/web`, plus the types exported from the package root. Nothing reaches into `tuninator/src/**` internals.
 
 ---
 
@@ -18,13 +18,16 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-The library is a sibling checkout, declared as `"tuninator": "file:../Tuninator"`, so the layout is:
+The library is this repository, declared as `"tuninator": "file:../.."`:
 
 ```
-parent/
-├── Tuninator/          # the library
-└── Tuninator-Example/  # this repo
+Tuninator/
+├── src/                       # the library
+└── examples/browser-demo/     # this demo
 ```
+
+Run `npm run build` in the repository root first — the demo resolves `tuninator` and
+`tuninator/web` through the package's `exports`, which point at `dist/`.
 
 | script | what it does |
 | --- | --- |

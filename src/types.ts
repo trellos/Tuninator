@@ -298,10 +298,21 @@ export type TuninatorEventHandler<E extends TuninatorEventName> =
   never;
 
 /* -------------------------------------------------------------------------- */
-/* Main interface                                                              */
+/* Worker interface                                                            */
 /* -------------------------------------------------------------------------- */
 
-export type Tuninator = {
+/**
+ * What a *worker* offers: a live, host-specific wrapper around the `Tuninator`
+ * library.
+ *
+ * The library itself is synchronous and platform-free — audio in, results out
+ * (see `src/tuninator.ts`). A worker is the part that knows how to get audio
+ * out of one particular host and push it in: `WorkerWebAudio` opens an
+ * `AudioContext` and an `AudioWorklet`, and hands results back as events on a
+ * clock it manages itself. Anything with a lifecycle, a subscription, or a
+ * permission prompt belongs here, not in the library.
+ */
+export type TuninatorWorker = {
   start(): Promise<void>;
   stop(): void;
   /** Safe to call while listening; never restarts the audio graph. */

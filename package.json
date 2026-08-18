@@ -1,7 +1,7 @@
 {
   "name": "tuninator",
   "version": "0.1.0",
-  "description": "UI-free browser library turning guitar microphone input into a continuous pitch stream and a high-level music-event stream.",
+  "description": "Platform-free library turning an audio stream into a continuous pitch stream and a high-level music-event stream, with a browser worker for microphone input.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -17,6 +17,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "import": "./dist/web.js"
     },
     "./worklet": "./dist/tuninator-worklet.js"
   },

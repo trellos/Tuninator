@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { downmixToMono, readWav, writeWav } from "../src/offline/wav.js";
+import { downmixToMono, readWav, writeWav } from "../src/eval/wav.js";
 import {
   ONSET_WINDOW_MS,
   acceptedAnswers,
@@ -23,7 +23,7 @@ import {
   sectionForLabel,
   type DetectedEvent,
   type LabeledEvent,
-} from "../src/offline/matcher.js";
+} from "../src/eval/matcher.js";
 
 /* -------------------------------------------------------------------------- */
 /* Builders                                                                    */

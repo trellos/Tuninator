@@ -33,7 +33,7 @@ import type {
   SectionSpec,
   ThresholdCheck,
   Thresholds,
-} from "../src/offline/matcher.js";
+} from "../src/eval/matcher.js";
 import {
   checkThresholds,
   filterResult,
@@ -41,14 +41,14 @@ import {
   scoreMatches,
   sectionForDetection,
   sectionForLabel,
-} from "../src/offline/matcher.js";
+} from "../src/eval/matcher.js";
 import {
   analyzeSamples,
   analyzeSamplesDetailed,
   type DetailedAnalyzeResult,
   type TraceRow,
-} from "../src/offline/analyzer.js";
-import { downmixToMono, readWav } from "../src/offline/wav.js";
+} from "../src/workers/offline.js";
+import { downmixToMono, readWav } from "../src/eval/wav.js";
 import {
   CACHE_DIR,
   REPO_ROOT,

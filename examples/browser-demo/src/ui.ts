@@ -3,7 +3,7 @@
  * surfaces, the live tuner readout, the active-event list and the event log.
  *
  * `ui.ts` knows about the DOM and about the library's public types; it knows
- * nothing about how a `Tuninator` is created or driven. `main.ts` owns that.
+ * nothing about how a worker is created or driven. `main.ts` owns that.
  */
 
 import type {

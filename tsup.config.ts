@@ -2,8 +2,9 @@ import { defineConfig } from "tsup";
 
 export default defineConfig([
   {
-    // Library build: ESM + type declarations.
-    entry: { index: "src/index.ts" },
+    // Library build: the general library (`.`) and the browser worker
+    // (`./web`). ESM + type declarations.
+    entry: { index: "src/index.ts", web: "src/web.ts" },
     format: ["esm"],
     dts: true,
     // Cleaning is done once by scripts/clean-dist.mjs. A per-config clean races
@@ -17,7 +18,7 @@ export default defineConfig([
     // Worklet build: ONE self-contained file with no import/export statements.
     // AudioWorkletGlobalScope has no module loader on older targets, so the
     // whole question is avoided by bundling to an IIFE.
-    entry: { "tuninator-worklet": "src/worklet/processor.ts" },
+    entry: { "tuninator-worklet": "src/workers/web-audio-processor.ts" },
     format: ["iife"],
     dts: false,
     clean: false,

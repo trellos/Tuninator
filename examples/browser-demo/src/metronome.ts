@@ -94,7 +94,7 @@ export class Metronome {
    *
    * NOTE: as of `types.ts` the library exposes no way to pass an AudioContext in
    * (`TuninatorOptions` has no `audioContext` field) and no way to read the one
-   * it created (`Tuninator` has no getter), so in practice the metronome always
+   * it created (the worker has no getter), so in practice the metronome always
    * ends up creating its own. This hook is here for the day the API allows it.
    */
   useContext(context: AudioContext): void {
