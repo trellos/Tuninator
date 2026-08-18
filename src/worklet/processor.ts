@@ -45,6 +45,16 @@ class TuninatorProcessor extends AudioWorkletProcessor {
   /** Scratch for the multi-channel downmix. Sized to the render quantum. */
   private mixBuffer = new Float32Array(128);
 
+  /**
+   * Per-channel sum of squares accumulated across the hop, and the sample count
+   * they were accumulated over. Reused across hops, never reallocated in
+   * steady state: `postMessage` structured-clones synchronously, so the array
+   * attached to a frame is already copied by the time the next hop touches it.
+   */
+  private readonly channelSquares: number[] = [];
+  private readonly channelRms: number[] = [];
+  private channelSamples = 0;
+
   constructor(options?: { processorOptions?: { policy: Policy } }) {
     super(options);
 
@@ -67,6 +77,7 @@ class TuninatorProcessor extends AudioWorkletProcessor {
       } else if (command.type === "reset") {
         const emissions = this.tracker.flush(currentTime * 1000);
         this.engine.reset();
+        this.resetChannelMeters();
         if (emissions.length > 0) {
           this.port.postMessage({
             type: "hop",
@@ -114,11 +125,14 @@ class TuninatorProcessor extends AudioWorkletProcessor {
       block = mix;
     }
 
+    this.meterChannels(input, first.length);
+
     const timestampMs = currentTime * 1000;
     const engineFrame = this.engine.push(block, timestampMs);
     if (engineFrame === null) return true;
 
     const emissions = this.tracker.process(engineFrame);
+    engineFrame.frame.channelRms = this.readChannelMeters(input.length);
     this.port.postMessage({
       type: "hop",
       frame: engineFrame.frame,
@@ -126,6 +140,40 @@ class TuninatorProcessor extends AudioWorkletProcessor {
     } satisfies WorkletMessage);
 
     return true;
+  }
+
+  /**
+   * Accumulates the *unsummed* level of every input channel.
+   *
+   * Summing for analysis is right, but it also erases the one fact a user needs
+   * when nothing is detected: whether the instrument is on a channel at all.
+   * Metering before the sum is what lets a UI show "ch0 dead, ch1 hot".
+   */
+  private meterChannels(input: Float32Array[], frames: number): void {
+    for (let c = 0; c < input.length; c++) {
+      const channel = input[c];
+      if (!channel) continue;
+      let sum = 0;
+      for (let i = 0; i < channel.length; i++) sum += channel[i]! * channel[i]!;
+      this.channelSquares[c] = (this.channelSquares[c] ?? 0) + sum;
+    }
+    this.channelSamples += frames;
+  }
+
+  private readChannelMeters(channels: number): number[] {
+    const samples = this.channelSamples;
+    this.channelRms.length = channels;
+    for (let c = 0; c < channels; c++) {
+      const squares = this.channelSquares[c] ?? 0;
+      this.channelRms[c] = samples === 0 ? 0 : Math.sqrt(squares / samples);
+    }
+    this.resetChannelMeters();
+    return this.channelRms;
+  }
+
+  private resetChannelMeters(): void {
+    for (let c = 0; c < this.channelSquares.length; c++) this.channelSquares[c] = 0;
+    this.channelSamples = 0;
   }
 }
 

@@ -21,17 +21,35 @@ type MockOptions = {
   suspended?: boolean;
   /** Throw when constructing the AudioContext. */
   contextError?: Error;
+  /** What the (mock) device reports back through `track.getSettings()`. */
+  trackChannelCount?: number;
 };
 
 const stoppedTracks: string[] = [];
 
-function installMocks(options: MockOptions = {}): { closed: () => boolean } {
-  const tracks = [{ kind: "audio", stop: () => stoppedTracks.push("audio") }];
-  const stream = { getTracks: () => tracks };
+/** Options the last AudioWorkletNode was constructed with. */
+type NodeOptions = Record<string, unknown>;
 
+function installMocks(options: MockOptions = {}): {
+  closed: () => boolean;
+  audioConstraints: () => Record<string, unknown>;
+  nodeOptions: () => NodeOptions | null;
+} {
+  const tracks = [
+    {
+      kind: "audio",
+      label: "Analogue 1/2 (Audient iD4)",
+      stop: () => stoppedTracks.push("audio"),
+      getSettings: () => ({ channelCount: options.trackChannelCount ?? 2 }),
+    },
+  ];
+  const stream = { getTracks: () => tracks, getAudioTracks: () => tracks };
+
+  let audioConstraints: Record<string, unknown> = {};
   vi.stubGlobal("navigator", {
     mediaDevices: {
-      getUserMedia: vi.fn(async () => {
+      getUserMedia: vi.fn(async (constraints: { audio?: Record<string, unknown> }) => {
+        audioConstraints = constraints.audio ?? {};
         if (options.micError) {
           const error = new Error(options.micError.name);
           error.name = options.micError.name;
@@ -72,16 +90,24 @@ function installMocks(options: MockOptions = {}): { closed: () => boolean } {
     }
   }
 
+  let nodeOptions: NodeOptions | null = null;
   class MockAudioWorkletNode {
     port = { postMessage: vi.fn(), onmessage: null as unknown };
     onprocessorerror: unknown = null;
+    constructor(_context: unknown, _name: string, opts?: NodeOptions) {
+      nodeOptions = opts ?? {};
+    }
     disconnect(): void {}
   }
 
   vi.stubGlobal("AudioContext", MockAudioContext);
   vi.stubGlobal("AudioWorkletNode", MockAudioWorkletNode);
 
-  return { closed: () => closed };
+  return {
+    closed: () => closed,
+    audioConstraints: () => audioConstraints,
+    nodeOptions: () => nodeOptions,
+  };
 }
 
 /** Collects state transitions and errors for assertions. */
@@ -231,5 +257,83 @@ describe("createTuninator", () => {
     const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
     await tuninator.start();
     expect(tuninator.getActiveEvents()).toEqual([]);
+  });
+});
+
+/**
+ * The stereo path.
+ *
+ * A 2-in interface is one stereo device to the browser, and an instrument in
+ * input 2 exists only on channel 1. Every one of these assertions guards a link
+ * where that channel silently disappears with no error and no level.
+ */
+describe("input channels", () => {
+  it("asks getUserMedia for two channels", async () => {
+    const mocks = installMocks();
+    const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
+    await tuninator.start();
+
+    // Chrome opens a capture device in mono unless a channel count is asked
+    // for, and nothing downstream can recover a channel that never arrived.
+    expect(mocks.audioConstraints()["channelCount"]).toBe(2);
+  });
+
+  it("requests the channel count as ideal, never exact", async () => {
+    const mocks = installMocks();
+    const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
+    await tuninator.start();
+
+    // `{ exact: 2 }` would turn every genuinely mono microphone into an
+    // OverconstrainedError, i.e. `mic-unavailable`.
+    expect(mocks.audioConstraints()["channelCount"]).not.toHaveProperty("exact");
+  });
+
+  it("lets input.channelCount override the request", async () => {
+    const mocks = installMocks();
+    const tuninator = createTuninator({
+      workletUrl: "/assets/tuninator-worklet.js",
+      input: { channelCount: 1 },
+    });
+    await tuninator.start();
+
+    expect(mocks.audioConstraints()["channelCount"]).toBe(1);
+  });
+
+  it("leaves the worklet node in the channel mode that preserves every channel", async () => {
+    const mocks = installMocks();
+    const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
+    await tuninator.start();
+
+    const options = mocks.nodeOptions();
+    // "max" carries as many channels as the source has, with no mixing.
+    // "explicit" + channelCount 1 would downmix; "discrete" would make any
+    // downmix discard the extra channels outright.
+    expect(options?.["channelCountMode"]).toBe("max");
+    expect(options?.["channelInterpretation"]).toBe("speakers");
+    expect(options).not.toHaveProperty("channelCount");
+  });
+
+  it("reports the device and its channel count as a status message", async () => {
+    installMocks({ trackChannelCount: 2 });
+    const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
+    const statuses: string[] = [];
+    tuninator.on("status", (message) => statuses.push(message));
+
+    await tuninator.start();
+
+    // Without this the failure is invisible: a mono capture and a correctly
+    // working stereo capture look identical from the outside.
+    expect(statuses.some((s) => s.includes("Audient iD4") && s.includes("2 channel(s)"))).toBe(true);
+  });
+
+  it("still reports a status when the mono fallback is what the browser gave", async () => {
+    installMocks({ trackChannelCount: 1 });
+    const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
+    const statuses: string[] = [];
+    tuninator.on("status", (message) => statuses.push(message));
+
+    await tuninator.start();
+
+    expect(statuses.some((s) => s.includes("1 channel(s)"))).toBe(true);
   });
 });

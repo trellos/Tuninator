@@ -55,6 +55,22 @@ export type PitchFrame = {
     peak?: number;
   };
 
+  /**
+   * RMS of each *input* channel over this hop, measured before the channels are
+   * summed into the single signal that `amplitude` and the detector describe.
+   *
+   * `channelRms.length` is the number of channels the browser actually handed
+   * the worklet, so this doubles as the input channel count. It exists because
+   * the alternative diagnosis is invisible: a 2-in interface presents as one
+   * stereo device ("Analogue 1/2"), and an instrument in input 2 lands entirely
+   * on channel 1 — a UI that only sees the mixed level cannot tell "no signal"
+   * from "signal on a channel nobody read".
+   *
+   * Absent outside the worklet (the offline harness feeds mono buffers), so
+   * always treat it as optional.
+   */
+  channelRms?: number[];
+
   /** Detector internals, exposed for debugging and offline evaluation. */
   detector: {
     /** Chosen lag in samples, at `effectiveSampleRate` (post-decimation). */
@@ -178,6 +194,15 @@ export type TuninatorOptions = {
     echoCancellation?: boolean;
     noiseSuppression?: boolean;
     autoGainControl?: boolean;
+    /**
+     * Channels to ask `getUserMedia` for. Defaults to 2.
+     *
+     * Requested as an *ideal* constraint, never `exact`: a genuinely mono
+     * built-in microphone still opens, it just reports 1. Chrome opens a
+     * capture device in mono unless a channel count is explicitly asked for,
+     * which silently loses whatever is on input 2 of a 2-in interface.
+     */
+    channelCount?: number;
   };
   analysis?: {
     minFrequencyHz?: number;

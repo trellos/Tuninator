@@ -100,6 +100,7 @@ class TuninatorImpl implements Tuninator {
       return;
     }
     this.stream = stream;
+    this.emitter.emit("status", this.describeInput(stream));
 
     let context: AudioContext;
     try {
@@ -151,6 +152,21 @@ class TuninatorImpl implements Tuninator {
       this.node = new AudioWorkletNode(context, PROCESSOR_NAME, {
         numberOfInputs: 1,
         numberOfOutputs: 0,
+        // These two are the AudioWorkletNode defaults, restated because getting
+        // them wrong silently destroys a channel and there is no way to see it
+        // from the outside.
+        //
+        // "max" means the node's input carries as many channels as the thing
+        // connected to it, with no mixing at all -- a 2-channel
+        // MediaStreamAudioSourceNode arrives in `process()` as two separate
+        // channels (verified in Chromium, headless). `channelCount` is ignored
+        // in this mode, which is why it is not set: setting
+        // `channelCountMode: "explicit"` with `channelCount: 1` would instead
+        // force a downmix, and `channelInterpretation: "discrete"` would make
+        // any such downmix *discard* the extra channels rather than fold them
+        // in. "speakers" is the survivable failure mode of the two.
+        channelCountMode: "max",
+        channelInterpretation: "speakers",
         processorOptions: { policy: this.policy },
       });
     } catch (error) {
@@ -203,9 +219,36 @@ class TuninatorImpl implements Tuninator {
         echoCancellation: input.echoCancellation ?? false,
         noiseSuppression: input.noiseSuppression ?? false,
         autoGainControl: input.autoGainControl ?? false,
+        // Ask for stereo explicitly.
+        //
+        // A 2-in interface presents as ONE stereo device ("Analogue 1/2"), and
+        // an instrument in input 2 is entirely on channel 1. Chrome opens a
+        // capture device in mono unless a channel count is requested, so
+        // without this the second input never reaches the page at all — no
+        // error, no level, nothing downstream can recover it.
+        //
+        // Plain value, not `{ exact: 2 }`: this is an *ideal* constraint, so a
+        // genuinely mono microphone still opens and simply reports 1 rather
+        // than failing with OverconstrainedError.
+        channelCount: input.channelCount ?? 2,
       },
       video: false,
     });
+  }
+
+  /**
+   * Best-effort description of what the browser actually opened.
+   *
+   * Deliberately total: this is diagnostics, and a stream shim that does not
+   * implement `getAudioTracks`/`getSettings` must not be able to fail `start()`.
+   */
+  private describeInput(stream: MediaStream): string {
+    const track = stream.getAudioTracks?.()?.[0];
+    if (!track) return "input: no audio track";
+    const channels = track.getSettings?.()?.channelCount;
+    const label = track.label ? `"${track.label}"` : "unnamed device";
+    const count = typeof channels === "number" ? `${channels} channel(s)` : "unknown channel count";
+    return `input: ${label}, ${count}`;
   }
 
   private resolveWorkletUrl(): string | URL | null {
