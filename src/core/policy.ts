@@ -30,7 +30,7 @@ export type Policy = {
   pitch: {
     /** Long YIN window, in samples. Sized for two periods of low E (82.4Hz). */
     longWindow: number;
-    /** Short YIN window, in samples. ~7x better time resolution. */
+    /** Short YIN window, in samples. 4x better time resolution than `longWindow`. */
     shortWindow: number;
     /** Above this frequency a confident short-window result is preferred. */
     shortWindowMinHz: number;

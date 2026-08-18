@@ -24,7 +24,7 @@ regression. See [Evaluation](#evaluation) for the actual numbers.
 npm install tuninator
 ```
 
-## Two entry points
+## Entry points
 
 | Import | What it is |
 |---|---|
@@ -60,8 +60,8 @@ const worker = createWorkerWebAudio({
 ```
 
 Bundlers do not copy this file for you, because it is loaded at runtime by URL rather than
-imported. If `workletUrl` is omitted the library falls back to resolving the asset next to its
-own `dist/index.js`, which works only when the package is served unbundled.
+imported. If `workletUrl` is omitted the worker falls back to resolving the asset next to its own
+`dist/` output, which works only when the package is served unbundled.
 
 A wrong or missing URL surfaces as a `worklet-load-failed` error event rather than an exception,
 so handle the `error` event and you will see it immediately.
@@ -215,7 +215,7 @@ Failures set the worker's state to `error` and emit an `error` event with a `Tun
 
 | Code | Cause |
 |---|---|
-| `mic-permission-denied` | The user denied microphone access (`NotAllowedError`). |
+| `mic-permission-denied` | The user denied microphone access (`NotAllowedError`, `SecurityError`). |
 | `mic-unavailable` | No usable microphone (`NotFoundError`, `NotReadableError`, `OverconstrainedError`). |
 | `audio-context-failed` | `AudioContext` could not be created. |
 | `worklet-unavailable` | The browser has no `AudioWorklet` support. |
@@ -241,7 +241,7 @@ is driving it. `input` and `workletUrl` are the web worker's alone.
 |---|---|---|
 | `analysis.minFrequencyHz` | `70` | Below E2 (82.4Hz), with headroom for flat tuning. |
 | `analysis.maxFrequencyHz` | `1400` | Above E6 (1319Hz). |
-| `analysis.pitchHopMs` | `12` | ~576 samples at 48kHz. Snapped to whole 128-sample render quanta. |
+| `analysis.pitchHopMs` | `12` | A *request*, snapped up or down to whole 128-sample render quanta: 640 samples (13.3ms) at 48kHz, 512 (11.6ms) at 44.1kHz. `Tuninator.hopSamples` reports what you actually got. |
 | `analysis.rmsGate` | `0.008` | Below this the frame is treated as silence. |
 | `analysis.confidenceGate` | `0.35` | Below this `frequencyHz` is reported as `null`. Measured, not guessed: at `0.5` the detector dropped frames mid-note on decaying low strings, which read as note-offs and split notes in two. |
 | `tracking.minStableMs` | `45` | Note identity settles slower than the frame rate. |
@@ -305,7 +305,7 @@ Notes on the contract:
 ## Architecture
 
 ```
-src/core/      the shared DSP kernel — ZERO imports, zero globals, zero DOM
+src/core/      the shared DSP kernel — no npm imports, no globals, no DOM
 src/tuninator.ts   the library: composes the kernel into audio-in/results-out
 src/workers/   platform adapters — web-audio, its AudioWorklet processor, offline (Node)
 src/eval/      harness-only: the scoring matcher and a WAV codec
@@ -326,16 +326,21 @@ separate "offline detector", and the eval feeds samples through the same `Tunina
 
 Window and hop are **decoupled**. A ring buffer accumulates input and every hop the detector
 analyses the most recent N samples. One period of low E (82.4Hz) is ~582 samples and YIN needs
-roughly two, so the long window is 2048 samples (~43ms) even though the hop is 12ms.
+roughly two, so the long window is 2048 samples (~43ms) even though the hop is ~13ms.
 
 A **dual-window** YIN runs every hop — 512 samples and 2048 samples — and the short window wins
-whenever it is confident above ~300Hz, where it genuinely spans two periods. This gives ~7×
-better time resolution on fast high passages while keeping low notes reliable.
+whenever it is confident above ~300Hz, where it genuinely spans two periods. At a quarter the
+length that is 4× better time resolution on fast high passages, while low notes keep the long
+window they need.
 
-Octave errors are YIN's known failure mode on guitar, so four mitigations stack:
+Octave errors are YIN's known failure mode on guitar, so five mitigations stack:
 
 - prefer the *first* CMND dip below threshold, not the global minimum;
 - a sub-harmonic check that prefers the higher octave when half the lag is equally periodic;
+- a cross-check between the two windows: the long window searches lags all the way down to
+  `minFrequencyHz`, so on a high note its CMND dips at every multiple of the true period and it
+  can lock onto one. The short window's search range physically excludes those lags, so when the
+  long window reports an exact octave-multiple *below* the short one, the short one wins;
 - an independent zero-crossing estimate that *corrects* the reading when the two disagree by a
   whole number of octaves. Only gaps of two octaves or more qualify: zero-crossing counts run high
   on a harmonic-rich string, so a one-octave disagreement is genuinely ambiguous and acting on it
@@ -421,8 +426,8 @@ Abstentions are **not** counted as wrong answers; they are reported separately. 
 denominator is labels in scope minus abstentions, so a detector cannot win by staying quiet on the
 hard notes — a missed label still counts against it.
 
-The one remaining confidently-wrong label is on `cowboy-chords`, where a D major is read as
-`Asus4`. It shares a root cause with the fixture's other D, which reads as `D5`: the F#4 third —
+The one confidently-wrong label left among the chord fixtures is on `cowboy-chords`, where a D
+major is read as `Asus4` (`clean-lead` has three of its own, from the over-segmentation above). It shares a root cause with the fixture's other D, which reads as `D5`: the F#4 third —
 high E string, 2nd fret — decays below the peak floor about 250ms in, so the third is genuinely
 absent from the spectrum. Guitar voicings sound the third once while doubling root and fifth, so a
 decayed third makes any triad look like a power chord.
@@ -450,8 +455,8 @@ npm run eval                              # full run, writes .cache/eval-report.
 npx tsx scripts/eval.ts --trace clean-lead-120bpm   # per-hop CSV of detector internals
 ```
 
-The trace dumps timestamp, frequency, confidence, rms, `tau`, `cmnd`, `zeroCrossingHz`, and the
-onset flag per hop. Every tuned constant in `src/core/policy.ts` was chosen by measuring against
+The trace dumps ten columns per hop: `timestampMs`, `frequencyHz`, `confidence`, `rms`, `tau`,
+`cmnd`, `zeroCrossingHz`, `onset`, `onsetFlux` and `nearestNote`. Every tuned constant in `src/core/policy.ts` was chosen by measuring against
 these fixtures, not picked a priori.
 
 ## License

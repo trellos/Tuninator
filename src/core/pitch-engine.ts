@@ -2,9 +2,13 @@
  * Block-in -> PitchFrame-out. Drives YIN, onset, and chroma at the hop.
  *
  * Window and hop are decoupled: a ring buffer accumulates input, and every hop
- * the detector analyses the most recent N samples. That is what gives a 12ms
+ * the detector analyses the most recent N samples. That is what gives a ~13ms
  * update rate without breaking low E (one period of 82.4Hz is ~582 samples, and
- * YIN needs roughly two, so the long window is 2048 even though the hop is 576).
+ * YIN needs roughly two, so the long window is 2048 even though the hop is 640).
+ *
+ * 640, not the 576 that `pitchHopMs: 12` literally asks for at 48kHz: the hop is
+ * snapped to a whole number of 128-sample render quanta, and 576 is 4.5 of them.
+ * `hopSamples` is the number that actually governs everything downstream.
  *
  * The dual-window trick is what makes fast passages tractable. In the fixtures
  * the timing pressure and the pitch range are inversely correlated: the slow
@@ -305,8 +309,8 @@ export class PitchEngine {
       zeroCrossingHz = zeroCrossingRateHz(this.longWindow, this.sampleRate);
 
       // Prefer the short window when it is confident and high enough that its
-      // window really does span two periods: ~7x better time resolution, which
-      // is what makes 125ms sixteenths resolvable.
+      // window really does span two periods: at 512 against 2048 that is 4x
+      // better time resolution, which is what makes 125ms sixteenths resolvable.
       const shortUsable =
         short.frequencyHz !== null &&
         short.frequencyHz >= policy.pitch.shortWindowMinHz &&
