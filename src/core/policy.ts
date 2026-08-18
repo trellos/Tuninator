@@ -72,6 +72,22 @@ export type Policy = {
   chords: {
     enabled: boolean;
     fftSize: number;
+    /**
+     * How much louder than its recent baseline a frame must be for an onset to
+     * split the chord already sounding.
+     *
+     * Barely above 1: the question is only "did energy stop falling?". The
+     * baseline is a fast EMA, so a chord still decaying sits below it and a
+     * re-strum sits above it; 1.02 is that test plus a margin for ripple.
+     *
+     * Its own number rather than `onset.repickRmsRise` (1.05) because the two
+     * are answering different questions about different signals, and swept
+     * against the fixtures they do not want the same answer: at 1.05 the
+     * strummed fixture drops from 76.9% to 64.3% exact and loses two more of
+     * its sixteen events, because a deliberately muted upstrum is quieter than
+     * the ringing downstrum it follows.
+     */
+    restrikeRmsRise: number;
     /** Minimum top-1 score for a confident chord label. */
     floor: number;
     /** Minimum score(top1) - score(top2) for a confident chord label. */
@@ -120,6 +136,7 @@ const BASE: Omit<Policy, "mode"> = {
   chords: {
     enabled: false,
     fftSize: 4096,
+    restrikeRmsRise: 1.02,
     floor: 0.55,
     margin: 0.08,
   },

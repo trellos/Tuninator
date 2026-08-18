@@ -42,6 +42,15 @@ const MAX_ALTERNATIVES = 4;
 const MIN_CHORD_EVIDENCE_FRAMES = 3;
 
 /**
+ * Distinct chroma readings a NEW root needs before it splits the event.
+ *
+ * The chroma runs once every few hops and its result is cached in between, so a
+ * wall-clock persistence rule alone can be satisfied by a single look at the
+ * spectrum. A real chord change survives being looked at repeatedly.
+ */
+const MIN_CHORD_CHANGE_OBSERVATIONS = 3;
+
+/**
  * How far the winning ROOT must outweigh the best rival root.
  *
  * This is the abstention rule, lifted from the hop to the event. `matchChord`
@@ -90,11 +99,13 @@ type ChordState = {
    * a Bm "B5". The event is named from the weight of its evidence instead.
    */
   chordVotes: Map<string, ChordVote>;
-  /** Committed chord label. */
-  chordLabel: string | null;
-  /** A candidate replacement label, held until it proves it is not a flap. */
-  pendingLabel: string | null;
+  /** Root this event has committed to. Null until a confident reading lands. */
+  chordRoot: PitchClass | null;
+  /** A candidate replacement ROOT, held until it proves it is not a flap. */
+  pendingRoot: PitchClass | null;
   pendingSince: number;
+  /** Distinct chroma readings backing `pendingRoot`. */
+  pendingObservations: number;
   /**
    * Votes cast since `pendingSince` — the evidence arguing for the change. A
    * split backdates the boundary to `pendingSince`, so these hops end up inside
@@ -134,16 +145,17 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
   protected createModeState(): ChordState {
     return {
       chordVotes: new Map(),
-      chordLabel: null,
-      pendingLabel: null,
+      chordRoot: null,
+      pendingRoot: null,
       pendingSince: 0,
+      pendingObservations: 0,
       pendingVotes: new Map(),
     };
   }
 
   process(engineFrame: EngineFrame): TrackerEmission[] {
     const out: TrackerEmission[] = [];
-    const { frame, chord } = engineFrame;
+    const { frame, chord, onset } = engineFrame;
     const t = frame.timestamp;
     const policy = this.policy;
     const gated = frame.amplitude.rms < policy.analysis.rmsGate;
@@ -161,38 +173,79 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
       return out;
     }
 
+    // A genuine re-strum is a new event, even when the chord did not change.
+    //
+    // Merging on root (below) is right for a chord decaying through C -> C5, and
+    // wrong for a chord played twice: the strummed fixture is four chords played
+    // TWICE each, sixteen events, and root-merging alone collapsed each pair
+    // into one. What separates the two cases is energy -- a re-strum puts it
+    // back into the strings, a decay does not -- which is the same test the note
+    // tracker applies to a re-picked note.
+    if (onset && this.active !== null) {
+      const rearticulated =
+        frame.amplitude.rms >= this.active.recentRms * policy.chords.restrikeRmsRise;
+      if (rearticulated) this.end(t, out);
+    }
+
     const confident = chord?.isConfident === true && chord.best !== null;
-    const label = confident ? chord!.best!.label : "unknown";
+    const root = confident ? chord!.best!.root : null;
+    // Whether this hop is a NEW look at the spectrum or the cached previous one.
+    // Computed before segmentation because segmentation counts these.
+    const isFreshReading = chord !== null && chord !== this.lastVotedChord;
 
     if (this.active === null) {
       const fresh = this.beginChord(frame.frequencyHz, t, engineFrame);
-      fresh.chordLabel = confident ? label : null;
+      fresh.chordRoot = root;
     } else {
       const active = this.active;
       active.unvoicedSince = null;
 
-      if (confident && active.chordLabel === null) {
+      if (confident && active.chordRoot === null) {
         // The attack transient is noisy and often unclassifiable; when it
         // resolves, upgrade this event in place rather than splitting. That
         // keeps `startedAt` on the actual attack, which is what onset error
         // measures.
-        active.chordLabel = label;
-      } else if (confident && label !== active.chordLabel) {
-        // Require persistence before switching, so one bad hop cannot shred a
-        // bar into fragments.
-        if (active.pendingLabel !== label) {
-          active.pendingLabel = label;
+        active.chordRoot = root;
+      } else if (confident && root !== active.chordRoot) {
+        // A different ROOT, not merely a different label.
+        //
+        // C and C5 are the same chord at two moments of its decay -- the third
+        // dies first, so a ringing C becomes a C5 on its way out -- and
+        // splitting there cut single strummed bars into two events apiece: on
+        // the power-chord fixture the C bar came out as C + C5, the E bar as E5
+        // + Esus2. Both halves then had half the evidence to be named from, and
+        // whichever half the matcher did not pick became a false positive.
+        //
+        // `judgeChordVotes` has always pooled by root for exactly this reason.
+        // Segmenting by label while naming by root was the two halves of this
+        // file disagreeing about what counts as the same chord.
+        if (active.pendingRoot !== root) {
+          active.pendingRoot = root;
           active.pendingSince = t;
+          active.pendingObservations = 0;
           active.pendingVotes = new Map();
-        } else if (t - active.pendingSince >= policy.tracking.minStableMs) {
+        }
+        if (isFreshReading) active.pendingObservations += 1;
+
+        // Persistence in wall-clock time is not enough on its own: the chroma
+        // runs once every few hops and is cached in between, so 120ms of "a
+        // different root" can be a single look at the spectrum. Demand distinct
+        // looks as well, the same evidence a name requires.
+        if (
+          active.pendingObservations >= MIN_CHORD_CHANGE_OBSERVATIONS &&
+          t - active.pendingSince >= policy.tracking.minStableMs
+        ) {
           const carried = active.pendingVotes;
           this.end(active.pendingSince, out);
           const fresh = this.beginChord(frame.frequencyHz, active.pendingSince, engineFrame);
-          fresh.chordLabel = label;
+          fresh.chordRoot = root;
           fresh.chordVotes = carried;
         }
-      } else if (label === active.chordLabel) {
-        active.pendingLabel = null;
+      } else if (confident) {
+        // Same root. The quality may have moved (C -> C5); the vote decides the
+        // name, and this event keeps going.
+        active.pendingRoot = null;
+        active.pendingObservations = 0;
         active.pendingVotes = new Map();
       }
     }
@@ -205,12 +258,11 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
     // too.
     const current = this.active;
     if (current !== null) {
-      const fresh = chord !== null && chord !== this.lastVotedChord;
-      if (fresh) {
+      if (isFreshReading) {
         this.lastVotedChord = chord;
         if (confident) {
           recordChordVote(current.chordVotes, chord.best!);
-          if (current.pendingLabel !== null) recordChordVote(current.pendingVotes, chord.best!);
+          if (current.pendingRoot !== null) recordChordVote(current.pendingVotes, chord.best!);
         }
       }
       this.applyChordLabel(current, engineFrame);

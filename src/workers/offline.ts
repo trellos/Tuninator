@@ -11,6 +11,7 @@
  */
 
 import type { MusicEvent, PitchFrame, TuninatorOptions } from "../types.js";
+import type { Policy } from "../core/policy.js";
 import { Tuninator } from "../tuninator.js";
 
 /**
@@ -26,6 +27,11 @@ export const RENDER_QUANTUM = 128;
 export type AnalyzeOptions = TuninatorOptions & {
   /** Collect every PitchFrame. Off by default — 20s at 12ms is ~1700 frames. */
   captureFrames?: boolean;
+  /**
+   * A fully-resolved policy, bypassing mode defaults. The parameter sweep in
+   * `scripts/sweep.ts` uses this to vary one field at a time.
+   */
+  policy?: Policy;
 };
 
 export type AnalyzeResult = {
@@ -64,7 +70,7 @@ export class WorkerOffline {
   private readonly tuninator: Tuninator;
   private readonly sampleRate: number;
 
-  constructor(sampleRate: number, options: TuninatorOptions = {}) {
+  constructor(sampleRate: number, options: AnalyzeOptions = {}) {
     this.sampleRate = sampleRate;
     this.tuninator = new Tuninator({ ...options, sampleRate });
   }
