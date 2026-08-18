@@ -1,9 +1,10 @@
 /**
  * WorkerWebAudio: state machine and error mapping, against a mocked browser.
  *
- * The plan covers these only as manual browser checks. They are cheap to pin
- * down here, and "denying permission surfaces mic-permission-denied rather than
- * a console throw" is exactly the kind of thing that silently regresses.
+ * A real browser is the only place this can be exercised for real, so the graph
+ * is mocked and the seams are pinned here instead: "denying permission surfaces
+ * mic-permission-denied rather than a console throw" is exactly the kind of thing
+ * that silently regresses.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";

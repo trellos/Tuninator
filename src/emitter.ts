@@ -51,8 +51,4 @@ export class Emitter {
       }
     }
   }
-
-  clear(): void {
-    this.handlers.clear();
-  }
 }

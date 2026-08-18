@@ -2,8 +2,9 @@
  * Input-channel selection.
  *
  * The unit half drives `ChannelSelector` directly with per-hop RMS, exactly the
- * way the worklet does. The last block is the reason the whole thing exists: a
- * mic and a DI of one guitar, summed, and what that does to pitch detection.
+ * way `channel-input.ts` does. The last block is the reason the whole thing
+ * exists: a mic and a DI of one guitar, summed, and what that does to pitch
+ * detection — which is why the library is handed one channel rather than a sum.
  */
 
 import { describe, expect, it } from "vitest";

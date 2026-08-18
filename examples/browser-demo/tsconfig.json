@@ -13,13 +13,12 @@
     "exactOptionalPropertyTypes": false,
 
     /*
-     * `noUnusedLocals` / `noUnusedParameters` are deliberately OFF.
-     * `paths` below puts the library's own source into this program, and
-     * TypeScript has no way to apply compiler options per file -- so those two
-     * flags would fail this demo's build on unused-variable style in the
-     * library's in-progress code, which this repo does not own and must not
-     * edit. Every flag that is on is a type-safety flag, not a style flag.
+     * On, now that only this demo's own code is in the program. They used to be
+     * off because a `paths` entry pulled the library's source in, and TypeScript
+     * cannot apply compiler options per file.
      */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
 
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
@@ -30,15 +29,18 @@
     "types": ["node", "vite/client"],
 
     /*
-     * The library's `dist/` is built concurrently and may not exist yet, so the
-     * demo typechecks (and bundles, see vite.config.ts) against the library's
-     * PUBLIC ENTRY POINT source. This is the single permitted exception to the
-     * "public API only" rule -- `src/index.ts` *is* the public API. Nothing in
-     * this demo may deepen this path into `tuninator/src/**` internals.
+     * No `paths` mapping on purpose.
+     *
+     * `tuninator` and `tuninator/web` resolve through the package `exports` map
+     * into `dist/*.d.ts`, exactly as they would for anyone who installed the
+     * package -- so this typecheck also proves the published type surface is
+     * usable, and that `exports` is wired correctly. It does mean the library
+     * must be built first; CI orders the steps accordingly.
+     *
+     * `vite.config.ts` and `vitest.config.ts` alias to the library's SOURCE
+     * instead, for live reload and so a stale `dist/` cannot make tests pass.
+     * The two views disagreeing would itself be a build bug worth catching.
      */
-    "paths": {
-      "tuninator": ["../Tuninator/src/index.ts"]
-    }
   },
   "include": ["src", "vite.config.ts"]
 }

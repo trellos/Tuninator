@@ -1,54 +1,24 @@
 # examples/
 
-## `browser-demo/` — this is a holding location, not its final home
+## `browser-demo/`
 
-This directory contains **Tuninator-Example**, the Vite browser demo: a scrolling note timeline
-with a 90bpm metronome, consuming the library through its public API only.
-
-It is intended to live in its own repository, `trellos/Tuninator-Example`, checked out as a
-sibling of this one:
-
-```
-C:\dev\Tuninator\
-C:\dev\Tuninator-Example\
-```
-
-It is committed here instead because the session that built it could not create the repository —
-the GitHub App returned `403 Resource not accessible by integration` on repository creation — and
-the build container it was written in is ephemeral. Committing it here was the only way to keep
-the work.
-
-### The files assume the sibling layout, unchanged
-
-`package.json` declares `"tuninator": "file:../Tuninator"` and `vite.config.ts` aliases
-`tuninator` to `../Tuninator/src/index.ts`. Those paths are correct for the standalone repo, and
-they are **deliberately left as they are** so the directory can be lifted out verbatim.
-
-That also means the demo does **not** build from this location without adjusting those two paths.
-
-### Moving it to its own repository
+A Vite browser demo: a scrolling note timeline, a 90bpm metronome, and a live tuner readout,
+consuming the library through its public API only.
 
 ```bash
-# from C:\dev
-mkdir Tuninator-Example
-cp -r Tuninator/examples/browser-demo/* Tuninator-Example/
-cp Tuninator/examples/browser-demo/.gitignore Tuninator-Example/
-cd Tuninator-Example
-git init && git add -A && git commit -m "Initial commit: Tuninator browser demo"
-gh repo create trellos/Tuninator-Example --public --source=. --push
-npm install && npm run dev
+npm run build                    # in the repository root, for dist/tuninator-worklet.js
+cd examples/browser-demo
+npm install
+npm run dev                      # http://localhost:5173
+npm test                         # the demo's own tests
 ```
 
-Then delete `examples/` from this repository.
+It is also where **channel selection** lives. The library analyses one mono channel and does not
+choose it — see [Input is mono](../README.md#input-is-mono) — so the demo does the choosing:
+[`channel-input.ts`](browser-demo/src/channel-input.ts) opens the microphone, splits it with a
+`ChannelSplitterNode`, and hands one channel to the worker, using the windowed hysteretic selector
+in [`channel-select.ts`](browser-demo/src/channel-select.ts). That selector used to live in the
+library; it was moved here rather than deleted, with its tests.
 
-### What it does
-
-See [`browser-demo/README.md`](browser-demo/README.md). Briefly: start/stop mic, live frequency
-and cents, active `MusicEvent`, a canvas timeline showing 16 beats (10.667s) of scrolling history
-with beat gridlines from the metronome clock, and a mode selector exercising `setMode()` while
-listening.
-
-It ships a **mock Tuninator** (`?mock=1`) that emits a synthetic pitch and event stream, so the UI
-can be developed and smoke-tested without a microphone or a built library. `npm run smoke` drives
-it headlessly and verifies the canvas actually rendered by reading pixels back;
-`screenshot.png` is the evidence.
+The demo depends on the library as `"tuninator": "file:../.."`, so it always builds against the
+checkout it sits in.

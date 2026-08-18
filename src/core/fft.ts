@@ -6,7 +6,7 @@
  * it is the one module two workstreams both build on.
  *
  * Part of `src/core/` — no DOM, no globals, no npm imports. All scratch is
- * preallocated in the constructor; `forward` and `magnitudes` never allocate.
+ * preallocated in the constructor; `magnitudes` never allocates.
  */
 
 /** Periodic (not symmetric) Hann window of `size` samples. */
@@ -64,61 +64,11 @@ export class RealFFT {
   }
 
   /**
-   * Forward transform of a real signal.
-   * `input.length` must be `size`; `outRe`/`outIm` length must be `bins`.
-   * Does not window the input — apply `hannWindow` beforehand if needed.
-   */
-  forward(input: Float32Array, outRe: Float32Array, outIm: Float32Array): void {
-    if (input.length !== this.size) {
-      throw new Error(`RealFFT.forward: expected ${this.size} samples, got ${input.length}`);
-    }
-
-    const { re, im, size } = this;
-    im.fill(0);
-
-    // Load with the bit-reversal permutation already applied.
-    const rev = this.reverse;
-    for (let i = 0; i < size; i++) {
-      re[rev[i]!] = input[i]!;
-    }
-
-    const cos = this.cosTable;
-    const sin = this.sinTable;
-
-    for (let len = 2; len <= size; len <<= 1) {
-      const halfLen = len >> 1;
-      const step = size / len;
-      for (let i = 0; i < size; i += len) {
-        for (let j = 0, k = 0; j < halfLen; j++, k += step) {
-          const wr = cos[k]!;
-          // Forward transform uses e^(-i2πk/N), hence the negated sine.
-          const wi = -sin[k]!;
-          const a = i + j;
-          const b = a + halfLen;
-
-          const br = re[b]!;
-          const bi = im[b]!;
-          const tr = br * wr - bi * wi;
-          const ti = br * wi + bi * wr;
-
-          re[b] = re[a]! - tr;
-          im[b] = im[a]! - ti;
-          re[a] = re[a]! + tr;
-          im[a] = im[a]! + ti;
-        }
-      }
-    }
-
-    const bins = this.bins;
-    for (let i = 0; i < bins; i++) {
-      outRe[i] = re[i]!;
-      outIm[i] = im[i]!;
-    }
-  }
-
-  /**
    * Magnitude spectrum. `input.length` must be `size`; `outMag.length` `bins`.
-   * Uses the same scratch as `forward`, so it does not allocate.
+   *
+   * The only transform on offer. A `forward()` returning re/im existed and was
+   * never called by anything -- it was a second verbatim copy of the butterfly
+   * below. Add it back the day something needs phase.
    */
   magnitudes(input: Float32Array, outMag: Float32Array): void {
     if (input.length !== this.size) {

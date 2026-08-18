@@ -28,7 +28,7 @@ import { YinDetector, zeroCrossingRateHz, rms as windowRms, peak as windowPeak }
 import { OnsetDetector } from "./onset.js";
 import { ChromaAnalyzer } from "./chroma.js";
 import { matchChord } from "./chords.js";
-import { describeFrequency, frequencyToMidiFloat } from "./notes.js";
+import { describeFrequency } from "./notes.js";
 import type { ChordMatch } from "./chords.js";
 import type { ChromaResult } from "./chroma.js";
 
@@ -465,14 +465,4 @@ function medianOf(values: readonly number[]): number {
   return sorted.length % 2 === 1
     ? sorted[mid]!
     : (sorted[mid - 1]! + sorted[mid]!) / 2;
-}
-
-/** Signed cents between two frequencies. Re-exported for the tracker. */
-export function centsBetweenFrequencies(hz: number, refHz: number): number {
-  return 1200 * Math.log2(hz / refHz);
-}
-
-/** Fractional MIDI, used by the tracker for step-vs-glide classification. */
-export function midiOf(hz: number): number {
-  return frequencyToMidiFloat(hz);
 }

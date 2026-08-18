@@ -21,6 +21,10 @@ export type {
   TuninatorConfig,
 } from "./tuninator.js";
 
+// `Policy` is reachable through the public surface -- `TuninatorConfig.policy`
+// takes one and `getPolicy()` returns one -- so it has to be nameable.
+export type { Policy } from "./core/policy.js";
+
 export type {
   EventPitch,
   MusicEvent,

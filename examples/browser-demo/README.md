@@ -1,7 +1,6 @@
-# Tuninator-Example
+# browser-demo
 
-A Vite browser demo for the [`tuninator`](https://github.com/trellos/Tuninator) guitar-analysis
-library: a scrolling note timeline, a 90 bpm metronome, and a live tuner readout driven by the
+A Vite browser demo for the `tuninator` guitar-analysis library in this repository: a scrolling note timeline, a 90 bpm metronome, and a live tuner readout driven by the
 library's `pitchFrame` and `MusicEvent` streams.
 
 ![The demo running against the mock source](./screenshot.png)
@@ -63,28 +62,32 @@ The library needs a `workletUrl` pointing at its built AudioWorklet bundle. This
 **That file is a copy of the library's `dist/tuninator-worklet.js`.** It is not authored here and it
 is not committed — `.gitignore` excludes it, and `public/assets/.gitkeep` keeps the directory. The
 copy is automatic: `vite.config.ts` installs a small plugin that copies
-`../Tuninator/dist/tuninator-worklet.js` into `public/assets/` on every build and dev-server start,
+the repository's `dist/tuninator-worklet.js` into `public/assets/` on every build and dev-server start,
 and re-copies it whenever the library is rebuilt while the dev server is running.
 
 So the ordinary workflow is:
 
 ```bash
-cd ../Tuninator && npm run build   # produces dist/tuninator-worklet.js
-cd ../Tuninator-Example && npm run dev
+cd ../..                 && npm run build   # produces dist/tuninator-worklet.js
+cd examples/browser-demo && npm run dev
 ```
 
 If the library has not been built yet, the copy step **warns and continues** rather than failing the
 build. The demo still runs against the mock; the live path then reports `worklet-load-failed` in the
 UI, which is the correct and legible outcome rather than a crash.
 
-## Building against the library's source
+## Two views of the library, on purpose
 
-`vite.config.ts` aliases `tuninator` to `../Tuninator/src/index.ts`, and `tsconfig.json` mirrors that
-with a `paths` entry.
+`vite.config.ts` and `vitest.config.ts` alias `tuninator` and `tuninator/web` to the library's
+SOURCE entry points (`src/index.ts`, `src/web.ts`). That gives live reload while working on the
+library, and means a stale `dist/` cannot make the demo's tests pass.
 
-This exists because the library's `dist/` is produced by a concurrent workstream and may not exist
-when you clone. Resolving the package through its `exports` map (`./dist/index.js`) would fail; the
-alias keeps the demo building today and gives live reload on library changes.
+`tsconfig.json` has no such mapping: `npx tsc --noEmit` resolves both specifiers through the
+package `exports` map into `dist/*.d.ts`, exactly as they would for anyone who installed the
+package. So the typecheck doubles as a check that the published type surface is usable and that
+`exports` is wired correctly — at the cost of needing the library built first.
+
+The two views disagreeing would itself be a build bug worth catching.
 
 `src/index.ts` **is** the library's public entry point, so this is not a way around the public API —
 it is the public API, in source form. The rule the demo holds itself to is that this alias is the
