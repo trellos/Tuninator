@@ -21,10 +21,15 @@ import type { PitchEstimate, PitchEstimator, PitchEstimatorOptions } from "./est
  * window YIN runs, so the comparison is between the methods and not between
  * their integration times.
  *
- * Measured on the lead fixture, 1024 is not the trade it looks like: it sees
- * more of each short note but reads the sixteenths WORSE (28/43 against 34/43),
- * because half a window of a plucked string is mostly attack transient and the
- * NSDF of a transient has no tall key maximum to anchor the octave rule.
+ * Swept on the lead fixture, the shorter windows are not the trade they look
+ * like. 1024 does buy frames — every note is longer than it, so nothing is
+ * unseeable and the bench takes 703 frames instead of 617 — but it reads them
+ * less decisively (mean agreement 70.3% against 75.2%, same 35/43 notes),
+ * because a 21ms window of a plucked string is mostly attack and the NSDF of an
+ * attack has no tall key maximum for the octave rule to work from. Longer than
+ * 2048 the decay and vibrato inside one window start to smear the peaks: 3072
+ * and 4096 lose notes (34/43 and 33/43) and buy a few tenths of a percent of
+ * frames, out of a fifth fewer frames to begin with.
  */
 const WINDOW = 2048;
 
@@ -35,13 +40,16 @@ const WINDOW = 2048;
  * This one constant IS the octave decision. Every multiple of a true period is
  * also a maximum of the NSDF and, because the NSDF has no length bias, they are
  * all about equally tall — so the true period is the shortest lag that comes
- * near the best, and `k` says how near. Below ~0.8 a second-harmonic ridge on a
- * plucked string qualifies and the note reads an octave high; above ~0.9 a
- * fundamental that has decayed below its own harmonic no longer qualifies and
- * the note reads an octave low. Swept on the lead fixture: 0.80 -> 32/43,
- * 0.85 -> 34/43, 0.90 -> 34/43, 0.95 -> 31/43.
+ * near the best, and `k` says how near. Lower it and a second-harmonic ridge on
+ * a plucked string qualifies, so the note reads an octave high; raise it and a
+ * fundamental that has decayed below its own harmonic stops qualifying, so the
+ * note reads an octave low. Swept on the lead fixture at 2048: 0.80 -> 34/43
+ * notes and 66.1% of frames, 0.85 -> 35/43 and 67.1%, 0.90 -> 35/43 and 69.0%,
+ * 0.95 -> 35/43 and 69.2%. Flat enough not to be worth tuning further, and 0.90
+ * is the top of the published range, which is where it is left: past it the
+ * rule stops discriminating at all and only the tallest maximum can ever win.
  */
-const PEAK_THRESHOLD = 0.87;
+const PEAK_THRESHOLD = 0.9;
 
 /**
  * NSDF height below which a frame is not called voiced.
@@ -63,15 +71,6 @@ const MIN_CLARITY = 0.3;
  * MPM precisely where MPM knows least.
  */
 const AMBIGUITY_FLOOR = 0.5;
-
-/**
- * Margin, in units of the tallest key maximum, at which the octave decision is
- * considered settled rather than knife-edge.
- *
- * The whole accept/reject band is only `1 - k` wide (0.13 here), so this has to
- * be a fraction of that band to discriminate at all.
- */
-const AMBIGUITY_MARGIN = 0.08;
 
 function clamp01(value: number): number {
   if (!(value > 0)) return 0;
@@ -241,34 +240,42 @@ export class MpmEstimator implements PitchEstimator {
     const clarity = clamp01(Math.max(chosenValue, this.refinedValue));
 
     /* --- 5. Confidence ------------------------------------------------------ */
-    // Two independent things have to be true for a reading to be the note.
+    // Two independent things have to be true for a reading to be the note, and
+    // the NSDF height only speaks to one of them.
     //
-    // The first is that the window is periodic at all, and the NSDF height says
-    // so directly: 1.0 is a segment repeating itself exactly, 0.0 is noise.
-    // That is a clarity, not a probability, but it is the same quantity YIN's
-    // `1 - cmnd` reports, which is what makes the two comparable at all.
+    // It says whether the window is periodic at all: 1.0 is a segment repeating
+    // itself exactly, 0.0 is noise. That is a clarity and not a probability,
+    // but it is the same quantity YIN reports as `1 - cmnd`, which is what
+    // makes the two numbers comparable at all.
     //
-    // The second is that the OCTAVE is right, and there the height says nothing
-    // — a second harmonic read as the fundamental scores just as high. What
-    // decides it is the `k` rule, so what measures the risk is how close that
-    // rule came to going the other way. Two ways it can:
+    // It says nothing about the OCTAVE — a second harmonic read as the
+    // fundamental scores just as high, and on this fixture that is exactly what
+    // happens to the low B, where the maxima stand at 0.977 (lag 196) and 0.997
+    // (lag 391) and the true period is the longer one. What decided that frame
+    // was not the height but the `k` tolerance, so the risk is measured by how
+    // much of that tolerance the reading had to spend. Frames are split by it
+    // on the lead fixture, over the notes that are not drowned out:
     //
-    //   * the chosen maximum only just cleared `k * highest`, so a hair less
-    //     and the estimate would have jumped to a longer lag (an octave down);
-    //   * a SHORTER-lag maximum came close to clearing it, so a hair more and
-    //     the estimate would have jumped up.
+    //     chosen maximum IS the tallest    495 frames   80% right   0% an octave high
+    //     spent up to 2% of the tolerance   23 frames   57% right  35% an octave high
+    //     spent 2-5%                        16 frames   44% right  38% an octave high
+    //     spent more                         6 frames   17% right  33% an octave high
     //
-    // Whichever is nearer the boundary is the fragility of this frame, and it
-    // is scaled by `highest` so it means the same thing at any signal level.
-    // At the boundary the method is choosing between two octaves with no
-    // evidence, and the confidence has to say that.
+    // Every octave error MPM makes is on the far side of that line, and none is
+    // on the near side, so the multiplier is 1 when nothing was spent and falls
+    // steeply -- as the square root, because the damage is done by the first
+    // couple of percent -- to a coin flip when the whole band was.
+    //
+    // The mirror case counts the same way: a SHORTER-lag maximum that came
+    // close to clearing the cutoff would have moved the estimate an octave UP,
+    // so its distance below the cutoff is spent tolerance too. Both are divided
+    // by the tallest maximum, so they mean the same thing at any signal level.
     let rivalBelow = 0;
     for (let i = 0; i < chosen; i++) if (peakValues[i]! > rivalBelow) rivalBelow = peakValues[i]!;
-    const marginAbove = (chosenValue - cutoff) / highest;
-    const marginBelow = (cutoff - rivalBelow) / highest;
-    const margin = Math.min(marginAbove, marginBelow);
-    const settled =
-      AMBIGUITY_FLOOR + (1 - AMBIGUITY_FLOOR) * clamp01(margin / AMBIGUITY_MARGIN);
+    const band = 1 - this.peakThreshold;
+    const gap = Math.min((chosenValue - cutoff) / highest, (cutoff - rivalBelow) / highest);
+    const spent = 1 - clamp01(gap / band);
+    const settled = 1 - (1 - AMBIGUITY_FLOOR) * Math.sqrt(spent);
 
     return { frequencyHz: this.sampleRate / this.refinedTau, confidence: clarity * settled };
   }
