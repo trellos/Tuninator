@@ -291,6 +291,91 @@ describe("EventTracker", () => {
     expect(emissions.at(-1)!.event.kind).toBe("chord");
   });
 
+  it("names a chord event from its best evidence, not its most decayed frame", () => {
+    // A guitar's third dies long before its root and fifth, so the tail of a Bm
+    // reads as a bare B5. Labelling from the last hop hands the event the name
+    // its own decay produced.
+    const policy = resolvePolicy({ mode: "chords" });
+    const tracker = new EventTracker(policy);
+    const emissions: TrackerEmission[] = [];
+
+    let t = 0;
+    for (const [count, name, quality, score] of [
+      [20, "Bm", "min", 0.86],
+      // Shorter than `minStableMs`, so this is decay, not a chord change: it
+      // must not split the event either.
+      [8, "B5", "5", 0.93],
+    ] as const) {
+      for (let i = 0; i < count; i++) {
+        const base = engineFrame(t, 246.94, { rms: 0.08 });
+        emissions.push(
+          ...tracker.process({
+            ...base,
+            chroma: {
+              chroma: new Float32Array(12),
+              bassPitchClass: 11,
+              bassFrequencyHz: 246.94,
+              salience: 0.8,
+              polyphony: 3,
+            },
+            chord: {
+              best: { label: name, root: "B", quality, score },
+              alternatives: [],
+              isConfident: true,
+              margin: 0.2,
+            },
+          })
+        );
+        t += HOP_MS;
+      }
+    }
+    emissions.push(...tracker.flush(t));
+
+    expect(emissions.filter((e) => e.type === "start")).toHaveLength(1);
+    // The decayed reading scores higher on the frames it owns, but twenty hops
+    // of Bm outweigh eight of B5.
+    expect(emissions.at(-1)!.event.label.name).toBe("Bm");
+    expect(emissions.at(-1)!.event.label.quality).toBe("min");
+  });
+
+  it("stays unknown when the only confident reading is a single flash", () => {
+    const tracker = new EventTracker(resolvePolicy({ mode: "chords" }));
+    const emissions: TrackerEmission[] = [];
+
+    const withChord = (t: number, confident: boolean): EngineFrame => {
+      const base = engineFrame(t, 130.81, { rms: 0.08 });
+      return {
+        ...base,
+        chroma: {
+          chroma: new Float32Array(12),
+          bassPitchClass: 0,
+          bassFrequencyHz: 130.81,
+          salience: 0.8,
+          polyphony: 3,
+        },
+        chord: {
+          best: { label: "C", root: "C", quality: "maj", score: confident ? 0.82 : 0.44 },
+          alternatives: [{ label: "Am", root: "A", quality: "min", score: 0.4 }],
+          isConfident: confident,
+          margin: confident ? 0.2 : 0.04,
+        },
+      };
+    };
+
+    let t = 0;
+    for (let i = 0; i < 20; i++) {
+      // Two hops out of twenty cleared the margin rule, and they are the last
+      // two — exactly where the old "label from the newest frame" rule would
+      // have taken the event's name from. That is a flash, not a reading the
+      // event can be named from.
+      emissions.push(...tracker.process(withChord(t, i >= 18)));
+      t += HOP_MS;
+    }
+    emissions.push(...tracker.flush(t));
+
+    expect(emissions.at(-1)!.event.label.name).toBe("unknown");
+  });
+
   it("reports unknown, with alternatives, when the chord margin rule fails", () => {
     const tracker = new EventTracker(resolvePolicy({ mode: "chords" }));
     const emissions: TrackerEmission[] = [];

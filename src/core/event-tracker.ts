@@ -20,7 +20,8 @@
  * Part of `src/core/` — no DOM, no globals, no npm imports.
  */
 
-import type { EventPitch, MusicEvent, MusicEventKind, MusicEventState } from "../types.js";
+import type { EventPitch, MusicEvent, MusicEventKind, MusicEventState, PitchClass } from "../types.js";
+import type { ChordQuality } from "./chords.js";
 import type { Policy } from "./policy.js";
 import type { EngineFrame } from "./pitch-engine.js";
 import { describeFrequency, midiToFrequency } from "./notes.js";
@@ -54,17 +55,44 @@ type Active = {
    * hands it the neighbour's name.
    */
   noteVotes: Map<number, number>;
+  /**
+   * The chord-mode counterpart of `noteVotes`: every confident reading seen
+   * while this event was active, keyed by label. Same reasoning — a strum's
+   * third decays far faster than its root and fifth, so by the end of an event
+   * the chroma has collapsed to a power chord and the last frame names a Bm
+   * "B5". The event is named from the weight of its evidence instead.
+   */
+  chordVotes: Map<string, ChordVote>;
   /** Committed chord label, chord mode only. */
   chordLabel: string | null;
   /** A candidate replacement label, held until it proves it is not a flap. */
   pendingLabel: string | null;
   pendingSince: number;
+  /**
+   * Votes cast since `pendingSince` — the evidence arguing for the change. A
+   * split backdates the boundary to `pendingSince`, so these hops end up inside
+   * the NEW event's span and are handed to it when the change is confirmed.
+   * Without that the new event loses its whole attack as evidence, which is the
+   * part where the third is still sounding.
+   */
+  pendingVotes: Map<string, ChordVote>;
   /** A candidate new pitch, held until it proves it is not a one-frame blip. */
   pendingStepHz: number | null;
   pendingStepFrames: number;
   /** Timestamp of the first frame showing the candidate pitch. */
   pendingStepAt: number;
   lastEmitted: { state: MusicEventState; bendCents: number; confidence: number; label: string };
+};
+
+/** One chord reading's accumulated evidence over an event's life. */
+type ChordVote = {
+  label: string;
+  root: PitchClass;
+  quality: ChordQuality;
+  /** Summed match score across the confident hops that voted for it. */
+  weight: number;
+  /** How many confident hops voted for it. */
+  hops: number;
 };
 
 const CENTS_PER_OCTAVE = 1200;
@@ -108,6 +136,15 @@ const ONSET_BACKDATE_WINDOW_MS = 120;
  * frame is a detector wobble; two at 12ms is still well inside a 125ms note.
  */
 const STEP_CONFIRM_FRAMES = 2;
+
+/**
+ * How many confident hops the winning ROOT needs before the event is willing to
+ * be named. The chroma path runs once every few hops and its result is cached
+ * in between, so a handful of identical hops can be a single look at the
+ * spectrum; this asks for a reading that survived more than one of them.
+ * Below it the evidence is a flash, and the honest answer is `unknown`.
+ */
+const MIN_CHORD_EVIDENCE_HOPS = 5;
 
 /** Weight of the newest frame in the rolling rms baseline. */
 const RMS_BASELINE_ALPHA = 0.25;
@@ -266,64 +303,75 @@ export class EventTracker {
 
     if (this.active === null) {
       this.begin("chord", frame.frequencyHz, t, engineFrame);
-      const active = this.active as Active | null;
-      if (active !== null) {
-        active.chordLabel = confident ? label : null;
-        this.applyChordLabel(active, engineFrame);
-      }
-      this.observe(engineFrame, t);
-      return;
-    }
+      const fresh = this.active as Active | null;
+      if (fresh !== null) fresh.chordLabel = confident ? label : null;
+    } else {
+      const active = this.active;
+      active.unvoicedSince = null;
 
-    const active = this.active;
-    active.unvoicedSince = null;
-
-    if (confident && active.chordLabel === null) {
-      // The attack transient is noisy and often unclassifiable; when it
-      // resolves, upgrade this event in place rather than splitting. That keeps
-      // `startedAt` on the actual attack, which is what onset error measures.
-      active.chordLabel = label;
-      this.applyChordLabel(active, engineFrame);
-    } else if (confident && label !== active.chordLabel) {
-      // Require persistence before switching, so one bad hop cannot shred a bar
-      // into fragments.
-      if (active.pendingLabel !== label) {
-        active.pendingLabel = label;
-        active.pendingSince = t;
-      } else if (t - active.pendingSince >= policy.tracking.minStableMs) {
-        this.end(active.pendingSince, out);
-        this.begin("chord", frame.frequencyHz, active.pendingSince, engineFrame);
-        const fresh = this.active as Active | null;
-        if (fresh !== null) {
-          fresh.chordLabel = label;
-          this.applyChordLabel(fresh, engineFrame);
+      if (confident && active.chordLabel === null) {
+        // The attack transient is noisy and often unclassifiable; when it
+        // resolves, upgrade this event in place rather than splitting. That
+        // keeps `startedAt` on the actual attack, which is what onset error
+        // measures.
+        active.chordLabel = label;
+      } else if (confident && label !== active.chordLabel) {
+        // Require persistence before switching, so one bad hop cannot shred a
+        // bar into fragments.
+        if (active.pendingLabel !== label) {
+          active.pendingLabel = label;
+          active.pendingSince = t;
+          active.pendingVotes = new Map();
+        } else if (t - active.pendingSince >= policy.tracking.minStableMs) {
+          const carried = active.pendingVotes;
+          this.end(active.pendingSince, out);
+          this.begin("chord", frame.frequencyHz, active.pendingSince, engineFrame);
+          const fresh = this.active as Active | null;
+          if (fresh !== null) {
+            fresh.chordLabel = label;
+            fresh.chordVotes = carried;
+          }
         }
+      } else if (label === active.chordLabel) {
+        active.pendingLabel = null;
+        active.pendingVotes = new Map();
       }
-    } else if (label === active.chordLabel) {
-      active.pendingLabel = null;
     }
 
-    if (active === this.active) {
-      this.applyChordLabel(active, engineFrame);
-      if (active.event.state === "release") active.event.state = "sustain";
+    // One vote per hop, cast for whichever event is active once segmentation
+    // has had its say. A hop observed while a change was merely pending votes
+    // for the event it was observed under; if that change is later confirmed,
+    // the backdated boundary puts the same hop inside the new event's span, and
+    // `pendingVotes` hands it over so it counts there too.
+    const current = this.active;
+    if (current !== null) {
+      if (confident) {
+        recordChordVote(current.chordVotes, chord!.best!);
+        if (current.pendingLabel !== null) recordChordVote(current.pendingVotes, chord!.best!);
+      }
+      this.applyChordLabel(current, engineFrame);
+      if (current.event.state === "release") current.event.state = "sustain";
     }
     this.observe(engineFrame, t);
   }
 
-  /** Writes the current chord interpretation onto the event, honestly. */
+  /** Writes the event's best-supported chord interpretation onto it, honestly. */
   private applyChordLabel(active: Active, engineFrame: EngineFrame): void {
     const chord = engineFrame.chord;
     if (!chord) return;
 
-    if (active.chordLabel !== null && chord.isConfident && chord.best !== null) {
-      active.event.label = {
-        name: chord.best.label,
-        root: chord.best.root,
-        quality: chord.best.quality,
-      };
+    // Not the newest frame: the vote. A guitar's third decays far faster than
+    // its root and fifth, so the last hop of a Bm reads `B5` — and the hops
+    // around a backdated boundary read as the neighbour. Same failure the
+    // `noteVotes` mode fixes for single notes.
+    const winner = bestChordVote(active.chordVotes);
+
+    if (winner !== null) {
+      active.event.label = { name: winner.label, root: winner.root, quality: winner.quality };
     } else {
-      // The margin rule said no. Say `unknown` and show the work, rather than
-      // committing to a confident wrong label.
+      // Nothing ever cleared the margin rule, or what did was too thin to name
+      // the event. Say `unknown` and show the work, rather than committing to a
+      // confident wrong label.
       active.event.label = { name: "unknown" };
     }
 
@@ -343,7 +391,11 @@ export class EventTracker {
       alternatives: alternatives.length > 0 ? alternatives : undefined,
       polyphony: engineFrame.chroma?.polyphony,
     };
-    active.event.confidenceParts.spectralFit = chord.best?.score;
+    // The fit that backs the NAME, not the fit of whatever the newest frame
+    // happened to see. Reporting a decayed frame's score under a voted label
+    // would understate a good call and overstate a lucky one.
+    active.event.confidenceParts.spectralFit =
+      winner !== null ? winner.weight / winner.hops : chord.best?.score;
 
     if (engineFrame.chroma) {
       active.event.pitches = chordPitches(engineFrame, chord);
@@ -425,9 +477,11 @@ export class EventTracker {
       recentRms: frame.amplitude.rms,
       recentHz: hz === null ? [] : [hz],
       noteVotes: new Map(nearest === null ? [] : [[nearest.midi, 1]]),
+      chordVotes: new Map(),
       chordLabel: null,
       pendingLabel: null,
       pendingSince: t,
+      pendingVotes: new Map(),
       pendingStepHz: null,
       pendingStepFrames: 0,
       pendingStepAt: t,
@@ -577,6 +631,66 @@ export class EventTracker {
     if (this.active === null || !this.active.emittedStart) return [];
     return [snapshot(this.active.event)];
   }
+}
+
+/** Folds one confident hop's chord reading into a tally. */
+function recordChordVote(
+  votes: Map<string, ChordVote>,
+  best: { label: string; root: PitchClass; quality: ChordQuality; score: number }
+): void {
+  const vote = votes.get(best.label) ?? {
+    label: best.label,
+    root: best.root,
+    quality: best.quality,
+    weight: 0,
+    hops: 0,
+  };
+  vote.weight += best.score;
+  vote.hops++;
+  votes.set(best.label, vote);
+}
+
+/**
+ * The event's name, decided in two stages: root first, then quality among the
+ * readings that agreed on that root.
+ *
+ * Root before quality because the root is the robust part — it is carried by
+ * the bass and the loudest partials and survives the decay — while the quality
+ * lives in the third, the first thing to disappear. Pooling by root means a
+ * decayed `B5` and a full `Bm` reinforce each other on the root rather than
+ * splitting the vote, and the quality is then settled only among frames that
+ * were looking at the same chord.
+ *
+ * Ties break toward the first reading seen, which is deterministic: `Map`
+ * iterates in insertion order and insertion order is hop order.
+ */
+function bestChordVote(votes: Map<string, ChordVote>): ChordVote | null {
+  const roots = new Map<string, { weight: number; hops: number }>();
+  for (const vote of votes.values()) {
+    const agg = roots.get(vote.root) ?? { weight: 0, hops: 0 };
+    agg.weight += vote.weight;
+    agg.hops += vote.hops;
+    roots.set(vote.root, agg);
+  }
+
+  let bestRoot: string | null = null;
+  let bestWeight = 0;
+  let bestHops = 0;
+  for (const [root, agg] of roots) {
+    if (agg.weight > bestWeight) {
+      bestRoot = root;
+      bestWeight = agg.weight;
+      bestHops = agg.hops;
+    }
+  }
+  if (bestRoot === null || bestHops < MIN_CHORD_EVIDENCE_HOPS) return null;
+
+  let winner: ChordVote | null = null;
+  for (const vote of votes.values()) {
+    if (vote.root !== bestRoot) continue;
+    if (winner === null || vote.weight > winner.weight) winner = vote;
+  }
+  return winner;
 }
 
 /**
