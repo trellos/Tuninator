@@ -35,6 +35,7 @@ function engineFrame(timestamp: number, hz: number | null, options: FrameOptions
   return {
     frame,
     onset: options.onset ?? false,
+    onsetAt: options.onset === true ? timestamp : null,
     onsetFlux: options.onset ? 1 : 0,
     chroma: null,
     chord: null,

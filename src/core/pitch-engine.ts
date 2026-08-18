@@ -26,7 +26,7 @@ import type { PitchFrame } from "../types.js";
 import type { Policy } from "./policy.js";
 import { YinDetector, zeroCrossingRateHz, rms as windowRms, peak as windowPeak } from "./yin.js";
 import { OnsetDetector } from "./onset.js";
-import { ChromaAnalyzer } from "./chroma.js";
+import { ChromaAnalyzer, ChromaSmoother } from "./chroma.js";
 import { matchChord } from "./chords.js";
 import { describeFrequency } from "./notes.js";
 import type { ChordMatch } from "./chords.js";
@@ -37,6 +37,12 @@ export type EngineFrame = {
   frame: PitchFrame;
   /** True when the onset detector fired on this hop. */
   onset: boolean;
+  /**
+   * When that attack actually happened. The onset detector needs to see the
+   * hops after a flux peak before it can call it one, so it reports a few hops
+   * late and stamps the report with the real time. Null when `onset` is false.
+   */
+  onsetAt: number | null;
   onsetFlux: number;
   /** Null when chord detection is disabled by policy. */
   chroma: ChromaResult | null;
@@ -80,6 +86,9 @@ export class PitchEngine {
   private yinShort: YinDetector;
   private onsetDetector: OnsetDetector;
   private chromaAnalyzer: ChromaAnalyzer | null = null;
+  private chromaSmoother: ChromaSmoother | null = null;
+  /** Set by an onset, cleared once the next chroma hop has acted on it. */
+  private chromaBoundaryPending = false;
 
   /** Circular buffer of recent voiced frequencies, for the temporal median. */
   private readonly medianBuf: number[] = [];
@@ -130,6 +139,7 @@ export class PitchEngine {
       minIntervalMs: policy.onset.minIntervalMs,
       medianWindow: policy.onset.medianWindow,
       sensitivity: policy.onset.sensitivity,
+        peakWindow: policy.onset.peakWindow,
         rippleFloorFactor: policy.onset.rippleFloorFactor,
     });
 
@@ -139,7 +149,14 @@ export class PitchEngine {
         fftSize: policy.chords.fftSize,
         minFrequencyHz: policy.analysis.minFrequencyHz,
         maxFrequencyHz: policy.analysis.maxFrequencyHz,
+        magnitudeExponent: policy.chords.magnitudeExponent,
+        harmonicDecay: policy.chords.harmonicDecay,
+        envelopes: policy.chords.envelopes,
+        fundamentalMinRatio: policy.chords.fundamentalMinRatio,
+        presenceRatio: policy.chords.presenceRatio,
+        contrast: policy.chords.contrast,
       });
+      this.chromaSmoother = new ChromaSmoother(policy.chords.smoothingFrames);
     }
   }
 
@@ -187,6 +204,7 @@ export class PitchEngine {
       policy.onset.minIntervalMs !== prev.onset.minIntervalMs ||
       policy.onset.medianWindow !== prev.onset.medianWindow ||
       policy.onset.sensitivity !== prev.onset.sensitivity ||
+      policy.onset.peakWindow !== prev.onset.peakWindow ||
       policy.onset.rippleFloorFactor !== prev.onset.rippleFloorFactor;
 
     if (onsetShapeChanged) {
@@ -197,13 +215,21 @@ export class PitchEngine {
         minIntervalMs: policy.onset.minIntervalMs,
         medianWindow: policy.onset.medianWindow,
         sensitivity: policy.onset.sensitivity,
+        peakWindow: policy.onset.peakWindow,
         rippleFloorFactor: policy.onset.rippleFloorFactor,
       });
     }
 
     if (policy.chords.enabled) {
       const chromaShapeChanged =
-        !this.chromaAnalyzer || policy.chords.fftSize !== prev.chords.fftSize;
+        !this.chromaAnalyzer ||
+        policy.chords.fftSize !== prev.chords.fftSize ||
+        policy.chords.magnitudeExponent !== prev.chords.magnitudeExponent ||
+        policy.chords.harmonicDecay !== prev.chords.harmonicDecay ||
+        policy.chords.envelopes !== prev.chords.envelopes ||
+        policy.chords.fundamentalMinRatio !== prev.chords.fundamentalMinRatio ||
+        policy.chords.presenceRatio !== prev.chords.presenceRatio ||
+        policy.chords.contrast !== prev.chords.contrast;
       if (chromaShapeChanged) {
         this.chromaWindow = new Float32Array(policy.chords.fftSize);
         this.chromaAnalyzer = new ChromaAnalyzer({
@@ -211,10 +237,20 @@ export class PitchEngine {
           fftSize: policy.chords.fftSize,
           minFrequencyHz: policy.analysis.minFrequencyHz,
           maxFrequencyHz: policy.analysis.maxFrequencyHz,
+          magnitudeExponent: policy.chords.magnitudeExponent,
+          harmonicDecay: policy.chords.harmonicDecay,
+          envelopes: policy.chords.envelopes,
+          fundamentalMinRatio: policy.chords.fundamentalMinRatio,
+          presenceRatio: policy.chords.presenceRatio,
+          contrast: policy.chords.contrast,
         });
+      }
+      if (chromaShapeChanged || policy.chords.smoothingFrames !== prev.chords.smoothingFrames) {
+        this.chromaSmoother = new ChromaSmoother(policy.chords.smoothingFrames);
       }
     } else {
       this.chromaAnalyzer = null;
+      this.chromaSmoother = null;
       this.lastChroma = null;
       this.lastChord = null;
     }
@@ -256,6 +292,8 @@ export class PitchEngine {
     this.hopCounter = 0;
     this.lastChroma = null;
     this.lastChord = null;
+    this.chromaBoundaryPending = false;
+    this.chromaSmoother?.reset();
     this.onsetDetector.reset();
   }
 
@@ -288,13 +326,21 @@ export class PitchEngine {
     // `medianFrames` hops. On a 166ms triplet that lag is enough to push the
     // event's dominant pitch onto the following note.
     let onset = false;
+    let onsetAt: number | null = null;
     let onsetFlux = 0;
     if (policy.onset.enabled && warmedUp) {
       this.readRecent(this.onsetWindow, this.onsetWindow.length);
       const result = this.onsetDetector.process(this.onsetWindow, timestamp);
       onset = result.isOnset && !gatedByAmplitude;
+      onsetAt = onset ? result.onsetTimestampMs : null;
       onsetFlux = result.flux;
-      if (onset) this.medianBuf.length = 0;
+      if (onset) {
+        this.medianBuf.length = 0;
+        // The chroma runs at a fraction of the hop rate, so the attack usually
+        // lands between chroma frames. Remember it until the next one, or the
+        // smoother would average the old chord into the new one.
+        this.chromaBoundaryPending = true;
+      }
     }
 
     let frequencyHz: number | null = null;
@@ -412,8 +458,13 @@ export class PitchEngine {
     ) {
       this.readRecent(this.chromaWindow, this.chromaWindow.length);
       const chroma = this.chromaAnalyzer.analyze(this.chromaWindow);
+      if (this.chromaBoundaryPending) {
+        this.chromaSmoother?.reset();
+        this.chromaBoundaryPending = false;
+      }
+      const smoothed = this.chromaSmoother?.push(chroma.chroma) ?? chroma.chroma;
       this.lastChroma = chroma;
-      this.lastChord = matchChord(chroma.chroma, {
+      this.lastChord = matchChord(smoothed, {
         floor: policy.chords.floor,
         margin: policy.chords.margin,
         bassPitchClass: chroma.bassPitchClass,
@@ -421,11 +472,13 @@ export class PitchEngine {
     } else if (gatedByAmplitude) {
       this.lastChroma = null;
       this.lastChord = null;
+      this.chromaSmoother?.reset();
     }
 
     return {
       frame,
       onset,
+      onsetAt,
       onsetFlux,
       chroma: this.lastChroma,
       chord: this.lastChord,

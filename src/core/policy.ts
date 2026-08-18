@@ -61,17 +61,24 @@ export type Policy = {
     /** Multiplier on the adaptive median; higher = fewer onsets. */
     sensitivity: number;
     /**
-     * Safety factor on the threshold's level-proportional floor.
+     * Hops either side of a candidate that it must lead to count as an attack.
      *
-     * The decaying peak-hold reference leaks `1 - REFERENCE_DECAY` of the
-     * frame's magnitude back into the flux every hop even when nothing is
-     * happening, so the floor has to cover that leak. This multiplies it.
+     * This is the peak-picking neighbourhood, and it is also the detector's
+     * latency: an onset is reported this many hops after it happened, carrying
+     * the timestamp of when it happened. 3 hops is ~40ms at the default hop,
+     * comfortably inside the 125ms between 120bpm sixteenths.
+     */
+    peakWindow: number;
+    /**
+     * Safety factor on the ripple floor — the threshold's lower bound for a
+     * spectrum that is merely ringing rather than being struck.
      *
-     * It matters far more than it looks: the floor competes with the adaptive
-     * median for `max()`, and because it scales with level it WINS in loud
-     * passages — measured at 75% of hops through the lead fixture's triplet run,
-     * where it made `sensitivity` inert and the detector deaf to exactly the
-     * note boundaries it was needed for.
+     * The onset detector's peak-hold reference decays a little every hop, so a
+     * perfectly steady note leaks that fraction of its own magnitude into the
+     * flux forever, and unresolved harmonics make the leak spiky. This scales
+     * the floor that covers it. The floor is proportional to the REFERENCE, so
+     * it sits just above the ripple of whatever is already sounding and falls
+     * to nothing where nothing is — which is where attacks are.
      */
     rippleFloorFactor: number;
     /**
@@ -109,6 +116,47 @@ export type Policy = {
     floor: number;
     /** Minimum score(top1) - score(top2) for a confident chord label. */
     margin: number;
+
+    /*
+     * The transcription front end. These four govern `NoteActivation`, which
+     * decides WHICH NOTES are sounding; everything above decides what to call
+     * them. See `src/core/note-activation.ts`.
+     */
+
+    /**
+     * Exponent applied to spectral peak amplitudes before the note fit.
+     *
+     * 1 fits raw amplitude, which is the physically honest thing to do and the
+     * wrong thing to want: a third fretted on one string is legitimately a
+     * tenth the amplitude of a root doubled across three, and a linear fit
+     * reports it as a tenth of a note. Below 1 the fit works in a compressed
+     * domain closer to how the ear weighs partials.
+     */
+    magnitudeExponent: number;
+    /** Per-harmonic decay of a dictionary column: `decay^(h-1)`. */
+    harmonicDecay: number;
+    /** Spectral-envelope variants per note. 1 assumes a textbook string. */
+    envelopes: number;
+    /**
+     * How large a note's own fundamental peak must be beside the largest peak
+     * on its harmonics, before the note may be activated at all. 0 accepts any
+     * peak, which lets recording rumble unlock a sub-harmonic phantom whose
+     * comb covers the whole chord.
+     */
+    fundamentalMinRatio: number;
+    /** Fraction of the strongest activation at which a note counts as sounding. */
+    presenceRatio: number;
+    /** Contrast exponent on the normalised chroma. Below 1 lifts quiet bins. */
+    contrast: number;
+    /**
+     * Chroma frames averaged before a chord is matched. 1 disables smoothing.
+     *
+     * A chord lasts hundreds of milliseconds and a chroma frame describes 85 of
+     * them, so single frames disagree far more than the chord does. The average
+     * is reset on every onset, so this smooths WITHIN a chord and never across
+     * a change.
+     */
+    smoothingFrames: number;
   };
 
   /** Emit events on onsets even when pitch is uncertain (rhythm mode). */
@@ -168,15 +216,23 @@ const BASE: Omit<Policy, "mode"> = {
     minIntervalMs: 90,
     medianWindow: 17,
     sensitivity: 1.6,
+    peakWindow: 3,
     rippleFloorFactor: 2,
     repickRmsRise: 1.05,
   },
   chords: {
     enabled: false,
     fftSize: 4096,
-    restrikeRmsRise: 1.02,
+    restrikeRmsRise: 1.1,
     floor: 0.55,
     margin: 0.08,
+    magnitudeExponent: 0.5,
+    harmonicDecay: 0.8,
+    envelopes: 3,
+    fundamentalMinRatio: 0.05,
+    presenceRatio: 0.15,
+    contrast: 0.5,
+    smoothingFrames: 1,
   },
   emitUnpitchedEvents: false,
 };

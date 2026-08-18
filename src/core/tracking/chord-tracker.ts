@@ -84,8 +84,10 @@ type ChordVote = {
   label: string;
   root: PitchClass;
   quality: ChordQuality;
-  /** Summed match score across the confident readings that voted for it. */
+  /** Sum of `score * loudness` over the confident readings that voted for it. */
   weight: number;
+  /** Sum of `loudness` over those readings — the denominator for a mean score. */
+  mass: number;
   /** How many confident readings voted for it. */
   hops: number;
 };
@@ -181,10 +183,20 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
     // into one. What separates the two cases is energy -- a re-strum puts it
     // back into the strings, a decay does not -- which is the same test the note
     // tracker applies to a re-picked note.
+    // The attack the onset detector is reporting happened a few hops ago, and
+    // both the boundary and the new event belong there, not where the report
+    // arrived. Onset error is measured on exactly this.
+    let attackAt = t;
+
     if (onset && this.active !== null) {
       const rearticulated =
         frame.amplitude.rms >= this.active.recentRms * policy.chords.restrikeRmsRise;
-      if (rearticulated) this.end(t, out);
+      if (rearticulated) {
+        attackAt = Math.max(engineFrame.onsetAt ?? t, this.active.event.startedAt);
+        this.end(attackAt, out);
+      }
+    } else if (onset) {
+      attackAt = engineFrame.onsetAt ?? t;
     }
 
     const confident = chord?.isConfident === true && chord.best !== null;
@@ -194,7 +206,7 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
     const isFreshReading = chord !== null && chord !== this.lastVotedChord;
 
     if (this.active === null) {
-      const fresh = this.beginChord(frame.frequencyHz, t, engineFrame);
+      const fresh = this.beginChord(frame.frequencyHz, attackAt, engineFrame);
       fresh.chordRoot = root;
     } else {
       const active = this.active;
@@ -261,8 +273,11 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
       if (isFreshReading) {
         this.lastVotedChord = chord;
         if (confident) {
-          recordChordVote(current.chordVotes, chord.best!);
-          if (current.pendingRoot !== null) recordChordVote(current.pendingVotes, chord.best!);
+          const loudness = frame.amplitude.rms;
+          recordChordVote(current.chordVotes, chord.best!, loudness);
+          if (current.pendingRoot !== null) {
+            recordChordVote(current.pendingVotes, chord.best!, loudness);
+          }
         }
       }
       this.applyChordLabel(current, engineFrame);
@@ -330,7 +345,7 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
     // failed to name it — a divided vote reports a low number, which is what
     // stops an `unknown` event from carrying a confident-looking score.
     active.event.confidenceParts.spectralFit =
-      verdict.winner !== null ? verdict.winner.weight / verdict.winner.hops : verdict.fit;
+      verdict.winner !== null ? verdict.winner.weight / verdict.winner.mass : verdict.fit;
 
     if (engineFrame.chroma) {
       active.event.pitches = chordPitches(engineFrame);
@@ -339,16 +354,38 @@ export class ChordTracker extends BaseTracker<ActiveChord> {
   }
 }
 
-/** Folds one confident reading into a tally. */
-function recordChordVote(votes: Map<string, ChordVote>, best: ChordCandidate): void {
+/**
+ * Folds one confident reading into a tally, weighted by how loud the frame was.
+ *
+ * A chord's identity is not spread evenly over its life. The third is fretted
+ * on one string and decays fastest, so the interval that says major or minor is
+ * loudest at the attack and gone within a few hundred milliseconds; what is
+ * left is the root and fifth, which is a power chord. Measured on the strummed
+ * fixture's first Bm, D4 is plainly in the chroma at 5480ms and has no peak at
+ * all by 5700ms — so an unweighted vote is mostly cast by frames that no longer
+ * contain the evidence, and Bm loses to B5 and Bsus4 on turnout.
+ *
+ * Weighting by loudness is not a thumb on the scale for early frames as such;
+ * it is the ordinary rule that evidence counts for what it is worth, and a
+ * decayed frame is worth less. `hops` still counts readings, so the
+ * "enough distinct looks" bar is unaffected.
+ *
+ * Plain rms, not rms to some tunable power: swept at 0, 1, 2, 4 and 8 the
+ * fixtures score identically, so there is nothing here for a policy field to
+ * choose between and the weighting stays fixed.
+ */
+function recordChordVote(votes: Map<string, ChordVote>, best: ChordCandidate, loudness: number): void {
   const vote = votes.get(best.label) ?? {
     label: best.label,
     root: best.root,
     quality: best.quality,
     weight: 0,
+    mass: 0,
     hops: 0,
   };
-  vote.weight += best.score;
+  const w = Math.max(loudness, 1e-9);
+  vote.weight += best.score * w;
+  vote.mass += w;
   vote.hops++;
   votes.set(best.label, vote);
 }
@@ -379,16 +416,18 @@ function recordChordVote(votes: Map<string, ChordVote>, best: ChordCandidate): v
  * iterates in insertion order and insertion order is observation order.
  */
 function judgeChordVotes(votes: Map<string, ChordVote>, floor: number): ChordVerdict {
-  const roots = new Map<string, { weight: number; hops: number }>();
+  const roots = new Map<string, { weight: number; mass: number; hops: number }>();
   for (const vote of votes.values()) {
-    const agg = roots.get(vote.root) ?? { weight: 0, hops: 0 };
+    const agg = roots.get(vote.root) ?? { weight: 0, mass: 0, hops: 0 };
     agg.weight += vote.weight;
+    agg.mass += vote.mass;
     agg.hops += vote.hops;
     roots.set(vote.root, agg);
   }
 
   let bestRoot: string | null = null;
   let bestWeight = 0;
+  let bestMass = 0;
   let bestHops = 0;
   let rivalWeight = 0;
   for (const [root, agg] of roots) {
@@ -396,15 +435,16 @@ function judgeChordVotes(votes: Map<string, ChordVote>, floor: number): ChordVer
       rivalWeight = bestWeight;
       bestRoot = root;
       bestWeight = agg.weight;
+      bestMass = agg.mass;
       bestHops = agg.hops;
     } else if (agg.weight > rivalWeight) {
       rivalWeight = agg.weight;
     }
   }
-  if (bestRoot === null || bestHops === 0) return { winner: null, fit: 0 };
+  if (bestRoot === null || bestHops === 0 || bestMass <= 0) return { winner: null, fit: 0 };
 
   const dominance = rivalWeight > 0 ? bestWeight / rivalWeight : Number.POSITIVE_INFINITY;
-  const meanScore = bestWeight / bestHops;
+  const meanScore = bestWeight / bestMass;
   if (bestHops < MIN_CHORD_EVIDENCE_FRAMES || meanScore < floor || dominance < MIN_ROOT_DOMINANCE) {
     // Discounted by every bar it failed: how well the best root fit, how
     // contested it was, and how little of it there was to look at.

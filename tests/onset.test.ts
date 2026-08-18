@@ -110,7 +110,9 @@ function collectOnsets(
     const result = detector.process(frame, ms);
     results.push({ ms, flux: result.flux, threshold: result.threshold });
     maxFlux = Math.max(maxFlux, result.flux);
-    if (result.isOnset) onsetsMs.push(ms);
+    // The detector reports a peak a few hops after it happened and stamps it
+    // with when it happened, so the onset time is the stamp, not the call.
+    if (result.isOnset) onsetsMs.push(result.onsetTimestampMs!);
   }
   return { onsetsMs, maxFlux, results };
 }

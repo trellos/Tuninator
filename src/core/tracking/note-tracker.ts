@@ -117,13 +117,19 @@ export class NoteTracker extends BaseTracker<ActiveNote> {
     // An onset boundary: a genuinely re-picked note at the same pitch must read
     // as two events, not one sustain — but only if the string was actually
     // struck again.
+    // The attack the onset detector is reporting happened a few hops ago, and
+    // the boundary belongs where the attack was, not where the report arrived.
+    const attackAt = engineFrame.onsetAt ?? t;
+
     if (onset && this.active !== null) {
       const rearticulated =
         frame.amplitude.rms >= this.active.recentRms * policy.onset.repickRmsRise;
       // ...and only if the pitch is not already gliding. A bend sweeps the
       // spectrum, which spikes spectral flux AND lifts the RMS, so the
       // amplitude test alone passes and the bend gets chopped into pieces.
-      if (rearticulated && !isGliding(this.active, frame.frequencyHz)) this.end(t, out);
+      if (rearticulated && !isGliding(this.active, frame.frequencyHz)) {
+        this.end(Math.max(attackAt, this.active.event.startedAt), out);
+      }
     }
 
     if (frame.frequencyHz !== null) {
@@ -206,7 +212,7 @@ export class NoteTracker extends BaseTracker<ActiveNote> {
       }
     } else if (onset && policy.emitUnpitchedEvents && !gated) {
       // Rhythm mode: an attack is an event even with no usable pitch.
-      this.begin("unknown", null, t, engineFrame);
+      this.begin("unknown", null, attackAt, engineFrame);
       this.observe(engineFrame, t);
     }
 

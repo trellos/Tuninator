@@ -74,7 +74,7 @@ export class EventTracker {
     this.lastSeenAt = t;
     // Shared across modes: a new event backdates onto the most recent attack
     // whichever tracker is running, and that has to survive a mode change.
-    if (engineFrame.onset) this.context.lastOnsetAt = t;
+    if (engineFrame.onset) this.context.lastOnsetAt = engineFrame.onsetAt ?? t;
 
     const out = this.drainPending();
     out.push(...this.current.process(engineFrame));

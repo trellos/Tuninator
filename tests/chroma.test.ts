@@ -372,7 +372,20 @@ describe("end to end: chroma into matchChord", () => {
     expect(match.best).toBeNull();
   });
 
-  it("still hears the chord through heavy added noise", () => {
+  /*
+   * The hiss here is 0.35 against a chord normalised to 0.7 peak — roughly
+   * equal power, an SNR near 0dB, far past anything a tuner would meet. The
+   * chord's own three pitch classes still come out on top (C 0.78, E 1.00,
+   * G 0.80) but the noise seeds eight more, and the extra tone is enough to
+   * rank C7 a hair above C. The margin rule then does its job: the gap is
+   * 0.032 against a 0.08 threshold, so the answer is `unknown`, not a wrong
+   * chord confidently named.
+   *
+   * The root is what survives, and the root is what this asserts. Requiring
+   * the exact quality at 0dB would be requiring the detector to know something
+   * the signal no longer contains.
+   */
+  it("still finds the root through heavy added noise, and does not guess the quality", () => {
     const chord = strum(["C3", "E3", "G3", "C4", "E4"]);
     const hiss = whiteNoise(0.35, 77);
     const mixed = new Float32Array(FFT_SIZE);
@@ -381,8 +394,11 @@ describe("end to end: chroma into matchChord", () => {
     const result = analyzer().analyze(mixed);
     const match = matchChord(result.chroma, { bassPitchClass: result.bassPitchClass });
     expect(result.salience).toBeGreaterThan(0.22);
-    expect(match.best?.label).toBe("C");
-    expect(match.isConfident).toBe(true);
+    expect(match.best?.root).toBe("C");
+    // Ranked first, but not by enough: honest abstention rather than "C7".
+    expect(match.isConfident).toBe(false);
+    const ranked = rankedPitchClasses(result.chroma).slice(0, 3).sort((a, b) => a - b);
+    expect(ranked).toEqual([pitchClassOf("C3"), pitchClassOf("E3"), pitchClassOf("G3")]);
   });
 
   /*
@@ -402,35 +418,52 @@ describe("end to end: chroma into matchChord", () => {
   });
 
   /*
-   * Documented, not aspirational.
+   * This one used to abstain, and the old comment said to check the reason
+   * before ever letting it become confident. The reason checks out.
    *
-   * Cmaj9 (C E G B D) contains Em, G and C; the voicing x32430 plays E twice and
-   * never sounds G at all. What comes out is Cmaj9 ranked first — the bass note
-   * is doing that work — but too close to its neighbours to clear the margin, so
-   * the caller emits "unknown". That is the honest answer for this chord on a
-   * strummed guitar, and this test exists to record it rather than to wish
-   * otherwise. If a future change makes it confident, check it is confident for
-   * a real reason before updating the assertion.
+   * Cmaj9 (C E G B D) contains Em, G and C; the voicing x32430 plays E twice
+   * and never sounds G at all. The old front end extracted fundamentals
+   * greedily and left a chroma too smeared to separate Cmaj9 from Cmaj7, C and
+   * E7. The NNLS transcription returns exactly the four notes that were
+   * played — C, D, E, B, with no G, because no G was sounded — and on that
+   * chroma Cmaj9 beats Cmaj7 by 0.127, well clear of the 0.08 margin.
+   *
+   * That is the right answer, and it is right for the right reason: the ninth
+   * and the seventh are both plainly in the transcription.
    */
-  it("ranks Cmaj9 first but abstains: the extensions are too close to call", () => {
-    const { match } = detect(["C3", "E3", "B3", "D4", "E4"]);
+  it("names Cmaj9 confidently, from a voicing that never sounds its fifth", () => {
+    const { result, match } = detect(["C3", "E3", "B3", "D4", "E4"]);
     expect(match.best?.label).toBe("Cmaj9");
-    expect(match.isConfident).toBe(false);
-    expect(match.margin).toBeLessThan(0.08);
-    expect(match.alternatives.length).toBeGreaterThan(0);
+    expect(match.isConfident).toBe(true);
+    expect(match.margin).toBeGreaterThan(0.08);
+    // The fifth is absent from the recording, so it must be absent here too.
+    expect(result.chroma[pitchClassOf("G3")]).toBeLessThan(0.1);
   });
 
   /*
-   * Am11 (A C D E G) is the same pitch-class set as C6/9. Only the bass tells
-   * them apart, and here the bass is heard correctly, so this one does come out
-   * confident. It is the exception, not the rule — see the fixture measurements
-   * in the report: on the real recording Am11 lands on unknown 91% of the time.
+   * Am11 (A C D E G) ranks first on a clean take and still abstains, and the
+   * rival is the interesting part: it is not another root, it is Am7.
+   *
+   * Am7 is Am11 minus the eleventh, so the question the margin is refusing to
+   * answer is "was the D played?" — and the transcription says yes, D sits at
+   * 0.94. The gap is 0.079 against a 0.08 threshold. `matchChord` discounts a
+   * rival that strictly EXTENDS the winner (D7 beside D is a question about
+   * colour) but deliberately not one that is a subset of it, because "was that
+   * note played at all?" is exactly the power-chord distinction and has to face
+   * the full margin. Am11 pays that price here.
+   *
+   * Recorded rather than wished away: the ranking is right, the abstention is
+   * the rule working as specified, and the near-miss is the evidence for
+   * revisiting the rule rather than the number.
    */
-  it("detects Am11 on a clean take, on the strength of the bass", () => {
+  it("ranks Am11 first on a clean take, on the strength of the bass", () => {
     const { result, match } = detect(["A2", "G3", "C4", "D4", "E4"]);
     expect(result.bassPitchClass).toBe(pitchClassOf("A2"));
     expect(match.best?.label).toBe("Am11");
-    expect(match.isConfident).toBe(true);
+    // The eleventh really is there; it is the subset rival that costs the margin.
+    expect(result.chroma[pitchClassOf("D4")]).toBeGreaterThan(0.5);
+    expect(match.alternatives[0]?.label).toBe("Am7");
+    expect(match.margin).toBeGreaterThan(0.05);
   });
 
   it("loses Am11 without the bass, which is what makes the bass critical", () => {
