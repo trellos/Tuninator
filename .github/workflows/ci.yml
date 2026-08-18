@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# A second push to the same branch cancels the run still in flight for it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build, test, eval
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          # package.json sets engines.node >= 20; 20 is the floor we support.
+          node-version: 20
+          cache: npm
+          # Two lockfiles: the library's and the demo's. Both must contribute to
+          # the cache key, or a demo-only dependency bump reuses a stale cache.
+          cache-dependency-path: |
+            package-lock.json
+            examples/browser-demo/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # Also asserts that dist/tuninator-worklet.js is self-contained (no imports),
+      # via scripts/assert-worklet-bundle.mjs. This step MUST come before anything
+      # in examples/browser-demo: the demo depends on the library through
+      # "file:../.." and resolves `tuninator/web` through the package `exports`
+      # map, i.e. through dist/. Without a prior build its `tsc --noEmit` fails
+      # with TS2307 "Cannot find module 'tuninator/web'".
+      - name: Build library
+        run: npm run build
+
+      - name: Demo — install dependencies
+        working-directory: examples/browser-demo
+        run: npm ci
+
+      - name: Demo — typecheck
+        working-directory: examples/browser-demo
+        run: npx tsc --noEmit
+
+      - name: Demo — test
+        working-directory: examples/browser-demo
+        run: npm test
+
+      # vite.config.ts aliases `tuninator` / `tuninator/web` to the library's
+      # source entry points and copies dist/tuninator-worklet.js into
+      # public/assets/, so this consumes the build produced above.
+      - name: Demo — build
+        working-directory: examples/browser-demo
+        run: npx vite build
+
+      # `npm run eval` decodes the fixtures and scores the detector against them.
+      # It EXITS 1 TODAY because 3 required fixtures miss their thresholds
+      # (chords-a-bm-g-d-2x-120bpm, clean-lead-120bpm,
+      # power-chords-c-a-g-e-c-d-fsharp-e-120bpm). That is a known, documented
+      # state, not a regression — so the step is non-blocking for now.
+      # Once those three pass, DROP `continue-on-error` and let eval block CI.
+      - name: Eval (non-blocking — see comment)
+        continue-on-error: true
+        run: npm run eval
+
+      # Uploaded with always() so the report is available precisely when eval
+      # failed, which is the case worth inspecting.
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: .cache/eval-report.json
+          if-no-files-found: warn

@@ -1,17 +1,21 @@
 # Tuninator
 
-A UI-free browser library that turns guitar microphone input into two streams:
+A library that turns an audio stream into two streams:
 
-- **`pitchFrame`** — a low-level continuous stream, one frame every ~12ms, suitable for building
+- **`PitchFrame`** — a low-level continuous stream, one frame every ~12ms, suitable for building
   a tuner.
 - **`MusicEvent`** — a higher-level stream of notes and chords with start/update/end lifecycles,
   suitable for games, practice tools, and scoring.
 
-ESM, TypeScript, zero runtime dependencies. Detection runs in an `AudioWorklet`, off the main
-thread.
+ESM, TypeScript, zero runtime dependencies.
+
+The library itself is platform-free: mono `Float32Array` in, results out. It has no clock, no
+I/O, and no DOM — you push audio and it hands back analysis. **Workers** are the thin adapters
+that get audio out of one particular host and into it; `tuninator/web` runs the detector in an
+`AudioWorklet`, off the main thread.
 
 The detector is graded against **recorded guitar**, not synthetic sine waves. `npm run eval`
-decodes four labelled fixtures, runs the real detection chain over them, and fails loudly on
+decodes five labelled fixtures, runs the real detection chain over them, and fails loudly on
 regression. See [Evaluation](#evaluation) for the actual numbers.
 
 ## Install
@@ -20,12 +24,24 @@ regression. See [Evaluation](#evaluation) for the actual numbers.
 npm install tuninator
 ```
 
+## Two entry points
+
+| Import | What it is |
+|---|---|
+| `tuninator` | The library. `class Tuninator` — audio in, analysis out. Works anywhere JavaScript does. |
+| `tuninator/web` | The browser worker. Microphone, `AudioContext`, `AudioWorklet`, event subscription. |
+| `tuninator/worklet` | The prebuilt worklet asset. Not imported — served. See below. |
+
+If you are writing a web page, you almost certainly want `tuninator/web`. If you have audio
+already — a decoded file, a Node stream, another audio host — use the library directly.
+
 ## Worklet asset setup — read this first
 
-This is the #1 integration failure mode.
+This is the #1 integration failure mode, and it applies only to `tuninator/web`.
 
-Tuninator's detector runs inside an `AudioWorklet`, and `AudioWorklet.addModule()` needs a **URL
-your server actually serves**. The library ships that file as a prebuilt, self-contained bundle:
+The web worker runs the detector inside an `AudioWorklet`, and `AudioWorklet.addModule()` needs a
+**URL your server actually serves**. The package ships that file as a prebuilt, self-contained
+bundle:
 
 ```
 node_modules/tuninator/dist/tuninator-worklet.js
@@ -38,7 +54,7 @@ cp node_modules/tuninator/dist/tuninator-worklet.js public/assets/
 ```
 
 ```ts
-const tuninator = createTuninator({
+const worker = createWorkerWebAudio({
   workletUrl: "/assets/tuninator-worklet.js",
 });
 ```
@@ -54,46 +70,71 @@ The bundle is deliberately a single file with **no `import`/`export` statements*
 `AudioWorkletGlobalScope` has no module loader on older targets. The build asserts this
 (`scripts/assert-worklet-bundle.mjs`) so a stray import cannot reach a release.
 
-## Usage
+## Usage — in a browser
 
 ```ts
-import { createTuninator } from "tuninator";
+import { createWorkerWebAudio } from "tuninator/web";
 
-const tuninator = createTuninator({
+const worker = createWorkerWebAudio({
   mode: "lead",
   workletUrl: "/assets/tuninator-worklet.js",
 });
 
-tuninator.on("stateChange", (state) => console.log("state:", state));
-tuninator.on("error", (error) => console.error(error.code, error.message));
+worker.on("stateChange", (state) => console.log("state:", state));
+worker.on("error", (error) => console.error(error.code, error.message));
 
 // Continuous stream — build a tuner on this.
-tuninator.on("pitchFrame", (frame) => {
+worker.on("pitchFrame", (frame) => {
   if (frame.frequencyHz === null) return;
   console.log(frame.nearest!.name, frame.nearest!.cents.toFixed(1), "cents");
 });
 
 // Musical interpretation — build a game or practice tool on this.
-tuninator.on("musicEventStart", (event) => console.log("start", event.label.name));
-tuninator.on("musicEventEnd", (event) => console.log("end", event.label.name));
+worker.on("musicEventStart", (event) => console.log("start", event.label.name));
+worker.on("musicEventEnd", (event) => console.log("end", event.label.name));
 
 // Must be called from a user gesture: the browser will not open a microphone
 // or resume an AudioContext without one.
-await tuninator.start();
+await worker.start();
 ```
 
 `on()` returns its own unsubscribe function:
 
 ```ts
-const off = tuninator.on("pitchFrame", handler);
+const off = worker.on("pitchFrame", handler);
 off();
 ```
 
+## Usage — anywhere else
+
+```ts
+import { Tuninator } from "tuninator";
+
+const tuninator = new Tuninator({ sampleRate: 48000, mode: "lead" });
+
+// Any block length. The caller owns the clock: `timestampMs` is the time of the
+// FIRST sample, and every timestamp coming back out is on that same clock.
+for (const { block, timeMs } of myAudioSource) {
+  for (const result of tuninator.analyze(block, timeMs)) {
+    console.log(result.frame.nearest?.name);
+    for (const emission of result.emissions) {
+      console.log(emission.type, emission.event.label.name);
+    }
+  }
+}
+
+// Ends anything still sounding, or the last note never gets its `end`.
+tuninator.flush(endTimeMs);
+```
+
+`analyze()` returns one result per hop boundary crossed — usually zero or one for a small block,
+several for a large one. Input must be **mono**; see [Input is mono](#input-is-mono).
+
 ## Modes
 
-`setMode()` is safe to call while listening — it swaps the detection policy and posts it to the
-worklet without restarting the audio graph. Modes change detection *policy*, never the event
-model, so a consumer written against `MusicEvent` keeps working in all four.
+`setMode()` is safe to call while listening — it swaps the detection policy in place without
+restarting anything. Modes change detection *policy*, never the event model, so a consumer
+written against `MusicEvent` keeps working in all four.
 
 | Mode | Behaviour |
 |---|---|
@@ -113,13 +154,12 @@ One analysis hop, emitted continuously while listening — **including during si
 
 ```ts
 {
-  timestamp: number;              // ms, monotonic, comparable with MusicEvent times
+  timestamp: number;              // ms, on the caller's clock, comparable with MusicEvent times
   frequencyHz: number | null;     // null when gated or unvoiced
   confidence: number;             // 0..1
   nearest: PitchNote | null;      // snapped to the nearest equal-tempered note
   amplitude: { rms: number; peak?: number };
-  channelRms?: number[];          // level of each INPUT channel, before they are mixed
-  selectedChannel?: number | null; // channel being analysed; null = summed; absent = unknown
+  channelRms?: number[];          // level of each channel that reached the worklet, unmixed
   detector: {                     // internals, exposed for debugging and eval
     tau?: number | null;
     cmnd?: number | null;
@@ -152,18 +192,26 @@ over tens of frames, a fretted step jumps within one or two.
 
 ### Chords, and honest abstention
 
-Chord detection reports `label.name: "unknown"` rather than a confident wrong label. When the top
-two template candidates are within `margin` of each other, or the best score is below `floor`, the
-event is labelled `unknown` and the candidates are surfaced in `ambiguity.alternatives`.
+Chord detection reports `label.name: "unknown"` rather than a confident wrong label, and it does
+so at two levels.
 
-This is a deliberate product guarantee, not a limitation. Extended voicings share most of their
-chroma with simpler chords — `Cmaj9` (C E G B D) contains `Em`, `G`, and `C`; `Am11` (A C D E G)
-contains `Am7`, `C6`, and `Dsus` — so on a strummed guitar an honest `unknown` is the correct
-answer far more often than a coin-flip between them.
+Per hop, `matchChord` abstains when the top candidate is below `floor`, or when the best rival
+with a *different root* is within `margin` of it. Per event, the same question is asked of the
+pooled evidence: an event is named only when enough distinct chroma readings agreed on a root,
+their mean score clears `floor`, and that root outweighs the best rival root. Otherwise the event
+is `unknown` and the candidates are surfaced in `ambiguity.alternatives`.
+
+Both levels are needed. A single hop can be confident and wrong; an event whose readings are
+split between two roots would otherwise be named after whichever happened to lead at the end.
+Extended voicings are exactly that case — `Cmaj9` (C E G B D) contains `Em`, `G`, and `C` — so on
+a strummed guitar an honest `unknown` is the correct answer far more often than a coin flip.
+
+Pooling is by **root**, not by label: a decayed `B5` and a full `Bm` are the same chord seen at
+two moments, and they reinforce each other rather than splitting the vote.
 
 ### Errors
 
-Failures set the state to `error` and emit an `error` event with a `TuninatorErrorCode`:
+Failures set the worker's state to `error` and emit an `error` event with a `TuninatorErrorCode`:
 
 | Code | Cause |
 |---|---|
@@ -177,14 +225,17 @@ Failures set the state to `error` and emit an `error` event with a `TuninatorErr
 ### Options and defaults
 
 ```ts
-createTuninator({
+createWorkerWebAudio({
   mode: "lead",
   workletUrl: "/assets/tuninator-worklet.js",
-  input:    { deviceId, channelCount: 2, channels: "auto", echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  input:    { source, deviceId, channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   analysis: { minFrequencyHz: 70, maxFrequencyHz: 1400, pitchHopMs: 12, rmsGate: 0.008, confidenceGate: 0.35 },
   tracking: { minStableMs: 45, releaseGraceMs: 90, bendThresholdCents: 45 },
 });
 ```
+
+`mode`, `analysis` and `tracking` belong to the library and mean the same thing whichever worker
+is driving it. `input` and `workletUrl` are the web worker's alone.
 
 | Option | Default | Why |
 |---|---|---|
@@ -196,73 +247,68 @@ createTuninator({
 | `tracking.minStableMs` | `45` | Note identity settles slower than the frame rate. |
 | `tracking.releaseGraceMs` | `90` | Survives pick noise and brief dropouts. |
 | `tracking.bendThresholdCents` | `45` | Below a semitone, above vibrato. |
+| `input.channelCount` | `1` | Analysis input is mono, and the worker does not choose channels. Ask for more if you intend to split it yourself. |
 
 The microphone processors default to **off**. `echoCancellation`, `noiseSuppression`, and
 `autoGainControl` are tuned for speech and will chew holes in a sustained guitar note.
 
-### Multi-channel interfaces
+### Input is mono
 
-A 2-in interface is a single **stereo** device to the browser — macOS and Windows both list the
-Audient iD4 as one input called "Analogue 1/2". A guitar in input 2 therefore exists only on
-channel 1, and nothing on channel 0.
+The library analyses one channel. Which channel that is, is **the host's decision**, and
+`input.source` is how you make it:
 
-Three things follow, and all three are handled:
+```ts
+// Two physical inputs arrive as one stereo device. Split it and hand over the
+// channel your instrument is actually plugged into.
+const context = new AudioContext();
+const mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 2 } });
+const splitter = context.createChannelSplitter(2);
+context.createMediaStreamSource(mic).connect(splitter);
 
-- `input.channelCount` defaults to **2**. Chrome opens a capture device in mono unless a channel
-  count is asked for, and a channel that never reaches the page cannot be recovered later. It is
-  requested as an *ideal* constraint, so a genuinely mono microphone still opens and reports `1`.
-- The worklet **selects the loudest channel** rather than reading channel 0 (`input.channels`,
-  below).
-- `PitchFrame.channelRms` reports the level of each channel *before* they are mixed, so a UI can
-  show which input is actually carrying signal. `channelRms.length` is the channel count the
-  browser handed over — `1` there means the capture is mono and input 2 never arrived.
-- `PitchFrame.selectedChannel` reports which channel is being analysed (`null` when they are
-  being summed). This cannot be inferred from `channelRms`: selection is hysteretic, so the
-  loudest channel in any single frame is routinely not the selected one.
+const chosen = context.createGain();
+splitter.connect(chosen, 1);        // channel 1 == physical input 2
 
-If a guitar is inaudible to the detector but audible through the interface's own monitoring,
-`channelRms` is the thing to look at first: direct monitoring is analogue and proves nothing
-about what the browser received.
+const worker = createWorkerWebAudio({
+  workletUrl: "/assets/tuninator-worklet.js",
+  input: { source: chosen },        // no microphone is opened; this graph is used as-is
+});
+```
 
-#### `input.channels` — selection, not summing
-
-| Value | Behaviour |
-|---|---|
-| `"auto"` *(default)* | Analyse the loudest channel, decided over a window and with hysteresis. Sums until a decision has latched. |
-| `"sum"` | Always sum every channel. |
-| a number | Always analyse that channel index. Out of range falls back to summing. |
-
-Summing looks like the safe default and is not. Two captures of **one** source — a DI into input 1
-and a mic on the cab into input 2, an entirely ordinary rig — are separated by the mic's acoustic
-delay, and adding them produces a comb filter: a spectrum with periodic notches. One metre of air
-is ~3ms, which is half a period of 166.7Hz, so around E3 the odd harmonics cancel outright and the
+This is not an arbitrary division of labour. A 2-in interface presents to the browser as a single
+**stereo** device — macOS and Windows both list the Audient iD4 as one input called
+"Analogue 1/2" — so a guitar in input 2 exists only on channel 1, and nothing is on channel 0.
+Which input it is plugged into is a fact about your rig, on your machine, right now. A library
+cannot know it, and guessing has a bad failure mode: summing two captures of *one* source (a DI
+into input 1 and a mic on the cab into input 2, an entirely ordinary rig) produces a comb filter.
+One metre of air is ~3ms, half a period of 166.7Hz, so around E3 the odd harmonics cancel and the
 strongest remaining periodicity is the second harmonic. The detector then reports E4 for an E3,
-confidently, with nothing anywhere looking broken. Selecting one channel cannot do this.
+confidently, with nothing anywhere looking broken.
 
-The rules `"auto"` follows, and why:
+`examples/browser-demo` does the whole job — split, meter each channel, pick the loudest with
+hysteresis, hand one channel over — in
+[`channel-input.ts`](examples/browser-demo/src/channel-input.ts) and
+[`channel-select.ts`](examples/browser-demo/src/channel-select.ts). Copy it if you want the
+behaviour; it used to live in this library and was moved out, not deleted.
 
-- **Decided over a window, not per hop.** Per-hop argmax jitters — a 12ms hop lands anywhere in a
-  note's attack. Energy accumulates over **250ms** and the decision is taken on the total.
-- **Hysteresis.** A challenger must beat the incumbent by **6dB** (a factor of two in amplitude)
-  for **3 consecutive windows** — 750ms — before the selection moves. Switching splices two
-  uncorrelated waveforms together in the analysis ring buffer, which is a worse input than either
-  channel alone, so the bar sits above anything a genuine stereo pair produces and far below an
-  unplugged input (30dB or more down). The *first* choice has no margin requirement; only switches
-  do.
-- **Silence never latches.** Before anyone plays, every channel is noise floor and "loudest" means
-  "worse preamp". Windows whose loudest channel is under `analysis.rmsGate` are discarded — they
-  neither latch a decision nor challenge one. Until then the channels are **summed**: a sum can be
-  a poor signal, but it cannot miss an instrument, which is the right way to be wrong while
-  waiting.
-- **A latched choice survives silence**, so pauses between phrases do not re-open the question.
-- **Mono is a no-op.** One channel, nothing to decide, no per-hop work at all.
+Notes on the contract:
+
+- When `input.source` is present, the worker opens **no** microphone and closes **nothing** it did
+  not create. An `AudioNode` brings its own `AudioContext`, which is reused rather than replaced —
+  nodes cannot cross contexts.
+- If something wider than mono arrives anyway, it is **summed** rather than silently read from
+  channel 0: a sum can be a poor signal, but it cannot miss an instrument entirely.
+- `PitchFrame.channelRms` reports each channel's level *before* that fold, so a host that wired it
+  wrong can see so. If a guitar is inaudible to the detector but audible through the interface's
+  own monitoring, this is the thing to look at first — direct monitoring is analogue and proves
+  nothing about what the browser received.
 
 ## Architecture
 
 ```
-src/core/     the shared DSP kernel — ZERO imports, zero globals, zero DOM
-src/worklet/  AudioWorkletProcessor wrapping the kernel
-src/offline/  the same kernel, driven from Node for evaluation
+src/core/      the shared DSP kernel — ZERO imports, zero globals, zero DOM
+src/tuninator.ts   the library: composes the kernel into audio-in/results-out
+src/workers/   platform adapters — web-audio, its AudioWorklet processor, offline (Node)
+src/eval/      harness-only: the scoring matcher and a WAV codec
 ```
 
 The load-bearing rule: **`src/core/` must be importable by the browser worklet, by Node, and by
@@ -270,9 +316,11 @@ Vitest with byte-identical behaviour.** No `window`, no `AudioContext`, no `perf
 imports, no top-level side effects — pure functions and classes over `Float32Array`, with sample
 rate and timestamps passed in.
 
-The offline evaluation is trustworthy *only* because it runs this exact code. There is no separate
-"offline detector"; the eval feeds samples through the same `PitchEngine` and `EventTracker` in the
-same 128-sample render quanta the `AudioWorklet` delivers.
+`Tuninator` sits directly on top of that and adds nothing platform-specific: it is the block loop
+(push a block, get a frame, feed the tracker, collect emissions) and nothing else. Every worker
+drives that same class. The offline evaluation is trustworthy *only* because of this — there is no
+separate "offline detector", and the eval feeds samples through the same `Tuninator` in the same
+128-sample render quanta the `AudioWorklet` delivers.
 
 ### How the detector works
 
@@ -288,27 +336,31 @@ Octave errors are YIN's known failure mode on guitar, so four mitigations stack:
 
 - prefer the *first* CMND dip below threshold, not the global minimum;
 - a sub-harmonic check that prefers the higher octave when half the lag is equally periodic;
-- an independent zero-crossing estimate — a ~2× disagreement halves confidence, because ZCR fails
-  differently than YIN does;
+- an independent zero-crossing estimate that *corrects* the reading when the two disagree by a
+  whole number of octaves. Only gaps of two octaves or more qualify: zero-crossing counts run high
+  on a harmonic-rich string, so a one-octave disagreement is genuinely ambiguous and acting on it
+  turned correct readings into octave-up errors;
 - a temporal median over recent voiced frames, so one bad frame cannot create a spurious event.
 
-Onsets use **spectral flux** (positive half-wave rectified difference of successive magnitude
-spectra) with an adaptive median threshold. An RMS envelope alone cannot see a re-picked note at
+Onsets use **spectral flux** (positive half-wave rectified difference against a decaying per-bin
+peak hold) with an adaptive median threshold. An RMS envelope alone cannot see a re-picked note at
 the same pitch.
 
 ## Development
 
 ```bash
 npm install
-npm run build      # library ESM+dts, and dist/tuninator-worklet.js as one self-contained file
+npm run build      # library + worker ESM/dts, and dist/tuninator-worklet.js as one self-contained file
 npm test           # vitest
 npm run typecheck
 npm run eval       # decode fixtures, grade the detector, exit nonzero on required failures
+
+cd examples/browser-demo && npm install && npm test   # the demo's own tests, incl. channel selection
 ```
 
 ## Evaluation
 
-`npm run eval` decodes the four recorded fixtures in `fixtures/audio/`, runs the real detection
+`npm run eval` decodes the five recorded fixtures in `fixtures/audio/`, runs the real detection
 chain over them, matches detected events one-to-one against the hand-written ground truth in
 `fixtures/labels/`, and exits nonzero when a fixture marked `required` misses a threshold.
 
@@ -316,38 +368,43 @@ chain over them, matches detected events one-to-one against the hand-written gro
 
 | Fixture | Mode | Labels | Detected | Matched | Missed | False pos. | Exact | Pitch class | Onset median |
 |---|---|---|---|---|---|---|---|---|---|
-| clean-lead-120bpm *(required)* | lead | 43 | 46 | 36 | 7 | 10 | 72.1% | **76.7%** | 103.2ms |
-| power-chords *(required)* | chords | 8 | 9 | 8 | 0 | 1 | **75.0%** | 75.0% | 153.3ms |
-| cowboy-chords | chords | 8 | 13 | 8 | 0 | 5 | 40.0% | 80.0% | 196.7ms |
-| spicy-chords | chords | 3 | 6 | 3 | 0 | 3 | 0.0% | 66.7% | 36.7ms |
+| clean-lead-120bpm *(required)* | lead | 43 | 42 | 34 | 9 | 8 | 67.4% | **72.1%** | 106.5ms |
+| chords-a-bm-g-d *(required)* | chords | 16 | 13 | 13 | 3 | 0 | **73.3%** | 80.0% | 13.7ms |
+| power-chords *(required)* | chords | 8 | 11 | 8 | 0 | 3 | **87.5%** | 100.0% | 140.0ms |
+| cowboy-chords | chords | 8 | 15 | 8 | 0 | 7 | 75.0% | 87.5% | 93.5ms |
+| spicy-chords | chords | 3 | 8 | 3 | 0 | 5 | 50.0% | 100.0% | 36.7ms |
 
 Per-section breakdown of the lead fixture, which is where the difficulty lives:
 
-| Section | Notes | Shortest | Pitch range | Pitch class | Onset median |
-|---|---|---|---|---|---|
-| quarters | 7 | 500ms | 123–220Hz | **100.0%** | 70.0ms |
-| triplets | 24 | 166ms | 494–988Hz | 70.8% | 93.7ms |
-| sixteenths* | 12 | 125ms | 440–554Hz | 75.0% | 124.2ms |
+| Section | Notes | Shortest | Pitch class | Onset median |
+|---|---|---|---|---|
+| quarters | 7 | 500ms | **100.0%** | 70.0ms |
+| triplets | 24 | 166ms | 62.5% | 100.0ms |
+| sixteenths* | 12 | 125ms | 75.0% | 124.2ms |
 
 \* Excluded from the required gate in `fixtures/eval.config.json`, visibly and by configuration.
 Its numbers are still reported. No label file was edited to achieve any of this.
 
 ### What passes and what does not
 
-**Passing:** onset timing on the gated lead subset (88.5ms median, threshold 100ms); every chord
-fixture matched all of its labels with zero misses; the quarter-note section is at 100% pitch
-class.
+**Passing:** every chord fixture matched all of its labels with zero misses except the strummed
+one; `chords-a-bm-g-d` has a 13.7ms median onset error against a 120ms limit; `power-chords` is at
+100% pitch class and 87.5% exact; the quarter-note section of the lead fixture is at 100% pitch
+class; and `spicy-chords` produces zero confidently-wrong labels, which is its actual criterion.
 
 **Failing, honestly:**
 
-- `clean-lead` pitch-class accuracy is **77.4%** on the gated subset against a 90% threshold, and
-  produces **9 false positives** against a limit of 3. Both come from the same root cause: fast
-  legato runs still over-segment, because separating "one note, re-picked" from "two notes
-  slurred" comes down to a flux spike that may not be there.
-- `power-chords` exact accuracy is **75%** against 80% — six of eight correct — and its onset
-  median is **153ms** against 120ms. Chord onsets are measured against 2s bars of continuous
-  strumming with no silence between them, so the detector must segment on chord *change*.
-- `spicy-chords` produces **1 confidently wrong label** against a limit of 0.
+- `clean-lead` pitch-class accuracy is **71.0%** on the gated subset against a 90% threshold, and
+  produces **7 false positives** against a limit of 3. Both come from the same root cause: fast
+  legato runs over-segment, because separating "one note, re-picked" from "two notes slurred"
+  comes down to a flux spike that may not be there. The triplet section is the worst of it at
+  62.5%.
+- `chords-a-bm-g-d` exact accuracy is **73.3%** against 75% — one short muted upstrum abstains
+  rather than committing, which costs accuracy by design. That threshold has deliberately not been
+  lowered to accommodate it.
+- `power-chords` onset median is **140ms** against 120ms. Chord onsets are measured against 2s
+  bars of continuous strumming with no silence between them, so the detector must segment on chord
+  *change*.
 
 ### Chords abstain rather than guess
 
@@ -355,42 +412,25 @@ Abstention rate — the share of detections that said `unknown` instead of commi
 
 | Fixture | Abstention | Confidently wrong |
 |---|---|---|
-| power-chords | 44.4% | 1 |
-| spicy-chords | 33.3% | 1 |
-| cowboy-chords | 23.1% | 1 |
+| spicy-chords | 37.5% (3/8) | 0 |
+| cowboy-chords | 20.0% (3/15) | 1 |
+| chords-a-bm-g-d | 7.7% (1/13) | 0 |
+| power-chords | 0.0% (0/11) | 0 |
 
 Abstentions are **not** counted as wrong answers; they are reported separately. The accuracy
 denominator is labels in scope minus abstentions, so a detector cannot win by staying quiet on the
 hard notes — a missed label still counts against it.
 
-Per-chord, measured across 866 analysis frames of the recorded fixtures — **45.2%
-confident-correct, 9.9% confident-wrong, 44.9% `unknown`**:
+The one remaining confidently-wrong label is on `cowboy-chords`, where a D major is read as
+`Asus4`. It shares a root cause with the fixture's other D, which reads as `D5`: the F#4 third —
+high E string, 2nd fret — decays below the peak floor about 250ms in, so the third is genuinely
+absent from the spectrum. Guitar voicings sound the third once while doubling root and fifth, so a
+decayed third makes any triad look like a power chord.
 
-| Chord | Result |
-|---|---|
-| A5, E5 | 100%, 97% correct |
-| C5, D5, G5 | 81/69%, 78%, 47% correct (G5 abstains 47% of the time) |
-| Am, Em, C | 100%, 92/75%, 78/72% correct |
-| G | 42% correct, plus 25% read as `G5` |
-| **F#5** | **42% correct, but 44% confidently `E5`** |
-| **D** | **0% — 92% `unknown` on the first pass, 56% confidently `D5` on the second** |
-| Cmaj9 | 100% `unknown` (best score 0.794, margin 0.027 — just inside the abstention rule) |
-| Am11 | 90% `unknown`, 10% `Am` (the parent triad) |
-
-Two of these are real defects rather than honest abstention, and are worth knowing about:
-
-- **F#5 is confidently mislabelled `E5`.** Bass detection splits 47/42 between F# and E, and the
-  chord label follows whichever the bass picked.
-- **D major is never identified.** Its F#4 third — high E string, 2nd fret — decays below the
-  peak floor about 250ms in, so the third is genuinely absent from the spectrum and the chord
-  reads as `D5` or `unknown`.
-
-The `G → G5` and `Em → E5` confusions share that root cause: guitar voicings sound the third once
-while doubling the root and fifth, so a decayed third makes any triad look like a power chord.
-
-`Cmaj9` and `Am11` abstaining is the **expected** outcome, not a defect. The `x32430` voicing
-sounds E twice and never sounds G, so the chroma contains neither a root nor a fifth and the bass
-is the only evidence for C. Abstaining is the correct answer there.
+`Cmaj9` abstaining is the **expected** outcome, not a defect: the `x32430` voicing sounds E twice
+and never sounds G, so the chroma contains neither a root nor a fifth and the bass is the only
+evidence for C. `Am11` resolves to its parent triad `Am` — pitch-class correct, exact wrong, and
+about as much as that voicing supports.
 
 ### The labels are estimates, and the eval says so
 
@@ -400,11 +440,8 @@ reported **separately** — a large gap between them points at the labels, while
 number points at the detector.
 
 Where the detector confidently disagrees with a label, the evidence is written to
-`.cache/proposed-label-corrections.json` rather than applied. The strongest current candidate is
-`q1`, labelled `B2`: the detector reads a clean 245.7Hz (`B3`) at confidence 0.89 with a CMND of
-0.022, and the independent zero-crossing estimate agrees at 247.8Hz. `B3` is also an open string
-in the fixture's stated tuning. That is evidence, not a verdict — **`fixtures/labels/` is
-read-only and was never modified.**
+`.cache/proposed-label-corrections.json` rather than applied. **`fixtures/labels/` is read-only
+and was never modified.**
 
 ### Reproducing and debugging
 
