@@ -73,13 +73,17 @@ export type PitchFrame = {
 
   /** Detector internals, exposed for debugging and offline evaluation. */
   detector: {
-    /** Chosen lag in samples, at `effectiveSampleRate` (post-decimation). */
+    /** Chosen lag in samples, at `effectiveSampleRate`. May be fractional. */
     tau?: number | null;
     /** Cumulative mean normalised difference at `tau`. Lower is more periodic. */
     cmnd?: number | null;
     /** Independent zero-crossing estimate, used as an octave sanity check. */
     zeroCrossingHz?: number | null;
-    /** Rate the pitch detector actually ran at, after decimation. */
+    /**
+     * Rate the pitch detector ran at. Currently always the input rate — there
+     * is no decimation stage — but `tau` is expressed in terms of it, so it is
+     * reported rather than assumed.
+     */
     effectiveSampleRate?: number | null;
   };
 };
@@ -105,7 +109,13 @@ export type EventPitch = {
   pitchClass?: PitchClass;
   octave?: number;
   cents?: number;
-  role: "primary" | "bass" | "chordTone" | "overtone" | "unknown";
+  /**
+   * What this pitch is within the event. Only two exist because only two are
+   * measurable: the detected fundamental, and the lowest partial the chroma
+   * found. Distinguishing a played chord tone from an overtone would need
+   * per-partial attribution the analyser does not attempt.
+   */
+  role: "primary" | "bass";
   confidence: number;
   amplitude?: number;
   salience?: number;
@@ -146,15 +156,12 @@ export type MusicEvent = {
     pitch?: number;
     stability?: number;
     amplitude?: number;
-    continuity?: number;
     spectralFit?: number;
-    noteCoverage?: number;
   };
 
   ambiguity: {
     /** Estimated number of simultaneous fundamentals. */
     polyphony?: number;
-    transientNoise?: number;
     /** Runner-up interpretations, most confident first. */
     alternatives?: Array<{
       label: string;

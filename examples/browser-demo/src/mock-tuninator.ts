@@ -482,14 +482,10 @@ class MockTuninator implements TuninatorWorker {
       const isPrimary = index === primaryIndex;
       const bent = isPrimary ? bendCents : 0;
       const frequencyHz = midiToHz(midi + bent / 100);
+      // Only the two roles the real library emits: the detected fundamental,
+      // and the lowest partial of a chord.
       const role: EventPitch["role"] =
-        entry.kind === "chord"
-          ? index === 0
-            ? "bass"
-            : "chordTone"
-          : isPrimary
-            ? "primary"
-            : "overtone";
+        entry.kind === "chord" && index === 0 ? "bass" : "primary";
       return {
         frequencyHz,
         midi,
@@ -525,14 +521,10 @@ class MockTuninator implements TuninatorWorker {
         pitch: clamp01(confidence + 0.04),
         stability: clamp01(0.6 + 0.4 * progress),
         amplitude: envelope,
-        continuity: clamp01(0.7 + 0.3 * progress),
-        ...(entry.kind === "chord"
-          ? { spectralFit: clamp01(confidence - 0.05), noteCoverage: 0.75 }
-          : {}),
+        ...(entry.kind === "chord" ? { spectralFit: clamp01(confidence - 0.05) } : {}),
       },
       ambiguity: {
         polyphony: entry.kind === "chord" ? entry.midi.length : 1,
-        transientNoise: clamp01(0.5 * (1 - progress * 6)),
         ...(entry.alternatives ? { alternatives: entry.alternatives } : {}),
       },
       amplitude: {

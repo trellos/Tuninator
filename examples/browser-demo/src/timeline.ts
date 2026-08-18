@@ -114,7 +114,6 @@ function extractPitches(event: MusicEvent): { pitches: number[]; primary: number
 
   const others: number[] = [];
   for (const pitch of event.pitches) {
-    if (pitch.role === "overtone") continue;
     const value = pitchOfEventPitch(pitch);
     if (value !== null) others.push(value);
   }
