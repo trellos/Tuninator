@@ -119,6 +119,15 @@ export function alignFixture(stem: string): Fixture {
   const notes: AlignedNote[] = [];
   for (const label of labels) {
     const note = labelNote(label.label);
+    // Chord fixtures label "Bm", not "B3". Aligning a chord means aligning a
+    // set of fundamentals against each other and is a different measurement;
+    // failing loudly beats silently aligning against a nonsense frequency.
+    if (!/^[A-G](#|b)?-?\d+$/.test(note)) {
+      throw new Error(
+        `${stem}: label "${label.label}" (${label.id}) is not a single note. ` +
+          `Alignment is defined for note fixtures only.`
+      );
+    }
     const own = hzOfName(note);
     let bestScore = -1;
     let bestOffset = 0;
