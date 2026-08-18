@@ -15,6 +15,11 @@ import type { MusicEvent, PitchFrame } from "../types.js";
 import type { Policy } from "../core/policy.js";
 import { PitchEngine } from "../core/pitch-engine.js";
 import { EventTracker } from "../core/event-tracker.js";
+import {
+  ChannelSelector,
+  resolveChannel,
+  type ChannelStrategy,
+} from "../core/channel-select.js";
 
 /* AudioWorkletGlobalScope declarations — not in the standard DOM lib. */
 declare const sampleRate: number;
@@ -45,6 +50,19 @@ class TuninatorProcessor extends AudioWorkletProcessor {
   /** Scratch for the multi-channel downmix. Sized to the render quantum. */
   private mixBuffer = new Float32Array(128);
 
+  /** How the host wants channels combined. Fixed for the life of the node. */
+  private readonly strategy: ChannelStrategy;
+  /**
+   * Built on the first `process()` call, once the real channel count is known,
+   * and rebuilt only if that count ever changes. Null for `"sum"`, for an
+   * explicit index, and for mono — in all three there is nothing to decide, so
+   * there is no per-hop work at all.
+   */
+  private selector: ChannelSelector | null = null;
+  private selectorChannels = 0;
+  /** The channel `process()` is currently reading, or -1 while summing. */
+  private appliedChannel = -1;
+
   /**
    * Per-channel sum of squares accumulated across the hop, and the sample count
    * they were accumulated over. Reused across hops, never reallocated in
@@ -55,7 +73,9 @@ class TuninatorProcessor extends AudioWorkletProcessor {
   private readonly channelRms: number[] = [];
   private channelSamples = 0;
 
-  constructor(options?: { processorOptions?: { policy: Policy } }) {
+  constructor(options?: {
+    processorOptions?: { policy: Policy; channels?: ChannelStrategy };
+  }) {
     super(options);
 
     const policy = options?.processorOptions?.policy;
@@ -63,6 +83,10 @@ class TuninatorProcessor extends AudioWorkletProcessor {
       throw new Error("TuninatorProcessor requires processorOptions.policy");
     }
     this.policy = policy;
+    // Not part of `Policy`: policy is per-*mode* detection tuning and is
+    // re-sent on every `setMode()`, whereas the channel strategy is a property
+    // of the wiring and is fixed when the node is constructed.
+    this.strategy = options?.processorOptions?.channels ?? "auto";
     this.engine = new PitchEngine(sampleRate, policy);
     this.tracker = new EventTracker(policy);
 
@@ -78,6 +102,8 @@ class TuninatorProcessor extends AudioWorkletProcessor {
         const emissions = this.tracker.flush(currentTime * 1000);
         this.engine.reset();
         this.resetChannelMeters();
+        this.selector?.reset();
+        this.appliedChannel = -1;
         if (emissions.length > 0) {
           this.port.postMessage({
             type: "hop",
@@ -97,7 +123,9 @@ class TuninatorProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Sum every channel, do not read channel 0 alone.
+    this.syncSelector(input.length);
+
+    // Never read channel 0 and nothing else.
     //
     // A 2-in audio interface presents as one stereo device ("Analogue 1/2"), and
     // a guitar in input 2 lands entirely on channel 1. Reading only channel 0
@@ -105,22 +133,33 @@ class TuninatorProcessor extends AudioWorkletProcessor {
     // -- no error, no pitch, level pinned at zero, which is indistinguishable
     // from a broken detector.
     //
-    // Summed rather than averaged on purpose: averaging costs 6dB when one
-    // channel is silent, which is exactly the case this exists to fix, and
-    // `analysis.rmsGate` is an absolute threshold that the loss could push the
-    // signal back under. A genuinely stereo source gains up to 6dB instead,
-    // which is harmless here -- nothing downstream reproduces this audio.
+    // What to do instead is `this.strategy`. The default picks the loudest
+    // channel (see `core/channel-select`), which cannot comb-filter a mic and a
+    // DI of the same guitar the way summing does. Until that decision has
+    // latched -- and whenever the host asks for it -- the channels are summed,
+    // which is the safe direction: a sum can be a poor signal, but it cannot
+    // miss an instrument entirely.
+    const channel = resolveChannel(this.strategy, input.length, this.selector);
+    this.appliedChannel = channel ?? -1;
+
     let block = first;
-    if (input.length > 1) {
+    if (channel !== null) {
+      block = input[channel] ?? first;
+    } else if (input.length > 1) {
+      // Summed rather than averaged on purpose: averaging costs 6dB when one
+      // channel is silent, which is exactly the case this exists to fix, and
+      // `analysis.rmsGate` is an absolute threshold that the loss could push the
+      // signal back under. A genuinely stereo source gains up to 6dB instead,
+      // which is harmless here -- nothing downstream reproduces this audio.
       if (this.mixBuffer.length !== first.length) {
         this.mixBuffer = new Float32Array(first.length);
       }
       const mix = this.mixBuffer;
       mix.set(first);
       for (let c = 1; c < input.length; c++) {
-        const channel = input[c];
-        if (!channel || channel.length !== mix.length) continue;
-        for (let i = 0; i < mix.length; i++) mix[i] = mix[i]! + channel[i]!;
+        const other = input[c];
+        if (!other || other.length !== mix.length) continue;
+        for (let i = 0; i < mix.length; i++) mix[i] = mix[i]! + other[i]!;
       }
       block = mix;
     }
@@ -132,7 +171,9 @@ class TuninatorProcessor extends AudioWorkletProcessor {
     if (engineFrame === null) return true;
 
     const emissions = this.tracker.process(engineFrame);
-    engineFrame.frame.channelRms = this.readChannelMeters(input.length);
+    const channelRms = this.readChannelMeters(input.length);
+    engineFrame.frame.channelRms = channelRms;
+    engineFrame.frame.selectedChannel = this.appliedChannel < 0 ? null : this.appliedChannel;
     this.port.postMessage({
       type: "hop",
       frame: engineFrame.frame,
@@ -143,11 +184,34 @@ class TuninatorProcessor extends AudioWorkletProcessor {
   }
 
   /**
+   * Creates (or recreates) the selector once the browser's real channel count
+   * is known. Allocates on the first call and then never again, unless the
+   * channel count itself changes, which a live `MediaStream` does not do.
+   */
+  private syncSelector(channels: number): void {
+    if (this.strategy !== "auto" || channels <= 1) {
+      this.selector = null;
+      this.selectorChannels = channels;
+      return;
+    }
+    if (this.selector && this.selectorChannels === channels) return;
+    this.selectorChannels = channels;
+    this.selector = new ChannelSelector({
+      channelCount: channels,
+      // The detector's own gate doubles as the "is anyone playing?" floor:
+      // below it no channel would produce a pitch, so which one is loudest is
+      // both unanswerable and irrelevant.
+      silenceRms: this.policy.analysis.rmsGate,
+    });
+  }
+
+  /**
    * Accumulates the *unsummed* level of every input channel.
    *
-   * Summing for analysis is right, but it also erases the one fact a user needs
-   * when nothing is detected: whether the instrument is on a channel at all.
-   * Metering before the sum is what lets a UI show "ch0 dead, ch1 hot".
+   * Two jobs. It erases the one fact a user needs when nothing is detected —
+   * whether the instrument is on a channel at all — unless it is measured
+   * before the channels are mixed; that is what lets a UI show "ch0 dead, ch1
+   * hot". And it is the input the channel selector decides on.
    */
   private meterChannels(input: Float32Array[], frames: number): void {
     for (let c = 0; c < input.length; c++) {
@@ -167,6 +231,14 @@ class TuninatorProcessor extends AudioWorkletProcessor {
       const squares = this.channelSquares[c] ?? 0;
       this.channelRms[c] = samples === 0 ? 0 : Math.sqrt(squares / samples);
     }
+
+    // The selector runs on the hop, not the render quantum: a 128-sample argmax
+    // is noise, and the per-channel RMS needed to decide is already computed
+    // here. `channelSamples` is the hop length in samples by construction.
+    if (this.selector && samples > 0) {
+      this.selector.observe(this.channelRms, (samples / sampleRate) * 1000);
+    }
+
     this.resetChannelMeters();
     return this.channelRms;
   }

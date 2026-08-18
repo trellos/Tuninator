@@ -71,6 +71,20 @@ export type PitchFrame = {
    */
   channelRms?: number[];
 
+  /**
+   * Which input channel this frame was actually analysed from.
+   *
+   * - a number — only that channel reached the detector,
+   * - `null` — every channel was summed together,
+   * - absent — no channel information at all (the offline harness).
+   *
+   * `channelRms` alone cannot answer this once selection exists, and its argmax
+   * is *not* the answer: selection is hysteretic on purpose, so the loudest
+   * channel in any one frame is routinely not the selected one. A UI that wants
+   * to show "listening to input 2" has to be told, not left to infer.
+   */
+  selectedChannel?: number | null;
+
   /** Detector internals, exposed for debugging and offline evaluation. */
   detector: {
     /** Chosen lag in samples, at `effectiveSampleRate` (post-decimation). */
@@ -203,6 +217,22 @@ export type TuninatorOptions = {
      * which silently loses whatever is on input 2 of a 2-in interface.
      */
     channelCount?: number;
+    /**
+     * What to do with the channels once they arrive. Defaults to `"auto"`.
+     *
+     * - `"auto"` — analyse the loudest channel, decided over a window and with
+     *   hysteresis so a stereo pair cannot flip back and forth. Until real
+     *   signal has been heard the channels are summed, because summing can be
+     *   wrong but cannot miss an instrument.
+     * - `"sum"` — always sum every channel. Guaranteed to hear whatever is
+     *   plugged in anywhere, at the cost of comb filtering when two channels
+     *   carry the same source (a mic and a DI of one guitar).
+     * - a number — always analyse that channel index, for a host that already
+     *   knows where the instrument is. Out of range falls back to summing.
+     *
+     * Ignored for mono input, where there is nothing to decide.
+     */
+    channels?: "auto" | "sum" | number;
   };
   analysis?: {
     minFrequencyHz?: number;

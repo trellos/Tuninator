@@ -118,7 +118,8 @@ One analysis hop, emitted continuously while listening — **including during si
   confidence: number;             // 0..1
   nearest: PitchNote | null;      // snapped to the nearest equal-tempered note
   amplitude: { rms: number; peak?: number };
-  channelRms?: number[];          // level of each INPUT channel, before they are summed
+  channelRms?: number[];          // level of each INPUT channel, before they are mixed
+  selectedChannel?: number | null; // channel being analysed; null = summed; absent = unknown
   detector: {                     // internals, exposed for debugging and eval
     tau?: number | null;
     cmnd?: number | null;
@@ -179,7 +180,7 @@ Failures set the state to `error` and emit an `error` event with a `TuninatorErr
 createTuninator({
   mode: "lead",
   workletUrl: "/assets/tuninator-worklet.js",
-  input:    { deviceId, channelCount: 2, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  input:    { deviceId, channelCount: 2, channels: "auto", echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   analysis: { minFrequencyHz: 70, maxFrequencyHz: 1400, pitchHopMs: 12, rmsGate: 0.008, confidenceGate: 0.35 },
   tracking: { minStableMs: 45, releaseGraceMs: 90, bendThresholdCents: 45 },
 });
@@ -210,15 +211,51 @@ Three things follow, and all three are handled:
 - `input.channelCount` defaults to **2**. Chrome opens a capture device in mono unless a channel
   count is asked for, and a channel that never reaches the page cannot be recovered later. It is
   requested as an *ideal* constraint, so a genuinely mono microphone still opens and reports `1`.
-- The worklet **sums** every input channel rather than reading channel 0. Summing, not averaging:
-  averaging costs 6dB exactly when one channel is silent, and `analysis.rmsGate` is absolute.
-- `PitchFrame.channelRms` reports the level of each channel *before* the sum, so a UI can show
-  which input is actually carrying signal. `channelRms.length` is the channel count the browser
-  handed over — `1` there means the capture is mono and input 2 never arrived.
+- The worklet **selects the loudest channel** rather than reading channel 0 (`input.channels`,
+  below).
+- `PitchFrame.channelRms` reports the level of each channel *before* they are mixed, so a UI can
+  show which input is actually carrying signal. `channelRms.length` is the channel count the
+  browser handed over — `1` there means the capture is mono and input 2 never arrived.
+- `PitchFrame.selectedChannel` reports which channel is being analysed (`null` when they are
+  being summed). This cannot be inferred from `channelRms`: selection is hysteretic, so the
+  loudest channel in any single frame is routinely not the selected one.
 
 If a guitar is inaudible to the detector but audible through the interface's own monitoring,
 `channelRms` is the thing to look at first: direct monitoring is analogue and proves nothing
 about what the browser received.
+
+#### `input.channels` — selection, not summing
+
+| Value | Behaviour |
+|---|---|
+| `"auto"` *(default)* | Analyse the loudest channel, decided over a window and with hysteresis. Sums until a decision has latched. |
+| `"sum"` | Always sum every channel. |
+| a number | Always analyse that channel index. Out of range falls back to summing. |
+
+Summing looks like the safe default and is not. Two captures of **one** source — a DI into input 1
+and a mic on the cab into input 2, an entirely ordinary rig — are separated by the mic's acoustic
+delay, and adding them produces a comb filter: a spectrum with periodic notches. One metre of air
+is ~3ms, which is half a period of 166.7Hz, so around E3 the odd harmonics cancel outright and the
+strongest remaining periodicity is the second harmonic. The detector then reports E4 for an E3,
+confidently, with nothing anywhere looking broken. Selecting one channel cannot do this.
+
+The rules `"auto"` follows, and why:
+
+- **Decided over a window, not per hop.** Per-hop argmax jitters — a 12ms hop lands anywhere in a
+  note's attack. Energy accumulates over **250ms** and the decision is taken on the total.
+- **Hysteresis.** A challenger must beat the incumbent by **6dB** (a factor of two in amplitude)
+  for **3 consecutive windows** — 750ms — before the selection moves. Switching splices two
+  uncorrelated waveforms together in the analysis ring buffer, which is a worse input than either
+  channel alone, so the bar sits above anything a genuine stereo pair produces and far below an
+  unplugged input (30dB or more down). The *first* choice has no margin requirement; only switches
+  do.
+- **Silence never latches.** Before anyone plays, every channel is noise floor and "loudest" means
+  "worse preamp". Windows whose loudest channel is under `analysis.rmsGate` are discarded — they
+  neither latch a decision nor challenge one. Until then the channels are **summed**: a sum can be
+  a poor signal, but it cannot miss an instrument, which is the right way to be wrong while
+  waiting.
+- **A latched choice survives silence**, so pauses between phrases do not re-open the question.
+- **Mono is a no-op.** One channel, nothing to decide, no per-hop work at all.
 
 ## Architecture
 

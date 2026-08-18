@@ -167,7 +167,12 @@ class TuninatorImpl implements Tuninator {
         // in. "speakers" is the survivable failure mode of the two.
         channelCountMode: "max",
         channelInterpretation: "speakers",
-        processorOptions: { policy: this.policy },
+        processorOptions: {
+          policy: this.policy,
+          // Fixed at construction: unlike the policy, this describes the
+          // wiring, not the detection mode, so `setMode()` never resends it.
+          channels: this.options.input?.channels ?? "auto",
+        },
       });
     } catch (error) {
       this.cleanup();

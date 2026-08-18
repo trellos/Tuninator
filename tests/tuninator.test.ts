@@ -313,6 +313,33 @@ describe("input channels", () => {
     expect(options).not.toHaveProperty("channelCount");
   });
 
+  it("tells the worklet to select the loudest channel by default", async () => {
+    const mocks = installMocks();
+    const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
+    await tuninator.start();
+
+    const processorOptions = mocks.nodeOptions()?.["processorOptions"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(processorOptions?.["channels"]).toBe("auto");
+  });
+
+  it("passes input.channels through to the worklet unchanged", async () => {
+    for (const channels of ["sum", 1] as const) {
+      const mocks = installMocks();
+      const tuninator = createTuninator({
+        workletUrl: "/assets/tuninator-worklet.js",
+        input: { channels },
+      });
+      await tuninator.start();
+
+      const processorOptions = mocks.nodeOptions()?.["processorOptions"] as
+        | Record<string, unknown>
+        | undefined;
+      expect(processorOptions?.["channels"]).toBe(channels);
+    }
+  });
+
   it("reports the device and its channel count as a status message", async () => {
     installMocks({ trackChannelCount: 2 });
     const tuninator = createTuninator({ workletUrl: "/assets/tuninator-worklet.js" });
