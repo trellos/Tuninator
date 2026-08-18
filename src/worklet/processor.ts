@@ -42,6 +42,8 @@ class TuninatorProcessor extends AudioWorkletProcessor {
   private engine: PitchEngine;
   private tracker: EventTracker;
   private policy: Policy;
+  /** Scratch for the multi-channel downmix. Sized to the render quantum. */
+  private mixBuffer = new Float32Array(128);
 
   constructor(options?: { processorOptions?: { policy: Policy } }) {
     super(options);
@@ -77,14 +79,43 @@ class TuninatorProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs: Float32Array[][]): boolean {
-    const channel = inputs[0]?.[0];
-    if (!channel || channel.length === 0) {
+    const input = inputs[0];
+    const first = input?.[0];
+    if (!input || !first || first.length === 0) {
       // No input connected yet. Stay alive; the node is still wired up.
       return true;
     }
 
+    // Sum every channel, do not read channel 0 alone.
+    //
+    // A 2-in audio interface presents as one stereo device ("Analogue 1/2"), and
+    // a guitar in input 2 lands entirely on channel 1. Reading only channel 0
+    // then sees pure silence while the player hears their instrument perfectly
+    // -- no error, no pitch, level pinned at zero, which is indistinguishable
+    // from a broken detector.
+    //
+    // Summed rather than averaged on purpose: averaging costs 6dB when one
+    // channel is silent, which is exactly the case this exists to fix, and
+    // `analysis.rmsGate` is an absolute threshold that the loss could push the
+    // signal back under. A genuinely stereo source gains up to 6dB instead,
+    // which is harmless here -- nothing downstream reproduces this audio.
+    let block = first;
+    if (input.length > 1) {
+      if (this.mixBuffer.length !== first.length) {
+        this.mixBuffer = new Float32Array(first.length);
+      }
+      const mix = this.mixBuffer;
+      mix.set(first);
+      for (let c = 1; c < input.length; c++) {
+        const channel = input[c];
+        if (!channel || channel.length !== mix.length) continue;
+        for (let i = 0; i < mix.length; i++) mix[i] = mix[i]! + channel[i]!;
+      }
+      block = mix;
+    }
+
     const timestampMs = currentTime * 1000;
-    const engineFrame = this.engine.push(channel, timestampMs);
+    const engineFrame = this.engine.push(block, timestampMs);
     if (engineFrame === null) return true;
 
     const emissions = this.tracker.process(engineFrame);
