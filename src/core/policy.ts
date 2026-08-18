@@ -168,7 +168,14 @@ const BASE: Omit<Policy, "mode"> = {
     minFrequencyHz: 70,
     maxFrequencyHz: 1400,
     pitchHopMs: 12,
-    rmsGate: 0.008,
+    // 0.005, not the 0.008 it was. A legato note -- hammered on, or picked
+    // lightly inside a run -- is a quarter the amplitude of the note that was
+    // struck before it, and the gate was discarding those frames before any
+    // pitch algorithm saw them. Measured on the lead fixture: the C#5 the
+    // labels place between B4 and D5 sits at 0.0058-0.0093 rms against 0.027
+    // for the picked notes either side of it. Two notes come back at 0.005 and
+    // nothing further is gained below it.
+    rmsGate: 0.005,
     // Tuned against the recorded fixtures, not chosen a priori. At 0.5 the
     // detector dropped frames mid-note on decaying low strings, which read as
     // note-offs and split notes in two; 0.35 keeps them voiced. Measured on

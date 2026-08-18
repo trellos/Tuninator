@@ -67,25 +67,24 @@ const SHORTFALL: Record<string, Record<string, string>> = {
   },
 
   /*
-   * The lead fixture is the largest remaining gap, and it is a different
-   * problem from the chords: YIN is a single-pitch estimator, and in this
-   * playing the previous note is still ringing when the next is picked. Six of
-   * these twelve are notes the tracker never emitted at all, five are the
-   * neighbouring note of the phrase, and one is an octave.
+   * The lead fixture is the largest remaining gap. Three of its former misses
+   * are gone: q1's low B was an octave error YIN made by taking the first lag
+   * under its threshold, and two notes were being discarded by the amplitude
+   * gate before any pitch algorithm saw them.
+   *
+   * What is left splits three ways. Three notes produce no event at all, three
+   * come out as the neighbouring note of the phrase, and three are octaves.
    */
   "clean-lead-120bpm": {
-    q1: "B2 -> B3. Octave: the fundamental of the low B is weaker than its second harmonic.",
     q7: "A3 bend to B3 -> A5. Octave, during a bend.",
-    t2: "C#5 -> no event. Triplet run, 166ms per note.",
+    t2: "C#5 -> no event. Triplet run, 166ms per note, played legato.",
     t4: "E5 -> no event.",
-    t6: "C#5 -> no event.",
+    t6: "C#5 -> D5. The previous note of the phrase.",
     t10: "E5 -> D5. The previous note of the phrase.",
     t15: "D5 -> C#5. The previous note of the phrase.",
     t16: "E5 -> no event.",
-    t24: "B5 -> B3. Octave.",
-    s4: "A4 -> no event. 125ms sixteenths.",
-    s5: "B4 -> no event.",
-    s10: "C#5 -> B4. The previous note of the phrase.",
+    t24: "B5 -> B3. Two octaves down.",
+    s5: "B4 -> no event. 125ms sixteenths.",
   },
 };
 
