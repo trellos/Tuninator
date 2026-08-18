@@ -29,6 +29,11 @@ import { OnsetDetector } from "./onset.js";
 import { ChromaAnalyzer, ChromaSmoother } from "./chroma.js";
 import { matchChord } from "./chords.js";
 import { describeFrequency } from "./notes.js";
+import { votePitch, type FusionDiagnostic } from "./pitch/fusion.js";
+import createMpm from "./pitch/mpm-estimator.js";
+import createSwipe from "./pitch/swipe-estimator.js";
+import createOnsetWeighted from "./pitch/onset-weighted-estimator.js";
+import type { PitchEstimator } from "./pitch/estimator.js";
 import type { ChordMatch } from "./chords.js";
 import type { ChromaResult } from "./chroma.js";
 
@@ -65,6 +70,14 @@ const CHORD_HOP_DIVISOR = 4;
  */
 const OCTAVE_TOLERANCE = 0.12;
 
+/**
+ * Range the witness vote is tallied over: the whole MIDI span, so a member is
+ * only ever excluded by its own configured bounds, never by the vote's.
+ * Readings outside a member's range never arrive here to begin with.
+ */
+const MIN_VOTE_MIDI = 0;
+const MAX_VOTE_MIDI = 127;
+
 export class PitchEngine {
   readonly sampleRate: number;
   /** Hop in samples, snapped to a whole number of 128-sample render quanta. */
@@ -84,6 +97,28 @@ export class PitchEngine {
 
   private yinLong: YinDetector;
   private yinShort: YinDetector;
+  /**
+   * Second and third opinions on the same window as `yinLong`.
+   *
+   * The two YIN windows are one witness with two time resolutions, not two
+   * witnesses: they share a failure mode, because they share an algorithm.
+   * These do not. MPM's normalised square difference has no length bias, so it
+   * decides the octave by a different rule and misses different notes; the
+   * onset-weighted estimator names the pitch of energy that has just ARRIVED,
+   * which is the only evidence that separates a new note from the previous one
+   * still ringing over it.
+   */
+  private mpm: PitchEstimator;
+  private swipe: PitchEstimator;
+  private onsetWeighted: PitchEstimator;
+  /** Reused every hop: `votePitch` clears it, and nothing may allocate here. */
+  private readonly voteScratch = new Float64Array(256);
+  private readonly witnesses: FusionDiagnostic[] = [
+    { name: "yin", frequencyHz: null, confidence: 0, weight: 1 },
+    { name: "mpm", frequencyHz: null, confidence: 0, weight: 1 },
+    { name: "swipe", frequencyHz: null, confidence: 0, weight: 1 },
+    { name: "onset-weighted", frequencyHz: null, confidence: 0, weight: 1 },
+  ];
   private onsetDetector: OnsetDetector;
   private chromaAnalyzer: ChromaAnalyzer | null = null;
   private chromaSmoother: ChromaSmoother | null = null;
@@ -131,6 +166,22 @@ export class PitchEngine {
       ),
       maxFrequencyHz: policy.analysis.maxFrequencyHz,
       threshold: policy.pitch.yinThreshold,
+    });
+
+    this.mpm = createMpm({
+      sampleRate,
+      minFrequencyHz: policy.analysis.minFrequencyHz,
+      maxFrequencyHz: policy.analysis.maxFrequencyHz,
+    });
+    this.swipe = createSwipe({
+      sampleRate,
+      minFrequencyHz: policy.analysis.minFrequencyHz,
+      maxFrequencyHz: policy.analysis.maxFrequencyHz,
+    });
+    this.onsetWeighted = createOnsetWeighted({
+      sampleRate,
+      minFrequencyHz: policy.analysis.minFrequencyHz,
+      maxFrequencyHz: policy.analysis.maxFrequencyHz,
     });
 
     this.onsetDetector = new OnsetDetector({
@@ -196,6 +247,21 @@ export class PitchEngine {
         ),
         maxFrequencyHz: policy.analysis.maxFrequencyHz,
         threshold: policy.pitch.yinThreshold,
+      });
+      this.mpm = createMpm({
+        sampleRate: this.sampleRate,
+        minFrequencyHz: policy.analysis.minFrequencyHz,
+        maxFrequencyHz: policy.analysis.maxFrequencyHz,
+      });
+      this.swipe = createSwipe({
+        sampleRate: this.sampleRate,
+        minFrequencyHz: policy.analysis.minFrequencyHz,
+        maxFrequencyHz: policy.analysis.maxFrequencyHz,
+      });
+      this.onsetWeighted = createOnsetWeighted({
+        sampleRate: this.sampleRate,
+        minFrequencyHz: policy.analysis.minFrequencyHz,
+        maxFrequencyHz: policy.analysis.maxFrequencyHz,
       });
     }
 
@@ -387,10 +453,39 @@ export class PitchEngine {
         }
       }
 
-      frequencyHz = chosen.frequencyHz;
-      confidence = chosen.confidence;
       tau = chosen.tau;
       cmnd = chosen.cmnd;
+
+      // The YIN pair is one witness. Two more read the same long window, and
+      // the three are combined by the same confidence-weighted vote the offline
+      // bench uses, so what ships and what is measured cannot drift apart.
+      //
+      // The point is not that either newcomer is better -- on the lead fixture
+      // MPM ties YIN exactly and the onset-weighted estimator scores lower.
+      // It is that they are wrong in different places, and a vote can tell.
+      // Seven of YIN's eight misses there are one mechanism: the previous note
+      // is still ringing at comparable or greater amplitude, so a monophonic
+      // method reports the loudest periodicity, correctly, and names the wrong
+      // note. Only the arriving-energy witness has anything to say about that.
+      this.witnesses[0]!.frequencyHz = chosen.frequencyHz;
+      this.witnesses[0]!.confidence = chosen.confidence;
+      this.witnesses[0]!.weight = policy.pitch.weightYin;
+      const mpmResult = this.mpm.estimate(this.longWindow);
+      this.witnesses[1]!.frequencyHz = mpmResult.frequencyHz;
+      this.witnesses[1]!.confidence = mpmResult.confidence;
+      this.witnesses[1]!.weight = policy.pitch.weightMpm;
+      const swipeResult = this.swipe.estimate(this.longWindow);
+      this.witnesses[2]!.frequencyHz = swipeResult.frequencyHz;
+      this.witnesses[2]!.confidence = swipeResult.confidence;
+      this.witnesses[2]!.weight = policy.pitch.weightSwipe;
+      const arrival = this.onsetWeighted.estimate(this.longWindow);
+      this.witnesses[3]!.frequencyHz = arrival.frequencyHz;
+      this.witnesses[3]!.confidence = arrival.confidence;
+      this.witnesses[3]!.weight = policy.pitch.weightArrival;
+
+      const fused = votePitch(this.witnesses, this.voteScratch, MIN_VOTE_MIDI, MAX_VOTE_MIDI);
+      frequencyHz = fused.frequencyHz;
+      confidence = fused.confidence;
 
       // Zero crossing is crude, but it fails in different ways than YIN does,
       // which is exactly what makes it usable as an arbiter. Rather than merely

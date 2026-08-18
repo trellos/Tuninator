@@ -74,6 +74,8 @@ export type FusionDiagnostic = {
   name: string;
   frequencyHz: number | null;
   confidence: number;
+  /** Relative trust. Defaults to 1 when a caller has no reason to differ. */
+  weight?: number;
 };
 
 export class FusedEstimator implements PitchEstimator {
@@ -101,7 +103,7 @@ export class FusedEstimator implements PitchEstimator {
     this.windowSize = Math.max(...specs.map((s) => s.estimator.windowSize));
     this.minMidi = Math.max(0, Math.floor(midiOfHz(options.minFrequencyHz)) - 1);
     this.maxMidi = Math.min(127, Math.ceil(midiOfHz(options.maxFrequencyHz)) + 1);
-    this.votes = new Float64Array(128);
+    this.votes = new Float64Array(256);
     this.lastVote = specs.map((s) => ({
       name: s.estimator.name,
       frequencyHz: null,
@@ -110,69 +112,114 @@ export class FusedEstimator implements PitchEstimator {
   }
 
   estimate(window: Float32Array): PitchEstimate {
-    this.votes.fill(0);
-    let cast = 0;
-    let totalWeight = 0;
-
     for (let i = 0; i < this.members.length; i++) {
       const member = this.members[i]!;
-      const size = member.estimator.windowSize;
-      member.buffer.set(window.subarray(window.length - size));
+      member.buffer.set(window.subarray(window.length - member.estimator.windowSize));
       const result = member.estimator.estimate(member.buffer);
       const diagnostic = this.lastVote[i]!;
       diagnostic.frequencyHz = result.frequencyHz;
       diagnostic.confidence = result.confidence;
-
-      totalWeight += member.weight;
-      if (result.frequencyHz === null || result.confidence < ABSTAIN_BELOW) continue;
-      const midi = Math.round(midiOfHz(result.frequencyHz));
-      if (midi < this.minMidi || midi > this.maxMidi) continue;
-      const mass = member.weight * result.confidence;
-      this.votes[midi]! += mass;
-      if (midi - 12 >= this.minMidi) this.votes[midi - 12]! += mass * OCTAVE_LEAK;
-      if (midi + 12 <= this.maxMidi) this.votes[midi + 12]! += mass * OCTAVE_LEAK;
-      cast++;
+      diagnostic.weight = member.weight;
     }
-    if (cast === 0) return { frequencyHz: null, confidence: 0 };
-
-    let winner = -1;
-    let first = 0;
-    let second = 0;
-    for (let midi = this.minMidi; midi <= this.maxMidi; midi++) {
-      const mass = this.votes[midi]!;
-      if (mass > first) {
-        second = first;
-        first = mass;
-        winner = midi;
-      } else if (mass > second) {
-        second = mass;
-      }
-    }
-    if (winner < 0) return { frequencyHz: null, confidence: 0 };
-
-    // Report the members' own frequencies rather than the semitone's nominal
-    // pitch: the vote decides WHICH note, but the winning members already
-    // measured it, bends and detuning included, and rounding that away would
-    // throw out the sub-semitone accuracy each of them worked for.
-    let sum = 0;
-    let sumWeight = 0;
-    for (let i = 0; i < this.members.length; i++) {
-      const vote = this.lastVote[i]!;
-      if (vote.frequencyHz === null || vote.confidence < ABSTAIN_BELOW) continue;
-      if (Math.round(midiOfHz(vote.frequencyHz)) !== winner) continue;
-      const mass = this.members[i]!.weight * vote.confidence;
-      sum += vote.frequencyHz * mass;
-      sumWeight += mass;
-    }
-    const frequencyHz = sumWeight > 0 ? sum / sumWeight : hzOfMidi(winner);
-
-    // Two independent factors, and both have to hold. Agreement alone would
-    // let every member be unanimously unsure; strength alone would let one
-    // certain member override a tie. Their product is low if either is.
-    const agreement = first > 0 ? (first - second) / first : 0;
-    const strength = first / Math.max(1e-9, totalWeight);
-    return { frequencyHz, confidence: Math.min(1, agreement * Math.min(1, strength) ** 0.5) };
+    return votePitch(this.lastVote, this.votes, this.minMidi, this.maxMidi);
   }
+}
+
+/**
+ * The vote itself, over readings that have already been taken.
+ *
+ * Separate from `FusedEstimator` because the pipeline arrives at its witnesses
+ * by a different route — two YIN windows with a measured arbitration between
+ * them, plus a zero-crossing estimate — and those deserve the same voting rule
+ * rather than a second copy of it that can drift out of step.
+ *
+ * `scratch` must be a 256-element buffer owned by the caller; it is cleared
+ * here. Nothing is allocated.
+ */
+export function votePitch(
+  readings: readonly FusionDiagnostic[],
+  scratch: Float64Array,
+  minMidi: number,
+  maxMidi: number
+): PitchEstimate {
+  // Two tallies over one buffer: direct votes in the low half, direct plus
+  // octave leak in the high half. The leak decides WHICH note wins, so members
+  // an octave apart coalesce instead of splitting the vote three ways; the
+  // margin is read off the direct votes only, because a lone member's own leak
+  // is not a rival opinion and must not be counted as one. Scoring the margin
+  // against the combined tally capped a unanimous single witness at 0.75
+  // confidence -- it was competing with its own echo.
+  scratch.fill(0);
+  const direct = scratch.subarray(0, 128);
+  const combined = scratch.subarray(128, 256);
+  let cast = 0;
+  let totalWeight = 0;
+
+  for (const reading of readings) {
+    const weight = reading.weight ?? 1;
+    totalWeight += weight;
+    if (reading.frequencyHz === null || reading.confidence < ABSTAIN_BELOW) continue;
+    const midi = Math.round(midiOfHz(reading.frequencyHz));
+    if (midi < minMidi || midi > maxMidi) continue;
+    const mass = weight * reading.confidence;
+    direct[midi]! += mass;
+    combined[midi]! += mass;
+    if (midi - 12 >= minMidi) combined[midi - 12]! += mass * OCTAVE_LEAK;
+    if (midi + 12 <= maxMidi) combined[midi + 12]! += mass * OCTAVE_LEAK;
+    cast++;
+  }
+  if (cast === 0) return { frequencyHz: null, confidence: 0 };
+
+  let winner = -1;
+  let first = 0;
+  for (let midi = minMidi; midi <= maxMidi; midi++) {
+    if (combined[midi]! > first) {
+      first = combined[midi]!;
+      winner = midi;
+    }
+  }
+  if (winner < 0) return { frequencyHz: null, confidence: 0 };
+
+  // The strongest genuine dissent: the heaviest direct vote for anything else.
+  let second = 0;
+  for (let midi = minMidi; midi <= maxMidi; midi++) {
+    if (midi !== winner && direct[midi]! > second) second = direct[midi]!;
+  }
+  first = Math.max(first, direct[winner]!);
+
+  // Report the members' own frequencies rather than the semitone's nominal
+  // pitch: the vote decides WHICH note, but the winning members already
+  // measured it, bends and detuning included, and rounding that away would
+  // throw out the sub-semitone accuracy each of them worked for.
+  let sum = 0;
+  let sumMass = 0;
+  /** Weight, not mass: the denominator of the supporters' mean confidence. */
+  let supporterWeight = 0;
+  for (const reading of readings) {
+    if (reading.frequencyHz === null || reading.confidence < ABSTAIN_BELOW) continue;
+    if (Math.round(midiOfHz(reading.frequencyHz)) !== winner) continue;
+    const weight = reading.weight ?? 1;
+    const mass = weight * reading.confidence;
+    sum += reading.frequencyHz * mass;
+    sumMass += mass;
+    supporterWeight += weight;
+  }
+  const frequencyHz = sumMass > 0 ? sum / sumMass : hzOfMidi(winner);
+
+  // How sure the members who backed the winner were, times how much of the
+  // opinion was theirs. Both factors are needed: the first alone would let a
+  // panel be unanimously wrong at full confidence, the second alone would let a
+  // barely-voiced reading win a walkover and report certainty.
+  //
+  // The scale is deliberately preserved rather than merely ordered. A lone
+  // witness reporting 0.5 must come out at 0.5, because the pipeline gates on
+  // this number against a threshold tuned for YIN's own scale -- an earlier
+  // version took a square root here and, with a single witness voting, turned
+  // that 0.5 into 0.71 and quietly lowered the gate. It read as the fusion
+  // finding a note more, when it was only the gate letting more through.
+  const support = supporterWeight > 0 ? sumMass / supporterWeight : 0;
+  const share = first + second > 0 ? first / (first + second) : 0;
+  return { frequencyHz, confidence: Math.min(1, support * share) };
 }
 
 function midiOfHz(hz: number): number {

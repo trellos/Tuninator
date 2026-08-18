@@ -41,13 +41,13 @@
  *
  * Two of those three pay for themselves on the lead fixture, measured by
  * removing them one at a time: without the square root it reads 34/43 notes and
- * 68.1% of frames, without the valleys 35/43 and 68.4%, against 36/43 and 70.7%
+ * 68.4% of frames, without the valleys 35/43 and 68.6%, against 36/43 and 71.0%
  * with everything. The prime restriction is the one that does not — a full comb
- * scores 36/43 and 71.2%, three frames better, which is noise. That is not an
+ * scores 36/43 and 71.3%, two frames better, which is noise. That is not an
  * argument for dropping it: this fixture is a clean monophonic lead whose only
  * octave-shaped error is on a note another note drowns out throughout, so it
  * cannot show what the prime set is for — and the restriction pays for itself
- * anyway, at 540k kernel entries against the full comb's 1.26M. Re-measure it
+ * anyway, at 270k kernel entries against the full comb's 628k. Re-measure it
  * on material that does confuse octaves.
  *
  * SHAPE
@@ -95,7 +95,7 @@ import type { PitchEstimate, PitchEstimator, PitchEstimatorOptions } from "./est
  * bench cannot take a frame until the window lies wholly inside the note, and
  * the lead fixture's sixteenths are ~110ms, so a long window stops seeing the
  * fast material at all. Measured on that fixture, notes exact / frame agreement:
- * 1024 -> 34, 68.8%; 2048 -> 36, 75.6%; 4096 -> 36, 78.0%; 8192 -> 7, because
+ * 1024 -> 34, 68.8%; 2048 -> 36, 75.7%; 4096 -> 36, 78.0%; 8192 -> 7, because
  * 34 of the 43 notes are then shorter than the window.
  *
  * 4096 reads its frames slightly more decisively, and 2048 is chosen anyway: it
@@ -111,23 +111,32 @@ const WINDOW = 2048;
  *
  * One extra radix-2 stage. It adds no information, but the analysis axis below
  * averages blocks of bins, and the padding lets a block straddle a partial
- * instead of quantising it — worth 36/43 notes and 70.7% of frames against
+ * instead of quantising it — worth 36/43 notes and 71.0% of frames against
  * 35/43 and 67.4% unpadded. Padding to four times the window buys nothing
  * further (70.8%).
  */
 const FFT_SIZE = WINDOW * 2;
 
-/** Candidate spacing. 24 = half a semitone of grid either side of the peak. */
-const CANDIDATES_PER_SEMITONE = 24;
+/**
+ * Candidates per semitone: the grid the kernel bank is built on, and the unit
+ * the rival search below measures a semitone in.
+ *
+ * 12 puts them 8 cents apart. Doubling to 24 and again to 48 changes nothing
+ * measurable — 436, 436 and 438 frames of 617, and under a cent of difference
+ * on a synthetic sawtooth sweep — because the parabolic fit, not the grid, is
+ * what sets the pitch accuracy. 12 does it in half the kernel bank (270k
+ * entries, 3.2MB) and 1.0ms a frame.
+ */
+const CANDIDATES_PER_SEMITONE = 12;
 
 /**
  * Analysis axis resolution, in transform bins per point.
  *
  * The axis cannot resolve more than the transform does, so this is expressed in
  * bins rather than Hz and follows the window size on its own. 1 and 2 score the
- * same (437 and 436 frames of 617); 4 loses a note and thirty frames, its 46Hz
- * points being wider than the kernel lobes of the low candidates. 2 at half the
- * inner-product work.
+ * same (437 and 438 frames of 617); 4 loses a note and thirty frames, its 46Hz
+ * points being wider than the kernel lobes of the low candidates. 2, for doing
+ * it in half the inner-product work.
  */
 const BINS_PER_POINT = 2;
 
@@ -170,9 +179,9 @@ const STRENGTH_CONFIDENT = 0.4;
  * of several estimators worse than its best member.
  *
  * Together with the strength ramp this comes out calibrated: over the fixture's
- * 617 frames the mean reported confidence is 0.71 and the reading is right 70.7%
- * of the time, and correct frames average 0.28 more confidence than wrong ones.
- * The incumbent YIN reports a mean 0.86 for its 68.9%.
+ * 617 frames the mean reported confidence is 0.712 and the reading is right
+ * 71.0% of the time, and correct frames average 0.28 more confidence than wrong
+ * ones (0.79 against 0.51). The incumbent YIN reports a mean 0.84 for its 68.9%.
  */
 const HARMONIC_TIE_MIN = 0.3;
 const HARMONIC_TIE_CLEAR = 0.6;
@@ -206,9 +215,9 @@ export class SwipeEstimator implements PitchEstimator {
   /*
    * The kernel bank in compressed-column form: candidate `c` occupies
    * `[kernelStart[c], kernelStart[c + 1])` of the paired point/weight arrays.
-   * Dense would be ~1250 candidates by ~1000 points of Float64, three quarters
+   * Dense would be ~620 candidates by ~1000 points of Float64, three quarters
    * of it the gaps between the used harmonics, and every frame would walk all
-   * of it. Sparse it is 540k entries, and a frame costs 1.8ms.
+   * of it. Sparse it is 270k entries, and a frame costs 1.0ms.
    */
   private readonly candidateHz: Float64Array;
   private readonly kernelStart: Int32Array;
@@ -409,9 +418,7 @@ export class SwipeEstimator implements PitchEstimator {
    * octave or its fifth, and when it makes that error the two candidates score
    * within a few percent of one another: the frame genuinely does not
    * distinguish them. Fusion needs that said out loud rather than hidden behind
-   * the argmax. Measured over the lead fixture the result is calibrated to
-   * within a point — mean confidence 0.70 against 69% of frames right — where
-   * the incumbent YIN reports a mean 0.86 for 71%.
+   * the argmax.
    */
   private confidenceOf(best: number, rival: number, bestIndex: number, rivalIndex: number): number {
     const level = clamp01((best - STRENGTH_FLOOR) / (STRENGTH_CONFIDENT - STRENGTH_FLOOR));

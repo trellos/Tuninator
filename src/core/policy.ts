@@ -49,6 +49,18 @@ export type Policy = {
      * so total displacement cannot distinguish them — only the per-hop rate can.
      */
     stepThresholdCents: number;
+    /**
+     * Relative trust of each witness in the per-frame pitch vote.
+     *
+     * Three methods read the same window and are combined by confidence-
+     * weighted vote: YIN (the two-window pair, arbitrated as before), MPM, and
+     * the arriving-energy estimator. They are not equally reliable across a
+     * whole recording, and these say by how much.
+     */
+    weightYin: number;
+    weightMpm: number;
+    weightSwipe: number;
+    weightArrival: number;
   };
 
   onset: {
@@ -214,6 +226,10 @@ const BASE: Omit<Policy, "mode"> = {
     // barely moves (81.4/79.1/79.1/79.1) but false positives fall 6/6/5/4, and
     // false positives are what the lead fixture is gated on.
     stepThresholdCents: 80,
+    weightYin: 4,
+    weightMpm: 1,
+    weightSwipe: 0,
+    weightArrival: 1,
   },
   onset: {
     enabled: true,
