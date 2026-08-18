@@ -73,7 +73,7 @@ export function createContext(): TrackerContext {
   return { nextId: 1, lastOnsetAt: null, lastEndedAt: null };
 }
 
-export const CENTS_PER_OCTAVE = 1200;
+const CENTS_PER_OCTAVE = 1200;
 
 export function cents(hz: number, refHz: number): number {
   return CENTS_PER_OCTAVE * Math.log2(hz / refHz);

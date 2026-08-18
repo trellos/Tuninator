@@ -93,7 +93,7 @@ export const DEFAULT_MARGIN_DB = 6;
 export const DEFAULT_SUSTAIN_WINDOWS = 3;
 
 /** Matches the default `analysis.rmsGate`. */
-export const DEFAULT_SILENCE_RMS = 0.008;
+const DEFAULT_SILENCE_RMS = 0.008;
 
 /**
  * Windowed, hysteretic "which channel is the instrument on?".

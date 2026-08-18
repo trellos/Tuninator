@@ -225,7 +225,7 @@ export class NoteTracker extends BaseTracker<ActiveNote> {
  * Most-voted note. Ties break toward the lower MIDI number so the result is
  * deterministic regardless of Map iteration order.
  */
-export function modeOf(votes: Map<number, number>): number {
+function modeOf(votes: Map<number, number>): number {
   let bestMidi = 0;
   let bestCount = -1;
   for (const [midi, count] of votes) {

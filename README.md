@@ -404,9 +404,12 @@ class; and `spicy-chords` produces zero confidently-wrong labels, which is its a
   legato runs over-segment, because separating "one note, re-picked" from "two notes slurred"
   comes down to a flux spike that may not be there. The triplet section is the worst of it at
   62.5%.
-- `chords-a-bm-g-d` exact accuracy is **73.3%** against 75% — one short muted upstrum abstains
-  rather than committing, which costs accuracy by design. That threshold has deliberately not been
-  lowered to accommodate it.
+- `chords-a-bm-g-d` exact accuracy is **73.3%** against 75%. The errors are three missed events
+  (two chords merged into one where the second strum did not re-articulate enough to split) and one
+  `D` read as `D5`. Separately, one short muted upstrum abstains instead of committing, and that is
+  what turns a pass into a failure: 11 of 15 scored is 73.3%, where naming that upstrum correctly
+  would have been 12 of 16 — exactly the 75% gate. Abstention is cheaper than being wrong (11 of 16
+  is 68.8%) but it is not free, and the threshold has deliberately not been lowered to absorb it.
 - `power-chords` onset median is **140ms** against 120ms. Chord onsets are measured against 2s
   bars of continuous strumming with no silence between them, so the detector must segment on chord
   *change*.

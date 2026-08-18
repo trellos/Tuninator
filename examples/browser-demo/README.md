@@ -25,8 +25,11 @@ Tuninator/
 └── examples/browser-demo/     # this demo
 ```
 
-Run `npm run build` in the repository root first — the demo resolves `tuninator` and
-`tuninator/web` through the package's `exports`, which point at `dist/`.
+`npm run dev`, `vite build` and `npm test` need no prior library build — they alias `tuninator`
+and `tuninator/web` straight at the library's source. Only `npm run typecheck` needs
+`npm run build` in the repository root first, because it resolves through the package's `exports`
+into `dist/`; see [Two views of the library](#two-views-of-the-library-on-purpose) below. The
+worklet asset does come from `dist/`, so a demo run without it warns and falls back to the mock.
 
 | script | what it does |
 | --- | --- |
@@ -89,15 +92,15 @@ package. So the typecheck doubles as a check that the published type surface is 
 
 The two views disagreeing would itself be a build bug worth catching.
 
-`src/index.ts` **is** the library's public entry point, so this is not a way around the public API —
-it is the public API, in source form. The rule the demo holds itself to is that this alias is the
-only path into the library and no import ever deepens into `tuninator/src/**`.
+`src/index.ts` and `src/web.ts` **are** the library's public entry points, so the source aliases are
+not a way around the public API — they are the public API, in source form. The rule the demo holds
+itself to is that those aliases are the only paths into the library, and no import ever deepens
+into `tuninator/src/**`.
 
-> One consequence worth knowing: `tsconfig.json` deliberately leaves `noUnusedLocals` and
-> `noUnusedParameters` off. The `paths` entry puts the library's own source into this TypeScript
-> program, and compiler options cannot be applied per file — so those two *style* flags would fail
-> this repo's build on unused variables in library code it does not own. Every flag that is on is a
-> type-safety flag.
+> `tsconfig.json` has `noUnusedLocals` and `noUnusedParameters` **on**. They used to be off,
+> because a `paths` entry pulled the library's own source into this TypeScript program and compiler
+> options cannot be applied per file. With the mapping gone, only this demo's code is in the
+> program, so the style flags are back.
 
 ---
 
