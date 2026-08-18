@@ -41,10 +41,11 @@
     "required": true,
     "mode": "chords",
     "gateOn": "exact",
-    "gateNote": "The cleanest strummed-chord case in the set: four open chords, twice through, deliberately separated by a mute so every boundary is unambiguous. Major vs minor is the point (A vs Bm), so the gate is on the full label. This fixture was added specifically because strummed chords were not being recognised at all; it is the target the chord path has to hit.",
+    "gateNote": "The cleanest strummed-chord case in the set: four open chords, twice through, TWO strums each -- a ringing downstrum then a muted upstrum -- so sixteen events, each one individually recognisable. Major vs minor is the point (A vs Bm), so the gate is on the full label. This fixture was added specifically because strummed chords were not being recognised at all; it is the target the chord path has to hit. Re-articulation matters here as much as identity: a detector that merges each chord's two strums into one event is wrong even if it names the chord correctly, and that shows up as missed events rather than bad labels.",
     "minLabelAccuracy": 0.75,
     "maxMedianOnsetErrorMs": 120,
-    "maxFalsePositives": 2
+    "maxFalsePositives": 3,
+    "maxMissed": 3
   },
 
   "spicy-chords-cmaj9-g-am11": {
