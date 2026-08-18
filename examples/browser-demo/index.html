@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Inline so the demo stays a single self-contained page (and so the
+         browser never 404s on /favicon.ico). -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1117'/%3E%3Cg stroke='%2358a6ff' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='M10 6v9a6 6 0 0 0 12 0V6'/%3E%3Cpath d='M16 21v6'/%3E%3C/g%3E%3C/svg%3E"
+    />
+    <title>Tuninator — browser demo</title>
+    <meta
+      name="description"
+      content="Browser demo for the tuninator guitar-analysis library: scrolling note timeline, 90bpm metronome and a live tuner readout."
+    />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="title">
+          <h1>Tuninator</h1>
+          <p>guitar analysis in the browser — pitch stream + music events</p>
+        </div>
+        <span class="badge" id="source-badge" data-kind="mock">mock input</span>
+      </header>
+
+      <section class="toolbar" aria-label="Transport">
+        <button id="listen-btn" class="btn primary" type="button">Start listening</button>
+        <button id="metronome-btn" class="btn" type="button">Metronome off · 90 bpm</button>
+        <label class="check">
+          <input type="checkbox" id="metronome-mute" />
+          mute click
+        </label>
+
+        <span class="spacer"></span>
+
+        <label class="field">
+          <span>Mode</span>
+          <!-- options are added by ui.ts from the TuninatorMode union -->
+          <select id="mode-select"></select>
+        </label>
+
+        <label class="field">
+          <span>Source</span>
+          <select id="source-select">
+            <option value="auto">auto</option>
+            <option value="mock">mock</option>
+            <option value="live">live mic</option>
+          </select>
+        </label>
+      </section>
+
+      <div class="error-banner" id="error-banner" role="alert" hidden>
+        <div class="error-head">
+          <strong id="error-title">Something went wrong</strong>
+          <code id="error-code">unknown</code>
+        </div>
+        <p class="error-message" id="error-message"></p>
+        <p class="error-hint" id="error-hint"></p>
+      </div>
+
+      <section class="status-bar" aria-label="Status">
+        <span class="pill" id="state-pill" data-state="idle">idle</span>
+        <span id="status-message">Ready.</span>
+      </section>
+
+      <section class="panel timeline-panel">
+        <div class="panel-head">
+          <h2>Timeline</h2>
+          <span class="muted">16 beats of history · 10.67 s · new notes enter at the right</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="timeline-canvas"></canvas>
+        </div>
+      </section>
+
+      <section class="grid">
+        <section class="panel tuner-panel">
+          <div class="panel-head"><h2>Pitch</h2><span class="muted">pitchFrame</span></div>
+
+          <div class="tuner">
+            <div class="gauge">
+              <div class="gauge-arc"></div>
+              <div class="gauge-ticks">
+                <span style="--a: -45deg"></span>
+                <span style="--a: -22.5deg"></span>
+                <span class="center" style="--a: 0deg"></span>
+                <span style="--a: 22.5deg"></span>
+                <span style="--a: 45deg"></span>
+              </div>
+              <div class="needle" id="needle" data-tuned="off"></div>
+              <div class="gauge-labels"><span>-50¢</span><span>0</span><span>+50¢</span></div>
+            </div>
+
+            <div class="readout">
+              <div class="note-name" id="note-name" data-tuned="off">—</div>
+              <div class="note-detail" id="note-detail">no pitch</div>
+              <div class="cents" id="cents-value"></div>
+            </div>
+          </div>
+
+          <dl class="meters">
+            <dt>frequency</dt>
+            <dd class="mono" id="frequency-value">— Hz</dd>
+
+            <dt>confidence</dt>
+            <dd>
+              <div class="meter"><div class="meter-fill" id="confidence-fill"></div></div>
+              <span class="mono" id="confidence-value">0.00</span>
+            </dd>
+
+            <dt>level</dt>
+            <dd>
+              <div class="meter"><div class="meter-fill level" id="level-fill"></div></div>
+            </dd>
+          </dl>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Active events</h2><span class="muted">getActiveEvents()</span></div>
+          <div id="active-events" class="active-events"><p class="empty">nothing sounding</p></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Event log</h2><span class="muted">start / end</span></div>
+          <div id="event-log" class="event-log"></div>
+        </section>
+      </section>
+
+      <footer class="app-footer">
+        <p>
+          <code>?mock=1</code> forces the synthetic source ·
+          <code>?mock=0</code> forces the real library ·
+          <code>?failWith=mic-permission-denied</code> exercises the error UI ·
+          <code>?workletUrl=/nope.js</code> exercises <code>worklet-load-failed</code>
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

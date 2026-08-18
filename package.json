@@ -1,0 +1,45 @@
+{
+  "name": "tuninator",
+  "version": "0.1.0",
+  "description": "UI-free browser library turning guitar microphone input into a continuous pitch stream and a high-level music-event stream.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trellos/Tuninator.git"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worklet": "./dist/tuninator-worklet.js"
+  },
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.js",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/clean-dist.mjs && tsup && node scripts/assert-worklet-bundle.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "decode-fixtures": "tsx scripts/decode-fixtures.ts",
+    "eval": "npm run decode-fixtures && tsx scripts/eval.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "ffmpeg-static": "^5.2.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

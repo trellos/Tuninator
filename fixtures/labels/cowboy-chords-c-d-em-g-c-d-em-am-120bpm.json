@@ -4,15 +4,15 @@
   "sourceAudio": "../audio/Cowboy  chords C D Em G C D Em Am 120bpm.m4a.mp4",
   "instrument": "guitar-clean",
   "tempoBpm": 120,
-  "timingNotes": "First attack estimated at 4550ms. Chords are labeled as one 4/4 bar each at 120bpm.",
+  "timingNotes": "Boundaries measured from the RMS envelope of the source audio: each is the first frame after the inter-bar trough where energy begins a sustained climb (a real strum attack), corrected from an initial uniform-2000ms-per-bar estimate. Bars run 1867-2187ms, not a flat 4 beats -- consistent with natural strum timing rather than a different time signature. Am (c8) has no closing attack; it rings until the recording ends, so its endMs is the last analysis frame the engine can produce for this file, not a detected chord change. Timestamps are quantized to the engine's analysis hop (640 samples @48kHz = 13.3ms) so they land on frame boundaries the engine can actually emit.",
   "events": [
-    { "id": "c1", "startMs": 4550, "endMs": 6550, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
-    { "id": "c2", "startMs": 6550, "endMs": 8550, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
-    { "id": "c3", "startMs": 8550, "endMs": 10550, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
-    { "id": "c4", "startMs": 10550, "endMs": 12550, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
-    { "id": "c5", "startMs": 12550, "endMs": 14550, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
-    { "id": "c6", "startMs": 14550, "endMs": 16550, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
-    { "id": "c7", "startMs": 16550, "endMs": 18550, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
-    { "id": "c8", "startMs": 18550, "endMs": 20550, "kind": "chord", "label": "Am", "pitches": ["A2", "E3", "A3", "C4", "E4"], "required": true }
+    { "id": "c1", "startMs": 4600, "endMs": 6787, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
+    { "id": "c2", "startMs": 6787, "endMs": 8653, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c3", "startMs": 8653, "endMs": 10680, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c4", "startMs": 10680, "endMs": 12653, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c5", "startMs": 12653, "endMs": 14680, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
+    { "id": "c6", "startMs": 14680, "endMs": 16600, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c7", "startMs": 16600, "endMs": 18680, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c8", "startMs": 18680, "endMs": 21173, "kind": "chord", "label": "Am", "pitches": ["A2", "E3", "A3", "C4", "E4"], "required": true }
   ]
 }

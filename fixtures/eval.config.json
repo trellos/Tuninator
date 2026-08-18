@@ -1,0 +1,50 @@
+{
+  "clean-lead-120bpm": {
+    "required": true,
+    "mode": "lead",
+    "gateOn": "pitchClass",
+    "gateNote": "Label octaves are first-pass estimates, so the required gate is on pitch class. Exact accuracy is still reported; a large exact/pitch-class gap points at the labels, a low pitch-class number points at the detector.",
+    "sections": {
+      "quarters": { "idPrefix": "q", "startMs": 3950, "endMs": 7950, "required": true },
+      "triplets": { "idPrefix": "t", "startMs": 11860, "endMs": 16193, "required": true },
+      "sixteenths": {
+        "idPrefix": "s",
+        "startMs": 19870,
+        "endMs": 21745,
+        "required": false,
+        "note": "125ms apart at 120bpm. Excluded from the required gate but always reported. Excluding it here is the ONLY sanctioned way to relax this fixture; the labels are never edited."
+      }
+    },
+    "minLabelAccuracy": 0.9,
+    "maxMedianOnsetErrorMs": 100,
+    "maxFalsePositives": 3
+  },
+
+  "power-chords-c-a-g-e-c-d-fsharp-e-120bpm": {
+    "required": true,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "This fixture exists to prove power-chord identification, so the gate is on the full label (root + quality \"5\"). Switch to \"pitchClass\" to relax it to root-only.",
+    "minLabelAccuracy": 0.8,
+    "maxMedianOnsetErrorMs": 120
+  },
+
+  "cowboy-chords-c-d-em-g-c-d-em-am-120bpm": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "Major vs minor is the whole point here (C vs Em vs Am), and that lives in the quality, not the root.",
+    "minLabelAccuracy": 0.6
+  },
+
+  "spicy-chords-cmaj9-g-am11": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "Extended voicings. Accuracy is not the criterion — honest abstention is. The real gate is maxFalseLabels: the detector may say \"unknown\", it may not confidently say the wrong thing.",
+    "minLabelAccuracy": 0.0,
+    "maxFalseLabels": 0,
+    "confidentlyWrongOn": "pitchClass",
+    "confidentLabelThreshold": 0.6
+  }
+}
