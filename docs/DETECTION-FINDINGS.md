@@ -8,14 +8,19 @@ no gate lowered (`git diff d8e4141..HEAD -- fixtures/` is empty).
 
 | metric | baseline | now | gate |
 |---|---|---|---|
-| labels missed | 12 / 78 | **3 / 78** | 0 |
-| required fixtures failing | 2 | **1** | 0 |
-| clean-lead pitch class (gated) | 77.4% | **89.66%** | 90% |
+| labels missed | 12 / 78 | **5 / 78** | 0 |
+| required fixtures failing | 2 | **0** | 0 |
+| clean-lead pitch class (gated) | 77.4% | **92.9%** | 90% |
+| clean-lead false positives | 8 | **1** | 3 |
 | power-chords onset median | 140ms FAIL | **113ms PASS** | 120ms |
 | chords-a-bm missed | 3 | **0** | — |
-| spurious Notes | 23 | 35 | — |
+| spurious Notes | 23 | **6** | — |
+| events yielding more than one Note | — | **11 / 78** | — |
 
-Four of five fixtures pass every gate they are held to.
+Every required fixture passes every gate it is held to, and `npm run eval`
+exits 0. The one remaining failure is `spicy-chords`' `maxFalseLabels`, on an
+informational fixture, and it is a chord-template problem rather than a
+segmentation one.
 
 ## What was wrong, and what fixed it
 
@@ -33,7 +38,100 @@ Notes 500ms apart. Two causes, both now fixed:
    clean lead line nothing stopped them, so a sustained note flipped octave and
    split, and the matcher then paired the label with the wrong-octave half.
 
-Spurious Notes: 51 → 35. No labelled event was lost to any of these.
+Spurious Notes: 51 → 35 at that point, and 6 now.
+No labelled event was lost to any of these.
+
+## The one that mattered
+
+`currentLabel()` returned the newest frame's pitch. The tracker had always
+accumulated a confidence-weighted vote per pitch — with a comment explaining
+that naming a Note from its last frame hands it its neighbour's name — and the
+label never read the votes. Naming a Note from its own accumulated evidence took
+the lead take from 89.7% to **93.1%** pitch class and 79.3% to **86.2%** exact,
+clearing a gate that fixture had never met.
+
+That is also why every experiment above that adjusted *voting* measured as
+neutral: the votes were not reaching the label. They are worth re-testing now
+that they do.
+
+## The remaining required failure — closed
+
+`clean-lead` failed `maxFalsePositives` at baseline (8 against 3) and had never
+passed. It now reports **1**. Every required fixture meets every threshold and
+`npm run eval` exits 0.
+
+What closed it was not a threshold sweep. It was the one shape the table below
+kept failing to separate: a transient firing inside a note that is already
+sounding. A re-pick puts energy into a string, so a re-picked note sits at or
+above where its own measured decay says it should be — across the fixtures,
+genuine re-picks land between 0.93 and 1.05 of the prediction. The seven
+spurious Notes that came from a played note splitting in two measure 0.43 and
+0.52: those notes are dying *faster* than their own fit expected, so nothing was
+added to them and the sharp transient on top is the string, not the pick. The
+sharpness escape now has a floor under it (`transient.ringOutDecayFloor`), and
+the gap between 0.55 and 0.65 is wide enough to sit in.
+
+## Fragmentation: one played event, several Notes
+
+The eval's false-positive count understates this, because its matcher pairs one
+detection with each label. `scripts/measure-splits.ts` counts it directly, under
+two assignment rules that bracket the truth — every Note blamed on the one label
+it started under, and every Note that overlaps a label counted against it.
+
+| | events split | extra Notes | worst single event |
+|---|---|---|---|
+| before this pass | 24 / 78 | 41 | 9 Notes |
+| now | **11 / 78** | **13** | **3 Notes** |
+| (overlap rule) | 51 -> 41 | 78 -> 48 | |
+
+Five changes did it, each measured separately:
+
+1. **The room's harmonic context latches.** A strummed chord's context estimate
+   sags as the chord decays — the third dies first, one string comes to
+   dominate, and YIN starts finding a period in what is still six strings
+   ringing. Read hop by hop, that estimate decided mid-ring that the chord had
+   become a single note, and the pitch-step segmentation it was suppressing came
+   straight back. `harmonicSince` existed for exactly this and was **never
+   written**, so the escape it gated had never once fired.
+2. **A stub is absorbed into the articulation that shed it.** For the first tens
+   of milliseconds of anything, the fast lane has nothing true to say: the
+   attack transient is the least periodic part of a note, so the pitch reported
+   belongs to whatever was ringing before, and a strum's six strings arrive one
+   at a time at six different pitches. When an attack ends a Note younger than
+   `transient.articulationMs`, the Note that follows takes its start time and
+   keeps its own pitch evidence — boundary from the stub, name from the frames
+   that describe what was played.
+3. **A voice is not a Note.** Once a Note has bloomed into a chord, an arriving
+   pitch no longer counts as a new pitch. A chord has no single pitch to change.
+4. **A ringing chord stops re-strumming itself.** The sharpness escape exists
+   for a muted upstrum, which answers its downstrum within a beat. Seconds into
+   a ring-out the same evidence means finger noise. Past
+   `transient.mutedRestrumWindowMs` a re-strum takes energy above the decay
+   curve.
+5. **A chord change that has held is a boundary even while the chroma
+   hesitates.** The pending-change timer was only ever consulted from inside the
+   branch handling a confident disagreement — and the moment a chord changes
+   over a ringing one is when the chroma is least sure of itself. The change
+   could stand pending for a second and never become a boundary.
+
+A bend also stays one Note again (architecture §17). A bend leaves the note it
+is named after on purpose, so "the arriving pitch is not this Note's pitch"
+stops carrying information; the estimate wobbling across the A#3/B3 boundary was
+enough to open a new Note. While a Note bends, an arriving pitch has to differ
+from the one that Note was sounding a hop ago by a real step.
+
+## What is still fragmenting, and why
+
+- **`cowboy:c2` (3 Notes)** — the D chord decays below the RMS gate mid-label
+  and comes back. The third Note is the same chord resurfacing after the
+  recogniser had honestly ended the previous one.
+- **`power:p3` (3 Notes)** — two of the three are a genuine second strum
+  (measured 1.27 above the decay curve, inside the range where `chords-a-bm-g-d`'s
+  labelled restrums live at 1.27, 1.29 and 1.35) and the third is the following
+  E chord's Note beginning 800ms before its label.
+- **The lead take's six remaining splits** are all boundary placement in the
+  triplet run: a Note carrying its neighbour's name for its first hops. That is
+  the latency-model problem below, not a threshold.
 
 ## What the audio will not support
 
@@ -56,42 +154,30 @@ measures 0.0007 against 0.0036 for t9).
 This is the documented exception: analysis shows the label is not recoverable.
 It costs no gate — clean-lead has no `maxMissed` check.
 
-### s4 and s11 are recoverable in principle, but not monophonically
+### The sixteenths run is not resolvable monophonically
 
-The sixteenths run has an open B ringing under the melody, so the passage is
-polyphonic even though it reads as a lead line. Multi-pitch sees the melody
-note plainly — at s4 it reports `A4 salience 0.986` beside `B4 1.000` — but the
-*loudest* fundamental is the ringing open string, not the note just played.
+The run has an open B ringing under the melody, so the passage is polyphonic
+even though it reads as a lead line. Multi-pitch sees the melody note plainly —
+at s4 it reports `A4 salience 0.986` beside `B4 1.000` — but the *loudest*
+fundamental is the ringing open string, not the note just played.
 
 Resolving these needs the deep lane to pick the fundamental that is NEW at the
 Note's onset rather than the strongest, which is the Voices-versus-Notes
-distinction (architecture §21) applied to pitch rather than to harmony. Both
-labels sit in the `sixteenths` section, which `eval.config.json` already marks
-`required: false`.
+distinction (architecture §21) applied to pitch rather than to harmony.
 
-## The one that mattered
+`s4` and `s11` were already unrecoverable. **`s9` joins them** in this pass:
+absorbing articulation stubs removes one detection from a run where the
+detections and the labels were only loosely in register, and the matcher then
+leaves `s9` unpaired. Total missed labels went 4 -> 5, all five inside this
+section or `t10`/`t17`, and the section is marked `required: false` in
+`eval.config.json`. Nothing in a gated section was lost.
 
-`currentLabel()` returned the newest frame's pitch. The tracker had always
-accumulated a confidence-weighted vote per pitch — with a comment explaining
-that naming a Note from its last frame hands it its neighbour's name — and the
-label never read the votes. Naming a Note from its own accumulated evidence took
-the lead take from 89.7% to **93.1%** pitch class and 79.3% to **86.2%** exact,
-clearing a gate that fixture had never met.
+### `spicy:sp1` is named `E5` rather than abstained
 
-That is also why every experiment above that adjusted *voting* measured as
-neutral: the votes were not reaching the label. They are worth re-testing now
-that they do.
-
-## The remaining required failure
-
-`clean-lead` fails two checks:
-
-- **pitch class — now passing at 93.1%.**
-- **12 spurious Notes against a limit of 3.** This check also failed at baseline
-  (8 against 3); it has never passed. Two of them are the 2.7 seconds of real
-  ring-out after the bend at 7950ms, where RMS runs 0.044 down to 0.022 against
-  a gate of 0.008 — the recogniser is reporting audio that is genuinely
-  sounding and that the ground truth stops annotating.
+`maxFalseLabels` has never passed on this fixture. The Cmaj9 voicing now comes
+out as ONE Note rather than seven, but the template that fits that one Note is
+`E5` at confidence 0.85, and the gate wants "unknown" instead. That is the
+chord-template path, not segmentation, and it is untouched by this pass.
 
 ## Hypotheses tested and rejected
 
@@ -100,43 +186,35 @@ are not tried again:
 
 | change | result |
 |---|---|
-| backdate step boundaries by estimator group delay | onset error 90→77ms, accuracy unchanged, +1 spurious |
+| backdate step boundaries by estimator group delay | onset error 90->77ms, accuracy unchanged, +1 spurious |
 | let a frame vote only once its window is inside the Note | no change at all |
-| delay voting until the estimate settles (40/70/95ms) | neutral at 40, accuracy 0.897→0.862 at 70+ |
+| delay voting until the estimate settles (40/70/95ms) | neutral at 40, accuracy 0.897->0.862 at 70+ |
 | give the deep lane a vote on a monophonic Note's pitch | no accuracy change (it is fooled by the same ringing note) |
-| median smoothing 3→2 / 3→1 | 3→2: +11 spurious; 3→1: +2 missed |
-| require a transient for same-pitch re-articulation | spurious 11→9 but accuracy 0.897→0.786 |
-| restrum sharpness 1.1 instead of 0.9 | −4 spurious, +2 missed, second fixture fails |
-| attribute each frame's pitch retrospectively, to the Note sounding when that audio happened | no change at 45ms, accuracy 0.931→0.862 beyond it |
-| absorb an identically-named stub into the Note it runs out of | clean-lead spurious 12→4, but eats genuine repeats: +4 missed, accuracy 0.931→0.828. Guarding Notes that began on their own attack makes it inert — the stubs all begin on attacks too |
+| median smoothing 3->2 / 3->1 | 3->2: +11 spurious; 3->1: +2 missed |
+| require a transient for same-pitch re-articulation | spurious 11->9 but accuracy 0.897->0.786 |
+| restrum sharpness 1.1 instead of 0.9 | -4 spurious, +2 missed, second fixture fails |
+| attribute each frame's pitch retrospectively, to the Note sounding when that audio happened | no change at 45ms, accuracy 0.931->0.862 beyond it |
+| absorb an identically-named stub into the Note it runs out of | clean-lead spurious 12->4, but eats genuine repeats: +4 missed, accuracy 0.931->0.828 |
 | widen the glide window so a slow bend registers as gliding | does not stop the bend splitting; breaks two other fixtures |
-| past the ring-out, require energy above the decay with no sharpness escape | missed 4→12, three fixtures failing, one unit test broken |
-| subtract the lag from *reported* times only, leaving voting untouched | onset error 90→36ms, but accuracy 0.897→0.862 and +2 missed: moving every Note earlier re-pairs detections onto their neighbours' labels |
+| past the ring-out, require energy above the decay with no sharpness escape | missed 4->12, three fixtures failing, one unit test broken. Re-tested after this pass: still missed 5->14 and two required fixtures failing. A **floor** under the sharpness escape is what works; removing it is not |
+| subtract the lag from *reported* times only, leaving voting untouched | onset error 90->36ms, but accuracy 0.897->0.862 and +2 missed |
+| clear a Note's pitch votes when it absorbs an attack | the merged Note then has no pitch at all for most of a fast run: eight lead notes came out "unknown", pitch class 0.929->0.818. Absorbing the stub INTO the survivor, so the survivor keeps its own votes, is the version that works |
+| absorb the predecessor of a *pitch-step* split as well as an attack split | at 60ms it costs a label; at 36ms it changes nothing. A step boundary is one the player put there |
+| let the articulation window scale with the recent gap between attacks | identical numbers to the fixed window on every fixture — the ceiling dominates. Inert complexity, not kept |
+| require the room to be in a harmonic stretch before a Note may abstain | does not recover any label and costs chords-a exact accuracy 0.833->0.769 |
+| `articulationMs` above 100 | the triplet and sixteenth runs start losing real notes: missed 5->7 at 100, 5->9 at 110 |
+| `minStableMs` above 60 | same cliff: 70ms costs two labels in the sixteenths |
+| keep the previous decay curve alive across a restart, so a restrum still has a curve to be measured against | correct in principle and provably inert here: the attack fires on the pick, a hop or two before the energy actually arrives, so the comparison is made too early to help. Not kept |
 
-What is left is one shape of error: a transient fires inside a Note that is
-already sounding, passes both the decay test and the sharpness test, and splits
-one played note into two identically-named ones. Seven of the lead take's twelve
-spurious Notes are exactly that, and two more are the bend at 6950ms coming
-apart into A3, A#3 and B3 — a bend is supposed to stay one Note.
+## What is left
 
-Every threshold that catches them costs genuine re-picks somewhere else, which
-is the ten rows above. They are not distinguishable by level or by flux
-sharpness, because a decaying string genuinely produces sharp transients — finger
-noise, the string re-seating against the fret — that no pick made. Separating
-those from a real pick wants the transient's spectral shape, which the detector
-does not currently look at: a pick excites the whole spectrum at once, while
-finger noise is narrowband and mostly high. That is a new witness, not a
-constant.
-
-The older observation still stands: the pitch path is systematically ~90ms late
-relative to the hand-annotated onsets, while the transient path is not. Closing the last gate
-needs one coherent latency model spanning both, so that boundary placement and
-pitch attribution move together — not another threshold.
-
-The last row is the clearest evidence for that. Correcting only the reported
-times fixes the onset error almost completely (90ms to 36ms) and makes the
-labelling worse, because the boundaries and the pitch evidence then disagree
-about where a Note is. Either both move or neither does. That is a change to how
-segmentation works, not a constant to tune, and it wants its own pass with the
-articulation tests extended first — a Note's boundary and the frames that name
-it have to be derived from the same clock.
+One shape, and it is the same one the last pass named: **the pitch path runs
+about 90ms behind the transient path.** Every remaining split in the lead take
+is a Note whose boundary is right and whose first hops describe its predecessor,
+or the reverse. Correcting only the reported times fixes the onset error almost
+completely (90ms to 36ms) and makes the labelling worse, because the boundaries
+and the pitch evidence then disagree about where a Note is. Either both move or
+neither does. That is a change to how segmentation works, not a constant to
+tune, and it wants its own pass with the articulation tests extended first — a
+Note's boundary and the frames that name it have to be derived from the same
+clock.
