@@ -77,6 +77,13 @@ export class RearticulationDetector implements IRearticulationDetector {
       // That leaves sharpness to carry the case a muted upstrum makes: it
       // damps the strings, so it puts total energy DOWN while plainly
       // re-articulating the chord. Only its transient gives it away.
+      //
+      // And only while the chord is fresh. An upstrum answers its downstrum
+      // within a beat; a sharp transient with no energy behind it seconds into
+      // a ring-out is the chord itself — finger noise, a string re-seating —
+      // and treating those as re-strums is how one strum kept shedding Notes
+      // until it faded. See `transient.mutedRestrumWindowMs`.
+      if (soundedMs > t.mutedRestrumWindowMs) return false;
       return attack.sharpness >= t.restrumSharpness;
     }
 

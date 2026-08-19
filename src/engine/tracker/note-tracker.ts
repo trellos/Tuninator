@@ -121,6 +121,16 @@ export class NoteTracker {
   private nextId = 1;
   private lastAttack: AttackEvidence | null = null;
   /**
+   * The first attack of the burst `lastAttack` belongs to.
+   *
+   * One articulation produces more than one transient — six strings crossed by
+   * a pick, the pick noise and then the string speaking — and a Note that opens
+   * on the last of them opens late. Attacks closer together than one
+   * articulation are one articulation, and the event began at the first of
+   * them.
+   */
+  private attackBurstStart: AttackEvidence | null = null;
+  /**
    * How polyphonic the audio has been lately, independent of any one Note.
    *
    * Polyphony is a property of what is sounding, not of the Note the tracker
@@ -158,6 +168,7 @@ export class NoteTracker {
     this.ended.length = 0;
     this.nextId = 1;
     this.lastAttack = null;
+    this.attackBurstStart = null;
     this.lastEndedAt = null;
     this.contextHarmonic = 0;
     this.contextUpdatedAt = null;
@@ -208,7 +219,17 @@ export class NoteTracker {
     const pitchChange = this.pitchChange.observe(frame);
     const gliding = this.pitchChange.isGliding();
 
-    if (frame.attack !== null && !frame.gated) this.lastAttack = frame.attack;
+    if (frame.attack !== null && !frame.gated) {
+      const previous = this.lastAttack;
+      const burst = this.attackBurstStart;
+      const continues =
+        previous !== null &&
+        burst !== null &&
+        frame.attack.at - previous.at <= config.transient.articulationMs &&
+        frame.attack.at - burst.at <= config.tracking.backdateWindowMs;
+      this.attackBurstStart = continues ? burst : frame.attack;
+      this.lastAttack = frame.attack;
+    }
 
     let active = this.current();
     /** Set when a split ends a Note whose successor should inherit its decay. */
@@ -279,7 +300,12 @@ export class NoteTracker {
           ? active.lastSeenAt - active.startTime >= config.transient.minRestrumMs
           : active.soundedMs >= config.tracking.minStableMs;
       if (rearticulated && settled) {
-        this.end(active, frame.attack.at, out);
+        // The boundary is the FIRST attack of this burst, not the one that
+        // finally cleared the bar. A pick crossing six strings, or a pick
+        // scrape followed by the string speaking, is one articulation with
+        // several transients, and the event began at the first of them.
+        const boundary = this.attackBurstStart ?? frame.attack;
+        this.end(active, boundary.at, out);
         // The successor is created below, once this hop has decided what it is.
         // It inherits the decay: a restrum re-excites the strings that were
         // already ringing, so the curve is continuous through the split.
@@ -328,7 +354,7 @@ export class NoteTracker {
       // pitch tracker can.
       let at = Math.max(pitchChange.at, active.startTime);
       let atSample = Math.max(pitchChange.atSample, 0);
-      const attack = this.lastAttack;
+      const attack = this.attackBurstStart ?? this.lastAttack;
       if (
         attack !== null &&
         attack.at > active.startTime &&
@@ -810,7 +836,7 @@ export class NoteTracker {
       // the attack far better. Without this backdating the whole Note slides
       // late, and on a 166ms triplet a late Note spends most of its frames on
       // the FOLLOWING note.
-      const attack = this.lastAttack;
+      const attack = this.attackBurstStart ?? this.lastAttack;
       if (attack !== null && frame.at - attack.at <= this.config.tracking.backdateWindowMs) {
         at = attack.at;
         atSample = attack.atSample;

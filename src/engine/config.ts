@@ -149,6 +149,21 @@ export type EngineConfig = {
      */
     restrumDecayExcess: number;
     /**
+     * How long after a chord began a *sharpness-only* re-strum stays plausible.
+     *
+     * The sharpness escape exists for one thing: a muted upstrum, which damps
+     * the strings and so puts total energy DOWN while plainly re-articulating
+     * the chord. That is part of a strumming pattern — it follows its downstrum
+     * within a beat, and on the fixtures every genuine one lands within half a
+     * second of the strum it answers. Further into a ring-out the same evidence
+     * means something else: a decaying chord produces sharp transients of its
+     * own — finger noise, a string re-seating against a fret — that no pick
+     * made, and reading those as re-strums is how a chord kept shedding Notes
+     * seconds after it was played. Past this, re-articulating a chord takes
+     * energy above its own decay curve, which is a witness ripple cannot fake.
+     */
+    mutedRestrumWindowMs: number;
+    /**
      * Total pitch motion across the glide window that counts as an active
      * glide, in cents. Bending sweeps the spectrum, which spikes flux AND lifts
      * RMS, so both attack tests pass mid-bend; an attack only means "new note"
@@ -366,6 +381,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     newPitchSharpness: 0.3,
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,
+    mutedRestrumWindowMs: 1300,
     glideMinCents: 25,
     glideWindowHops: 5,
     articulationMs: 90,
