@@ -387,7 +387,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     articulationMs: 90,
   },
   tracking: {
-    minStableMs: 45,
+    minStableMs: 60,
     minUnpitchedStableMs: 90,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
