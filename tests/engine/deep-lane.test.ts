@@ -189,3 +189,167 @@ describe("what it hears", () => {
     expect(result?.evidence.voiceSpreadSemitones ?? 0).toBeGreaterThan(6);
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* Regions                                                                     */
+/* -------------------------------------------------------------------------- */
+
+describe("region re-segmentation", () => {
+  it("walks the whole region rather than one window", () => {
+    // The window-tagger could only ever read one 4096-sample buffer, because
+    // there is exactly one of them. A region is that same buffer, read again at
+    // successive offsets.
+    const { deep, ring } = lane();
+    const window = DEFAULT_ENGINE_CONFIG.harmony.fftSize;
+    ring.write(chord([60], window * 2));
+    deep.requestRegion({
+      fromSample: 0,
+      toSample: window * 2,
+      notBefore: 0,
+      holdNoteIds: ["n1"],
+    });
+
+    const drain = deep.drain(1e9, ring);
+    expect(drain.segmentations).toHaveLength(1);
+    expect(drain.segmentations[0]?.windowCount).toBeGreaterThan(4);
+    expect(drain.droppedRegions).toHaveLength(0);
+  });
+
+  it("hands back a segmentation that names no Note", () => {
+    // The contract change that matters. A verdict keyed to a noteId can only
+    // ever agree with the segmentation it was handed.
+    const { deep, ring } = lane();
+    const window = DEFAULT_ENGINE_CONFIG.harmony.fftSize;
+    ring.write(chord([60], window * 2));
+    deep.requestRegion({
+      fromSample: 0, toSample: window * 2, notBefore: 0, holdNoteIds: ["n1"],
+    });
+    const segmentation = deep.drain(1e9, ring).segmentations[0];
+    expect(segmentation).toBeDefined();
+    expect(JSON.stringify(segmentation)).not.toContain("n1");
+    expect(segmentation?.segments.length).toBeGreaterThan(0);
+  });
+
+  it("finds the boundary where the pitch actually changed", () => {
+    const { deep, ring } = lane();
+    const window = DEFAULT_ENGINE_CONFIG.harmony.fftSize;
+    ring.write(chord([69], window * 3));
+    ring.write(chord([74], window * 3));
+    deep.requestRegion({
+      fromSample: 0, toSample: window * 6, notBefore: 0, holdNoteIds: [],
+    });
+
+    const segments = deep.drain(1e9, ring).segmentations[0]?.segments ?? [];
+    expect(segments.length).toBeGreaterThanOrEqual(2);
+    const changed = segments.find((s) => s.boundary === "pitchChange");
+    expect(changed).toBeDefined();
+    // Within one analysis window of the truth: a boundary can only be located
+    // to the resolution of the transform that saw it.
+    expect(Math.abs((changed?.fromSample ?? 0) - window * 3)).toBeLessThanOrEqual(window);
+  });
+
+  it("holds the Notes it was asked to hold, and no others", () => {
+    const { deep, ring } = lane();
+    ring.write(chord([60], 8192));
+    deep.requestRegion({
+      fromSample: 0, toSample: 8192, notBefore: 500, holdNoteIds: ["n1", "n2"],
+    });
+    expect([...deep.busyNoteIds()].sort()).toEqual(["n1", "n2"]);
+    deep.drain(500, ring);
+    expect(deep.busyNoteIds().size).toBe(0);
+  });
+
+  it("supersedes an older region and carries its held Notes forward", () => {
+    // A region always runs from the oldest unruled Note to now, so a later
+    // request covers everything an earlier one did. Queueing both would apply
+    // the stalest verdict last.
+    const { deep, ring } = lane();
+    ring.write(chord([60], 16384));
+    deep.requestRegion({
+      fromSample: 0, toSample: 8192, notBefore: 0, holdNoteIds: ["n1"],
+    });
+    deep.requestRegion({
+      fromSample: 0, toSample: 16384, notBefore: 0, holdNoteIds: ["n2"],
+    });
+    expect([...deep.busyNoteIds()].sort()).toEqual(["n1", "n2"]);
+    const drain = deep.drain(1e9, ring);
+    expect(drain.segmentations).toHaveLength(1);
+    expect(drain.segmentations[0]?.toSample).toBe(16384);
+  });
+
+  it("drops a region whose audio has aged out, loudly", () => {
+    // The one thing that must never happen is a confident verdict about three
+    // seconds of different music.
+    const clock = new SampleClock(SAMPLE_RATE);
+    const deep = new DeepLane(clock, DEFAULT_ENGINE_CONFIG);
+    const ring = new AudioRing(16384);
+    ring.write(chord([60], 16384));
+    deep.requestRegion({
+      fromSample: 0, toSample: 16384, notBefore: 0, holdNoteIds: ["n1"],
+    });
+    ring.write(chord([62], 16384));
+
+    const drain = deep.drain(1e9, ring);
+    expect(drain.segmentations).toHaveLength(0);
+    expect(drain.droppedRegions).toHaveLength(1);
+    expect(drain.droppedRegions[0]?.reason).toBe("agedOut");
+    // Released rather than stranded: a Note waiting on a verdict that will
+    // never come must still be allowed to finish.
+    expect(drain.droppedRegions[0]?.holdNoteIds).toEqual(["n1"]);
+    expect(deep.busyNoteIds().size).toBe(0);
+  });
+
+  it("refuses a region shorter than one window rather than guessing", () => {
+    const { deep, ring } = lane();
+    ring.write(chord([60], 8192));
+    deep.requestRegion({
+      fromSample: 0, toSample: 1024, notBefore: 0, holdNoteIds: ["n1"],
+    });
+    const drain = deep.drain(1e9, ring);
+    expect(drain.segmentations).toHaveLength(0);
+    expect(drain.droppedRegions[0]?.reason).toBe("tooShort");
+  });
+
+  it("bounds the work a long region can cost", () => {
+    const config = {
+      ...DEFAULT_ENGINE_CONFIG,
+      deep: { ...DEFAULT_ENGINE_CONFIG.deep, maxRegionWindows: 8 },
+    };
+    const clock = new SampleClock(SAMPLE_RATE);
+    const deep = new DeepLane(clock, config);
+    const ring = new AudioRing(SAMPLE_RATE * 4);
+    ring.write(chord([60], SAMPLE_RATE * 2));
+    deep.requestRegion({
+      fromSample: 0, toSample: SAMPLE_RATE * 2, notBefore: 0, holdNoteIds: [],
+    });
+    const segmentation = deep.drain(1e9, ring).segmentations[0];
+    expect(segmentation?.windowCount).toBeLessThanOrEqual(8);
+    // Coarser, but still about the WHOLE region rather than a prefix of it.
+    expect(segmentation?.toSample).toBe(SAMPLE_RATE * 2);
+  });
+
+  it("replays identically", () => {
+    const run = (): string => {
+      const { deep, ring } = lane();
+      ring.write(chord([69], 16384));
+      ring.write(chord([74], 16384));
+      deep.requestRegion({
+        fromSample: 0, toSample: 32768, notBefore: 0, holdNoteIds: [],
+      });
+      return JSON.stringify(deep.drain(1e9, ring).segmentations);
+    };
+    expect(run()).toBe(run());
+  });
+
+  it("clears with everything else", () => {
+    const { deep, ring } = lane();
+    ring.write(chord([60], 8192));
+    deep.requestRegion({
+      fromSample: 0, toSample: 8192, notBefore: 0, holdNoteIds: ["n1"],
+    });
+    expect(deep.hasPendingRegion).toBe(true);
+    deep.clear();
+    expect(deep.hasPendingRegion).toBe(false);
+    expect(deep.drain(1e9, ring).segmentations).toHaveLength(0);
+  });
+});

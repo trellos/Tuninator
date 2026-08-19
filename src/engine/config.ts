@@ -346,6 +346,62 @@ export type EngineConfig = {
      * cost of deep analysis and, offline, makes that delay deterministic.
      */
     latencyMs: number;
+    /**
+     * Samples between successive windows when the deep lane walks a region.
+     *
+     * A quarter of the 4096-point window: enough overlap that a boundary is
+     * localised to about 21ms, cheap enough that a second of audio is fifty
+     * transforms rather than two hundred.
+     */
+    regionHopSamples: number;
+    /**
+     * Longest pending region, in ms, before it is analysed without waiting for
+     * a Note to end.
+     *
+     * A player holding one chord produces no Note ends for seconds, and a
+     * region that grows unboundedly eventually outruns the ring and is dropped
+     * — which would mean the deep lane never rules on anything.
+     */
+    maxRegionMs: number;
+    /** Hard ceiling on windows per region, whatever the hop works out to. */
+    maxRegionWindows: number;
+    /**
+     * Shortest span the region segmenter will call an event.
+     *
+     * Below this a "boundary" is the analysis window sliding across an existing
+     * boundary rather than a second thing being played: the fastest run in the
+     * fixtures is 125ms per note.
+     */
+    minSegmentMs: number;
+    /**
+     * Consecutive windows a new dominant fundamental must hold before it counts
+     * as a boundary.
+     *
+     * One window is a flap — an 85ms transform straddling a boundary reports
+     * whichever of the two notes happens to be louder, and it changes its mind
+     * on the next hop. Two in a row is a note.
+     */
+    segmentHoldWindows: number;
+    /**
+     * How far the envelope must rise above the quietest point of the current
+     * segment before that rise is a new articulation.
+     *
+     * This is the witness that catches a note re-picked at the same pitch,
+     * which no amount of looking at the spectrum will ever separate: a D5
+     * picked twice is D5 throughout. Measured on the fixtures, a genuine
+     * re-pick clears 2.5x over the trough it starts from while sustain ripple
+     * stays under 1.6x.
+     */
+    segmentRiseRatio: number;
+    /**
+     * Let the deep lane absorb Notes the fast lane over-segmented.
+     *
+     * Splitting is additive — it can only turn one detection into two — while
+     * merging deletes a detection the recognizer already stood behind, and if
+     * the segmenter is wrong that is a played note thrown away. Separately
+     * switchable so the two directions can be measured apart.
+     */
+    regionMerge: boolean;
   };
 
   diagnostics: {
@@ -430,6 +486,13 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   deep: {
     ringSeconds: 4,
     latencyMs: 40,
+    regionHopSamples: 1024,
+    maxRegionMs: 1200,
+    maxRegionWindows: 96,
+    minSegmentMs: 90,
+    segmentHoldWindows: 2,
+    segmentRiseRatio: 2.0,
+    regionMerge: true,
   },
   diagnostics: {
     pitchFrames: false,

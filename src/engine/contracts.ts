@@ -257,7 +257,75 @@ export interface IDeepScheduler {
   readonly pending: number;
 }
 
-export type DeepJobPurpose = "harmony" | "bend" | "multiPitch";
+export type DeepJobPurpose = "harmony" | "bend" | "multiPitch" | "resegment";
+
+/* -------------------------------------------------------------------------- */
+/* Region re-segmentation                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One window's reading inside a region, ordered oldest first.
+ *
+ * The region analyser walks a span of audio at a hop rather than looking at one
+ * window ending at "now", so what it produces is a *sequence*. Everything the
+ * segmenter decides from is here, so the segmentation rule is testable against
+ * a handwritten sequence with no FFT in sight.
+ */
+export type RegionWindowReading = {
+  /** Inclusive start of the analysed window. */
+  fromSample: number;
+  /** Exclusive end. */
+  toSample: number;
+  /** Source time of the END of the analysed audio. */
+  at: SourceTimeMs;
+  /** Strongest fundamental in this window, register intact. Null when silent. */
+  dominantMidi: number | null;
+  /** Salience of the runner-up relative to the leader. 0 when there is none. */
+  runnerUpSalience: number;
+  rms: number;
+  activations: PitchActivation[];
+  evidence: SpectralEvidence;
+  reading: HarmonicReading;
+};
+
+/**
+ * One musical event the region analyser believes happened, in absolute samples.
+ *
+ * Deliberately carries no note id. The whole point of the region lane is that
+ * it decides how many events there were, which it cannot do while it is being
+ * told in advance whose window it is looking at.
+ */
+export type RegionSegment = {
+  fromSample: number;
+  toSample: number;
+  from: SourceTimeMs;
+  to: SourceTimeMs;
+  /** Strongest fundamental over the segment. Null when nothing was found. */
+  dominantMidi: number | null;
+  /** Every activation seen in the segment, strongest first. */
+  activations: PitchActivation[];
+  /** The best harmonic reading over the segment, or an abstention. */
+  reading: HarmonicReading;
+  /** Windows that voted for this segment. */
+  windows: number;
+  /** How sure the analyser is that this is one event. */
+  confidence: number;
+  /** Why the segment began. The first segment of a region is "regionStart". */
+  boundary: "regionStart" | "pitchChange" | "energyRise";
+};
+
+/** What the deep lane concluded about a whole region of audio. */
+export type DeepSegmentation = {
+  fromSample: number;
+  toSample: number;
+  from: SourceTimeMs;
+  to: SourceTimeMs;
+  segments: RegionSegment[];
+  /** Windows analysed. Zero means the region was too short to look at. */
+  windowCount: number;
+  /** Mean per-segment confidence, or 0 when there are no segments. */
+  confidence: number;
+};
 
 export type DeepJob = {
   /** Jobs with the same key coalesce: a newer one supersedes an older one. */
