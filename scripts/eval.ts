@@ -23,7 +23,6 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { TuninatorMode } from "../src/types.js";
 import type {
   ConfidentDisagreement,
   DetectedEvent,
@@ -48,6 +47,7 @@ import {
   type DetailedAnalyzeResult,
   type TraceRow,
 } from "../src/offline/analyzer.js";
+import { projectEmissions, type EvalProjections } from "../src/offline/eval-adapter.js";
 import { downmixToMono, readWav } from "../src/offline/wav.js";
 import {
   CACHE_DIR,
@@ -65,7 +65,6 @@ type ConfiguredSection = SectionSpec & { note?: string };
 type FixtureConfig = Thresholds & {
   /** A required fixture missing any threshold fails the whole run. */
   required?: boolean;
-  mode?: TuninatorMode;
   gateNote?: string;
   sections?: Record<string, ConfiguredSection>;
   confidentlyWrongOn?: "exact" | "pitchClass";
@@ -191,7 +190,6 @@ type SectionReport = { name: string; required: boolean; stats: EvalStats };
 type FixtureReport = {
   stem: string;
   required: boolean;
-  mode: TuninatorMode;
   sourceAudio: string;
   wavPath: string;
   audio: { sampleCount: number; sampleRate: number; channels: number; durationMs: number } | null;
@@ -224,11 +222,14 @@ type FixtureReport = {
     endMs: number | null;
     confidence: number;
   }>;
+  /**
+   * The same take scored on the label each Note carried at `noteStarted`,
+   * before any deep-lane revision. Reported, never gated: the gap between this
+   * and `overall` is what the deep lane is worth.
+   */
+  fast: EvalStats | null;
+  revisions: EvalProjections["revisions"] | null;
 };
-
-function inferMode(labels: readonly LabeledEvent[]): TuninatorMode {
-  return labels.some((event) => event.kind === "chord") ? "chords" : "lead";
-}
 
 function evaluateFixture(
   fixture: DecodeOutcome,
@@ -236,7 +237,6 @@ function evaluateFixture(
   traceStem: string | null
 ): FixtureReport {
   const labels = fixture.label.events as LabeledEvent[];
-  const mode = config.mode ?? inferMode(labels);
   const required = config.required === true;
   const sections = config.sections ?? {};
   const sectionNames = Object.keys(sections);
@@ -244,7 +244,6 @@ function evaluateFixture(
   const report: FixtureReport = {
     stem: fixture.stem,
     required,
-    mode,
     sourceAudio: relative(REPO_ROOT, fixture.audioPath),
     wavPath: relative(REPO_ROOT, fixture.wavPath),
     audio: {
@@ -263,9 +262,12 @@ function evaluateFixture(
     pairs: [],
     missedLabels: [],
     falsePositiveDetections: [],
+    fast: null,
+    revisions: null,
   };
 
   let detections: DetectedEvent[];
+  let projections: EvalProjections;
   let trace: TraceRow[] = [];
 
   try {
@@ -274,9 +276,10 @@ function evaluateFixture(
     // Only the traced fixture pays for the per-hop trace array.
     const wantTrace = traceStem === fixture.stem;
     const analysis = wantTrace
-      ? analyzeSamplesDetailed(mono, wav.sampleRate, { mode })
-      : analyzeSamples(mono, wav.sampleRate, { mode });
-    detections = analysis.events as unknown as DetectedEvent[];
+      ? analyzeSamplesDetailed(mono, wav.sampleRate)
+      : analyzeSamples(mono, wav.sampleRate);
+    projections = projectEmissions(analysis.emissions);
+    detections = projections.final;
     if (wantTrace) trace = (analysis as DetailedAnalyzeResult).trace;
   } catch (error) {
     report.error = (error as Error).message;
@@ -357,6 +360,11 @@ function evaluateFixture(
   }
 
   report.gated = scoreMatches(gatedResult, scoreOptions);
+  report.fast = scoreMatches(
+    matchEvents(labels, projections.fast, { onsetWindowMs: config.onsetWindowMs }),
+    scoreOptions
+  );
+  report.revisions = projections.revisions;
   report.checks = checkThresholds(report.gated, config);
   report.passed = report.checks.every((check) => check.passed);
 
@@ -398,9 +406,7 @@ function writeTrace(stem: string, trace: readonly TraceRow[]): void {
 function printFixture(report: FixtureReport, config: FixtureConfig): void {
   const out = process.stdout;
   out.write(`\n${rule()}\n`);
-  out.write(
-    `${report.stem}\n  mode=${report.mode}  ${report.required ? "REQUIRED" : "informational"}\n`
-  );
+  out.write(`${report.stem}\n  ${report.required ? "REQUIRED" : "informational"}\n`);
   out.write(`  source  ${report.sourceAudio}\n`);
   if (report.audio) {
     out.write(
@@ -448,6 +454,25 @@ function printFixture(report: FixtureReport, config: FixtureConfig): void {
       `(confidence >= ${config.confidentLabelThreshold ?? DEFAULT_CONFIDENT_THRESHOLD}, ` +
       `disagrees on ${config.confidentlyWrongOn ?? "pitchClass"})\n`
   );
+
+  if (report.fast && report.revisions) {
+    // Never gated. The first answer and the settled answer are different
+    // products: one is what a live UI shows immediately, the other is what the
+    // recognizer stands behind. Reporting only the second hides a recognizer
+    // that is right eventually and useless in real time.
+    const ttf = report.revisions.timeToFinalLabelMs;
+    const median =
+      ttf.length === 0
+        ? null
+        : [...ttf].sort((a, b) => a - b)[Math.floor((ttf.length - 1) / 2)] ?? null;
+    out.write(
+      `\n  first answer (at noteStarted, ungated): exact ${pct(report.fast.exactAccuracy)} ` +
+        `pitch class ${pct(report.fast.pitchClassAccuracy)}\n` +
+        `  revisions: ${report.revisions.corrected}/${report.revisions.notes} notes corrected, ` +
+        `${report.revisions.changes} change events, ` +
+        `median time to final label ${num(median)}ms\n`
+    );
+  }
 
   if (config.gateNote) out.write(`\n  gate: ${config.gateNote}\n`);
   out.write(`\n  thresholds (gated subset)\n${renderChecks(report.checks)}\n`);

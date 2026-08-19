@@ -17,7 +17,7 @@ export default defineConfig([
     // Worklet build: ONE self-contained file with no import/export statements.
     // AudioWorkletGlobalScope has no module loader on older targets, so the
     // whole question is avoided by bundling to an IIFE.
-    entry: { "tuninator-worklet": "src/worklet/processor.ts" },
+    entry: { "tuninator-worklet": "src/worklet/capture-processor.ts" },
     format: ["iife"],
     dts: false,
     clean: false,

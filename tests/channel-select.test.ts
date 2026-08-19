@@ -14,8 +14,8 @@ import {
   DEFAULT_WINDOW_MS,
   resolveChannel,
 } from "../src/engine/kernels/channel-select.js";
-import { PitchEngine } from "../src/core/pitch-engine.js";
-import { resolvePolicy } from "../src/core/policy.js";
+import { RecognitionEngine } from "../src/engine/engine.js";
+import { DEFAULT_ENGINE_CONFIG } from "../src/engine/config.js";
 
 /** The real hop: 12ms requested, snapped to 576 samples at 48k. */
 const HOP_MS = 12;
@@ -282,15 +282,20 @@ function sawtooth(
 
 /** Median detected frequency across a whole buffer, or NaN if never voiced. */
 function detect(signal: Float32Array): number {
-  const engine = new PitchEngine(SAMPLE_RATE, resolvePolicy({ mode: "lead" }));
+  const engine = new RecognitionEngine(SAMPLE_RATE, {
+    ...DEFAULT_ENGINE_CONFIG,
+    diagnostics: { pitchFrames: true, contour: false },
+  });
   const voiced: number[] = [];
   const blocks = Math.floor(signal.length / RENDER_QUANTUM);
   for (let b = 0; b < blocks; b++) {
-    const result = engine.push(
+    const result = engine.processChunk(
       signal.subarray(b * RENDER_QUANTUM, (b + 1) * RENDER_QUANTUM),
-      ((b * RENDER_QUANTUM) / SAMPLE_RATE) * 1000
+      b * RENDER_QUANTUM
     );
-    if (result && result.frame.frequencyHz !== null) voiced.push(result.frame.frequencyHz);
+    for (const frame of result.frames) {
+      if (frame.frequencyHz !== null) voiced.push(frame.frequencyHz);
+    }
   }
   if (voiced.length === 0) return Number.NaN;
   const sorted = voiced.sort((a, b) => a - b);
