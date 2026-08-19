@@ -118,6 +118,19 @@ export type EngineConfig = {
      */
     ringOutMs: number;
     /**
+     * How close to its own predicted decay a single note must still be for a
+     * transient to count as re-picking it.
+     *
+     * A pick puts energy into a string, so a re-picked note sits at or above
+     * where its own curve says it should be — measured on the fixtures, genuine
+     * re-picks land between 0.93 and 1.05 of the prediction. A note at half its
+     * predicted level had nothing added to it: it is dying faster than its own
+     * fit expected, and the sharp transient on top of it is the string itself,
+     * not a pick. Those measure 0.43 and 0.52, and they are how a quarter note
+     * came out as two.
+     */
+    ringOutDecayFloor: number;
+    /**
      * Transient sharpness a *pitch-changing* attack needs before it starts a
      * new Note.
      *
@@ -378,6 +391,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rearticulationSharpness: 0.7,
     restrumSharpness: 0.9,
     ringOutMs: 250,
+    ringOutDecayFloor: 0.6,
     newPitchSharpness: 0.3,
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,

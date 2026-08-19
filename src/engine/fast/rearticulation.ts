@@ -102,6 +102,11 @@ export class RearticulationDetector implements IRearticulationDetector {
       decayExcess !== null &&
       decayExcess < t.restrumDecayExcess
     ) {
+      // Near its own curve, a sharp transient can still be a re-pick that was
+      // no louder than what it interrupted. Far below it, nothing was added:
+      // the note is dying faster than its own fit expected and the transient is
+      // the string, not the pick. See `transient.ringOutDecayFloor`.
+      if (decayExcess < t.ringOutDecayFloor) return false;
       return attack.sharpness >= t.restrumSharpness;
     }
 
