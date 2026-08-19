@@ -134,11 +134,15 @@ export class NoteTracker {
      *     sweeps the spectrum, which fires both attack witnesses repeatedly
      *     inside what is musically one note. */
     if (frame.attack !== null && active !== null) {
+      const arriving = frame.pitch.nearest?.midi ?? null;
+      const sounding = active.dominantMidi();
+      const pitchDiffers = arriving !== null && sounding !== null && arriving !== sounding;
       const rearticulated = this.rearticulation.isRearticulation(
         frame.attack,
         frame,
         gliding,
-        active.sustainedRms
+        active.sustainedRms,
+        pitchDiffers
       );
       if (rearticulated && active.soundedMs >= config.tracking.minStableMs) {
         this.end(active, frame.attack.at, out);
@@ -155,11 +159,27 @@ export class NoteTracker {
       pitchChange.kind === "step" &&
       !active.harmonyBloomed
     ) {
-      const at = Math.max(pitchChange.at, active.startTime);
+      // The step is detected late by construction: YIN has to fill its window
+      // with the new note and the temporal median has to turn over. When a
+      // transient sits between the old Note's start and here, that transient is
+      // where the note actually began, and it localises far better than the
+      // pitch tracker can.
+      let at = Math.max(pitchChange.at, active.startTime);
+      let atSample = Math.max(pitchChange.atSample, 0);
+      const attack = this.lastAttack;
+      if (
+        attack !== null &&
+        attack.at > active.startTime &&
+        attack.at < at &&
+        at - attack.at <= config.tracking.backdateWindowMs
+      ) {
+        at = attack.at;
+        atSample = attack.atSample;
+      }
       this.end(active, at, out);
       active = this.begin("pitchChange", frame, out, {
         at,
-        atSample: Math.max(pitchChange.atSample, 0),
+        atSample,
         frequencyHz: pitchChange.toHz,
       });
     }

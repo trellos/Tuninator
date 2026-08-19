@@ -69,6 +69,12 @@ export type EngineConfig = {
      */
     rearticulationRiseRatio: number;
     /**
+     * Transient sharpness (flux / RMS) at which an attack counts as a genuine
+     * re-articulation even though it is no louder than what it interrupts.
+     * A muted upstrum over a ringing chord is exactly that case.
+     */
+    rearticulationSharpness: number;
+    /**
      * Total pitch motion across the glide window that counts as an active
      * glide, in cents. Bending sweeps the spectrum, which spikes flux AND lifts
      * RMS, so both attack tests pass mid-bend; an attack only means "new note"
@@ -158,7 +164,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     envelopeWindowMs: 20,
     envelopeBaselineMs: 80,
     envelopeRiseRatio: 1.35,
-    rearticulationRiseRatio: 1.05,
+    rearticulationRiseRatio: 1.25,
+    rearticulationSharpness: 0.7,
     glideMinCents: 25,
     glideWindowHops: 5,
   },

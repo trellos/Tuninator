@@ -57,6 +57,17 @@ export type AttackEvidence = {
   envelope: boolean;
   /** RMS over the short window divided by the baseline. 1 = no change. */
   riseRatio: number;
+  /**
+   * Spectral flux divided by the frame's own RMS: how *sharp* the transient is,
+   * independent of how loud the passage is.
+   *
+   * This is what separates a muted upstrum over a ringing chord — quieter than
+   * what it interrupts, so its rise ratio is below 1, but unmistakably a pick
+   * hitting strings — from the ordinary flux ripple of a chord decaying.
+   * Measured across the fixtures, hops near a labeled attack sit around 0.3-1.0
+   * and hops elsewhere around 0.1.
+   */
+  sharpness: number;
   /** 0..1 blend of both witnesses. */
   strength: number;
 };
@@ -175,12 +186,15 @@ export interface IRearticulationDetector {
    * @param attack the arriving energy
    * @param gliding whether the pitch is currently sweeping
    * @param sustainedRms the rolling baseline of what is already sounding
+   * @param pitchDiffers the arriving pitch is not the sounding Note's own
    */
   isRearticulation(
     attack: AttackEvidence,
     frame: FastFrame,
     gliding: boolean,
-    sustainedRms: number
+    sustainedRms: number,
+    /** The arriving pitch is not the one the sounding Note is named after. */
+    pitchDiffers: boolean
   ): boolean;
 }
 

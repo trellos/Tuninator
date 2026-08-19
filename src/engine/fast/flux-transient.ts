@@ -88,6 +88,15 @@ export class FluxTransientDetector implements ITransientDetector {
     if (this.rmsHistory.length > this.baselineFrames * 2) this.rmsHistory.shift();
 
     const fluxResult = this.flux.process(spectralWindow, at);
+    // Normalised by the frame's own level, so the same figure means the same
+    // thing in a loud passage and a quiet one.
+    let energy = 0;
+    for (let i = 0; i < spectralWindow.length; i++) {
+      const v = spectralWindow[i] as number;
+      energy += v * v;
+    }
+    const windowRms = Math.sqrt(energy / spectralWindow.length);
+    const sharpness = fluxResult.flux / Math.max(windowRms, 1e-9);
 
     const audible = shortRms >= this.config.analysis.rmsGate;
     const envelope = audible && riseRatio >= t.envelopeRiseRatio;
@@ -112,6 +121,7 @@ export class FluxTransientDetector implements ITransientDetector {
       fluxValue: fluxResult.flux,
       envelope,
       riseRatio,
+      sharpness,
       strength,
     };
   }

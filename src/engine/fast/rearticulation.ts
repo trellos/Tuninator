@@ -34,17 +34,24 @@ export class RearticulationDetector implements IRearticulationDetector {
     attack: AttackEvidence,
     frame: FastFrame,
     gliding: boolean,
-    sustainedRms: number
+    sustainedRms: number,
+    pitchDiffers: boolean
   ): boolean {
     if (gliding) return false;
     if (frame.gated) return false;
 
     const t = this.config.transient;
 
-    // The envelope witness has already measured a rise against a decaying
-    // baseline, which is precisely the injection test; a flux-only firing has
-    // not, so it has to pass the rise test against the note's own level.
-    if (attack.envelope) return true;
-    return frame.rms >= sustainedRms * t.rearticulationRiseRatio;
+    // A new pitch arriving on an attack is unambiguous: the player fretted
+    // somewhere else and picked. No energy argument is needed or wanted — in a
+    // fast run the notes are often quieter than the one still ringing.
+    if (pitchDiffers) return true;
+
+    // At the same pitch the question is whether the string was struck again.
+    // Two independent ways to answer it, because a re-pick is not always
+    // louder: a muted upstrum over a ringing chord is quieter than what it
+    // interrupts, and only its sharpness gives it away.
+    if (frame.rms >= sustainedRms * t.rearticulationRiseRatio) return true;
+    return attack.sharpness >= t.rearticulationSharpness;
   }
 }
