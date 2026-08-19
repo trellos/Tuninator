@@ -202,6 +202,72 @@ describe("fast runs", () => {
   });
 });
 
+describe("alternate picking", () => {
+  /**
+   * Picking faster than one articulation window.
+   *
+   * A pick is not one transient: the fast lane opens a Note on the first, and
+   * whatever fires over the next few tens of milliseconds is the same pick
+   * still landing — a strum crossing six strings, or pick noise and then the
+   * string speaking. Two devices exist for that. The boundary of a split is
+   * backdated to the FIRST transient of the burst, and a Note the burst shed on
+   * its way is absorbed into the articulation that shed it.
+   *
+   * Both stop being true once the player picks faster than the burst window.
+   * The boundary then lands at or before the start of the Note it is supposed
+   * to end, which collapses that Note to nothing, and what is absorbed is not a
+   * fragment but the stroke before this one. The run comes out at half its real
+   * rate — which is what the recogniser did to a take of sixteenths at 140bpm,
+   * where the strokes are 107ms apart and the quieter ones only 80ms.
+   */
+  // Four strokes per pitch, which is how the take is actually played: the
+  // easy version alternates pitch every stroke, and then "the pitch changed"
+  // does all the work. Here it says nothing for three strokes out of four.
+  const hz = [659.25, 659.25, 659.25, 659.25, 739.99, 739.99, 739.99, 739.99];
+
+  function run(spacingMs: number, loud: number, quiet: number): Note[] {
+    const strokes = hz.map((f, i) => pluck(f, ms(spacingMs), i % 2 === 0 ? loud : quiet, 180));
+    return notesOf(concat(silence(ms(300)), concat(...strokes), silence(ms(400))));
+  }
+
+  it("resolves eight strokes 107ms apart", () => {
+    expect(run(107, 0.35, 0.35).filter((n) => n.endTime !== n.startTime).length).toBe(8);
+  });
+
+  it("resolves strokes picked closer together than one articulation", () => {
+    // 80ms is inside `transient.articulationMs`, so every device meant for a
+    // strum's interior applies to a stroke that is a note in its own right.
+    const notes = run(80, 0.35, 0.35).filter((n) => n.endTime !== n.startTime);
+    expect(notes.length).toBeGreaterThan(5);
+  });
+
+  it("never reports a Note that ends before it began", () => {
+    // The collapse that produced the half-rate reading: a boundary placed back
+    // at the start of the Note it ends. Those Notes are dropped rather than
+    // emitted, so what the run loses is a stroke, silently.
+    for (const note of run(80, 0.35, 0.35)) {
+      expect(note.endTime === null || (note.endTime as number) > note.startTime).toBe(true);
+    }
+  });
+
+  it("does not report a fast run at half its rate", () => {
+    const spans = run(85, 0.35, 0.3)
+      .filter((n) => n.endTime !== null && n.endTime !== n.startTime)
+      .map((n) => (n.endTime as number) - n.startTime)
+      .sort((a, b) => a - b);
+    const median = spans[Math.floor(spans.length / 2)] ?? 0;
+    // Two strokes read as one gives a median near 170ms. One stroke gives 85.
+    expect(median).toBeLessThan(130);
+  });
+
+  it("still absorbs the fragment of a single articulation", () => {
+    // One pick, whose first hops the pitch estimator cannot read. Nothing here
+    // peaked and fell before the next transient, so the stub is still a stub.
+    const notes = notesOf(concat(silence(ms(300)), pluck(220, ms(700), 0.35, 600), silence(ms(300))));
+    expect(notes).toHaveLength(1);
+  });
+});
+
 describe("overlap", () => {
   it("a Note that ends and one that begins never share a span", () => {
     const notes = notesOf(

@@ -115,6 +115,30 @@ const HARMONIC_CONTEXT_THRESHOLD = 0.5;
  */
 const ATTACK_HISTORY = 256;
 
+/**
+ * How close to its own peak a Note must still be for the transient that ends it
+ * to be the same articulation still arriving.
+ *
+ * A pick is not instantaneous: the fast lane opens a Note on the first
+ * transient and then spends a hop or two with nothing true to say, because an
+ * attack is the least periodic part of a note and a strum's six strings arrive
+ * one at a time. Whatever fires during those hops is the SAME pick still
+ * landing, and the Note it interrupts has not had a chance to decay — it is at
+ * or near the loudest it will ever be. A second pick is the opposite case: the
+ * note it interrupts had peaked and begun to fall before fresh energy arrived.
+ *
+ * That is the Note measured against itself, so it means the same thing at any
+ * level, on any signal path and at any tempo — which is exactly what a duration
+ * cannot claim. At 140bpm a genuine sixteenth measures 80ms, well inside a
+ * window sized so that a 120bpm strum's fragments are absorbed, and absorbing
+ * it deletes a note somebody played.
+ *
+ * Not 1.0, because the RMS window ripples hop to hop; 5% is below that ripple
+ * and above nothing. Fitted on the 120bpm fixtures, where it reproduces the
+ * previous behaviour exactly.
+ */
+const STILL_RISING_FRACTION = 0.95;
+
 /** Confidence movement below this is not worth an event. */
 const CONFIDENCE_EPSILON = 0.15;
 /**
@@ -367,7 +391,15 @@ export class NoteTracker {
         // finally cleared the bar. A pick crossing six strings, or a pick
         // scrape followed by the string speaking, is one articulation with
         // several transients, and the event began at the first of them.
-        const boundary = this.attackBurstStart ?? frame.attack;
+        //
+        // Unless the Note now ending is the one that burst already opened. A
+        // Note cannot end before it began, and placing the boundary back at its
+        // own start collapses it to nothing — so a run picked faster than one
+        // burst window comes out at half its real rate, one Note per pair.
+        // When the burst is already this Note's own, the boundary is the
+        // transient in hand.
+        const burst = this.attackBurstStart ?? frame.attack;
+        const boundary = burst.at > active.startTime ? burst : frame.attack;
         this.end(active, boundary.at, out);
         // The successor is created below, once this hop has decided what it is.
         // It inherits the decay: a restrum re-excites the strings that were
@@ -810,6 +842,13 @@ export class NoteTracker {
     // event somebody played. Only the stub of a forming articulation qualifies.
     if (predecessor.harmonyBloomed) return;
     if (predecessor.durationMs > this.config.transient.articulationMs) return;
+    // And a Note that had already begun to decay was not a stub. See
+    // `STILL_RISING_FRACTION`: a fragment of a forming articulation is
+    // interrupted by the same pick still arriving, so it is at its own peak
+    // when it dies, while a note answered by a second pick had peaked and
+    // started to fall. Duration cannot separate those at two tempos; this is
+    // the same claim made about the Note against itself.
+    if (predecessor.rms < predecessor.maxRms * STILL_RISING_FRACTION) return;
     // Contiguous by construction when the split ended the predecessor here, but
     // checked rather than assumed: a gap means silence, and silence means two
     // separate events.
