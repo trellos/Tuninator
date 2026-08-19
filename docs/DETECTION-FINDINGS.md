@@ -6,16 +6,18 @@ no gate lowered (`git diff d8e4141..HEAD -- fixtures/` is empty).
 
 ## Against the frozen baseline (docs/BASELINE.md)
 
-| metric | baseline | now | gate |
-|---|---|---|---|
-| labels missed | 12 / 78 | **5 / 78** | 0 |
-| required fixtures failing | 2 | **0** | 0 |
-| clean-lead pitch class (gated) | 77.4% | **92.9%** | 90% |
-| clean-lead false positives | 8 | **1** | 3 |
-| power-chords onset median | 140ms FAIL | **113ms PASS** | 120ms |
-| chords-a-bm missed | 3 | **0** | — |
-| spurious Notes | 23 | **6** | — |
-| events yielding more than one Note | — | **11 / 78** | — |
+| metric | baseline | before the region lane | now | gate |
+|---|---|---|---|---|
+| labels missed | 12 / 78 | 5 / 78 | **4 / 78** | 0 |
+| required fixtures failing | 2 | 0 | **0** | 0 |
+| clean-lead pitch class (gated) | 77.4% | 92.9% | **96.3%** | 90% |
+| clean-lead exact | — | 79.5% | **81.6%** | — |
+| triplets pitch class | — | 90.5% | **95.0%** | — |
+| clean-lead false positives | 8 | 1 | **1** | 3 |
+| power-chords onset median | 140ms FAIL | 113ms PASS | **113ms PASS** | 120ms |
+| chords-a-bm missed | 3 | 0 | **0** | — |
+| spurious Notes | 23 | 6 | **6** | — |
+| events yielding more than one Note | — | 11 / 78 | **11 / 78** | — |
 
 Every required fixture passes every gate it is held to, and `npm run eval`
 exits 0. The one remaining failure is `spicy-chords`' `maxFalseLabels`, on an
@@ -208,7 +210,11 @@ are not tried again:
 
 ## What is left
 
-One shape, and it is the same one the last pass named: **the pitch path runs
+Two shapes now. The first is `s4`/`s9`/`s11` above: the region lane can see
+those events and cannot act on them, because it proposes boundaries into a
+partition the fast lane already made rather than owning the partition.
+
+The second is the one the last pass named: **the pitch path runs
 about 90ms behind the transient path.** Every remaining split in the lead take
 is a Note whose boundary is right and whose first hops describe its predecessor,
 or the reverse. Correcting only the reported times fixes the onset error almost
@@ -218,6 +224,108 @@ neither does. That is a change to how segmentation works, not a constant to
 tune, and it wants its own pass with the articulation tests extended first — a
 Note's boundary and the frames that name it have to be derived from the same
 clock.
+
+## The deep lane re-segments; it no longer tags windows
+
+The section below this one is still true of the lane it describes, and it is
+why that lane was replaced rather than tuned. A job was queued for the Notes
+active at the scheduling moment and its result was filed under them, which
+fixes what the lane is able to say: it can improve a Note's name, and it can
+do nothing else. It cannot report that three notes were played where two were
+emitted, because the third does not exist to be tagged, and it cannot pick the
+voice that just *arrived* over the loudest one, because one window has nothing
+to compare against.
+
+The lane now analyses a **region** — the span from the start of the oldest Note
+nobody has ruled on to now — as a sequence of 4096-point windows at a hop of
+1024, and returns an ordered list of segments with no `noteId` anywhere in the
+result. The tracker reconciles that against the Notes it already emitted, and
+a Note only reaches `Resolved` once it has been compared against a re-analysis
+of its own audio. Closing Notes are held until then; without that hold there is
+nothing left to correct by the time the verdict arrives.
+
+Two witnesses, decided from the window sequence alone:
+
+- **the leader moved and stayed moved** — compared by pitch class, held for two
+  windows;
+- **the envelope rose above the trough since the last boundary** — the only
+  witness that can ever separate a note re-picked at its own pitch from itself,
+  since a D5 picked twice is D5 throughout.
+
+### `t17` — three notes played, two emitted, and now three
+
+| | before | after |
+|---|---|---|
+| `t17` (D5 @14527ms) | missed | matched, onset error **+4ms** |
+| triplets missed | 2 (`t10`, `t17`) | 1 (`t10`, documented unrecoverable) |
+| triplets pitch class | 90.5% | 95.0% |
+
+The fast lane emitted one Note over 14360–14653ms covering both `t16` and
+`t17`, and abstained on it. The region sees the envelope trough at 14552ms and
+a 2.6x rise by 14616ms; the fast lane saw a transient at 14573ms and acted on
+nothing, because that hop sits **below the amplitude gate** — a note picked into
+the tail of the one before it can. Neither witness is sufficient alone and
+together they are unambiguous.
+
+The recovered Note abstains rather than naming itself. Splitting a Note the
+recognizer declined to name is a claim about how many events there were, not a
+licence to name them, and `t16`'s E5 is still not in the signal.
+
+### What keeps it from shredding everything else
+
+Each is a rule the fast lane already lives by, applied to region evidence:
+
+1. **A Note that named a chord is identified, not merely detected.** Untouched.
+2. **A chord's leader moving is a voice, not a Note.** A strum's strings arrive
+   over tens of milliseconds and decay at different rates, so the strongest
+   fundamental wanders for the chord's whole life. Without this rule
+   `chords-a-bm` shed five extra Notes and `spicy` shattered into seven.
+3. **A bend is one thing the player did.** A sweep fires both attack witnesses
+   repeatedly and drags the leader through every semitone on the way.
+4. **A re-articulation needs energy to have arrived**, within one backdate
+   window of a transient the fast lane actually saw.
+5. **A split must change the Note's name.** Cutting a C#5 in two and calling
+   both halves C#5 is fragmentation whatever the transform saw in between. This
+   one rule is worth 1 split, 1 extra Note and 1 false positive on its own.
+
+### Measured and rejected in this pass
+
+| change | result |
+|---|---|
+| block re-segmentation while the room reads harmonic (`harmonicSince`) | crude: still 4 false positives on `chords-a-bm` and it blocks the sixteenths outright. The per-witness rules above are strictly better |
+| let a bloomed Note be split on a leader change | inert on these fixtures — the bend guard fires first on the merged sixteenths Note — and it shatters chords when the bend guard does not |
+| allow a split when the region's leader RETURNS to an earlier pitch class (a melody returns, a decay converges) | measured completely inert: identical eval and identical fragmentation. Inert complexity, not kept |
+| let a carved-out event run for the length the region gave it rather than stopping at the Note it came from | false positives 6 -> 8, fragmentation 11/78 -> 12/78, and it still does not recover `s4` |
+| `deep.segmentRiseRatio` 2.0 / 2.5 / 3.0 / 3.5 | identical on every fixture. The attack corroboration dominates; the ratio only proposes |
+| `deep.segmentHoldWindows` 2 / 3 / 4 | identical on every fixture |
+| `deep.minSegmentMs` 90 / 100 / 110 / 125 | identical totals; only the boundary placement inside one triplet moves |
+| `deep.regionSettleMs` x `deep.maxRegionMs` over 200/400/700 x 700/1200/2000 | no combination recovers `s4`, `s9` or `s11`; several cost false positives |
+| deep-lane merging (`deep.regionMerge`) | false positives 6 -> 10, fragmentation 11/78 -> 12/78, worst case five Notes on one event. Absorbing a pair moves a start time, which opens the survivor to the fast lane's own absorption path and cascades. Built, tested, **off** |
+| deep-lane pitch correction (`deep.regionCorrectPitch`) | clean-lead pitch class 92.9% -> 81.5%, gate fails. Same cause the earlier "give the deep lane a vote" experiment found: the strongest fundamental in a window is the loudest voice, and in a fast run that is the note before this one. Built, tested, **off** |
+
+### `s4`, `s9`, `s11` are still missed, and here is exactly why
+
+The evidence is plainly there. Over 20200–20560ms the region's leader reads
+`B4 -> A4 (window ending 20371) -> B4 (20520)`, and the A4 stretch is `s4`,
+which the fast lane emitted **nothing at all** for — a 146ms hole between two
+Notes. Over 20940–21520ms it reads `A4 -> B4 -> C#5 -> B4 -> A4`, which is
+`s8` through `s12`.
+
+Two structural things stop the reconciler acting on it, and neither is a
+threshold:
+
+- **`s4`'s segment starts inside its neighbour.** The boundary estimate lands at
+  20286ms while the Note before it runs to 20347ms, so the segment is *owned* by
+  that Note and becomes a 61ms split candidate rather than a new event. Letting
+  a carved event run its own length instead was measured above and is worse.
+- **`s9`/`s11` live inside a Note the bend guard protects.** The fast lane's one
+  Note across 20960–21493ms measures a 193-cent "bend", because a Note that
+  spans a melody wanders by definition. Distinguishing that from a real bend is
+  the open problem; the returning-leader test written for it measured inert.
+
+Both want the region lane to own boundary *placement* rather than proposing
+boundaries into a timeline the fast lane already partitioned. That is the next
+change, and it is a bigger one than this.
 
 ## Latency alone does not buy correctness
 
@@ -251,6 +359,12 @@ that moment and its result is applied to them. Reach 200ms forward during a
 evidence about a Note's successor and files it under the Note. Chords degrade
 more gently (cowboy 75% to 63%) precisely because their extra audio still
 belongs to the same event, while the lead line collapses.
+
+**This is the part the region lane changed.** `deep.regionSettleMs` waits for
+the audio a region is about to finish arriving before analysing it, which is
+not the latency measured above: that one delayed *applying* a window that
+always ended at "now", and bought nothing. Waiting until a boundary has audio
+on both sides of it is what makes the boundary visible at all.
 
 Extra time is only worth having if the window stays INSIDE the Note it is about.
 That means scheduling relative to a Note's own span — analyse its sustain, apply
