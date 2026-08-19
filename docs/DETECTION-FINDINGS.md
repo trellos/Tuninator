@@ -69,17 +69,25 @@ distinction (architecture §21) applied to pitch rather than to harmony. Both
 labels sit in the `sixteenths` section, which `eval.config.json` already marks
 `required: false`.
 
+## The one that mattered
+
+`currentLabel()` returned the newest frame's pitch. The tracker had always
+accumulated a confidence-weighted vote per pitch — with a comment explaining
+that naming a Note from its last frame hands it its neighbour's name — and the
+label never read the votes. Naming a Note from its own accumulated evidence took
+the lead take from 89.7% to **93.1%** pitch class and 79.3% to **86.2%** exact,
+clearing a gate that fixture had never met.
+
+That is also why every experiment above that adjusted *voting* measured as
+neutral: the votes were not reaching the label. They are worth re-testing now
+that they do.
+
 ## The remaining required failure
 
 `clean-lead` fails two checks:
 
-- **pitch class 89.66% against 90%** — 26 correct of 29 scored; one label short.
-  The two wrong ones in the gated sections are t12 (C#5 read as D#5) and t15
-  (D5 read as C#5). Both are boundary-placement failures, not pitch failures:
-  across t12 the estimator reports D5 for the first 94ms and then C#5 correctly
-  for the rest, so the right answer is in the signal and the Note boundary is
-  landing in the wrong place.
-- **13 spurious Notes against a limit of 3.** This check also failed at baseline
+- **pitch class — now passing at 93.1%.**
+- **12 spurious Notes against a limit of 3.** This check also failed at baseline
   (8 against 3); it has never passed. Two of them are the 2.7 seconds of real
   ring-out after the bend at 7950ms, where RMS runs 0.044 down to 0.022 against
   a gate of 0.008 — the recogniser is reporting audio that is genuinely
@@ -99,10 +107,29 @@ are not tried again:
 | median smoothing 3→2 / 3→1 | 3→2: +11 spurious; 3→1: +2 missed |
 | require a transient for same-pitch re-articulation | spurious 11→9 but accuracy 0.897→0.786 |
 | restrum sharpness 1.1 instead of 0.9 | −4 spurious, +2 missed, second fixture fails |
+| attribute each frame's pitch retrospectively, to the Note sounding when that audio happened | no change at 45ms, accuracy 0.931→0.862 beyond it |
+| absorb an identically-named stub into the Note it runs out of | clean-lead spurious 12→4, but eats genuine repeats: +4 missed, accuracy 0.931→0.828. Guarding Notes that began on their own attack makes it inert — the stubs all begin on attacks too |
+| widen the glide window so a slow bend registers as gliding | does not stop the bend splitting; breaks two other fixtures |
+| past the ring-out, require energy above the decay with no sharpness escape | missed 4→12, three fixtures failing, one unit test broken |
 | subtract the lag from *reported* times only, leaving voting untouched | onset error 90→36ms, but accuracy 0.897→0.862 and +2 missed: moving every Note earlier re-pairs detections onto their neighbours' labels |
 
-The common thread: the pitch path is systematically ~90ms late relative to the
-hand-annotated onsets, while the transient path is not. Closing the last gate
+What is left is one shape of error: a transient fires inside a Note that is
+already sounding, passes both the decay test and the sharpness test, and splits
+one played note into two identically-named ones. Seven of the lead take's twelve
+spurious Notes are exactly that, and two more are the bend at 6950ms coming
+apart into A3, A#3 and B3 — a bend is supposed to stay one Note.
+
+Every threshold that catches them costs genuine re-picks somewhere else, which
+is the ten rows above. They are not distinguishable by level or by flux
+sharpness, because a decaying string genuinely produces sharp transients — finger
+noise, the string re-seating against the fret — that no pick made. Separating
+those from a real pick wants the transient's spectral shape, which the detector
+does not currently look at: a pick excites the whole spectrum at once, while
+finger noise is narrowband and mostly high. That is a new witness, not a
+constant.
+
+The older observation still stands: the pitch path is systematically ~90ms late
+relative to the hand-annotated onsets, while the transient path is not. Closing the last gate
 needs one coherent latency model spanning both, so that boundary placement and
 pitch attribution move together — not another threshold.
 
