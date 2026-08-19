@@ -381,7 +381,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     newPitchSharpness: 0.3,
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,
-    mutedRestrumWindowMs: 1300,
+    mutedRestrumWindowMs: 800,
     glideMinCents: 25,
     glideWindowHops: 5,
     articulationMs: 90,

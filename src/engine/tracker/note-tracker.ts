@@ -526,33 +526,39 @@ export class NoteTracker {
           reading.confidence
         );
 
-        if (
-          this.notes.has(record.id) &&
-          at - record.pendingHarmonySince >= this.config.harmony.changeStableMs
-        ) {
-          // The evidence gathered while the change was merely pending belongs
-          // to the NEW Note: the backdated boundary puts those readings inside
-          // its span, and they are the ones where the third is still sounding.
-          const boundary = Math.max(record.pendingHarmonySince, record.startTime);
-          const carried = new Map(record.pendingHarmonyVotes);
-          this.end(record, boundary, out);
-          const successor = this.beginHarmonic(boundary, record, carried);
-          for (const emission of this.applyHarmony(
-            successor.id,
-            reading,
-            activations,
-            evidence,
-            at
-          )) {
-            out.push(emission);
-          }
-          this.publish(out);
-          return out;
-        }
       } else if (reading.root === record.harmonyRoot) {
         record.pendingHarmonyRoot = null;
         record.pendingHarmonyVotes.clear();
       }
+    }
+
+    // Has a pending chord change stood long enough to be a boundary?
+    //
+    // Asked on every reading, not only on a confident one that disagrees. The
+    // moment a chord changes over a ringing one is exactly when the chroma is
+    // least sure of itself — the old chord is still sounding under the new — so
+    // the readings that follow the change are routinely unconfident, and
+    // requiring one of them to carry the timer meant the change could stand
+    // pending indefinitely and never become a boundary. A reading that declines
+    // to name anything does not contradict a pending change.
+    if (
+      record.pendingHarmonyRoot !== null &&
+      record.pendingHarmonyVotes.size > 0 &&
+      this.notes.has(record.id) &&
+      at - record.pendingHarmonySince >= this.config.harmony.changeStableMs
+    ) {
+      // The evidence gathered while the change was merely pending belongs to
+      // the NEW Note: the backdated boundary puts those readings inside its
+      // span, and they are the ones where the third is still sounding.
+      const boundary = Math.max(record.pendingHarmonySince, record.startTime);
+      const carried = new Map(record.pendingHarmonyVotes);
+      this.end(record, boundary, out);
+      const successor = this.beginHarmonic(boundary, record, carried);
+      for (const emission of this.applyHarmony(successor.id, reading, activations, evidence, at)) {
+        out.push(emission);
+      }
+      this.publish(out);
+      return out;
     }
 
     // Blooming is a claim that more than one string is sounding, so it needs
@@ -701,6 +707,11 @@ export class NoteTracker {
       peak: predecessor.maxPeak,
     });
     record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
+    // Born because the harmony changed, so it is a chord from its first hop.
+    // Making it re-earn that leaves it open to the pitch-step segmentation a
+    // bloomed Note is protected from, and a chord whose Note has just been
+    // handed over shatters into one Note per string while it waits.
+    record.harmonyBloomed = predecessor.harmonyBloomed;
     record.sustainedRms = predecessor.sustainedRms;
     for (const [label, vote] of carriedVotes) record.harmonyVotes.set(label, { ...vote });
     this.notes.set(record.id, record);
