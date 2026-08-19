@@ -11,7 +11,7 @@
  * Part of `src/core/` — no DOM, no globals, no npm imports.
  */
 
-import type { PitchClass } from "../types.js";
+import type { PitchClass } from "../../types.js";
 
 /** Chord qualities in the dictionary, as they appear in `label.quality`. */
 export type ChordQuality =

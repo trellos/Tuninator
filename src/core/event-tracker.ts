@@ -21,10 +21,10 @@
  */
 
 import type { EventPitch, MusicEvent, MusicEventKind, MusicEventState, PitchClass } from "../types.js";
-import type { ChordQuality } from "./chords.js";
+import type { ChordQuality } from "../engine/kernels/chords.js";
 import type { Policy } from "./policy.js";
 import type { EngineFrame } from "./pitch-engine.js";
-import { describeFrequency, midiToFrequency } from "./notes.js";
+import { describeFrequency, midiToFrequency } from "../engine/kernels/notes.js";
 
 export type TrackerEmission = {
   type: "start" | "update" | "end";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { OnsetDetector } from "../src/core/onset.js";
-import { YinDetector } from "../src/core/yin.js";
+import { OnsetDetector } from "../src/engine/kernels/onset.js";
+import { YinDetector } from "../src/engine/kernels/yin.js";
 
 const SR = 44100;
 const FFT = 1024;

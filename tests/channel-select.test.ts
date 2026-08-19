@@ -13,7 +13,7 @@ import {
   DEFAULT_SUSTAIN_WINDOWS,
   DEFAULT_WINDOW_MS,
   resolveChannel,
-} from "../src/core/channel-select.js";
+} from "../src/engine/kernels/channel-select.js";
 import { PitchEngine } from "../src/core/pitch-engine.js";
 import { resolvePolicy } from "../src/core/policy.js";
 

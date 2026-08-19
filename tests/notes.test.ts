@@ -12,7 +12,7 @@ import {
   midiToOctave,
   midiToPitchClass,
   nameToMidi,
-} from "../src/core/notes.js";
+} from "../src/engine/kernels/notes.js";
 import type { PitchClass } from "../src/types.js";
 
 /* -------------------------------------------------------------------------- */

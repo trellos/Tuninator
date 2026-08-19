@@ -20,13 +20,13 @@
 
 import type { PitchFrame } from "../types.js";
 import type { Policy } from "./policy.js";
-import { YinDetector, zeroCrossingRateHz, rms as windowRms, peak as windowPeak } from "./yin.js";
-import { OnsetDetector } from "./onset.js";
-import { ChromaAnalyzer } from "./chroma.js";
-import { matchChord } from "./chords.js";
-import { describeFrequency, frequencyToMidiFloat } from "./notes.js";
-import type { ChordMatch } from "./chords.js";
-import type { ChromaResult } from "./chroma.js";
+import { YinDetector, zeroCrossingRateHz, rms as windowRms, peak as windowPeak } from "../engine/kernels/yin.js";
+import { OnsetDetector } from "../engine/kernels/onset.js";
+import { ChromaAnalyzer } from "../engine/kernels/chroma.js";
+import { matchChord } from "../engine/kernels/chords.js";
+import { describeFrequency, frequencyToMidiFloat } from "../engine/kernels/notes.js";
+import type { ChordMatch } from "../engine/kernels/chords.js";
+import type { ChromaResult } from "../engine/kernels/chroma.js";
 
 /** One hop's worth of analysis: the public frame plus tracker-only detail. */
 export type EngineFrame = {

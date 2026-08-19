@@ -7,7 +7,7 @@
  * Part of `src/core/` — no DOM, no globals, no npm imports.
  */
 
-import type { PitchClass, PitchNote } from "../types.js";
+import type { PitchClass, PitchNote } from "../../types.js";
 
 export const A4_HZ = 440;
 export const A4_MIDI = 69;

@@ -317,3 +317,23 @@ export type Tuninator = {
     handler: TuninatorEventHandler<E>
   ): () => void;
 };
+
+/* -------------------------------------------------------------------------- */
+/* Source time (new surface — see src/engine/clock.ts)                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Milliseconds of *source audio* since the first processed sample (epoch = 0).
+ *
+ * Derived only from sample count / sample rate, never from a wall clock, so an
+ * offline run over a WAV and a live run over the same audio agree exactly. Both
+ * lanes, pitch frames, Notes and the hypothesis trail all share this one scale.
+ */
+export type SourceTimeMs = number;
+
+/** How `SourceTimeMs` relates to the host's own clock, when there is one. */
+export type Timebase = {
+  sampleRate: number;
+  /** `AudioContext.currentTime` at source time 0. Absent offline. */
+  originContextTime?: number;
+};

@@ -19,7 +19,7 @@ import {
   ChannelSelector,
   resolveChannel,
   type ChannelStrategy,
-} from "../core/channel-select.js";
+} from "../engine/kernels/channel-select.js";
 
 /* AudioWorkletGlobalScope declarations — not in the standard DOM lib. */
 declare const sampleRate: number;
