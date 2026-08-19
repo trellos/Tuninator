@@ -85,6 +85,16 @@ export type EngineConfig = {
      */
     rearticulationSharpness: number;
     /**
+     * Transient sharpness a re-strum needs over a *ringing chord*.
+     *
+     * Higher than `rearticulationSharpness`, and the only energy-independent
+     * witness available there, because a chord's decay makes every level-based
+     * test unreliable. Measured on the fixtures: genuine strums sit at 0.9 and
+     * above (median 2.4 on the cowboy take), while most fragments a ringing
+     * chord sheds top out just above 1.1.
+     */
+    restrumSharpness: number;
+    /**
      * Transient sharpness a *pitch-changing* attack needs before it starts a
      * new Note.
      *
@@ -309,6 +319,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     envelopeRiseRatio: 1.35,
     rearticulationRiseRatio: 1.25,
     rearticulationSharpness: 0.7,
+    restrumSharpness: 0.9,
     newPitchSharpness: 0.3,
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,

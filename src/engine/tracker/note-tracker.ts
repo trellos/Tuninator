@@ -201,6 +201,8 @@ export class NoteTracker {
     if (frame.attack !== null && !frame.gated) this.lastAttack = frame.attack;
 
     let active = this.current();
+    /** Set when a split ends a Note whose successor should inherit its decay. */
+    let splitFrom: NoteRecord | null = null;
 
     /* (a) An attack over something already sounding: a restrum or a re-pick.
      *     Only a genuine energy injection counts, and never mid-glide — a bend
@@ -242,6 +244,10 @@ export class NoteTracker {
           : active.soundedMs >= config.tracking.minStableMs;
       if (rearticulated && settled) {
         this.end(active, frame.attack.at, out);
+        // The successor is created below, once this hop has decided what it is.
+        // It inherits the decay: a restrum re-excites the strings that were
+        // already ringing, so the curve is continuous through the split.
+        splitFrom = active;
         active = null;
       }
     }
@@ -285,12 +291,15 @@ export class NoteTracker {
         at = attack.at;
         atSample = attack.atSample;
       }
+      const previous = active;
       this.end(active, at, out);
-      active = this.begin("pitchChange", frame, out, {
-        at,
-        atSample,
-        frequencyHz: pitchChange.toHz,
-      });
+      active = this.begin(
+        "pitchChange",
+        frame,
+        out,
+        { at, atSample, frequencyHz: pitchChange.toHz },
+        previous
+      );
     }
 
     /* (c) Nothing is sounding and something just happened. */
@@ -298,7 +307,7 @@ export class NoteTracker {
       const voiced = frame.pitch.frequencyHz !== null;
       const struck = frame.attack !== null && !frame.gated;
       if (voiced || struck) {
-        active = this.begin(struck ? "attack" : "pitchChange", frame, out, null);
+        active = this.begin(struck ? "attack" : "pitchChange", frame, out, null, splitFrom);
       }
     }
 
@@ -660,7 +669,12 @@ export class NoteTracker {
     trigger: NoteOriginTrigger,
     frame: FastFrame,
     out: TrackerEmission[],
-    override: { at: SourceTimeMs; atSample: number; frequencyHz: number | null } | null
+    override: { at: SourceTimeMs; atSample: number; frequencyHz: number | null } | null,
+    /**
+     * The Note this one is splitting away from, if any. Its decay state carries
+     * over: the strings are the same strings, still ringing on the same curve.
+     */
+    predecessor: NoteRecord | null = null
   ): NoteRecord {
     const frequencyHz = override?.frequencyHz ?? frame.pitch.frequencyHz;
     let at = override?.at ?? frame.at;
@@ -712,6 +726,7 @@ export class NoteTracker {
       peak: frame.peak,
     });
     record.polyphonic = this.contextHarmonic >= 0.5;
+    if (predecessor !== null) record.decay.adopt(predecessor.decay);
     this.notes.set(record.id, record);
     if (frequencyHz !== null) this.pitchChange.clearAfterSplit(frequencyHz, at);
     void out;

@@ -64,7 +64,19 @@ export class RearticulationDetector implements IRearticulationDetector {
     // to precisely the case the fixtures care most about: a *muted* upstrum
     // damps the strings, so it puts the total energy DOWN even as it plainly
     // re-articulates the chord. Only its sharpness gives that away.
-    if (polyphonic && decayExcess !== null && decayExcess >= t.restrumDecayExcess) return true;
+    if (polyphonic) {
+      if (decayExcess !== null && decayExcess >= t.restrumDecayExcess) return true;
+      // Deliberately NOT falling through to the rolling-baseline test below.
+      // A decaying chord drags its own baseline down with it, so ordinary
+      // sustain ripple clears any fixed multiple of it every few hundred
+      // milliseconds — which is precisely how one strummed chord shredded into
+      // a run of contiguous fragments, each re-splitting the last.
+      //
+      // That leaves sharpness to carry the case a muted upstrum makes: it
+      // damps the strings, so it puts total energy DOWN while plainly
+      // re-articulating the chord. Only its transient gives it away.
+      return attack.sharpness >= t.restrumSharpness;
+    }
 
     // On a single note the weaker witnesses are the right ones. A note's own
     // decay curve is a poor guide there: a monophonic Note is routinely bent,

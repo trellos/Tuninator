@@ -99,6 +99,30 @@ export class VoiceDecay {
     return rms / predicted;
   }
 
+  /**
+   * Take over another Note's decay state.
+   *
+   * The decay describes the strings that are ringing, and strings outlive the
+   * Note that named them: when a Note is split the same strings carry on
+   * decaying on the same curve. Starting a fresh fit at every split destroys
+   * the only evidence that could reject the *next* split, so a chord shreds
+   * into a run of contiguous fragments — each one too young to have measured
+   * anything, each one therefore unable to say no.
+   *
+   * Inheriting is safe for a genuine restrum: fresh energy sets a new peak,
+   * and `observe` restarts the fit there on its own.
+   */
+  adopt(other: VoiceDecay): void {
+    this.peak = other.peak;
+    this.peakAt = other.peakAt;
+    this.n = other.n;
+    this.sumT = other.sumT;
+    this.sumL = other.sumL;
+    this.sumTT = other.sumTT;
+    this.sumTL = other.sumTL;
+    this.lastAt = other.lastAt;
+  }
+
   get observations(): number {
     return this.n;
   }
