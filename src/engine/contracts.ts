@@ -212,7 +212,9 @@ export interface IRearticulationDetector {
      */
     decayExcess: number | null,
     /** The sounding Note is a chord, on the deep lane's evidence. */
-    polyphonic: boolean
+    polyphonic: boolean,
+    /** How long the sounding Note has already lasted, ms. */
+    soundedMs: number
   ): boolean;
 }
 

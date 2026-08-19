@@ -37,7 +37,9 @@ export class RearticulationDetector implements IRearticulationDetector {
     sustainedRms: number,
     pitchDiffers: boolean,
     decayExcess: number | null,
-    polyphonic: boolean
+    polyphonic: boolean,
+    /** How long the sounding Note has already lasted, ms. */
+    soundedMs: number
   ): boolean {
     if (gliding) return false;
     if (frame.gated) return false;
@@ -78,12 +80,28 @@ export class RearticulationDetector implements IRearticulationDetector {
       return attack.sharpness >= t.restrumSharpness;
     }
 
-    // On a single note the weaker witnesses are the right ones. A note's own
-    // decay curve is a poor guide there: a monophonic Note is routinely bent,
-    // vibratoed and re-fingered, all of which move the envelope without any new
-    // energy arriving, and a fast run gives the fit too little to work with.
-    // A re-pick is also not always louder — a muted note is quieter than what
-    // it interrupts — so sharpness carries the case.
+    // A single note whose decay has been measured and which is sitting on that
+    // curve is ringing out, not being re-picked. The rolling-baseline test
+    // cannot see this — the baseline falls with the note — and it is how a
+    // long ring-out shed a run of new Notes after the phrase had ended.
+    // Sharpness still gets a say, because a re-pick is not always louder.
+    // Only once the Note has been sounding long enough for "ringing out" to be
+    // the likely explanation. A note in a fast run lasts barely a tenth of a
+    // second and is re-picked while its own decay is still steep, so applying
+    // this there rejects real re-picks; a phrase ringing on for seconds after
+    // the player stopped is the case this exists for.
+    if (
+      soundedMs >= t.ringOutMs &&
+      decayExcess !== null &&
+      decayExcess < t.restrumDecayExcess
+    ) {
+      return attack.sharpness >= t.restrumSharpness;
+    }
+
+    // With no usable fit the weaker witnesses are the right ones. A monophonic
+    // Note is routinely bent, vibratoed and re-fingered, all of which move the
+    // envelope without any new energy arriving, and a fast run gives the fit
+    // too little to work with.
     if (frame.rms >= sustainedRms * t.rearticulationRiseRatio) return true;
     return attack.sharpness >= t.rearticulationSharpness;
   }

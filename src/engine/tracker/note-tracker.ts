@@ -232,7 +232,8 @@ export class NoteTracker {
         // the room happens to read as harmonic. The decay model describes a
         // struck chord ringing out; applying it to a bent or vibratoed single
         // note describes nothing.
-        active.harmonyLabel !== null
+        active.harmonyLabel !== null,
+        active.soundedMs
       );
       // A harmonically-named Note has proved it is a chord, and a chord's own
       // ring-out is full of transient-looking energy for hundreds of

@@ -95,6 +95,15 @@ export type EngineConfig = {
      */
     restrumSharpness: number;
     /**
+     * How long a single Note must have sounded before its own decay curve is
+     * allowed to veto a re-articulation.
+     *
+     * Comfortably longer than a sixteenth at 140bpm (107ms) so fast runs keep
+     * splitting normally, and far shorter than the seconds-long ring-out that
+     * follows a phrase, which is what this is for.
+     */
+    ringOutMs: number;
+    /**
      * Transient sharpness a *pitch-changing* attack needs before it starts a
      * new Note.
      *
@@ -320,6 +329,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rearticulationRiseRatio: 1.25,
     rearticulationSharpness: 0.7,
     restrumSharpness: 0.9,
+    ringOutMs: 250,
     newPitchSharpness: 0.3,
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,
