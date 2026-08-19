@@ -42,10 +42,13 @@ export class RearticulationDetector implements IRearticulationDetector {
 
     const t = this.config.transient;
 
-    // A new pitch arriving on an attack is unambiguous: the player fretted
-    // somewhere else and picked. No energy argument is needed or wanted — in a
-    // fast run the notes are often quieter than the one still ringing.
-    if (pitchDiffers) return true;
+    // A new pitch arriving on an attack is strong evidence: the player fretted
+    // somewhere else and picked. It still has to be an attack rather than the
+    // next string of the same strum arriving — those cross pitch classes too,
+    // over tens of milliseconds — but the bar is much lower than at an
+    // unchanging pitch, because in a fast run the new note is routinely quieter
+    // than the one still ringing.
+    if (pitchDiffers && attack.sharpness >= t.newPitchSharpness) return true;
 
     // At the same pitch the question is whether the string was struck again.
     // Two independent ways to answer it, because a re-pick is not always

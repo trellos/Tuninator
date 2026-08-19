@@ -20,6 +20,7 @@ import { SampleClock } from "./clock.js";
 import type { EngineConfig } from "./config.js";
 import { RENDER_QUANTUM } from "./config.js";
 import type { FastFrame } from "./contracts.js";
+import { DeepLane } from "./deep/deep-lane.js";
 import { FastLane } from "./fast/fast-lane.js";
 import { AudioRing } from "./ring-buffer.js";
 import { NoteTracker, type TrackerEmission } from "./tracker/note-tracker.js";
@@ -42,14 +43,18 @@ export class RecognitionEngine {
 
   private readonly ring: AudioRing;
   private readonly fast: FastLane;
+  private readonly deep: DeepLane;
   private readonly tracker: NoteTracker;
   private readonly scratch: FastFrame[] = [];
+  /** Deep jobs whose audio had aged out. Reported, never silently swallowed. */
+  private droppedDeepJobs = 0;
 
   constructor(sampleRate: number, config: EngineConfig, originContextTime?: number) {
     this.clock = new SampleClock(sampleRate, originContextTime);
     this.config = config;
     this.ring = new AudioRing(Math.ceil(config.deep.ringSeconds * sampleRate));
     this.fast = new FastLane(this.clock, config);
+    this.deep = new DeepLane(this.clock, config);
     this.tracker = new NoteTracker(this.clock, config);
   }
 
@@ -81,7 +86,14 @@ export class RecognitionEngine {
   reset(): void {
     this.ring.reset();
     this.fast.reset();
+    this.deep.clear();
     this.tracker.reset();
+    this.droppedDeepJobs = 0;
+  }
+
+  /** Deep jobs dropped because their audio aged out of the ring. */
+  get droppedDeepJobCount(): number {
+    return this.droppedDeepJobs;
   }
 
   /**
@@ -116,6 +128,9 @@ export class RecognitionEngine {
         fast.push(frame);
       }
       for (const emission of this.tracker.process(frame)) emissions.push(emission);
+      this.requestDeepWork(frame);
+      this.applyDeepResults(frame.at, emissions);
+      this.tracker.releaseClosed(this.deep.busyNoteIds(), emissions);
     }
     this.scratch.length = 0;
     return { emissions, frames, fast };
@@ -123,7 +138,57 @@ export class RecognitionEngine {
 
   /** Ends every open Note. Idempotent. */
   flush(): EngineOutput {
-    return { emissions: this.tracker.flush(this.now), frames: [], fast: [] };
+    const emissions: TrackerEmission[] = [];
+    // Deep work still in flight describes audio that has already been heard, so
+    // it is applied before the Notes it concerns are closed. Dropping it would
+    // discard the very evidence that names the last chord of a take.
+    this.applyDeepResults(Number.POSITIVE_INFINITY, emissions);
+    this.tracker.releaseClosed(this.deep.busyNoteIds(), emissions);
+    for (const emission of this.tracker.flush(this.now)) emissions.push(emission);
+    return { emissions, frames: [], fast: [] };
+  }
+
+  /**
+   * Queue deep analysis of the audio under whatever is currently sounding.
+   *
+   * Only every `harmony.hopDivisor` hops: a 4096-point transform is far more
+   * expensive than the fast lane's whole budget, and the spectrum does not
+   * change meaningfully between adjacent 13ms hops anyway.
+   */
+  private requestDeepWork(frame: FastFrame): void {
+    if (frame.gated) return;
+    if (frame.hop % this.config.harmony.hopDivisor !== 0) return;
+
+    const windowSize = this.deep.windowSize;
+    const toSample = frame.sampleIndex;
+    const fromSample = toSample - windowSize;
+    if (fromSample < 0) return;
+
+    for (const note of this.tracker.activeNoteIds()) {
+      this.deep.request({
+        noteId: note,
+        purpose: "harmony",
+        fromSample,
+        toSample,
+        notBefore: frame.at + this.config.deep.latencyMs,
+      });
+    }
+  }
+
+  private applyDeepResults(now: number, out: TrackerEmission[]): void {
+    const drain = this.deep.drain(now, this.ring);
+    this.droppedDeepJobs += drain.dropped;
+    for (const result of drain.results) {
+      for (const emission of this.tracker.applyHarmony(
+        result.noteId,
+        result.reading,
+        result.activations,
+        result.evidence,
+        result.at
+      )) {
+        out.push(emission);
+      }
+    }
   }
 
   /** The block size the capture side is expected to deliver. */

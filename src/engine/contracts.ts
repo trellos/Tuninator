@@ -122,6 +122,17 @@ export type SpectralEvidence = {
   bassFrequencyHz: number | null;
   salience: number;
   polyphony: number;
+  /**
+   * Semitones between the lowest and highest detected fundamental.
+   *
+   * The count of fundamentals alone does not separate a chord from a single
+   * note: a plucked string routinely produces two or three surviving
+   * fundamentals an octave apart, so "polyphony 2" is as common in a lead line
+   * as in a dyad. What a chord actually looks like is voices *spread across the
+   * neck* — measured across the fixtures, the lead take's fundamentals sit a
+   * median of 4 semitones apart while the chord takes sit at 12 to 24.
+   */
+  voiceSpreadSemitones: number;
 };
 
 /** A chord reading, or an honest refusal to name one. */

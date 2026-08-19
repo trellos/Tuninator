@@ -88,6 +88,15 @@ export function projectEmissions(emissions: readonly TrackerEmission[]): EvalPro
   // say that?" question is answered in a second pass over a recorded history
   // of label changes rather than guessed forward.
   const labelHistory = new Map<string, Array<{ at: number; label: string }>>();
+  /**
+   * Notes absorbed into another Note by a structural revision.
+   *
+   * Their `noteStarted`/`noteEnded` were really delivered and stand as history,
+   * but the recognizer's final position is that they were part of a larger
+   * event. Scoring them as separate detections would count one chord's attack
+   * several times over.
+   */
+  const absorbed = new Set<string>();
 
   for (const emission of emissions) {
     const note = emission.note;
@@ -102,6 +111,9 @@ export function projectEmissions(emissions: readonly TrackerEmission[]): EvalPro
       }
       case "changed": {
         changeCount.set(note.id, (changeCount.get(note.id) ?? 0) + 1);
+        if (emission.change.type === "structuralRevision") {
+          for (const id of emission.change.relatedNoteIds ?? []) absorbed.add(id);
+        }
         const history = labelHistory.get(note.id);
         const label = labelOf(note);
         if (history !== undefined && history[history.length - 1]?.label !== label) {
@@ -127,10 +139,15 @@ export function projectEmissions(emissions: readonly TrackerEmission[]): EvalPro
   // The fast projection has to span the same timeline as the final one, or the
   // matcher's overlap rule scores it differently for reasons that have nothing
   // to do with labels.
+  const surviving = final.filter((d) => !absorbed.has(d.id));
+  final.length = 0;
+  final.push(...surviving);
+
   const endById = new Map(final.map((d) => [d.id, d.endedAt]));
   for (const detection of fast) detection.endedAt = endById.get(detection.id) ?? null;
 
-  // A fast detection for a Note that never ended has nothing to compare against.
+  // A fast detection for a Note that never ended, or one that was absorbed into
+  // another, has nothing to compare against.
   const fastScored = fast.filter((d) => endById.has(d.id));
 
   const corrected = final.filter((d) => firstLabel.get(d.id) !== d.label.name).length;

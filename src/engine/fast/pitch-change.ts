@@ -25,6 +25,25 @@ import type { FastFrame, IPitchChangeDetector, PitchChangeEvidence } from "../co
 
 const CENTS_PER_OCTAVE = 1200;
 
+/** How close to a whole octave a jump must be to read as a detector flip. */
+const OCTAVE_FLIP_TOLERANCE_CENTS = 60;
+
+/**
+ * True when a pitch jump is a whole number of octaves.
+ *
+ * On polyphonic audio this is the dual-window detector's known failure mode
+ * rather than a note change: the long window's CMND dips at every multiple of
+ * the true period, so YIN moves between one string's fundamental and another
+ * string's octave freely. Whether that is a reason to ignore the jump depends
+ * on what is sounding, which is why the test lives here and the decision does
+ * not.
+ */
+export function isOctaveJump(cents: number): boolean {
+  if (Math.abs(cents) < CENTS_PER_OCTAVE / 2) return false;
+  const octaves = cents / CENTS_PER_OCTAVE;
+  return Math.abs(octaves - Math.round(octaves)) * CENTS_PER_OCTAVE < OCTAVE_FLIP_TOLERANCE_CENTS;
+}
+
 export function centsBetween(hz: number, refHz: number): number {
   return CENTS_PER_OCTAVE * Math.log2(hz / refHz);
 }
@@ -37,6 +56,15 @@ export class PitchChangeDetector implements IPitchChangeDetector {
   private readonly recent: number[] = [];
 
   private candidateHz: number | null = null;
+  /**
+   * The pitch the candidate departed FROM.
+   *
+   * Not recoverable at confirmation time: `lastVoicedHz` advances every hop, so
+   * by the second frame of a real step it already holds the new pitch and the
+   * measured interval would come out as zero. The departure has to be recorded
+   * when it happens.
+   */
+  private candidateFromHz = 0;
   private candidateFrames = 0;
   private candidateAt = 0;
   private candidateSample = 0;
@@ -124,6 +152,7 @@ export class PitchChangeDetector implements IPitchChangeDetector {
       this.candidateFrames++;
     } else {
       this.candidateHz = hz;
+      this.candidateFromHz = previous;
       this.candidateFrames = 1;
       this.candidateAt = frame.at;
       this.candidateSample = frame.sampleIndex;
@@ -131,7 +160,7 @@ export class PitchChangeDetector implements IPitchChangeDetector {
 
     if (this.candidateFrames < this.config.pitch.stepConfirmFrames) return null;
 
-    const fromHz = previous;
+    const fromHz = this.candidateFromHz;
     const toHz = this.candidateHz as number;
     const evidence: PitchChangeEvidence = {
       kind: this.isGliding() ? "glide" : "step",

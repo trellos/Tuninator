@@ -92,7 +92,18 @@ export class NoteRecord {
    * chord and the last frame names a Bm "B5".
    */
   readonly harmonyVotes = new Map<string, HarmonyVote>();
+  /**
+   * More than one string is sounding, on the deep lane's evidence.
+   *
+   * Set from the first deep reading, long before the Note has enough evidence
+   * to be *named*, because it changes segmentation immediately: YIN's
+   * fundamental is meaningless on a strummed chord, so "the arriving pitch
+   * differs from this Note's" stops being a reason to split.
+   */
+  polyphonic = false;
   harmonyBloomed = false;
+  /** This Note has committed to a chord name at least once. */
+  harmonyNamed = false;
   harmonyLabel: string | null = null;
   harmonyRoot: PitchClass | null = null;
   harmonyQuality: string | null = null;
@@ -112,6 +123,35 @@ export class NoteRecord {
   bendPeakCents = 0;
   bendReleaseDetected = false;
   bendConfidence = 0;
+
+  /** A rival harmony reading, held until it proves it is not a flap. */
+  pendingHarmonyRoot: PitchClass | null = null;
+  pendingHarmonySince = 0;
+  /**
+   * Votes cast since `pendingHarmonySince` — the evidence arguing for the
+   * change. A split backdates the boundary to that moment, so these readings
+   * end up inside the NEW Note's span and are handed to it. Without that the
+   * new Note loses its whole attack as evidence, which is the part where the
+   * third is still sounding.
+   */
+  readonly pendingHarmonyVotes = new Map<string, HarmonyVote>();
+
+  /**
+   * The Note is over, but its `resolved`/`ended` events are held back until the
+   * deep lane has said its last word about it. A chord's identity is often only
+   * settled by analysis that started before the strum stopped.
+   */
+  closing = false;
+
+  /**
+   * This Note turned out to be part of another one and has been absorbed.
+   *
+   * Its already-delivered events stand — history is never rewritten — but the
+   * recognizer no longer stands behind it as a separate event, and anything
+   * summarising the final state should follow the `structuralRevision` on the
+   * survivor rather than counting this Note again.
+   */
+  merged = false;
 
   spectralFit: number | undefined;
   contour: Array<readonly [SourceTimeMs, number, number]> = [];

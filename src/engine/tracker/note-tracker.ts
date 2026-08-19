@@ -33,16 +33,17 @@ import type {
   NoteChange,
   NoteChangeType,
   NoteOriginTrigger,
+  PitchClass,
   SourceTimeMs,
 } from "../../types.js";
 import type { EngineConfig } from "../config.js";
 import type { AttackEvidence, FastFrame, HarmonicReading, PitchActivation } from "../contracts.js";
 import { SampleClock } from "../clock.js";
 import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
-import { PitchChangeDetector, centsBetween } from "../fast/pitch-change.js";
+import { PitchChangeDetector, centsBetween, isOctaveJump } from "../fast/pitch-change.js";
 import { RearticulationDetector } from "../fast/rearticulation.js";
 import type { HypothesisTransition } from "./hypotheses.js";
-import { NoteRecord } from "./note-record.js";
+import { NoteRecord, type HarmonyVote } from "./note-record.js";
 import { classifyHarmonyChange, classifyPitchChange } from "./revision.js";
 
 export type TrackerEmission =
@@ -58,6 +59,13 @@ export type TrackerEmission =
  * becoming the leader, becoming settled, or being ruled out are all things a UI
  * showing the recognizer's thinking would want to react to.
  */
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
+
+/** No-op comparator: `Array.prototype.sort` is stable, so this preserves order. */
+function stableByNothing(): number {
+  return 0;
+}
+
 const NOTABLE_STATES = new Set(["leading", "confirmed", "discredited", "superseded", "incorporated"]);
 
 function queueTransitions(record: NoteRecord, transitions: HypothesisTransition[]): void {
@@ -69,6 +77,13 @@ function queueTransitions(record: NoteRecord, transitions: HypothesisTransition[
 
 /** Weight of the newest frame in the rolling amplitude baseline. */
 const RMS_BASELINE_ALPHA = 0.25;
+
+/**
+ * Weight of the newest deep reading in the room's polyphony estimate. Slow
+ * enough that one confused window during an attack transient does not convince
+ * the tracker a chord became a single note.
+ */
+const POLYPHONY_CONTEXT_ALPHA = 0.2;
 
 /** Confidence movement below this is not worth an event. */
 const CONFIDENCE_EPSILON = 0.15;
@@ -83,11 +98,34 @@ export class NoteTracker {
 
   /** Every Note not yet ended. Plural from day one; see the header. */
   private readonly notes = new Map<string, NoteRecord>();
+  /** Notes that have stopped sounding but whose deep work is still in flight. */
+  private readonly closing: NoteRecord[] = [];
   /** Recently ended Notes, so `getNote()` can still answer for them. */
   private readonly ended: NoteRecord[] = [];
 
   private nextId = 1;
   private lastAttack: AttackEvidence | null = null;
+  /**
+   * How polyphonic the audio has been lately, independent of any one Note.
+   *
+   * Polyphony is a property of what is sounding, not of the Note the tracker
+   * happens to have open, and keeping it per-Note loses it on every split —
+   * which is exactly when it is needed. A chord that fragments into four short
+   * Notes would rediscover from scratch, four times, that six strings are
+   * ringing, and each rediscovery arrives a deep-lane latency too late to stop
+   * the next split. So a new Note inherits the room's polyphony.
+   */
+  private contextHarmonic = 0;
+  /**
+   * When the audio last *became* harmonic, or null while it is not.
+   *
+   * Measured on the room rather than on the Note, because that is where the
+   * distinction actually lives. A strummed take is continuously harmonic
+   * whether or not the tracker happens to have split the current bar into two
+   * Notes; a fast run reads as harmonic only in flashes, as an 85ms transform
+   * straddles one note boundary and then the next.
+   */
+  private harmonicSince: SourceTimeMs | null = null;
   /** End of the most recently closed Note, so backdating cannot overlap it. */
   private lastEndedAt: SourceTimeMs | null = null;
 
@@ -100,10 +138,13 @@ export class NoteTracker {
 
   reset(): void {
     this.notes.clear();
+    this.closing.length = 0;
     this.ended.length = 0;
     this.nextId = 1;
     this.lastAttack = null;
     this.lastEndedAt = null;
+    this.contextHarmonic = 0;
+    this.harmonicSince = null;
     this.pitchChange.reset();
   }
 
@@ -115,9 +156,17 @@ export class NoteTracker {
     return out;
   }
 
+  /** Ids of every Note still open, for the deep lane to queue work against. */
+  activeNoteIds(): string[] {
+    return [...this.notes.keys()];
+  }
+
   getNote(id: string): Note | undefined {
     const active = this.notes.get(id);
     if (active !== undefined) return active.snapshot();
+    for (const record of this.closing) {
+      if (record.id === id) return record.snapshot();
+    }
     for (let i = this.ended.length - 1; i >= 0; i--) {
       const record = this.ended[i] as NoteRecord;
       if (record.id === id) return record.snapshot();
@@ -151,9 +200,18 @@ export class NoteTracker {
      *     sweeps the spectrum, which fires both attack witnesses repeatedly
      *     inside what is musically one note. */
     if (frame.attack !== null && active !== null) {
+      // Compared by pitch CLASS, not by MIDI note. On a sustained chord YIN
+      // reports whichever string dominates the window and flips freely between
+      // them — and on a single ringing string it flips between the fundamental
+      // and its octave. Both read as "the pitch changed" and neither is a new
+      // note. A genuinely new note in a line changes the pitch class.
       const arriving = frame.pitch.nearest?.midi ?? null;
       const sounding = active.dominantMidi();
-      const pitchDiffers = arriving !== null && sounding !== null && arriving !== sounding;
+      const pitchDiffers =
+        arriving !== null &&
+        sounding !== null &&
+        (((arriving - sounding) % 12) + 12) % 12 !== 0 &&
+        frame.pitch.confidence >= config.pitch.splitConfidence;
       const rearticulated = this.rearticulation.isRearticulation(
         frame.attack,
         frame,
@@ -161,7 +219,15 @@ export class NoteTracker {
         active.sustainedRms,
         pitchDiffers
       );
-      if (rearticulated && active.soundedMs >= config.tracking.minStableMs) {
+      // A harmonically-named Note has proved it is a chord, and a chord's own
+      // ring-out is full of transient-looking energy for hundreds of
+      // milliseconds. A Note that has only ever been a single pitch has no such
+      // internal structure and may be re-articulated as soon as it is real.
+      const settled =
+        active.harmonyLabel !== null
+          ? active.lastSeenAt - active.startTime >= config.transient.minRestrumMs
+          : active.soundedMs >= config.tracking.minStableMs;
+      if (rearticulated && settled) {
         this.end(active, frame.attack.at, out);
         active = null;
       }
@@ -170,10 +236,23 @@ export class NoteTracker {
     /* (b) A confirmed pitch step with no attack: a legato move. The boundary is
      *     the FIRST frame that showed the new pitch, not the one that confirmed
      *     it, or every note in a run starts a hop and a half late. */
+    // On polyphonic audio a YIN step is not a note boundary. There is no single
+    // period to find in a strummed chord, so the estimator settles on whichever
+    // string dominates the window and moves between them — often by exactly an
+    // octave, which is its own known failure mode. Segmentation there comes from
+    // attacks and from harmony changes, both of which describe the chord rather
+    // than one string of it.
+    const harmonicContext = this.contextHarmonic >= config.harmony.octaveFlipContext;
+    const spuriousStep =
+      pitchChange !== null &&
+      harmonicContext &&
+      (isOctaveJump(pitchChange.cents) || this.contextHarmonic >= config.harmony.stepSuppressContext);
+
     if (
       active !== null &&
       pitchChange !== null &&
       pitchChange.kind === "step" &&
+      !spuriousStep &&
       !active.harmonyBloomed
     ) {
       // The step is detected late by construction: YIN has to fill its window
@@ -243,43 +322,151 @@ export class NoteTracker {
   /**
    * Apply a deep-lane harmonic reading to a Note the fast lane already
    * reported on. This is where a Note blooms into a chord.
+   *
+   * The reading is a *vote*, not the answer. A strum's third decays far faster
+   * than its root and fifth, so by the end of a chord the chroma has collapsed
+   * to a power chord and a Note named from its last reading calls a Bm "B5".
+   * Votes are pooled by root first and quality second, because the root is the
+   * robust part — carried by the bass and the loudest partials, and it survives
+   * the decay — while the quality lives in the third, the first thing to go.
    */
   applyHarmony(
     noteId: string,
     reading: HarmonicReading,
     activations: readonly PitchActivation[],
-    polyphony: number,
+    evidence: { polyphony: number; voiceSpreadSemitones: number },
     at: SourceTimeMs
   ): TrackerEmission[] {
+    const polyphony = evidence.polyphony;
     const out: TrackerEmission[] = [];
     const record = this.notes.get(noteId) ?? this.endedRecord(noteId);
     if (record === undefined) return out;
 
     record.polyphonySum += polyphony;
     record.polyphonyHops++;
-    record.recordActivations(activations);
+    if (activations.length > 0) record.recordActivations(activations);
+    const runningPolyphony =
+      record.polyphonyHops > 0 ? record.polyphonySum / record.polyphonyHops : polyphony;
+    // Three conditions, all necessary, because each is individually fooled.
+    // Enough fundamentals — but a plucked string produces octave doublings that
+    // satisfy the count. Enough distance between them — but a 4096-point window
+    // is 85ms, so a fast run straddles two notes plus the decay of a third and
+    // looks every bit as spread out as a chord. And weak periodicity — because
+    // the one thing a single sounding string does that six do not is have a
+    // period, which YIN finds with near-total confidence.
+    const meanConfidence = record.frames > 0 ? record.confidenceSum / record.frames : 0;
+    const harmonicNow =
+      polyphony >= this.config.harmony.minPolyphony &&
+      evidence.voiceSpreadSemitones >= this.config.harmony.minVoiceSpreadSemitones &&
+      meanConfidence <= this.config.harmony.maxMonophonicConfidence
+        ? 1
+        : 0;
+    this.contextHarmonic =
+      this.contextHarmonic * (1 - POLYPHONY_CONTEXT_ALPHA) + harmonicNow * POLYPHONY_CONTEXT_ALPHA;
+    record.polyphonic = this.contextHarmonic >= 0.5;
 
-    if (reading.chordName !== null && reading.root !== null) {
+    if (reading.isConfident && reading.root !== null && reading.chordName !== null) {
+      castHarmonyVote(
+        record.harmonyVotes,
+        reading.chordName,
+        reading.root,
+        reading.quality,
+        reading.confidence
+      );
       record.hypotheses.observe("harmony", reading.chordName, reading.confidence, at);
+      queueTransitions(record, record.hypotheses.settle("harmony", at));
+
+      // A chord change with no attack behind it. See `harmony.changeStableMs`.
+      if (record.harmonyRoot !== null && reading.root !== record.harmonyRoot) {
+        if (record.pendingHarmonyRoot !== reading.root) {
+          record.pendingHarmonyRoot = reading.root;
+          record.pendingHarmonySince = at;
+          record.pendingHarmonyVotes.clear();
+        }
+        castHarmonyVote(
+          record.pendingHarmonyVotes,
+          reading.chordName,
+          reading.root,
+          reading.quality,
+          reading.confidence
+        );
+
+        if (
+          this.notes.has(record.id) &&
+          at - record.pendingHarmonySince >= this.config.harmony.changeStableMs
+        ) {
+          // The evidence gathered while the change was merely pending belongs
+          // to the NEW Note: the backdated boundary puts those readings inside
+          // its span, and they are the ones where the third is still sounding.
+          const boundary = Math.max(record.pendingHarmonySince, record.startTime);
+          const carried = new Map(record.pendingHarmonyVotes);
+          this.end(record, boundary, out);
+          const successor = this.beginHarmonic(boundary, record, carried);
+          for (const emission of this.applyHarmony(
+            successor.id,
+            reading,
+            activations,
+            evidence,
+            at
+          )) {
+            out.push(emission);
+          }
+          this.publish(out);
+          return out;
+        }
+      } else if (reading.root === record.harmonyRoot) {
+        record.pendingHarmonyRoot = null;
+        record.pendingHarmonyVotes.clear();
+      }
     }
+
+    // Blooming is a claim that more than one string is sounding, so it needs
+    // evidence of polyphony rather than merely a template that happened to fit.
+    // A single picked note fits "C5" perfectly well if you let it.
+    const meanPolyphony = runningPolyphony;
+    const enoughEvidence = record.polyphonyHops >= this.config.harmony.minEvidenceHops;
+    const meanPitchConfidence =
+      record.frames > 0 ? record.confidenceSum / record.frames : 0;
+    const monophonic = meanPitchConfidence > this.config.harmony.maxMonophonicConfidence;
+    if (!record.polyphonic || monophonic || !enoughEvidence) return out;
+
+    const winner = bestHarmonyVote(record.harmonyVotes, this.config.harmony.minEvidenceHops);
+    // Either this Note has itself sustained long enough to be a chord, or the
+    // room has been unambiguously harmonic for that long — a strummed take
+    // stays harmonic across a boundary the tracker has just drawn, and the new
+    // Note should not have to re-earn what the previous one established.
+    const minimum = this.config.harmony.minChordDurationMs;
+    const sustained =
+      Math.max(record.lastSeenAt, at) - record.startTime >= minimum ||
+      (this.harmonicSince !== null && at - this.harmonicSince >= minimum);
+    // See `harmony.minChordDurationMs`: an unnameable chord is a much weaker
+    // claim than a named one, and the only one that misfires on a fast run.
+    if (winner === null && !record.harmonyBloomed && !sustained) return out;
 
     const previousRoot = record.harmonyRoot;
     const previousQuality = record.harmonyQuality;
     const previousLabel = record.harmonyLabel;
-
     const bloomed = record.harmonyBloomed;
+
     record.harmonyBloomed = true;
-    record.harmonyRoot = reading.root;
-    record.harmonyQuality = reading.quality;
-    record.harmonyLabel = reading.chordName;
-    record.harmonyConfidence = reading.confidence;
-    record.harmonyIntervals = reading.intervals;
+    record.harmonyConfidence = winner === null ? 0 : winner.weight / winner.hops;
     record.harmonyAlternatives = reading.alternatives;
-    record.spectralFit = reading.confidence;
-    record.estimatedVoiceCount = {
-      value: record.polyphonyHops > 0 ? record.polyphonySum / record.polyphonyHops : polyphony,
-      confidence: reading.confidence,
-    };
+    record.estimatedVoiceCount = { value: meanPolyphony, confidence: reading.confidence };
+    if (winner === null) {
+      // Nothing ever cleared both the floor and the margin often enough to name
+      // this Note. Saying so is a result: the recognizer knows it is a chord and
+      // will not guess which one.
+      record.harmonyRoot = null;
+      record.harmonyQuality = null;
+      record.harmonyLabel = null;
+      record.harmonyIntervals = [];
+    } else {
+      record.harmonyRoot = winner.root;
+      record.harmonyQuality = winner.quality;
+      record.harmonyLabel = winner.label;
+      record.harmonyIntervals = reading.intervals;
+      record.spectralFit = record.harmonyConfidence;
+    }
     if (reading.bass !== null) {
       record.harmonyBass = {
         midi: reading.bass.midi,
@@ -296,35 +483,133 @@ export class NoteTracker {
     // A Note that has just learned it is a chord has not been corrected — the
     // pitch it reported is a member of that chord. Say so, rather than
     // discarding it.
-    if (!bloomed && record.currentPitch !== null && reading.chordName !== null) {
-      record.hypotheses.incorporate("pitch", record.currentPitch.name, reading.chordName, at);
+    if (!bloomed && record.currentPitch !== null && record.harmonyLabel !== null) {
+      record.hypotheses.incorporate("pitch", record.currentPitch.name, record.harmonyLabel, at);
     }
     if (
       bloomed &&
       previousLabel !== null &&
-      reading.chordName !== null &&
-      previousLabel !== reading.chordName
+      record.harmonyLabel !== null &&
+      previousLabel !== record.harmonyLabel
     ) {
-      record.hypotheses.supersede("harmony", previousLabel, reading.chordName, at);
+      record.hypotheses.supersede("harmony", previousLabel, record.harmonyLabel, at);
     }
-    queueTransitions(record, record.hypotheses.settle("harmony", at));
 
     const type: NoteChangeType = bloomed
-      ? classifyHarmonyChange(previousRoot, previousQuality, reading.root, reading.quality)
+      ? classifyHarmonyChange(previousRoot, previousQuality, record.harmonyRoot, record.harmonyQuality)
       : "harmonyEnrichment";
 
-    if (record.announced && record.endTime === null) {
+    // A Note that has just named itself a chord reaches back for the fragments
+    // of its own attack. See `harmony.mergeLookbackMs`.
+    // Keyed on the first time this Note is NAMED, not the first time it bloomed:
+    // a Note routinely blooms as an abstention first — it knows it is a chord
+    // several readings before it knows which one — and the fragments of its
+    // attack are still waiting to be claimed when the name finally arrives.
+    const justNamed = !record.harmonyNamed && record.harmonyLabel !== null;
+    if (record.harmonyLabel !== null) record.harmonyNamed = true;
+    const longEnoughToBeAChord =
+      Math.max(record.lastSeenAt, at) - record.startTime >= this.config.harmony.mergeMinSurvivorMs;
+    if (justNamed && longEnoughToBeAChord && record.endTime === null) {
+      const absorbed = this.absorbAttackFragments(record);
+      if (absorbed.length > 0 && record.announced) {
+        const revisionNumber = record.bump("structuralRevision");
+        out.push({
+          type: "changed",
+          note: record.snapshot(),
+          change: {
+            type: "structuralRevision",
+            at,
+            revisionNumber,
+            relatedNoteIds: absorbed,
+          },
+        });
+      }
+    }
+
+    const label = record.currentLabel();
+    if (record.announced && record.endTime === null && label !== record.lastEmitted.label) {
       const revisionNumber = record.bump(type);
       const change: NoteChange = { type, at, revisionNumber };
       if (bloomed && previousLabel !== null && type === "harmonyCorrection") {
         change.previous = { label: previousLabel };
       }
+      record.lastEmitted.label = label;
       out.push({ type: "changed", note: record.snapshot(), change });
-      record.lastEmitted.label = record.currentLabel();
     } else {
       record.bump(type);
     }
     return out;
+  }
+
+  /** Opens the Note that takes over when the harmony changes mid-ring. */
+  private beginHarmonic(
+    at: SourceTimeMs,
+    predecessor: NoteRecord,
+    carriedVotes: ReadonlyMap<string, HarmonyVote>
+  ): NoteRecord {
+    const record = new NoteRecord({
+      id: `n${this.nextId++}`,
+      config: this.config,
+      startTime: at,
+      startSample: this.clock.toSamples(at),
+      trigger: "pitchChange",
+      frequencyHz: predecessor.currentFrequencyHz,
+      originPitch: predecessor.currentPitch,
+      confidence: predecessor.pitchConfidence,
+      rms: predecessor.rms,
+      peak: predecessor.maxPeak,
+    });
+    record.polyphonic = this.contextHarmonic >= 0.5;
+    record.sustainedRms = predecessor.sustainedRms;
+    for (const [label, vote] of carriedVotes) record.harmonyVotes.set(label, { ...vote });
+    this.notes.set(record.id, record);
+    return record;
+  }
+
+  /**
+   * Absorb the unnamed Notes immediately preceding `survivor` into it.
+   *
+   * Only unnamed ones: a preceding Note that named its own chord is a different
+   * chord, not a fragment of this one. Contiguity is required in both
+   * directions — a gap means silence, and silence means two separate events.
+   *
+   * The survivor's start moves back to the earliest absorbed Note's start,
+   * which is the point of the exercise: the fast lane's first fragment sits on
+   * the real attack, and the Note that eventually names the chord does not.
+   */
+  private absorbAttackFragments(survivor: NoteRecord): string[] {
+    const config = this.config.harmony;
+    const absorbed: string[] = [];
+    let earliest = survivor;
+
+    for (let guard = 0; guard < 16; guard++) {
+      let previous: NoteRecord | null = null;
+      for (const candidate of [...this.closing, ...this.ended]) {
+        if (candidate.merged) continue;
+        if (candidate.harmonyLabel !== null) continue;
+        if (candidate.endTime === null) continue;
+        if (candidate.endTime - candidate.startTime > config.mergeMaxFragmentMs) continue;
+        if (candidate.endTime > earliest.startTime + config.mergeMaxGapMs) continue;
+        if (candidate.endTime < earliest.startTime - config.mergeMaxGapMs) continue;
+        if (survivor.startTime - candidate.startTime > config.mergeLookbackMs) continue;
+        if (previous === null || candidate.startTime > previous.startTime) previous = candidate;
+      }
+      if (previous === null) break;
+      previous.merged = true;
+      absorbed.push(previous.id);
+      earliest = previous;
+    }
+
+    if (absorbed.length > 0) {
+      survivor.startTime = earliest.startTime;
+      survivor.startSample = earliest.startSample;
+    }
+    return absorbed;
+  }
+
+  /** The harmony a Note currently answers to, for segmentation decisions. */
+  currentHarmonyOf(noteId: string): string | null {
+    return this.notes.get(noteId)?.harmonyLabel ?? null;
   }
 
   /** Ends every open Note. Called on stop, and at the end of offline input. */
@@ -334,6 +619,7 @@ export class NoteTracker {
       this.end(record, Math.max(at, record.startTime), out);
     }
     this.publish(out);
+    this.releaseClosed(EMPTY_SET, out);
     return out;
   }
 
@@ -394,6 +680,7 @@ export class NoteTracker {
       rms: frame.rms,
       peak: frame.peak,
     });
+    record.polyphonic = this.contextHarmonic >= 0.5;
     this.notes.set(record.id, record);
     if (frequencyHz !== null) this.pitchChange.clearAfterSplit(frequencyHz, at);
     void out;
@@ -588,6 +875,7 @@ export class NoteTracker {
     this.notes.delete(record.id);
     const endAt = Math.max(at, record.startTime);
     this.lastEndedAt = endAt;
+    record.endTime = endAt;
 
     if (!record.announced) {
       // Never announced: too short to have been a Note. Drop it rather than
@@ -605,26 +893,118 @@ export class NoteTracker {
       out.push({ type: "started", note: record.snapshot() });
     }
 
-    if (!record.resolvedAnnounced) {
-      record.resolvedAnnounced = true;
-      record.lifecycle = "resolved";
-      record.bump("resolved");
-      out.push({ type: "resolved", note: record.snapshot() });
+    // The sound is over, but the recognizer may not have finished thinking. A
+    // chord's identity is routinely settled by deep analysis that started
+    // before the strum stopped, so the closing events wait for it — otherwise
+    // the answer a consumer keeps is the one from before the evidence arrived.
+    record.closing = true;
+    this.closing.push(record);
+  }
+
+  /**
+   * Emit the held closing events for every Note the deep lane is done with.
+   *
+   * @param busy ids the deep lane still has queued work for
+   */
+  releaseClosed(busy: ReadonlySet<string>, out: TrackerEmission[]): void {
+    for (let i = this.closing.length - 1; i >= 0; i--) {
+      const record = this.closing[i] as NoteRecord;
+      if (busy.has(record.id)) continue;
+      this.closing.splice(i, 1);
+
+      if (!record.resolvedAnnounced) {
+        record.resolvedAnnounced = true;
+        record.lifecycle = "resolved";
+        record.bump("resolved");
+        out.push({ type: "resolved", note: record.snapshot() });
+      }
+
+      record.lifecycle = "ended";
+      out.push({ type: "ended", note: record.snapshot() });
+
+      this.ended.push(record);
+      if (this.ended.length > this.config.tracking.endedNoteHistory) this.ended.shift();
     }
-
-    record.lifecycle = "ended";
-    record.endTime = endAt;
-    out.push({ type: "ended", note: record.snapshot() });
-
-    this.ended.push(record);
-    if (this.ended.length > this.config.tracking.endedNoteHistory) this.ended.shift();
+    // Closing Notes are emitted newest-last, so a consumer sees them in the
+    // order they stopped sounding rather than in queue order.
+    out.sort(stableByNothing);
   }
 
   private endedRecord(id: string): NoteRecord | undefined {
+    for (const record of this.closing) {
+      if (record.id === id) return record;
+    }
     for (let i = this.ended.length - 1; i >= 0; i--) {
       const record = this.ended[i] as NoteRecord;
       if (record.id === id) return record;
     }
     return undefined;
   }
+}
+
+function castHarmonyVote(
+  votes: Map<string, HarmonyVote>,
+  label: string,
+  root: PitchClass,
+  quality: string | null,
+  confidence: number
+): void {
+  const vote = votes.get(label) ?? {
+    label,
+    root,
+    quality: quality ?? "maj",
+    weight: 0,
+    hops: 0,
+  };
+  vote.weight += confidence;
+  vote.hops++;
+  votes.set(label, vote);
+}
+
+/**
+ * A Note's chord name, decided in two stages: root first, then quality among
+ * the readings that agreed on that root.
+ *
+ * Root before quality because the root is the robust part — it is carried by
+ * the bass and the loudest partials and survives the decay — while the quality
+ * lives in the third, the first thing to disappear. Pooling by root means a
+ * decayed `B5` and a full `Bm` reinforce each other on the root rather than
+ * splitting the vote, and the quality is then settled only among readings that
+ * were looking at the same chord.
+ *
+ * Ties break toward the first reading seen, which is deterministic: `Map`
+ * iterates in insertion order and insertion order is analysis order.
+ */
+function bestHarmonyVote(
+  votes: ReadonlyMap<string, HarmonyVote>,
+  minEvidenceHops: number
+): HarmonyVote | null {
+  const roots = new Map<string, { weight: number; hops: number }>();
+  for (const vote of votes.values()) {
+    const aggregate = roots.get(vote.root) ?? { weight: 0, hops: 0 };
+    aggregate.weight += vote.weight;
+    aggregate.hops += vote.hops;
+    roots.set(vote.root, aggregate);
+  }
+
+  let bestRoot: string | null = null;
+  let bestWeight = 0;
+  let bestHops = 0;
+  for (const [root, aggregate] of roots) {
+    if (aggregate.weight > bestWeight) {
+      bestRoot = root;
+      bestWeight = aggregate.weight;
+      bestHops = aggregate.hops;
+    }
+  }
+  // Below this the evidence is a flash rather than a reading, and the honest
+  // answer is that this is a chord we will not name.
+  if (bestRoot === null || bestHops < minEvidenceHops) return null;
+
+  let winner: HarmonyVote | null = null;
+  for (const vote of votes.values()) {
+    if (vote.root !== bestRoot) continue;
+    if (winner === null || vote.weight > winner.weight) winner = vote;
+  }
+  return winner;
 }

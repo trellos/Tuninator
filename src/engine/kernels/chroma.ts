@@ -52,6 +52,16 @@ export type ChromaResult = {
   salience: number;
   /** Estimated number of simultaneous fundamentals. */
   polyphony: number;
+  /**
+   * The fundamentals themselves, strongest first, with their register intact.
+   *
+   * `chroma` deliberately folds octaves away, which is right for matching
+   * templates and wrong for describing a voicing: "C, E, G" cannot tell C/G
+   * from a root-position C, and cannot say which C. Cancellation already
+   * computes these on the way to `polyphony`, so reporting them costs nothing
+   * and is the only place the register survives.
+   */
+  fundamentals: Array<{ midi: number; salience: number }>;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -337,12 +347,21 @@ export class ChromaAnalyzer {
     const fundamentals = this.estimateFundamentals();
     const chroma = this.foldToChroma(fundamentals);
 
+    const detected: Array<{ midi: number; salience: number }> = [];
+    for (let f = 0; f < fundamentals; f++) {
+      detected.push({
+        midi: GRID_MIN_MIDI + (this.fundamentalGrid[f] as number),
+        salience: this.fundamentalSalience[f] as number,
+      });
+    }
+
     return {
       chroma,
       bassPitchClass,
       bassFrequencyHz,
       salience,
       polyphony: fundamentals,
+      fundamentals: detected,
     };
   }
 
@@ -704,5 +723,6 @@ function untonalResult(salience: number): ChromaResult {
     bassFrequencyHz: null,
     salience,
     polyphony: 0,
+    fundamentals: [],
   };
 }
