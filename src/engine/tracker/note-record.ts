@@ -27,6 +27,7 @@ import type { ConfidenceParts, PitchActivation } from "../contracts.js";
 import { DefaultConfidenceModel } from "./confidence.js";
 import { StatefulHypothesisTracker, type HypothesisTransition } from "./hypotheses.js";
 import { VoiceDecay } from "./voices.js";
+import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
 
 const confidenceModel = new DefaultConfidenceModel();
 
@@ -268,9 +269,54 @@ export class NoteRecord {
   }
 
   /** The name this Note would answer to right now. */
+  /**
+   * The pitch this Note is NAMED after, from the accumulated evidence.
+   *
+   * Not the newest frame. A boundary that is off by part of a note leaves the
+   * Note's first frames describing its predecessor, and naming it from the last
+   * frame it saw hands it its successor's name instead — on a fast run one or
+   * other of those is true most of the time. `noteVotes` already weighs every
+   * frame by how sure the estimator was; this is what that was collected for.
+   *
+   * Falls back to the live pitch only while nothing has voted yet, which is the
+   * Note's first hop.
+   */
+  settledPitch(): DetectedPitch | null {
+    const midi = this.dominantMidi();
+    if (midi === null) return this.currentPitch;
+    if (this.currentPitch !== null && this.currentPitch.midi === midi) return this.currentPitch;
+    // Prefer a real reading of this pitch over a synthesised one, so cents and
+    // frequency stay true to what was heard rather than to the tempered grid.
+    for (let i = this.contour.length - 1; i >= 0; i--) {
+      const point = this.contour[i] as readonly [SourceTimeMs, number, number];
+      const described = describeFrequency(point[1]);
+      if (described.midi === midi) {
+        return {
+          midi: described.midi,
+          name: described.name,
+          pitchClass: described.pitchClass,
+          octave: described.octave,
+          frequencyHz: described.frequencyHz,
+          centsOffset: described.cents,
+          role: "first",
+          confidence: this.pitchConfidence,
+        };
+      }
+    }
+    const ideal = describeFrequency(midiToFrequency(midi));
+    return {
+      midi: ideal.midi,
+      name: ideal.name,
+      pitchClass: ideal.pitchClass,
+      octave: ideal.octave,
+      role: "first",
+      confidence: this.pitchConfidence,
+    };
+  }
+
   currentLabel(): string {
     if (this.harmonyBloomed) return this.harmonyLabel ?? "unknown";
-    return this.currentPitch?.name ?? "unknown";
+    return this.settledPitch()?.name ?? "unknown";
   }
 
   bump(type: NoteChangeType): number {
@@ -324,7 +370,8 @@ export class NoteRecord {
     };
 
     if (this.currentFrequencyHz !== null) note.pitch.currentFrequencyHz = this.currentFrequencyHz;
-    if (this.currentPitch !== null) note.pitch.current = { ...this.currentPitch };
+    const settled = this.settledPitch();
+    if (settled !== null) note.pitch.current = { ...settled };
     if (this.config.diagnostics.contour && this.contour.length > 0) {
       note.pitch.contour = this.contour.map((p) => [p[0], p[1], p[2]] as const);
     }

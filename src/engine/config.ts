@@ -38,6 +38,20 @@ export type EngineConfig = {
     /** Frames of temporal median applied before snapping to a note. */
     medianFrames: number;
     /**
+     * How far behind the audio the pitch estimate runs, ms.
+     *
+     * A frame is stamped at the END of the window it analysed, and the temporal
+     * median needs several hops to turn over, so the pitch reported at time T
+     * describes audio from around T minus this. The transient path has no such
+     * delay, which is why a Note that begins on an attack lands on time while
+     * its pitch arrives late.
+     *
+     * Used to decide WHICH Note a frame's pitch is evidence about. Zero means
+     * every frame votes for whatever is sounding when it arrives, which on a
+     * 167ms triplet hands half of each Note's evidence to its predecessor.
+     */
+    voteLagMs: number;
+    /**
      * A single-hop pitch jump this large reads as a new note rather than a bend.
      * Total displacement cannot separate "A3 bent up to B3" from a legato
      * D5->E5 step — both are 200 cents — only the per-hop rate can.
@@ -314,6 +328,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     shortWindowMinHz: 300,
     yinThreshold: 0.13,
     medianFrames: 3,
+    voteLagMs: 0,
     stepThresholdCents: 70,
     stepConfirmFrames: 2,
     splitConfidence: 0.6,

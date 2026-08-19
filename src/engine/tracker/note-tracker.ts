@@ -798,9 +798,13 @@ export class NoteTracker {
     // was sure and a hop where it barely cleared the gate are not equal
     // evidence, and in a fast run the uncertain hops cluster at the boundaries,
     // where the window is straddling two notes.
-    record.noteVotes.set(
+    // Vote for the Note this audio belongs to, which is not always the Note
+    // sounding now. See `pitch.voteLagMs`.
+    const lag = config.pitch.voteLagMs;
+    const owner = lag > 0 ? (this.recordSoundingAt(t - lag) ?? record) : record;
+    owner.noteVotes.set(
       nearest.midi,
-      (record.noteVotes.get(nearest.midi) ?? 0) + frame.pitch.confidence
+      (owner.noteVotes.get(nearest.midi) ?? 0) + frame.pitch.confidence
     );
     record.hypotheses.observe("pitch", nearest.name, frame.pitch.confidence, t);
 
@@ -995,6 +999,27 @@ export class NoteTracker {
     // Closing Notes are emitted newest-last, so a consumer sees them in the
     // order they stopped sounding rather than in queue order.
     out.sort(stableByNothing);
+  }
+
+  /**
+   * The Note that was sounding at `at`, live or already finished.
+   *
+   * Pitch evidence arrives later than the audio it describes, so by the time a
+   * frame can be voted on, the Note it belongs to may have ended — on a fast
+   * run that is most of the run. Attributing it to whatever is sounding NOW
+   * instead is what gave each Note a share of its predecessor's pitch.
+   */
+  private recordSoundingAt(at: SourceTimeMs): NoteRecord | undefined {
+    let best: NoteRecord | undefined;
+    const consider = (record: NoteRecord): void => {
+      if (record.startTime > at) return;
+      if (record.endTime !== null && record.endTime <= at) return;
+      if (best === undefined || record.startTime > best.startTime) best = record;
+    };
+    for (const record of this.notes.values()) consider(record);
+    for (const record of this.closing) consider(record);
+    for (let i = this.ended.length - 1; i >= 0; i--) consider(this.ended[i] as NoteRecord);
+    return best;
   }
 
   private endedRecord(id: string): NoteRecord | undefined {
