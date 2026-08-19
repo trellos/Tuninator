@@ -242,6 +242,15 @@ export class NoteTracker {
         Math.abs(centsBetween(frame.pitch.frequencyHz, active.lastVoicedHz)) <
           config.pitch.stepThresholdCents;
       const pitchDiffers =
+        // Never on a Note that has bloomed into a chord. A chord's pitch is not
+        // one pitch: YIN reports whichever string dominates the window and
+        // moves between them freely, so "a different pitch arrived" is the
+        // normal state of affairs inside a strum and says nothing about a new
+        // event. Segmentation there comes from attacks and from harmony
+        // changes, both of which describe the chord rather than one voice of
+        // it. This is the Voices-versus-Notes distinction: a string arriving is
+        // a voice, and a voice is not a Note.
+        !active.harmonyBloomed &&
         !bentSteady &&
         arriving !== null &&
         sounding !== null &&
