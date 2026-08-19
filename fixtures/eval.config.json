@@ -115,5 +115,68 @@
     "gateNote": "HELD-OUT DATA, informational only, and the hardest thing in the corpus: 48 sixteenths 107ms apart, the only test of the 140bpm sixteenth-note requirement anywhere in the fixtures. Four repeats of a pitch per beat, alternating loud downstrokes and quiet upstrokes, so the failure mode to watch for is halving -- 24 events at eighth-note spacing instead of 48. Missed-event count matters more than label accuracy on this one.",
     "minLabelAccuracy": 0.7,
     "maxMedianOnsetErrorMs": 60
+  },
+  "power-chords-di-b-a-g-fsharp-b-a-g-e-140bpm": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "HELD-OUT DATA, informational only. Direct-input capture of the same performance as power-chords-b-a-g-fsharp-b-a-g-e-140bpm (the room mic) and power-chords-amped-... (the amp sim). The three files are one performance through three signal paths, which is what makes them useful: a number that moves between them is a signal-path effect, a number that moves on all three is the detector. Sixteen quarter-note strums 857ms apart, in same-chord pairs whose second member is muted early, so merging a pair shows up as a missed event.",
+    "minLabelAccuracy": 0.8,
+    "maxMedianOnsetErrorMs": 120
+  },
+
+  "power-chords-amped-b-a-g-fsharp-b-a-g-e-140bpm": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "HELD-OUT DATA, informational only. The DI power-chord take through a Marshall Plexi sim. Its compression is severe enough that not one transient in the file stands 60x above its own noise floor, where the DI has eight, so this is the file that punishes any re-articulation test keyed to absolute transient sharpness.",
+    "minLabelAccuracy": 0.8,
+    "maxMedianOnsetErrorMs": 120
+  },
+
+  "lead-line-di-quarter-eighth-triplet-140bpm": {
+    "required": false,
+    "mode": "lead",
+    "gateOn": "pitchClass",
+    "gateNote": "HELD-OUT DATA, informational only. Direct-input capture of the same performance as lead-line-quarter-eighth-triplet-140bpm.",
+    "sections": {
+      "quarters": { "idPrefix": "q", "startMs": 4373, "endMs": 10173, "required": false },
+      "eighths": { "idPrefix": "e", "startMs": 12873, "endMs": 17273, "required": false },
+      "triplets": { "idPrefix": "t", "startMs": 23173, "endMs": 27123, "required": false }
+    },
+    "minLabelAccuracy": 0.7,
+    "maxMedianOnsetErrorMs": 100
+  },
+
+  "lead-line-amped-quarter-eighth-triplet-140bpm": {
+    "required": false,
+    "mode": "lead",
+    "gateOn": "pitchClass",
+    "gateNote": "HELD-OUT DATA, informational only. The DI lead take through the amp sim; the mic capture of the same performance is lead-line-quarter-eighth-triplet-140bpm.",
+    "sections": {
+      "quarters": { "idPrefix": "q", "startMs": 4373, "endMs": 10173, "required": false },
+      "eighths": { "idPrefix": "e", "startMs": 12873, "endMs": 17273, "required": false },
+      "triplets": { "idPrefix": "t", "startMs": 23173, "endMs": 27123, "required": false }
+    },
+    "minLabelAccuracy": 0.7,
+    "maxMedianOnsetErrorMs": 100
+  },
+
+  "lead-line-di-sixteenths-e-fsharp-140bpm": {
+    "required": false,
+    "mode": "lead",
+    "gateOn": "pitchClass",
+    "gateNote": "HELD-OUT DATA, informational only, and the control for the hardest thing in the corpus. 48 sixteenths 107ms apart with the quiet upstrokes intact; every one of the 48 has its own flux peak on this file, which is what settles that the mic labels are not over-counting. The failure mode to watch for is halving to 24 events at eighth-note spacing.",
+    "minLabelAccuracy": 0.7,
+    "maxMedianOnsetErrorMs": 60
+  },
+
+  "lead-line-amped-sixteenths-e-fsharp-140bpm": {
+    "required": false,
+    "mode": "lead",
+    "gateOn": "pitchClass",
+    "gateNote": "HELD-OUT DATA, informational only. The sixteenths through the amp sim: quiet upstrokes plus a compressor is the worst case for any onset test that compares a transient against the level around it.",
+    "minLabelAccuracy": 0.7,
+    "maxMedianOnsetErrorMs": 60
   }
 }
