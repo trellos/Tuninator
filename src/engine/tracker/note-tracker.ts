@@ -41,6 +41,7 @@ import { SampleClock } from "../clock.js";
 import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
 import { PitchChangeDetector, centsBetween } from "../fast/pitch-change.js";
 import { RearticulationDetector } from "../fast/rearticulation.js";
+import type { HypothesisTransition } from "./hypotheses.js";
 import { NoteRecord } from "./note-record.js";
 import { classifyHarmonyChange, classifyPitchChange } from "./revision.js";
 
@@ -49,6 +50,22 @@ export type TrackerEmission =
   | { type: "changed"; note: Note; change: NoteChange }
   | { type: "resolved"; note: Note }
   | { type: "ended"; note: Note };
+
+/**
+ * State moves worth telling a consumer about.
+ *
+ * Reaching `contender` is bookkeeping — every reading passes through it — while
+ * becoming the leader, becoming settled, or being ruled out are all things a UI
+ * showing the recognizer's thinking would want to react to.
+ */
+const NOTABLE_STATES = new Set(["leading", "confirmed", "discredited", "superseded", "incorporated"]);
+
+function queueTransitions(record: NoteRecord, transitions: HypothesisTransition[]): void {
+  for (const transition of transitions) {
+    if (!NOTABLE_STATES.has(transition.to)) continue;
+    record.pendingTransitions.push(transition);
+  }
+}
 
 /** Weight of the newest frame in the rolling amplitude baseline. */
 const RMS_BASELINE_ALPHA = 0.25;
@@ -290,7 +307,7 @@ export class NoteTracker {
     ) {
       record.hypotheses.supersede("harmony", previousLabel, reading.chordName, at);
     }
-    record.hypotheses.settle("harmony", at);
+    queueTransitions(record, record.hypotheses.settle("harmony", at));
 
     const type: NoteChangeType = bloomed
       ? classifyHarmonyChange(previousRoot, previousQuality, reading.root, reading.quality)
@@ -482,7 +499,7 @@ export class NoteTracker {
       record.currentPitch = { ...record.currentPitch, frequencyHz: hz };
     }
 
-    record.hypotheses.settle("pitch", t);
+    queueTransitions(record, record.hypotheses.settle("pitch", t));
     if (record.lifecycle === "started" && record.soundedMs >= config.tracking.minStableMs) {
       record.lifecycle = "enriching";
     }
@@ -517,6 +534,34 @@ export class NoteTracker {
       const labelChanged = label !== last.label;
       const bendChanged = Math.abs(record.bendCents - last.bendCents) > BEND_EPSILON;
       const confidenceChanged = Math.abs(confidence - last.confidence) > CONFIDENCE_EPSILON;
+
+      // A hypothesis moving state is news in its own right, and it is news
+      // that arrives BEFORE the label catches up: a reading being promoted to
+      // `leading` is the interesting moment, not the later hop where it
+      // finally changes the answer. Emitted first, and at most one per hop, so
+      // the trail stays readable rather than becoming a per-frame firehose.
+      const transition = record.pendingTransitions.shift();
+      record.pendingTransitions.length = 0;
+      if (transition !== undefined) {
+        const kind: NoteChangeType =
+          transition.to === "discredited" || transition.to === "superseded"
+            ? "hypothesisDiscredited"
+            : transition.to === "incorporated"
+              ? "hypothesisIncorporated"
+              : "hypothesisPromoted";
+        const revisionNumber = record.bump(kind);
+        out.push({
+          type: "changed",
+          note: record.snapshot(),
+          change: {
+            type: kind,
+            at: record.lastSeenAt,
+            revisionNumber,
+            previous: { label: transition.hypothesis.label, hypothesisId: transition.hypothesis.id },
+          },
+        });
+      }
+
       if (!labelChanged && !bendChanged && !confidenceChanged) continue;
 
       const type: NoteChangeType = labelChanged

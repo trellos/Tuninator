@@ -25,7 +25,7 @@ import type {
 import type { EngineConfig } from "../config.js";
 import type { ConfidenceParts, PitchActivation } from "../contracts.js";
 import { DefaultConfidenceModel } from "./confidence.js";
-import { StatefulHypothesisTracker } from "./hypotheses.js";
+import { StatefulHypothesisTracker, type HypothesisTransition } from "./hypotheses.js";
 
 const confidenceModel = new DefaultConfidenceModel();
 
@@ -118,6 +118,15 @@ export class NoteRecord {
 
   /** What was last emitted, so an update fires on change rather than per hop. */
   lastEmitted = { label: "", confidence: -1, bendCents: 0, lifecycle: "started" as NoteLifecycle };
+
+  /**
+   * Hypothesis transitions observed since the last emission, oldest first.
+   *
+   * Queued rather than emitted inline because a single hop can promote one
+   * reading and discredit two others, and a consumer wants the resulting
+   * events in order, after the Note snapshot that reflects all of them.
+   */
+  readonly pendingTransitions: HypothesisTransition[] = [];
 
   private readonly config: EngineConfig;
 
