@@ -106,6 +106,16 @@ export type EngineConfig = {
      */
     minRestrumMs: number;
     /**
+     * How far above a Note's own measured decay curve the signal must sit for
+     * the extra energy to count as a fresh strum.
+     *
+     * The one test a muted upstrum can pass and sustain ripple cannot: the
+     * upstrum puts energy into strings that were on their way down, and no
+     * amount of ripple lifts a decaying chord above where its own decay says
+     * it should be.
+     */
+    restrumDecayExcess: number;
+    /**
      * Total pitch motion across the glide window that counts as an active
      * glide, in cents. Bending sweeps the spectrum, which spikes flux AND lifts
      * RMS, so both attack tests pass mid-bend; an attack only means "new note"
@@ -119,6 +129,16 @@ export type EngineConfig = {
   tracking: {
     /** How long a Note must sound before it is announced. */
     minStableMs: number;
+    /**
+     * How long a Note with no measurable pitch must sound before it is
+     * announced.
+     *
+     * Longer than `minStableMs`, because there is less to go on. A pitched Note
+     * has already been confirmed by an independent estimator; an unpitched one
+     * has only energy, and energy alone is also what a pick scrape, a fret
+     * buzz and the tail of the previous chord look like.
+     */
+    minUnpitchedStableMs: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -291,11 +311,13 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rearticulationSharpness: 0.7,
     newPitchSharpness: 0.3,
     minRestrumMs: 380,
+    restrumDecayExcess: 1.25,
     glideMinCents: 25,
     glideWindowHops: 5,
   },
   tracking: {
     minStableMs: 45,
+    minUnpitchedStableMs: 90,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

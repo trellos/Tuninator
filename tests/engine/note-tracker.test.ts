@@ -117,8 +117,18 @@ describe("Note lifecycle", () => {
     expect(note.endTime as number).toBeLessThan(300 + 500 + 200);
   });
 
-  it("does not announce a Note too short to have been played", () => {
-    const result = run(concat(silence(ms(300)), sawtooth(220, ms(20)), silence(ms(400))));
+  it("does not announce a click that never became a note", () => {
+    // A 20ms burst with no periodicity: energy arrived, nothing was played.
+    // The bar for an unpitched Note is deliberately higher than for a pitched
+    // one, because energy alone is also what a pick scrape and a fret buzz
+    // look like.
+    const burst = new Float32Array(ms(20));
+    let state = 12345;
+    for (let i = 0; i < burst.length; i++) {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      burst[i] = (state / 0x100000000) * 0.6 - 0.3;
+    }
+    const result = run(concat(silence(ms(300)), burst, silence(ms(400))));
     expect(result.started).toHaveLength(0);
     expect(result.ended).toHaveLength(0);
   });

@@ -26,6 +26,7 @@ import type { EngineConfig } from "../config.js";
 import type { ConfidenceParts, PitchActivation } from "../contracts.js";
 import { DefaultConfidenceModel } from "./confidence.js";
 import { StatefulHypothesisTracker, type HypothesisTransition } from "./hypotheses.js";
+import { VoiceDecay } from "./voices.js";
 
 const confidenceModel = new DefaultConfidenceModel();
 
@@ -61,8 +62,19 @@ export class NoteRecord {
 
   lastVoicedHz: number | null;
   lastVoicedAt: SourceTimeMs;
+  /**
+   * When this Note was last *audible*, which is not the same as last pitched.
+   *
+   * A strummed chord has no single periodicity for YIN to find, so a Note whose
+   * life is measured in voiced frames can sound for two seconds and never be
+   * announced. Announcement is about whether something was really played, and
+   * that is a question about energy.
+   */
+  lastAudibleAt: SourceTimeMs;
   lastSeenAt: SourceTimeMs;
   unvoicedSince: SourceTimeMs | null = null;
+  /** When the audio last fell below the gate, or null while it is audible. */
+  silentSince: SourceTimeMs | null = null;
 
   /** Emitted `noteStarted` yet. A Note too short to be real never does. */
   announced = false;
@@ -77,6 +89,8 @@ export class NoteRecord {
   rms: number;
   /** Short rolling mean of rms — the baseline a re-pick has to rise above. */
   sustainedRms: number;
+  /** This Note's own decay, fitted from its envelope. See `voices.ts`. */
+  readonly decay = new VoiceDecay();
 
   /**
    * How many voiced frames landed on each MIDI note. The Note is labeled from
@@ -196,6 +210,7 @@ export class NoteRecord {
     this.pitchConfidence = options.confidence;
     this.lastVoicedHz = options.frequencyHz;
     this.lastVoicedAt = options.startTime;
+    this.lastAudibleAt = options.startTime;
     this.lastSeenAt = options.startTime;
     this.rms = options.rms;
     this.maxRms = options.rms;
@@ -210,7 +225,15 @@ export class NoteRecord {
 
   /** How long the Note has actually sounded, not how long ago it began. */
   get soundedMs(): number {
-    return this.lastVoicedAt - this.startTime;
+    return Math.max(this.lastVoicedAt, this.lastAudibleAt) - this.startTime;
+  }
+
+  /** The bar this Note has to clear to be announced. See the config comments. */
+  get announceThresholdMs(): number {
+    const pitched = this.lastVoicedAt > this.startTime || this.harmonyBloomed;
+    return pitched
+      ? this.config.tracking.minStableMs
+      : this.config.tracking.minUnpitchedStableMs;
   }
 
   get durationMs(): number {

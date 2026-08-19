@@ -205,7 +205,14 @@ export interface IRearticulationDetector {
     gliding: boolean,
     sustainedRms: number,
     /** The arriving pitch is not the one the sounding Note is named after. */
-    pitchDiffers: boolean
+    pitchDiffers: boolean,
+    /**
+     * How far above its own fitted decay curve the sounding Note is, or null
+     * while that decay is not yet measurable. See `tracker/voices.ts`.
+     */
+    decayExcess: number | null,
+    /** The sounding Note is a chord, on the deep lane's evidence. */
+    polyphonic: boolean
   ): boolean;
 }
 

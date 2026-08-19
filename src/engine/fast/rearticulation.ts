@@ -35,7 +35,9 @@ export class RearticulationDetector implements IRearticulationDetector {
     frame: FastFrame,
     gliding: boolean,
     sustainedRms: number,
-    pitchDiffers: boolean
+    pitchDiffers: boolean,
+    decayExcess: number | null,
+    polyphonic: boolean
   ): boolean {
     if (gliding) return false;
     if (frame.gated) return false;
@@ -51,9 +53,25 @@ export class RearticulationDetector implements IRearticulationDetector {
     if (pitchDiffers && attack.sharpness >= t.newPitchSharpness) return true;
 
     // At the same pitch the question is whether the string was struck again.
-    // Two independent ways to answer it, because a re-pick is not always
-    // louder: a muted upstrum over a ringing chord is quieter than what it
-    // interrupts, and only its sharpness gives it away.
+    //
+    // Once a chord's own decay has been measured, energy above where that curve
+    // says it should be by now had to be put in from outside — a stronger
+    // statement than "louder than the rolling baseline", because a decaying
+    // chord's baseline falls with it and ordinary ripple keeps clearing any
+    // fixed multiple of it.
+    //
+    // It is an additional witness rather than the only one, because it is deaf
+    // to precisely the case the fixtures care most about: a *muted* upstrum
+    // damps the strings, so it puts the total energy DOWN even as it plainly
+    // re-articulates the chord. Only its sharpness gives that away.
+    if (polyphonic && decayExcess !== null && decayExcess >= t.restrumDecayExcess) return true;
+
+    // On a single note the weaker witnesses are the right ones. A note's own
+    // decay curve is a poor guide there: a monophonic Note is routinely bent,
+    // vibratoed and re-fingered, all of which move the envelope without any new
+    // energy arriving, and a fast run gives the fit too little to work with.
+    // A re-pick is also not always louder — a muted note is quieter than what
+    // it interrupts — so sharpness carries the case.
     if (frame.rms >= sustainedRms * t.rearticulationRiseRatio) return true;
     return attack.sharpness >= t.rearticulationSharpness;
   }

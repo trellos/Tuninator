@@ -217,7 +217,13 @@ export class NoteTracker {
         frame,
         gliding,
         active.sustainedRms,
-        pitchDiffers
+        pitchDiffers,
+        active.decay.excess(frame.at, frame.rms),
+        // A Note that has actually named a chord, not merely one sounding while
+        // the room happens to read as harmonic. The decay model describes a
+        // struck chord ringing out; applying it to a bent or vibratoed single
+        // note describes nothing.
+        active.harmonyLabel !== null
       );
       // A harmonically-named Note has proved it is a chord, and a chord's own
       // ring-out is full of transient-looking energy for hundreds of
@@ -295,22 +301,28 @@ export class NoteTracker {
       const unvoiced = frame.pitch.frequencyHz === null;
 
       if (silent || unvoiced) {
+        if (active.silentSince === null && silent) active.silentSince = t;
+        if (!silent) active.silentSince = null;
         if (active.unvoicedSince === null) active.unvoicedSince = t;
-        const held = t - active.unvoicedSince;
-        // A harmonically-bloomed Note is not ended by losing its fundamental —
-        // a strummed chord has no single periodicity for YIN to hold onto —
-        // only by going quiet.
-        const expired = silent
-          ? held >= config.tracking.releaseGraceMs
-          : !active.harmonyBloomed && held >= config.tracking.releaseGraceMs;
+
+        // A Note ends when the sound stops, not when the pitch tracker loses
+        // it. Those are different events and conflating them was a real defect:
+        // a strummed chord has no single periodicity for YIN to hold onto, so
+        // a Note that expired on unvoiced frames could not survive its own
+        // first 90ms — the chord would vanish and, with no fresh attack to
+        // restart it, never come back.
+        const expired =
+          active.silentSince !== null &&
+          t - active.silentSince >= config.tracking.releaseGraceMs;
         if (expired) {
-          this.end(active, active.unvoicedSince, out);
+          this.end(active, active.silentSince as SourceTimeMs, out);
           active = null;
         } else {
           this.observe(active, frame, gliding);
         }
       } else {
         active.unvoicedSince = null;
+        active.silentSince = null;
         this.observe(active, frame, gliding);
       }
     }
@@ -699,7 +711,9 @@ export class NoteTracker {
     record.maxPeak = Math.max(record.maxPeak, frame.peak);
     record.sustainedRms =
       record.sustainedRms * (1 - RMS_BASELINE_ALPHA) + frame.rms * RMS_BASELINE_ALPHA;
+    record.decay.observe(t, frame.rms);
     record.lastSeenAt = t;
+    if (!frame.gated) record.lastAudibleAt = t;
 
     const hz = frame.pitch.frequencyHz;
     if (hz === null) {
@@ -802,7 +816,7 @@ export class NoteTracker {
         // Measure over how long the Note SOUNDED, not wall-clock since it
         // started: a Note in release still ages, so a 24ms blip could otherwise
         // cross a 45ms stability gate purely by sitting in its release grace.
-        if (record.soundedMs < this.config.tracking.minStableMs) continue;
+        if (record.soundedMs < record.announceThresholdMs) continue;
         record.announced = true;
         record.lastEmitted = {
           label: record.currentLabel(),
@@ -882,7 +896,7 @@ export class NoteTracker {
       // emit an end with no matching start. Measured over how long it SOUNDED,
       // the same bar `publish` uses — a blip that spent its whole life in
       // release grace must not qualify just because the grace is long.
-      if (record.soundedMs < this.config.tracking.minStableMs) return;
+      if (record.soundedMs < record.announceThresholdMs) return;
       record.announced = true;
       record.lastEmitted = {
         label: record.currentLabel(),
