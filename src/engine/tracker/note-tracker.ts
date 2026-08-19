@@ -262,11 +262,22 @@ export class NoteTracker {
     // octave, which is its own known failure mode. Segmentation there comes from
     // attacks and from harmony changes, both of which describe the chord rather
     // than one string of it.
-    const harmonicContext = this.contextHarmonic >= config.harmony.octaveFlipContext;
+    // An octave-sized jump is the pitch estimator's best-known failure mode,
+    // not a note boundary — it halves or doubles the period it locked onto, and
+    // it does that on a single ringing string as readily as on a chord. Left
+    // alone it splits one sustained note into two, and the fragment that keeps
+    // the true octave is then a second event nobody played.
+    //
+    // Suppressed everywhere rather than only under harmonic context, because
+    // the monophonic case is where it does the most damage: a lead note is long
+    // enough for the estimate to flip mid-note and there is no chord to blame.
+    // A genuine octave leap is rarer than this artefact and, when it is real,
+    // arrives with an attack, which is a separate witness.
     const spuriousStep =
       pitchChange !== null &&
-      harmonicContext &&
-      (isOctaveJump(pitchChange.cents) || this.contextHarmonic >= config.harmony.stepSuppressContext);
+      (isOctaveJump(pitchChange.cents) ||
+        (this.contextHarmonic >= config.harmony.octaveFlipContext &&
+          this.contextHarmonic >= config.harmony.stepSuppressContext));
 
     if (
       active !== null &&
