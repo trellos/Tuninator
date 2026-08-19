@@ -336,11 +336,22 @@ export class NoteTracker {
         active.sustainedRms,
         pitchDiffers,
         active.decay.excess(frame.at, frame.rms),
-        // A Note that has actually named a chord, not merely one sounding while
-        // the room happens to read as harmonic. The decay model describes a
-        // struck chord ringing out; applying it to a bent or vibratoed single
-        // note describes nothing.
-        active.harmonyLabel !== null,
+        // A Note that has decided it is a chord — not merely one sounding while
+        // the room happens to read as harmonic, which on a fast run is every
+        // other window. The decay model describes a struck chord ringing out;
+        // applying it to a bent or vibratoed single note describes nothing.
+        //
+        // Deliberately "bloomed" rather than "named". Blooming is a claim about
+        // the AUDIO: several fundamentals, spread across more than a fifth, and
+        // no single period for YIN to lock onto. Naming is additionally a claim
+        // that a chord template fitted, and a template fitting is the first
+        // thing a saturated amp sim takes away — on the amped cowboy take the
+        // recognizer emits "unknown" for chords it hears perfectly well as
+        // chords. Gating on the name meant the one path that protects a ringing
+        // chord from being chopped switched itself off on exactly the signal
+        // that needed it, and the chord then went down the monophonic route and
+        // shed a Note every few hundred milliseconds.
+        active.harmonyBloomed,
         active.soundedMs
       );
       // A harmonically-named Note has proved it is a chord, and a chord's own

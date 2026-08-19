@@ -1,8 +1,10 @@
 # Where the recogniser stands, and what the audio will and will not support
 
 Measured on the committed fixtures. Every number here came from running the
-code, not from reasoning about it. `fixtures/` is untouched — no label edited,
-no gate lowered (`git diff d8e4141..HEAD -- fixtures/` is empty).
+code, not from reasoning about it. The five original 120bpm fixtures and their
+thresholds are untouched — no label edited, no gate lowered. The 140bpm
+fixtures added since are held-out data: new label files and additive
+`eval.config.json` entries only, and no engine constant is fitted to them.
 
 ## Against the frozen baseline (docs/BASELINE.md)
 
@@ -207,6 +209,125 @@ are not tried again:
 | `articulationMs` above 100 | the triplet and sixteenth runs start losing real notes: missed 5->7 at 100, 5->9 at 110 |
 | `minStableMs` above 60 | same cliff: 70ms costs two labels in the sixteenths |
 | keep the previous decay curve alive across a restart, so a restrum still has a curve to be measured against | correct in principle and provably inert here: the attack fires on the pick, a hop or two before the energy actually arrives, so the comparison is made too early to help. Not kept |
+
+## The corpus grew a controlled variable: three signal paths per performance
+
+Every 140bpm performance now exists as a direct input, an amp sim and a room
+mic, labelled per path from the same playing. That is the most useful thing in
+the set, because a number that moves between the three paths is a signal-path
+effect and a number that moves on all three is the detector.
+
+It settled the power-chord take's structure outright. The take was suspected of
+hiding a quieter re-strum on beats 2 and 4 under each ringing strum, which would
+have made it 32 events rather than 16. On the DI, whose noise floor is 3.3e-5
+against strum peaks of 0.79:
+
+- every spectral-flux peak that is not one of the sixteen strums is followed by
+  a FALL in 30ms RMS of 2-22dB, where each of the sixteen is followed by a RISE
+  of 12-55dB. The in-between peaks are the muting hand, not a pick;
+- a targeted scan of the quarter-note midpoint after each strum (+428.6ms
+  +-120ms) finds a maximum 60ms RMS rise of 1.6-5.0dB and a 4kHz-band peak
+  2.1-5.5x the window median, against 18-60dB and 8-524x at the strums.
+
+Sixteen events, and 857ms is the performer's quarter note rather than a half
+note: he played that take at 70bpm. Four bars of chord X on 1, X on 2 then
+muted, chord Y on 3, Y on 4 then muted.
+
+The DI also confirms the two label sets that were least certain: all 48 of the
+sixteenths and all 55 of the lead-line notes have their own flux peak there,
+matched one to one against the mic labels shifted by a constant offset, at a
+median disagreement under 1ms.
+
+## The chord-chopping defect: a threshold that changed meaning
+
+The performer reported that a single strum comes apart into several notes while
+it rings. It reproduces on the held-out fixtures, and the cause is not a
+threshold set too low. It is two tests that mean something different once the
+signal path changes.
+
+**`transient.restrumSharpness` is not path-independent.** Sharpness is spectral
+flux over the frame's RMS, which removes how loud the passage is and nothing
+else. A compressor holds the level flat while the spectrum keeps churning, so a
+compressed chord's ordinary sustain reads as sharp as a real pick does on a
+direct input:
+
+| | off-label sharpness (p10 / median / p90) |
+|---|---|
+| clean 120bpm takes | 0.27 / 0.46-1.02 / 1.12-3.00 |
+| amp-sim takes | 0.99-1.12 / 1.30-1.37 / 1.45-1.86 |
+
+The fitted threshold, 0.9, sits between them. On the amped cowboy take ten
+separate re-articulations were accepted inside ringing chords at sharpness
+1.26-1.53 with a rise ratio of 1.00 — no energy arrived at all.
+
+The flux kernel already carries a figure that does generalise. Its threshold is
+a running median of this signal's own recent flux, so flux/threshold asks
+"sharper than this signal usually is". Its off-label median is 1.02-1.24 on
+every path in the corpus, against 0.46-3.24 for sharpness. Both sharpness
+escapes now require it (`transient.restrumFluxRatio`), and the value comes off
+the 120bpm fixtures as every other constant here did: the two muted upstrums the
+escape exists for measure 1.58 and 1.78 there, while ripple that has just
+cleared the onset threshold sits a hair above 1.0 by construction.
+
+**Blooming into a chord, not naming one, is what protects a chord.** The strict
+polyphonic branch was entered only once a Note had NAMED a chord. Naming
+additionally requires a chord template to fit, and a saturated amp sim is
+exactly where templates stop fitting — the recognizer emits "unknown" for chords
+on that take that it hears perfectly well as chords. So the one path that
+protects a ringing chord from being chopped switched itself off on the signal
+that needed it most, and the chord went down the monophonic route instead.
+The branch now keys on `harmonyBloomed`, which is a claim about the audio
+(several fundamentals, spread across more than a fifth, no single period) rather
+than about a template.
+
+### Measured, before and after
+
+| fixture | detections / labels | | missed | | false positives | |
+|---|---|---|---|---|---|---|
+| | before | after | before | after | before | after |
+| cowboy amped 140 | 19 / 8 | **11 / 8** | 0 | 0 | 11 | **3** |
+| cowboy mic 140 | 9 / 8 | **8 / 8** | 0 | 0 | 1 | **0** |
+| cowboy DI 140 | 10 / 8 | 9 / 8 | 0 | **1** | 2 | 2 |
+| lead line mic 140 | 72 / 55 | 72 / 55 | 0 | 0 | 17 | 17 |
+| power chords mic 140 | 22 / 16 | 22 / 16 | 1 | 1 | 7 | 7 |
+| the five 120bpm fixtures | — | unchanged | 4 | 4 | 1 | 1 |
+
+The five originals are bit-identical: 11 of 78 events split, 13 extra Notes,
+and every required fixture meets every threshold it is held to. On the eleven fixtures that existed before the new
+signal paths arrived, fragmentation goes 48/221 events split and 55 extra Notes
+to 47/221 and 49.
+
+**One event was lost, and it is worth naming.** `cowboy-chords-di` c6 — the D to
+Em change 1400ms into a ringing chord — used to be carried by the ring-out
+sharpness escape on a Note that had never named a chord. Once that Note blooms,
+the change falls past `transient.mutedRestrumWindowMs` and is rejected. Letting
+a late re-strum through on a high flux ratio recovers it and costs two extra
+splits on the 120bpm fixtures, whatever ratio is chosen between 2.5 and 3.4, so
+it was not kept. The right repair is the harmony-change path carrying that
+boundary, not the re-articulation path.
+
+### What did NOT move, and why
+
+`lead-line-quarter-eighth-triplet` (72 detections for 55) and
+`power-chords-...-140bpm` (22 for 16) are unchanged, and neither is the defect
+above. Instrumented, the lead take accepts only six re-articulations that land
+on no labelled event; its 22 split events are each exactly two Notes, which is
+the boundary-placement problem this document has already named — a Note whose
+boundary is right and whose first hops describe its predecessor. The power mic
+take's extras are the muting hand (a mute produces a transient AND, briefly,
+energy above the chord's decay curve, measured at 1.35) and three handling
+knocks after the playing stops. Separating a mute from a strum needs to see that
+the energy collapsed 60ms LATER, which the fast lane cannot do causally; the
+region lane can see it and currently has no way to act on it, because merging is
+off on measurement.
+
+### Also measured and rejected in this pass
+
+| change | result |
+|---|---|
+| enter the strict polyphonic branch whenever the ROOM reads harmonic, not just this Note | cowboy amped 19 -> 10 and the lead mic take 72 -> 65, but clean-lead falls to 6 missed and 81.1% pitch class and FAILS its required gate: a lead line reads harmonic in flashes, and merging on those flashes eats real notes |
+| past `mutedRestrumWindowMs`, allow a re-strum on a high flux ratio instead of rejecting outright | recovers `cowboy-di` c6 and takes the power DI/amped takes closer to 16 events, but costs two splits on the 120bpm fixtures at every ratio tried (2.5, 3.0, 3.4). Not kept |
+| require the flux ratio on the weakest sharpness fallback as well | the genuine fast re-picks in `clean-lead` measure 1.07-1.15 there, so any ratio that removes the amped fragments (1.02-1.15) removes real notes too |
 
 ## What is left
 
