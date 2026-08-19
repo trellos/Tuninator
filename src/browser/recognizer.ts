@@ -93,7 +93,12 @@ class BrowserRecognizer implements Recognizer {
   private async doStart(): Promise<void> {
     this.setState("starting");
     try {
+      // Each resource is recorded on `this` the moment it exists, not once the
+      // whole graph is built: a failure part-way through has to be able to
+      // release what was already acquired, and a context created and then
+      // orphaned by a denied microphone permission is a real leak.
       const context = await this.resolveContext();
+      this.context = context;
       const stream = await this.openMicrophone();
       this.stream = stream;
 
@@ -136,7 +141,6 @@ class BrowserRecognizer implements Recognizer {
 
       source.connect(node);
 
-      this.context = context;
       this.source = source;
       this.node = node;
       this.engine = engine;
