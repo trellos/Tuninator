@@ -226,7 +226,23 @@ export class NoteTracker {
       // note. A genuinely new note in a line changes the pitch class.
       const arriving = frame.pitch.nearest?.midi ?? null;
       const sounding = active.dominantMidi();
+      // A bending Note has left the pitch it is named after on purpose, so
+      // "the arriving pitch is not the Note's pitch" stops meaning anything:
+      // once A3 has been bent a semitone, every hop arrives at some other note
+      // name, and a wobble across the A#3/B3 boundary reads as a new note
+      // arriving. What still means something there is the frequency actually
+      // moving, so while the Note bends the arriving pitch has to differ from
+      // the one this Note was sounding a hop ago by a real step. Nothing
+      // outside a bend is affected. "A3 bent up to B3" is one thing the player
+      // did, and it has to come out as one Note.
+      const bentSteady =
+        active.bendActive &&
+        active.lastVoicedHz !== null &&
+        frame.pitch.frequencyHz !== null &&
+        Math.abs(centsBetween(frame.pitch.frequencyHz, active.lastVoicedHz)) <
+          config.pitch.stepThresholdCents;
       const pitchDiffers =
+        !bentSteady &&
         arriving !== null &&
         sounding !== null &&
         (((arriving - sounding) % 12) + 12) % 12 !== 0 &&
