@@ -183,6 +183,16 @@ export class NoteRecord {
    */
   readonly pendingTransitions: HypothesisTransition[] = [];
 
+  /**
+   * Notes this one has swallowed, waiting to be announced as such.
+   *
+   * A Note can absorb its predecessor before it has itself been announced, and
+   * a `structuralRevision` is a change to a Note the consumer already knows
+   * about. So the absorption is recorded here and reported on the first hop
+   * where reporting it means anything.
+   */
+  readonly pendingAbsorbed: string[] = [];
+
   private readonly config: EngineConfig;
 
   constructor(options: {

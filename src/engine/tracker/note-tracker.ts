@@ -329,7 +329,14 @@ export class NoteTracker {
       const voiced = frame.pitch.frequencyHz !== null;
       const struck = frame.attack !== null && !frame.gated;
       if (voiced || struck) {
-        active = this.begin(struck ? "attack" : "pitchChange", frame, out, null, splitFrom);
+        active = this.begin(
+          struck ? "attack" : "pitchChange",
+          frame,
+          out,
+          null,
+          splitFrom,
+          splitFrom !== null
+        );
       }
     }
 
@@ -650,6 +657,47 @@ export class NoteTracker {
   }
 
   /**
+   * Absorb the Note this one has just split away from, when the two are one
+   * articulation rather than two events.
+   *
+   * A strum is a single gesture that excites six strings over tens of
+   * milliseconds, and a picked note opens with a transient the pitch estimator
+   * cannot read for a window and a median afterwards. Both produce the same
+   * artefact: a stub of a Note, sounding for a few tens of milliseconds and
+   * named after whatever was ringing before it, ending on the attack the player
+   * actually meant. The stub is not wrong so much as premature, and the Note
+   * that follows it is the event.
+   *
+   * Absorbing rather than merging is the point: the survivor keeps its OWN
+   * pitch evidence and inherits only the stub's start time, so the boundary
+   * lands on the attack while the name still comes from the frames that
+   * describe what was played. Merging would hand it the stub's votes too, which
+   * is how a Note ends up answering to its predecessor's name.
+   */
+  private absorbArticulationFragment(
+    survivor: NoteRecord,
+    predecessor: NoteRecord | null
+  ): void {
+    if (predecessor === null) return;
+    if (predecessor.merged) return;
+    // A Note that named a chord, or that sustained past one articulation, is an
+    // event somebody played. Only the stub of a forming articulation qualifies.
+    if (predecessor.harmonyBloomed) return;
+    if (predecessor.durationMs > this.config.transient.articulationMs) return;
+    // Contiguous by construction when the split ended the predecessor here, but
+    // checked rather than assumed: a gap means silence, and silence means two
+    // separate events.
+    const end = predecessor.endTime;
+    if (end === null) return;
+    if (Math.abs(end - survivor.startTime) > this.config.harmony.mergeMaxGapMs) return;
+
+    predecessor.merged = true;
+    survivor.startTime = predecessor.startTime;
+    survivor.startSample = predecessor.startSample;
+    survivor.pendingAbsorbed.push(predecessor.id, ...predecessor.pendingAbsorbed);
+  }
+
+  /**
    * Absorb the unnamed Notes immediately preceding `survivor` into it.
    *
    * Only unnamed ones: a preceding Note that named its own chord is a different
@@ -717,7 +765,14 @@ export class NoteTracker {
      * The Note this one is splitting away from, if any. Its decay state carries
      * over: the strings are the same strings, still ringing on the same curve.
      */
-    predecessor: NoteRecord | null = null
+    predecessor: NoteRecord | null = null,
+    /**
+     * Whether `predecessor` may be absorbed into this Note as a fragment of one
+     * articulation. True only when an ATTACK ended it: a confirmed pitch step
+     * is a boundary the player put there, and a legato note in a fast run is
+     * short without being premature.
+     */
+    absorbPredecessor = false
   ): NoteRecord {
     const frequencyHz = override?.frequencyHz ?? frame.pitch.frequencyHz;
     let at = override?.at ?? frame.at;
@@ -770,6 +825,7 @@ export class NoteTracker {
     });
     record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
     if (predecessor !== null) record.decay.adopt(predecessor.decay);
+    if (absorbPredecessor) this.absorbArticulationFragment(record, predecessor);
     this.notes.set(record.id, record);
     if (frequencyHz !== null) this.pitchChange.clearAfterSplit(frequencyHz, at);
     void out;
@@ -914,6 +970,21 @@ export class NoteTracker {
         };
         out.push({ type: "started", note: record.snapshot() });
         continue;
+      }
+
+      if (record.pendingAbsorbed.length > 0) {
+        const absorbed = record.pendingAbsorbed.splice(0, record.pendingAbsorbed.length);
+        const revisionNumber = record.bump("structuralRevision");
+        out.push({
+          type: "changed",
+          note: record.snapshot(),
+          change: {
+            type: "structuralRevision",
+            at: record.lastSeenAt,
+            revisionNumber,
+            relatedNoteIds: absorbed,
+          },
+        });
       }
 
       const label = record.currentLabel();

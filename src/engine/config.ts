@@ -157,6 +157,24 @@ export type EngineConfig = {
     glideMinCents: number;
     /** Hops of pitch history the glide test looks back over. */
     glideWindowHops: number;
+    /**
+     * How long one articulation lasts, ms — the window in which a Note that has
+     * just been ended by an attack is still the *same* thing being played.
+     *
+     * A strum is one gesture, not six: the pick crosses six strings over tens
+     * of milliseconds and each string arrives as its own transient at its own
+     * pitch. A single picked note is no better behaved — the attack transient
+     * is the least periodic part of it, so the pitch estimator spends its first
+     * hops still reporting whatever was ringing before. Either way the fast
+     * lane emits a stub, named after the wrong thing, that ends on the attack
+     * the player actually meant.
+     *
+     * Sized to cover the pitch path's lag and a strum's spread, and to stay
+     * under a sixteenth at 120bpm (125ms) so a genuinely fast run still
+     * segments. The fixtures put the cliff between 75 and 110ms: below it the
+     * stubs survive, above it real notes in the triplet run are swallowed.
+     */
+    articulationMs: number;
   };
 
   tracking: {
@@ -350,6 +368,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     restrumDecayExcess: 1.25,
     glideMinCents: 25,
     glideWindowHops: 5,
+    articulationMs: 90,
   },
   tracking: {
     minStableMs: 45,
