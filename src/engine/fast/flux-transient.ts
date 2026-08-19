@@ -97,6 +97,10 @@ export class FluxTransientDetector implements ITransientDetector {
     }
     const windowRms = Math.sqrt(energy / spectralWindow.length);
     const sharpness = fluxResult.flux / Math.max(windowRms, 1e-9);
+    // Against the kernel's own adaptive threshold, which is a running median of
+    // this signal's recent flux: "sharper than this signal usually is" rather
+    // than "sharp" in units that a microphone or an amp sim can move.
+    const fluxRatio = fluxResult.flux / Math.max(fluxResult.threshold, 1e-12);
 
     const audible = shortRms >= this.config.analysis.rmsGate;
     const envelope = audible && riseRatio >= t.envelopeRiseRatio;
@@ -122,6 +126,7 @@ export class FluxTransientDetector implements ITransientDetector {
       envelope,
       riseRatio,
       sharpness,
+      fluxRatio,
       strength,
     };
   }

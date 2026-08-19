@@ -109,6 +109,28 @@ export type EngineConfig = {
      */
     restrumSharpness: number;
     /**
+     * How far above the flux kernel's own adaptive threshold a transient must
+     * stand before a *sharpness-only* re-articulation is believed.
+     *
+     * The companion to `restrumSharpness`, and the reason that constant no
+     * longer decides anything on its own. Sharpness is spectral flux over the
+     * frame's RMS, which is independent of how loud the passage is but not of
+     * what the signal path did to it: a room mic and an amp sim leave far more
+     * steady-state spectral churn behind than a direct input does, so the same
+     * figure means "a pick hit a string" on one path and "nothing happened" on
+     * another. Measured across the corpus, the sharpness of attacks that land
+     * on no labelled event runs 0.46 on the clean 120bpm takes and 1.37 on the
+     * amp-sim ones, which straddles any fixed threshold that could be chosen.
+     *
+     * This is measured against the signal's OWN recent flux instead — the
+     * kernel's threshold is a running median of the last seventeen hops — so it
+     * reads the same on every path. Derived on the 120bpm fixtures, where the
+     * two muted upstrums this escape exists for measure 1.58 and 1.78 while
+     * sustain ripple that has just cleared the onset threshold sits, by
+     * construction, a hair above 1.0.
+     */
+    restrumFluxRatio: number;
+    /**
      * How long a single Note must have sounded before its own decay curve is
      * allowed to veto a re-articulation.
      *
@@ -480,6 +502,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rearticulationRiseRatio: 1.25,
     rearticulationSharpness: 0.7,
     restrumSharpness: 0.9,
+    restrumFluxRatio: 1.3,
     ringOutMs: 250,
     ringOutDecayFloor: 0.6,
     newPitchSharpness: 0.3,

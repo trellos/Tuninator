@@ -68,6 +68,23 @@ export type AttackEvidence = {
    * and hops elsewhere around 0.1.
    */
   sharpness: number;
+  /**
+   * Spectral flux divided by the threshold the flux kernel had adapted to when
+   * it fired: how far this transient stands above what THIS signal's own
+   * transients have been doing over the last few hundred milliseconds.
+   *
+   * `sharpness` divides by the frame's RMS, which makes it independent of how
+   * loud the passage is but not of what the signal path did to it. A room mic
+   * and an amp sim leave far more steady-state spectral churn behind than a
+   * direct input does, so the same absolute sharpness means "a pick hit a
+   * string" on one path and "nothing happened" on another — measured across
+   * the corpus, the sharpness of attacks that land on nothing runs 0.46 on the
+   * clean fixtures and 1.37 on the amp-sim ones, straddling any fixed
+   * threshold. This ratio has the signal's own recent history in its
+   * denominator instead, and its off-label median sits at 1.02-1.24 on every
+   * path in the corpus.
+   */
+  fluxRatio: number;
   /** 0..1 blend of both witnesses. */
   strength: number;
 };

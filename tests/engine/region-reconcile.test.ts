@@ -81,6 +81,7 @@ function frame(
             envelope: true,
             riseRatio: 3,
             sharpness: 0.6,
+            fluxRatio: 2,
             strength: 0.9,
           }
         : null,

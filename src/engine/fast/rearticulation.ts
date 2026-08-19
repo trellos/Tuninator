@@ -23,6 +23,25 @@
 import type { EngineConfig } from "../config.js";
 import type { AttackEvidence, FastFrame, IRearticulationDetector } from "../contracts.js";
 
+/**
+ * Is this transient sharp enough to carry a re-articulation on its own?
+ *
+ * Two readings of the same flux, and both have to agree. `sharpness` divides it
+ * by the frame's RMS, which is level-independent but not path-independent: an
+ * amp sim's compression holds the level flat while the spectrum keeps churning,
+ * so its ordinary sustain reads as sharp as a real pick does on a clean direct
+ * input. `fluxRatio` divides it by the flux the kernel had adapted to over the
+ * preceding hops — the signal's own recent history — which reads the same on
+ * every path in the corpus.
+ *
+ * Neither alone is enough. Without the ratio, a compressed signal re-articulates
+ * itself every few hundred milliseconds; without the sharpness, a quiet passage
+ * whose adaptive threshold has collapsed re-articulates on nothing.
+ */
+function sharpEnough(attack: AttackEvidence, t: EngineConfig["transient"]): boolean {
+  return attack.sharpness >= t.restrumSharpness && attack.fluxRatio >= t.restrumFluxRatio;
+}
+
 export class RearticulationDetector implements IRearticulationDetector {
   private readonly config: EngineConfig;
 
@@ -84,7 +103,7 @@ export class RearticulationDetector implements IRearticulationDetector {
       // and treating those as re-strums is how one strum kept shedding Notes
       // until it faded. See `transient.mutedRestrumWindowMs`.
       if (soundedMs > t.mutedRestrumWindowMs) return false;
-      return attack.sharpness >= t.restrumSharpness;
+      return sharpEnough(attack, t);
     }
 
     // A single note whose decay has been measured and which is sitting on that
@@ -107,7 +126,7 @@ export class RearticulationDetector implements IRearticulationDetector {
       // the note is dying faster than its own fit expected and the transient is
       // the string, not the pick. See `transient.ringOutDecayFloor`.
       if (decayExcess < t.ringOutDecayFloor) return false;
-      return attack.sharpness >= t.restrumSharpness;
+      return sharpEnough(attack, t);
     }
 
     // With no usable fit the weaker witnesses are the right ones. A monophonic
