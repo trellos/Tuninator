@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "title": "Power chords B B A A G G F# F# B B A A G G E E 140bpm Les Paul",
+  "sourceAudio": "../audio/Power Chords Mic BBAAGGF#F#BBAAGGEE 140bpm LP.m4a",
+  "instrument": "guitar-amp-mic",
+  "tempoBpm": 140,
+  "tuning": ["E2", "A2", "D3", "G3", "B3", "E4"],
+  "timingNotes": "Onsets are pick-attack transients on a three-pole 5kHz-highpassed 1ms RMS envelope, backtracked to 30% of each attack peak above its local floor; the sixteen attacks stand 10-30x above every other peak in that band, so the count is unambiguous. Measured inter-onset intervals are 815-885ms (mean 857.2ms). That is a HALF note at 140bpm (857.1ms), not a quarter: the take is sixteen evenly spaced events, and it contains no quarter/eighth contrast despite the performer's description of \"quarter then eighth notes\". The 140bpm clock itself is confirmed by the cowboy-chord takes from the same session, whose bars measure 1714ms. Identity comes from FFT peak picking on 8192- and 32768-point windows 100-300ms into each note. Every chord is root+fifth+octave on the low E and A strings; strong partials two octaves and a major third above each root (A#4 over F#2, G#4 over E2, C#5 over A2, B4 over G2, D#5 over B2) are the fifth harmonic of the root, not a major third in the voicing. End times are where each note's RMS falls below 15% of its attack peak: the second note of each pair is muted about 360ms in, leaving a real gap before the next pair. No detector output was used to derive any value here.",
+  "events": [
+    { "id": "p1", "startMs": 10019, "endMs": 10887, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p2", "startMs": 10887, "endMs": 11247, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p3", "startMs": 11702, "endMs": 12544, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p4", "startMs": 12544, "endMs": 12934, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p5", "startMs": 13406, "endMs": 14270, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p6", "startMs": 14270, "endMs": 14650, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p7", "startMs": 15141, "endMs": 15988, "kind": "chord", "label": "F#5", "pitches": ["F#2", "C#3", "F#3"], "required": true },
+    { "id": "p8", "startMs": 15988, "endMs": 16348, "kind": "chord", "label": "F#5", "pitches": ["F#2", "C#3", "F#3"], "required": true },
+    { "id": "p9", "startMs": 16847, "endMs": 17718, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p10", "startMs": 17718, "endMs": 18068, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p11", "startMs": 18586, "endMs": 19448, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p12", "startMs": 19448, "endMs": 19818, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p13", "startMs": 20282, "endMs": 21167, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p14", "startMs": 21167, "endMs": 21517, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p15", "startMs": 21993, "endMs": 22877, "kind": "chord", "label": "E5", "pitches": ["E2", "B2", "E3"], "required": true },
+    { "id": "p16", "startMs": 22877, "endMs": 23217, "kind": "chord", "label": "E5", "pitches": ["E2", "B2", "E3"], "required": true }
+  ]
+}

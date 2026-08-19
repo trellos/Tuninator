@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "title": "Cowboy chords amped D Em G C 2x 140bpm Les Paul",
+  "sourceAudio": "../audio/Cowboy Chords Amped D Em G C D Em G C 140bpm LP.mp3",
+  "instrument": "guitar-amp-sim",
+  "tempoBpm": 140,
+  "tuning": ["E2", "A2", "D3", "G3", "B3", "E4"],
+  "timingNotes": "Same performance as the DI take, re-amped through a Marshall Plexi sim; the two files are the same length and cross-correlate at a lag of +3ms (r=0.80 on a 300Hz-highpassed 1ms envelope over the whole played region). The amp sim's compression flattens the envelope so completely that a threshold-on-attack-peak measurement drifts 30-170ms early here, so these onsets are the DI onsets plus that measured 3ms latency rather than an independent per-attack estimate on this file. DI onsets themselves: first sustained rise of each strum on a 1.5kHz-highpassed 1ms RMS envelope, cross-checked against the raw waveform and a spectral-flux backtrack. Chord identity verified independently on this file by chroma template match. No detector output was used to derive any value here. Expect onset detection to be genuinely hard on this file -- that is the point of including it.",
+  "events": [
+    { "id": "c1", "startMs": 2456, "endMs": 4195, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c2", "startMs": 4195, "endMs": 5907, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c3", "startMs": 5907, "endMs": 7652, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c4", "startMs": 7652, "endMs": 9379, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
+    { "id": "c5", "startMs": 9379, "endMs": 10996, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c6", "startMs": 10996, "endMs": 12844, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c7", "startMs": 12844, "endMs": 14503, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c8", "startMs": 14503, "endMs": 16233, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true }
+  ]
+}

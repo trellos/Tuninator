@@ -57,5 +57,63 @@
     "maxFalseLabels": 0,
     "confidentlyWrongOn": "pitchClass",
     "confidentLabelThreshold": 0.6
+  },
+  "cowboy-chords-di-d-em-g-c-2x-140bpm": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "HELD-OUT DATA. Added after the 58 engine constants were fitted to the five 120bpm takes; nothing here may be used to retune them. Informational only. Direct-input capture of a 140bpm Les Paul take, D Em G C twice, one bar each. The cleanest of the three captures of this performance -- if the chord path generalises to 140bpm at all, it should show here first.",
+    "minLabelAccuracy": 0.6,
+    "maxMedianOnsetErrorMs": 120
+  },
+
+  "cowboy-chords-amped-d-em-g-c-2x-140bpm": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "HELD-OUT DATA, informational only. Same performance as the DI take through a Marshall Plexi sim. The amp sim's compression removes almost all envelope contrast between bars, so this is the onset-detection stress case of the set: expect missed re-articulations rather than bad chord names.",
+    "minLabelAccuracy": 0.6,
+    "maxMedianOnsetErrorMs": 120
+  },
+
+  "cowboy-chords-mic-d-em-g-c-2x-140bpm": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "HELD-OUT DATA, informational only. Room-mic capture of the same performance: real room tone, acoustic path, and a different start offset. Comparing this against the DI take isolates what the microphone path costs the detector, since the notes and their spacing are identical.",
+    "minLabelAccuracy": 0.6,
+    "maxMedianOnsetErrorMs": 120
+  },
+
+  "power-chords-b-a-g-fsharp-b-a-g-e-140bpm": {
+    "required": false,
+    "mode": "chords",
+    "gateOn": "exact",
+    "gateNote": "HELD-OUT DATA, informational only. Sixteen root+fifth+octave shapes on the low strings, mic'd through an amp, 857ms apart. Gated on the full label as the 120bpm power-chord fixture is, so a detector that names the root but drops the \"5\" scores zero here too. Note the pairs: each pitch is played twice, and the second of each pair is muted early, so merging a pair into one event shows up as a missed event.",
+    "minLabelAccuracy": 0.8,
+    "maxMedianOnsetErrorMs": 120
+  },
+
+  "lead-line-quarter-eighth-triplet-140bpm": {
+    "required": false,
+    "mode": "lead",
+    "gateOn": "pitchClass",
+    "gateNote": "HELD-OUT DATA, informational only. The 140bpm counterpart to clean-lead-120bpm, but mic'd through an amp instead of clean. Octaves in the labels are measured from the spectrum rather than estimated, so the exact number is meaningful here; the gate still sits on pitch class to stay comparable with the 120bpm fixture.",
+    "sections": {
+      "quarters": { "idPrefix": "q", "startMs": 5400, "endMs": 11200, "required": false },
+      "eighths": { "idPrefix": "e", "startMs": 13900, "endMs": 18300, "required": false },
+      "triplets": { "idPrefix": "t", "startMs": 24200, "endMs": 28150, "required": false }
+    },
+    "minLabelAccuracy": 0.7,
+    "maxMedianOnsetErrorMs": 100
+  },
+
+  "lead-line-sixteenths-e-fsharp-140bpm": {
+    "required": false,
+    "mode": "lead",
+    "gateOn": "pitchClass",
+    "gateNote": "HELD-OUT DATA, informational only, and the hardest thing in the corpus: 48 sixteenths 107ms apart, the only test of the 140bpm sixteenth-note requirement anywhere in the fixtures. Four repeats of a pitch per beat, alternating loud downstrokes and quiet upstrokes, so the failure mode to watch for is halving -- 24 events at eighth-note spacing instead of 48. Missed-event count matters more than label accuracy on this one.",
+    "minLabelAccuracy": 0.7,
+    "maxMedianOnsetErrorMs": 60
   }
 }
