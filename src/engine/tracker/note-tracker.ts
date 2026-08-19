@@ -90,6 +90,16 @@ const POLYPHONY_CONTEXT_TAU_MS = 250;
 /** Ceiling on that estimate's step, however long the gap between readings. */
 const POLYPHONY_CONTEXT_MAX_ALPHA = 0.2;
 
+/**
+ * Where the room's harmonic-context estimate tips from "a note" to "a chord".
+ *
+ * One number rather than two, because "this Note is sounding over harmonic
+ * audio" and "the room has stopped being harmonic" are the same claim measured
+ * over different spans, and letting them disagree produced Notes that believed
+ * they were chords in a room that did not.
+ */
+const HARMONIC_CONTEXT_THRESHOLD = 0.5;
+
 /** Confidence movement below this is not worth an event. */
 const CONFIDENCE_EPSILON = 0.15;
 /** Bend movement below this is not worth an event, in cents. */
@@ -277,7 +287,7 @@ export class NoteTracker {
       pitchChange !== null &&
       (isOctaveJump(pitchChange.cents) ||
         (this.contextHarmonic >= config.harmony.octaveFlipContext &&
-          this.contextHarmonic >= config.harmony.stepSuppressContext));
+          this.harmonicSince !== null));
 
     if (
       active !== null &&
@@ -415,7 +425,22 @@ export class NoteTracker {
     );
     this.contextUpdatedAt = at;
     this.contextHarmonic = this.contextHarmonic * (1 - alpha) + harmonicNow * alpha;
-    record.polyphonic = this.contextHarmonic >= 0.5;
+    record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
+    // When the ROOM entered its current harmonic stretch.
+    //
+    // Declared, read, and never once written before now, so the thing it gates
+    // never happened. Latched with hysteresis rather than read hop by hop: a
+    // strummed chord's context estimate sags as the chord decays — the third
+    // dies first, one string comes to dominate, and YIN starts finding a period
+    // in it again — so an instantaneous test decides mid-ring that the chord
+    // became a single note, which is exactly when the pitch-step segmentation
+    // that shatters it is let back in. Entering takes real evidence; leaving
+    // takes the room dropping well below it.
+    if (this.contextHarmonic >= this.config.harmony.stepSuppressContext) {
+      if (this.harmonicSince === null) this.harmonicSince = at;
+    } else if (this.contextHarmonic < HARMONIC_CONTEXT_THRESHOLD) {
+      this.harmonicSince = null;
+    }
 
     if (reading.isConfident && reading.root !== null && reading.chordName !== null) {
       castHarmonyVote(
@@ -483,14 +508,20 @@ export class NoteTracker {
     if (!record.polyphonic || monophonic || !enoughEvidence) return out;
 
     const winner = bestHarmonyVote(record.harmonyVotes, this.config.harmony.minEvidenceHops);
-    // Either this Note has itself sustained long enough to be a chord, or the
-    // room has been unambiguously harmonic for that long — a strummed take
-    // stays harmonic across a boundary the tracker has just drawn, and the new
-    // Note should not have to re-earn what the previous one established.
+    // This Note has itself sustained long enough to be a chord.
+    //
+    // Deliberately NOT "or the room has been harmonic for that long", which is
+    // what this line used to say against a `harmonicSince` nothing ever set.
+    // Now that something does, the difference is measurable and it is bad:
+    // saying "this is a chord and I will not name it" is the weakest claim the
+    // recogniser makes, and the room's harmony is precisely the evidence that
+    // misleads it — an 85ms transform over a 167ms run straddles two notes plus
+    // the decay of a third and reads as harmonic in flashes. Licensing
+    // abstention from that turns picked notes in a lead line into unnamed
+    // chords. Keeping a strummed chord in one piece is what the room's harmony
+    // is good for, and that is `harmonicSince`'s job in `process`.
     const minimum = this.config.harmony.minChordDurationMs;
-    const sustained =
-      Math.max(record.lastSeenAt, at) - record.startTime >= minimum ||
-      (this.harmonicSince !== null && at - this.harmonicSince >= minimum);
+    const sustained = Math.max(record.lastSeenAt, at) - record.startTime >= minimum;
     // See `harmony.minChordDurationMs`: an unnameable chord is a much weaker
     // claim than a named one, and the only one that misfires on a fast run.
     if (winner === null && !record.harmonyBloomed && !sustained) return out;
@@ -611,7 +642,7 @@ export class NoteTracker {
       rms: predecessor.rms,
       peak: predecessor.maxPeak,
     });
-    record.polyphonic = this.contextHarmonic >= 0.5;
+    record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
     record.sustainedRms = predecessor.sustainedRms;
     for (const [label, vote] of carriedVotes) record.harmonyVotes.set(label, { ...vote });
     this.notes.set(record.id, record);
@@ -737,7 +768,7 @@ export class NoteTracker {
       rms: frame.rms,
       peak: frame.peak,
     });
-    record.polyphonic = this.contextHarmonic >= 0.5;
+    record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
     if (predecessor !== null) record.decay.adopt(predecessor.decay);
     this.notes.set(record.id, record);
     if (frequencyHz !== null) this.pitchChange.clearAfterSplit(frequencyHz, at);
