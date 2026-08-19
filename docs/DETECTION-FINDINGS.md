@@ -218,3 +218,44 @@ neither does. That is a change to how segmentation works, not a constant to
 tune, and it wants its own pass with the articulation tests extended first — a
 Note's boundary and the frames that name it have to be derived from the same
 clock.
+
+## Latency alone does not buy correctness
+
+The deep lane is allowed to be late, and it is natural to assume that letting it
+wait longer would let it answer better. Measured, it does the opposite.
+
+`deep.latencyMs` only sets when a result may be APPLIED. The job's span is fixed
+when it is queued and always ends at the scheduling moment, so waiting longer
+delays the same answer rather than improving it:
+
+| deep.latencyMs | missed | spurious | required failures |
+|---|---|---|---|
+| 40 (current) | 5 | 6 | 0 |
+| 150 | 4 | 7 | 1 |
+| 400 | 9 | 17 | 2 |
+
+Reaching the window FORWARD so it covers audio that has not happened yet — a
+`deep.lookaheadMs` prototyped and reverted — is worse still:
+
+| lookahead | missed | spurious | required failures | overall exact | lead pitch class |
+|---|---|---|---|---|---|
+| 0 (current) | 5 | 6 | 0 | 78.6% | 92.9% |
+| 100ms | 5 | 9 | 1 | 72.9% | 92.6% |
+| 200ms | 12 | 12 | 3 | 53.2% | 65.2% |
+| 400ms | 12 | 15 | 3 | 51.7% | 59.1% |
+| 800ms | 8 | 25 | 3 | 39.0% | 65.0% |
+
+The cause is attribution, not analysis. A job is queued for the Notes active at
+that moment and its result is applied to them. Reach 200ms forward during a
+167ms triplet run and the window covers the NEXT note, so the lane gathers
+evidence about a Note's successor and files it under the Note. Chords degrade
+more gently (cowboy 75% to 63%) precisely because their extra audio still
+belongs to the same event, while the lead line collapses.
+
+Extra time is only worth having if the window stays INSIDE the Note it is about.
+That means scheduling relative to a Note's own span — analyse its sustain, apply
+it to that Note, and discard the result if the window has drifted past the
+Note's end — rather than at a fixed offset from now. That is a different change
+from "add latency", and it is the one worth making. It should be built and
+tuned against recordings these constants have never seen, not against these 78
+events.
