@@ -99,8 +99,17 @@ are not tried again:
 | median smoothing 3→2 / 3→1 | 3→2: +11 spurious; 3→1: +2 missed |
 | require a transient for same-pitch re-articulation | spurious 11→9 but accuracy 0.897→0.786 |
 | restrum sharpness 1.1 instead of 0.9 | −4 spurious, +2 missed, second fixture fails |
+| subtract the lag from *reported* times only, leaving voting untouched | onset error 90→36ms, but accuracy 0.897→0.862 and +2 missed: moving every Note earlier re-pairs detections onto their neighbours' labels |
 
 The common thread: the pitch path is systematically ~90ms late relative to the
 hand-annotated onsets, while the transient path is not. Closing the last gate
 needs one coherent latency model spanning both, so that boundary placement and
 pitch attribution move together — not another threshold.
+
+The last row is the clearest evidence for that. Correcting only the reported
+times fixes the onset error almost completely (90ms to 36ms) and makes the
+labelling worse, because the boundaries and the pitch evidence then disagree
+about where a Note is. Either both move or neither does. That is a change to how
+segmentation works, not a constant to tune, and it wants its own pass with the
+articulation tests extended first — a Note's boundary and the frames that name
+it have to be derived from the same clock.
