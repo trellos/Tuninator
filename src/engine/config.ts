@@ -410,10 +410,32 @@ export type EngineConfig = {
      *
      * Splitting is additive — it can only turn one detection into two — while
      * merging deletes a detection the recognizer already stood behind, and if
-     * the segmenter is wrong that is a played note thrown away. Separately
-     * switchable so the two directions can be measured apart.
+     * the segmenter is wrong that is a played note thrown away.
+     *
+     * **Off, on measurement.** Enabled on these fixtures it takes false
+     * positives 6 -> 10 and fragmentation 11/78 to 12/78 with a worst case of
+     * five Notes on one event — merging one pair moves a start time, which
+     * opens the survivor to the fast lane's own absorption path and cascades.
+     * The mechanism is here and tested; it does not yet pay for itself, and
+     * saying so is cheaper than a number nobody can explain.
      */
     regionMerge: boolean;
+    /**
+     * Let the deep lane rename a Note the region disagrees with.
+     *
+     * A different claim from the structural switches: splitting and merging are
+     * about how many events there were, renaming is about what one of them was
+     * called, and the two fail in unrelated ways.
+     *
+     * **Off, on measurement, and for a reason already on the record.** The
+     * findings note that giving the deep lane a vote on a monophonic Note's
+     * pitch changed nothing because it is fooled by the same ringing
+     * predecessor YIN is. Letting it *override* rather than vote is worse:
+     * clean-lead pitch class 92.9% -> 81.5%, which fails the gate. The
+     * strongest fundamental in a window is the loudest voice, and the loudest
+     * voice in a fast run is routinely the note before this one.
+     */
+    regionCorrectPitch: boolean;
   };
 
   diagnostics: {
@@ -505,7 +527,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minSegmentMs: 90,
     segmentHoldWindows: 2,
     segmentRiseRatio: 2.0,
-    regionMerge: true,
+    regionMerge: false,
+    regionCorrectPitch: false,
   },
   diagnostics: {
     pitchFrames: false,

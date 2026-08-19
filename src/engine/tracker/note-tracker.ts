@@ -920,23 +920,37 @@ export class NoteTracker {
   applySegmentation(segmentation: DeepSegmentation): TrackerEmission[] {
     const out: TrackerEmission[] = [];
     const candidates: NoteRecord[] = [];
+    const inRegion = (record: NoteRecord): boolean =>
+      !record.merged &&
+      record.endTime !== null &&
+      record.startSample >= segmentation.fromSample &&
+      record.endTime <= segmentation.to;
     for (const record of this.closing) {
-      if (record.merged || record.deepResolved) continue;
-      if (record.endTime === null) continue;
-      if (record.startSample < segmentation.fromSample) continue;
-      if (record.endTime > segmentation.to) continue;
-      candidates.push(record);
+      if (record.deepResolved) continue;
+      if (inRegion(record)) candidates.push(record);
+    }
+    // Notes that have already been let go are still open to being *corrected*.
+    // Their extent is history and cannot be rewritten — the `ended` for them
+    // has been delivered — but a name is a belief, and the region saw the whole
+    // event where the hops each saw 43ms straddling its edges. This is the same
+    // path `applyHarmony` has always taken for a Note whose chord resolved
+    // after it stopped sounding.
+    const ended: NoteRecord[] = [];
+    for (const record of this.ended) {
+      if (inRegion(record)) ended.push(record);
     }
     candidates.sort((a, b) => a.startTime - b.startTime || (a.id < b.id ? -1 : 1));
-    if (candidates.length === 0) return out;
-
     for (const record of candidates) record.deepResolved = true;
 
     // Everything past the last Note under consideration belongs to audio that
     // is still arriving. The region reaches into it on purpose — a boundary is
     // only visible once the window has seen what comes after it — but nothing
     // out there may be acted on yet.
-    const horizon = Math.max(...candidates.map((r) => r.endTime as number));
+    const horizon = Math.max(
+      ...candidates.map((r) => r.endTime as number),
+      ...ended.map((r) => r.endTime as number),
+      Number.NEGATIVE_INFINITY
+    );
     const segments = segmentation.segments.filter((segment) => segment.from < horizon);
     if (segments.length === 0) return out;
 
@@ -945,7 +959,6 @@ export class NoteTracker {
     // fresh notes to both witnesses. Leave it alone, and leave its span alone.
     const named = candidates.filter((record) => record.harmonyLabel !== null);
     const open = candidates.filter((record) => record.harmonyLabel === null);
-    if (open.length === 0) return out;
 
 
 
@@ -971,11 +984,134 @@ export class NoteTracker {
       this.splitAtSegments(record, mine, out);
     }
 
+    if (this.config.deep.regionMerge) {
+      for (const segment of segments) this.mergeWithinSegment(segment, open, out);
+    }
+
     for (const segment of orphans) {
       this.insertFromSegment(segment, candidates, out);
     }
 
+    // Corrections last, and applied to Notes that have already been let go as
+    // readily as to Notes still closing.
+    for (const record of [...open, ...ended]) {
+      if (record.merged) continue;
+      const segment = ownerOfSegment(segments, record.startTime);
+      if (segment !== null) this.correctPitch(record, segment, out);
+    }
+
     return out;
+  }
+
+  /**
+   * Absorb Notes the fast lane cut where the region found no boundary.
+   *
+   * The mirror of splitting, and the direction that has to be more careful:
+   * splitting can only turn one detection into two, while absorbing deletes a
+   * detection the recognizer already stood behind, and if the region is wrong
+   * that is a note somebody played thrown away. So it happens only where the
+   * region positively found ONE event — no boundary of any kind between them —
+   * and where the Notes agree with the segment and with each other about what
+   * was sounding.
+   */
+  private mergeWithinSegment(
+    segment: RegionSegment,
+    open: readonly NoteRecord[],
+    out: TrackerEmission[]
+  ): void {
+    const inside = open
+      .filter(
+        (record) =>
+          !record.merged &&
+          record.startTime >= segment.from &&
+          record.startTime < segment.to &&
+          (record.endTime ?? 0) <= segment.to
+      )
+      .sort((a, b) => a.startTime - b.startTime);
+    if (inside.length < 2) return;
+
+    const survivor = inside[0] as NoteRecord;
+    if (survivor.deepStructural) return;
+    const target = pitchClassIndex(segment.dominantMidi);
+    const absorbed: string[] = [];
+    let end = survivor.endTime as SourceTimeMs;
+
+    for (let i = 1; i < inside.length; i++) {
+      const record = inside[i] as NoteRecord;
+      if (record.deepStructural) break;
+      // Contiguous, or the silence between them says they are two events.
+      if (record.startTime - end > this.config.harmony.mergeMaxGapMs) break;
+      // And about the same thing the region says was sounding.
+      if (target !== null && pitchClassIndex(record.dominantMidi()) !== target) break;
+      record.merged = true;
+      absorbed.push(record.id);
+      end = Math.max(end, record.endTime ?? end) as SourceTimeMs;
+    }
+    if (absorbed.length === 0) return;
+
+    survivor.endTime = end;
+    survivor.deepStructural = true;
+    if (!survivor.announced) return;
+    const revisionNumber = survivor.bump("structuralRevision");
+    out.push({
+      type: "changed",
+      note: survivor.snapshot(),
+      change: {
+        type: "structuralRevision",
+        at: end,
+        revisionNumber,
+        relation: "absorbed",
+        relatedNoteIds: absorbed,
+      },
+    });
+  }
+
+  /**
+   * Rename a Note the region disagrees with.
+   *
+   * Not a structural claim and not gated on the Note still being open: an
+   * already-ended Note's extent is history, but its name is a belief, and the
+   * whole point of a lane that is allowed to be late is that it may arrive
+   * after the fact with better evidence. A Note that has bloomed into a chord
+   * is left alone — a chord is not named from one fundamental.
+   */
+  private correctPitch(
+    record: NoteRecord,
+    segment: RegionSegment,
+    out: TrackerEmission[]
+  ): void {
+    if (!this.config.deep.regionCorrectPitch) return;
+    if (record.harmonyBloomed) return;
+    const activation = segment.activations[0];
+    if (activation === undefined) return;
+    const named = pitchClassIndex(record.dominantMidi());
+    if (named === null || named === pitchClassIndex(activation.midi)) return;
+
+    const previous = record.currentLabel();
+    record.deepPitch = {
+      midi: activation.midi,
+      name: `${activation.pitchClass}${activation.octave}`,
+      pitchClass: activation.pitchClass,
+      octave: activation.octave,
+      frequencyHz: activation.frequencyHz,
+      centsOffset: 0,
+      role: "first",
+      confidence: activation.confidence,
+    };
+    const label = record.currentLabel();
+    if (!record.announced || label === previous) return;
+    const revisionNumber = record.bump("pitchCorrection");
+    record.lastEmitted.label = label;
+    out.push({
+      type: "changed",
+      note: record.snapshot(),
+      change: {
+        type: "pitchCorrection",
+        at: segment.from,
+        revisionNumber,
+        previous: { label: previous },
+      },
+    });
   }
 
   /**
@@ -1639,6 +1775,17 @@ function ownerOf(records: readonly NoteRecord[], at: SourceTimeMs): NoteRecord |
     if (best === null || record.startTime > best.startTime) best = record;
   }
   return best;
+}
+
+/** The segment whose span contains `at`. */
+function ownerOfSegment(
+  segments: readonly RegionSegment[],
+  at: SourceTimeMs
+): RegionSegment | null {
+  for (const segment of segments) {
+    if (at >= segment.from && at < segment.to) return segment;
+  }
+  return null;
 }
 
 /** True when any of `records` is sounding at `at`. */

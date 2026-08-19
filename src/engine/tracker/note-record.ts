@@ -192,6 +192,17 @@ export class NoteRecord {
    */
   merged = false;
 
+  /**
+   * The pitch the region lane settled on, when it disagreed with the hops.
+   *
+   * Preferred over the vote tally rather than merged into it, because the two
+   * are not the same kind of evidence and averaging them loses the point: the
+   * votes come from hops that each saw 43ms straddling this Note's boundaries,
+   * the region saw the whole event and its neighbours and decided where the
+   * boundaries actually were. When the region has ruled, it has ruled.
+   */
+  deepPitch: DetectedPitch | null = null;
+
   spectralFit: number | undefined;
   contour: Array<readonly [SourceTimeMs, number, number]> = [];
 
@@ -316,6 +327,7 @@ export class NoteRecord {
    * Note's first hop.
    */
   settledPitch(): DetectedPitch | null {
+    if (this.deepPitch !== null) return this.deepPitch;
     const midi = this.dominantMidi();
     if (midi === null) return this.currentPitch;
     if (this.currentPitch !== null && this.currentPitch.midi === midi) return this.currentPitch;
