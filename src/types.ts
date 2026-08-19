@@ -179,6 +179,21 @@ export type NoteChange = {
   previous?: { label: string; hypothesisId?: string };
   /** Other Notes involved. Present on splits and merges. */
   relatedNoteIds?: string[];
+  /**
+   * What `relatedNoteIds` are to this Note.
+   *
+   * `"absorbed"` — they were part of this event after all, and this Note now
+   * stands for all of them; anything summarising the final state must count
+   * this Note once and them not at all. `"split"` — this Note turned out to be
+   * several events, and they are the rest of them; every one of them is a
+   * separate event that really happened.
+   *
+   * The two are opposite claims about the same field, and a consumer that
+   * cannot tell them apart either double-counts a strum or throws away notes
+   * somebody played. Absent means `"absorbed"`, which is what the field meant
+   * before splits existed.
+   */
+  relation?: "absorbed" | "split";
 };
 
 export type NoteOriginTrigger = "attack" | "pitchChange" | "rearticulation";

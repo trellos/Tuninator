@@ -37,7 +37,14 @@ import type {
   SourceTimeMs,
 } from "../../types.js";
 import type { EngineConfig } from "../config.js";
-import type { AttackEvidence, FastFrame, HarmonicReading, PitchActivation } from "../contracts.js";
+import type {
+  AttackEvidence,
+  DeepSegmentation,
+  FastFrame,
+  HarmonicReading,
+  PitchActivation,
+  RegionSegment,
+} from "../contracts.js";
 import { SampleClock } from "../clock.js";
 import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
 import { PitchChangeDetector, centsBetween, isOctaveJump } from "../fast/pitch-change.js";
@@ -100,8 +107,28 @@ const POLYPHONY_CONTEXT_MAX_ALPHA = 0.2;
  */
 const HARMONIC_CONTEXT_THRESHOLD = 0.5;
 
+/**
+ * Attack times kept for the region lane to corroborate against.
+ *
+ * A few seconds' worth at any playable density, which is all the region lane
+ * can reach anyway — the ring is four seconds long.
+ */
+const ATTACK_HISTORY = 256;
+
 /** Confidence movement below this is not worth an event. */
 const CONFIDENCE_EPSILON = 0.15;
+/**
+ * A bend big enough that the Note is provably following the player's hand.
+ *
+ * Above this the pitch has left the note it is named after on purpose, so both
+ * boundary witnesses stop carrying information — a sweep fires the attack
+ * witnesses repeatedly and drags the leader through every semitone on the way.
+ * Below it, a decaying string wobbling across a semitone boundary registers as
+ * a "bend" too, and refusing to re-segment those would hand the whole triplet
+ * run back to the fast lane.
+ */
+const BEND_IS_ONE_NOTE_CENTS = 150;
+
 /** Bend movement below this is not worth an event, in cents. */
 const BEND_EPSILON = 10;
 
@@ -130,6 +157,19 @@ export class NoteTracker {
    * them.
    */
   private attackBurstStart: AttackEvidence | null = null;
+  /**
+   * When energy last arrived, oldest first.
+   *
+   * The fast lane sees every transient and then declines to act on most of
+   * them, because whether a transient means a new note depends on what is
+   * already sounding. The region lane has the opposite problem: it can see that
+   * the envelope rose over a trough hundreds of milliseconds later, but its
+   * 85ms windows localise that rise poorly and it cannot tell a pick from the
+   * ordinary ripple of a decay. Between them the answer is unambiguous — the
+   * fast lane says exactly WHEN energy arrived, the region lane says whether
+   * that arrival was a new event — and neither witness alone is enough.
+   */
+  private readonly attackTimes: SourceTimeMs[] = [];
   /**
    * How polyphonic the audio has been lately, independent of any one Note.
    *
@@ -169,6 +209,7 @@ export class NoteTracker {
     this.nextId = 1;
     this.lastAttack = null;
     this.attackBurstStart = null;
+    this.attackTimes.length = 0;
     this.lastEndedAt = null;
     this.contextHarmonic = 0;
     this.contextUpdatedAt = null;
@@ -218,6 +259,17 @@ export class NoteTracker {
 
     const pitchChange = this.pitchChange.observe(frame);
     const gliding = this.pitchChange.isGliding();
+
+    // Every transient, gated or not. The amplitude gate exists to stop the fast
+    // lane opening a Note on room tone, and it is right to be conservative
+    // there — but a note picked into the tail of the one before it can sit
+    // under the gate for the hop where the pick lands, which is exactly the
+    // event the region lane is trying to corroborate. The gate still decides
+    // what the fast lane may act on; this list only records what it saw.
+    if (frame.attack !== null) {
+      this.attackTimes.push(frame.attack.at);
+      if (this.attackTimes.length > ATTACK_HISTORY) this.attackTimes.shift();
+    }
 
     if (frame.attack !== null && !frame.gated) {
       const previous = this.lastAttack;
@@ -742,6 +794,7 @@ export class NoteTracker {
   ): void {
     if (predecessor === null) return;
     if (predecessor.merged) return;
+    if (predecessor.deepStructural) return;
     // A Note that named a chord, or that sustained past one articulation, is an
     // event somebody played. Only the stub of a forming articulation qualifies.
     if (predecessor.harmonyBloomed) return;
@@ -779,6 +832,10 @@ export class NoteTracker {
       let previous: NoteRecord | null = null;
       for (const candidate of [...this.closing, ...this.ended]) {
         if (candidate.merged) continue;
+        // A Note the region lane split out, or created, is a decided event
+        // rather than a fragment of a forming articulation. Absorbing it would
+        // let a chord that names itself nearby swallow the re-segmentation.
+        if (candidate.deepStructural) continue;
         if (candidate.harmonyLabel !== null) continue;
         if (candidate.endTime === null) continue;
         if (candidate.endTime - candidate.startTime > config.mergeMaxFragmentMs) continue;
@@ -800,19 +857,382 @@ export class NoteTracker {
     return absorbed;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Region re-segmentation                                              */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * The span of audio nobody has ruled on yet, or null when there is none.
+   *
+   * It runs from the start of the oldest Note that has stopped sounding but has
+   * not been compared against a re-analysis of its own region, up to whatever
+   * "now" turns out to be when the job is queued. A Note leaves this set by
+   * being resolved, which is what stops the region growing without bound.
+   *
+   * Live Notes are deliberately excluded: their audio has not finished
+   * arriving, and re-segmenting a Note against a region that stops in the
+   * middle of it is how a note gets cut in half by the analysis rather than by
+   * the player.
+   */
+  pendingRegion(): { fromSample: number; noteIds: string[]; lastEndTime: SourceTimeMs } | null {
+    let fromSample = Number.POSITIVE_INFINITY;
+    let lastEndTime = Number.NEGATIVE_INFINITY;
+    const noteIds: string[] = [];
+    for (const record of this.closing) {
+      if (record.deepResolved || record.merged) continue;
+      fromSample = Math.min(fromSample, record.startSample);
+      lastEndTime = Math.max(lastEndTime, record.endTime ?? record.lastSeenAt);
+      noteIds.push(record.id);
+    }
+    if (noteIds.length === 0) return null;
+    return { fromSample, noteIds, lastEndTime: lastEndTime as SourceTimeMs };
+  }
+
+  /**
+   * Let a region's Notes go without a verdict.
+   *
+   * Called when the audio aged out of the ring before the deep lane reached it.
+   * A Note held open waiting for an answer that will never arrive would never
+   * emit its own ending, which is a far worse failure than an unrevised Note.
+   */
+  resolveRegion(noteIds: readonly string[]): void {
+    for (const id of noteIds) {
+      const record = this.endedRecord(id) ?? this.notes.get(id);
+      if (record !== undefined) record.deepResolved = true;
+    }
+  }
+
+  /**
+   * Reconcile a region's segmentation against the Notes already emitted in it.
+   *
+   * This is the direction the window-tagger could not run in. A harmony reading
+   * arrives already addressed to a Note, so all it can do is improve that
+   * Note's name; a segmentation arrives addressed to a span of audio, so it can
+   * disagree about how many Notes there were at all.
+   *
+   * Three things a Note that named a chord is protected from, and one reason:
+   * a strum IS several events' worth of energy arriving over tens of
+   * milliseconds, so the witnesses that identify a fresh note in a line — the
+   * leader moving, the envelope rising — both fire inside one chord routinely.
+   * The deep lane may re-segment what has not already been identified as a
+   * single chord, and nothing else.
+   */
+  applySegmentation(segmentation: DeepSegmentation): TrackerEmission[] {
+    const out: TrackerEmission[] = [];
+    const candidates: NoteRecord[] = [];
+    for (const record of this.closing) {
+      if (record.merged || record.deepResolved) continue;
+      if (record.endTime === null) continue;
+      if (record.startSample < segmentation.fromSample) continue;
+      if (record.endTime > segmentation.to) continue;
+      candidates.push(record);
+    }
+    candidates.sort((a, b) => a.startTime - b.startTime || (a.id < b.id ? -1 : 1));
+    if (candidates.length === 0) return out;
+
+    for (const record of candidates) record.deepResolved = true;
+
+    // Everything past the last Note under consideration belongs to audio that
+    // is still arriving. The region reaches into it on purpose — a boundary is
+    // only visible once the window has seen what comes after it — but nothing
+    // out there may be acted on yet.
+    const horizon = Math.max(...candidates.map((r) => r.endTime as number));
+    const segments = segmentation.segments.filter((segment) => segment.from < horizon);
+    if (segments.length === 0) return out;
+
+    // A Note that already knows which chord it is has been identified, not
+    // merely detected, and a strum's interior looks exactly like a run of
+    // fresh notes to both witnesses. Leave it alone, and leave its span alone.
+    const named = candidates.filter((record) => record.harmonyLabel !== null);
+    const open = candidates.filter((record) => record.harmonyLabel === null);
+    if (open.length === 0) return out;
+
+
+
+    const owned = new Map<string, RegionSegment[]>();
+    const orphans: RegionSegment[] = [];
+    for (const segment of segments) {
+      const owner = ownerOf(open, segment.from);
+      if (owner === null) {
+        if (coveredBy(named, segment.from)) continue;
+        orphans.push(segment);
+        continue;
+      }
+      const list = owned.get(owner.id);
+      if (list === undefined) owned.set(owner.id, [segment]);
+      else list.push(segment);
+    }
+
+    for (const record of open) {
+      const mine = (owned.get(record.id) ?? []).filter(
+        (segment, index) => index === 0 || this.isRealBoundary(record, segment)
+      );
+      if (mine.length < 2) continue;
+      this.splitAtSegments(record, mine, out);
+    }
+
+    for (const segment of orphans) {
+      this.insertFromSegment(segment, candidates, out);
+    }
+
+    return out;
+  }
+
+  /**
+   * Is this segment boundary a note the player put there?
+   *
+   * Two rules, one per witness, and each is the same rule the fast lane already
+   * lives by, applied to region evidence instead of hop evidence.
+   *
+   *  - **A chord's leader moving is a voice, not a Note.** A strum has no
+   *    single pitch: its strings arrive over tens of milliseconds and decay at
+   *    different rates, so the strongest fundamental wanders through the chord
+   *    for its whole life. Splitting on that shattered every strum into one
+   *    Note per string, which is the defect the fast lane's own
+   *    Voices-versus-Notes rule exists to prevent.
+   *  - **A re-articulation needs energy to have arrived.** The region lane can
+   *    see the envelope rise over a trough, but an 85ms window localises that
+   *    badly and cannot tell a pick from the ripple of a decay. The fast lane
+   *    saw the transient and knows exactly when. Requiring both means a note
+   *    re-picked at its own pitch is recoverable while sustain ripple is not.
+   */
+  private isRealBoundary(record: NoteRecord, segment: RegionSegment): boolean {
+    // A bend sweeps the spectrum, which fires both attack witnesses repeatedly
+    // inside what is musically one note, and drags the leader through every
+    // semitone it passes on the way. Neither witness carries information here.
+    // "A3 bent up to B3" is one thing the player did, and it comes out as one
+    // Note or the recognizer is wrong about what happened.
+    if (Math.abs(record.bendPeakCents) >= BEND_IS_ONE_NOTE_CENTS) return false;
+
+    if (segment.boundary === "pitchChange") {
+      // A chord's leader moving is a voice, not a Note. A strum has no single
+      // pitch: its strings arrive over tens of milliseconds and decay at
+      // different rates, so the strongest fundamental wanders through the chord
+      // for its whole life. This is the fast lane's own Voices-versus-Notes
+      // rule, applied to region evidence.
+      if (record.harmonyBloomed) return false;
+      // The boundary was found from the window that FIRST showed a new leader.
+      // Whether the leader stayed changed is a question about the whole
+      // segment, and only the accumulated answer is worth splitting a Note
+      // over. Measured against the Note's OWN name rather than against the
+      // neighbouring segment, because that is what the split has to change to
+      // be worth making: cutting a C#5 in two and calling both halves C#5 is
+      // fragmentation whatever the transform saw in between. Compared by pitch
+      // class, since an octave-sized jump is the estimator's failure mode
+      // rather than a note.
+      const carved = pitchClassIndex(segment.dominantMidi);
+      const named = pitchClassIndex(record.dominantMidi());
+      return carved !== null && named !== null && carved !== named;
+    }
+
+    // A re-articulation needs energy to have arrived. The region lane can see
+    // the envelope rise over a trough hundreds of milliseconds later, but an
+    // 85ms window localises that badly and cannot tell a pick from the ripple
+    // of a decay; the fast lane saw the transient and knows exactly when.
+    // Neither witness is enough alone, and together they are unambiguous.
+    const tolerance = this.config.tracking.backdateWindowMs;
+    for (const at of this.attackTimes) {
+      if (Math.abs(at - segment.from) <= tolerance) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Cut one Note into the events the region says it contained.
+   *
+   * The Note keeps its own identity and its first segment; each later segment
+   * becomes a Note of its own, backdated onto the boundary the region found.
+   * The original is announced as structurally revised rather than silently
+   * shortened, because a consumer holding it needs to know it is now one of
+   * several rather than the whole thing.
+   */
+  private splitAtSegments(
+    record: NoteRecord,
+    segments: readonly RegionSegment[],
+    out: TrackerEmission[]
+  ): void {
+    const originalEnd = record.endTime as SourceTimeMs;
+    const created: string[] = [];
+    const announcements: TrackerEmission[] = [];
+
+    for (let i = 1; i < segments.length; i++) {
+      const segment = segments[i] as RegionSegment;
+      const from = Math.max(segment.from, record.startTime);
+      const to = Math.min(
+        originalEnd,
+        i + 1 < segments.length ? (segments[i + 1] as RegionSegment).from : segment.to
+      );
+      // Both sides, not just the new one. A boundary that leaves a stub behind
+      // is the analysis window sliding across a boundary that is already there,
+      // and the stub it leaves is a Note nobody played.
+      if (to - from < this.config.deep.minSegmentMs) continue;
+      if (from - record.startTime < this.config.deep.minSegmentMs) continue;
+      const successor = this.beginFromSegment(segment, from, to, record, announcements);
+      created.push(successor.id);
+    }
+
+    if (created.length === 0) return;
+
+    // The original now ends where the second event began.
+    const firstNewStart = Math.min(
+      ...created.map((id) => (this.endedRecord(id) as NoteRecord).startTime)
+    );
+    record.endTime = Math.max(record.startTime, firstNewStart) as SourceTimeMs;
+    record.deepStructural = true;
+
+    if (record.announced) {
+      const revisionNumber = record.bump("structuralRevision");
+      out.push({
+        type: "changed",
+        note: record.snapshot(),
+        change: {
+          type: "structuralRevision",
+          at: record.endTime,
+          revisionNumber,
+          // The opposite claim from an absorption, on the same field: these are
+          // the rest of the events this Note turned out to be, and every one of
+          // them really happened.
+          relation: "split",
+          relatedNoteIds: created,
+        },
+      });
+    }
+    // The revision lands before the Notes it announces, so a consumer learns
+    // that the Note it is holding has become several BEFORE the first of them
+    // arrives.
+    for (const emission of announcements) out.push(emission);
+  }
+
+  /**
+   * Open a Note for a segment nothing was emitted for.
+   *
+   * The sixteenths run has an open B ringing under it, so a picked A4 is
+   * plainly present in the spectrum and never becomes the loudest fundamental
+   * in any single window. The fast lane emitted nothing at all across it. This
+   * is the case a re-segmenter exists for: an event the first pass did not
+   * merely misname, but missed.
+   */
+  private insertFromSegment(
+    segment: RegionSegment,
+    neighbours: readonly NoteRecord[],
+    out: TrackerEmission[]
+  ): void {
+    const min = this.config.deep.minSegmentMs;
+    // Never where a Note already begins: that is the same event twice.
+    for (const neighbour of neighbours) {
+      if (Math.abs(neighbour.startTime - segment.from) < min) return;
+    }
+    let to = segment.to;
+    for (const neighbour of neighbours) {
+      if (neighbour.startTime > segment.from) to = Math.min(to, neighbour.startTime);
+    }
+    if (to - segment.from < min) return;
+    this.beginFromSegment(segment, segment.from, to as SourceTimeMs, null, out);
+  }
+
+  /**
+   * Build a Note from a segment and close it immediately.
+   *
+   * The audio is already in the past, so there is nothing to observe hop by
+   * hop: the segment IS the evidence. It goes through the ordinary closing path
+   * so that its `started`, `resolved` and `ended` come out in the same shape and
+   * the same order as every other Note's.
+   *
+   * A child of a Note that had bloomed into an unnamed chord inherits that
+   * abstention. Splitting a Note the recognizer declined to name is a claim
+   * about how many events there were, not a licence to suddenly name them.
+   */
+  private beginFromSegment(
+    segment: RegionSegment,
+    from: SourceTimeMs,
+    to: SourceTimeMs,
+    parent: NoteRecord | null,
+    out: TrackerEmission[]
+  ): NoteRecord {
+    const activation = segment.activations[0] ?? null;
+    const frequencyHz = activation === null ? null : activation.frequencyHz;
+    const originPitch: DetectedPitch | null =
+      activation === null
+        ? null
+        : {
+            midi: activation.midi,
+            name: `${activation.pitchClass}${activation.octave}`,
+            pitchClass: activation.pitchClass,
+            octave: activation.octave,
+            frequencyHz: activation.frequencyHz,
+            centsOffset: 0,
+            role: "first",
+            confidence: activation.confidence,
+          };
+
+    const record = new NoteRecord({
+      id: `n${this.nextId++}`,
+      config: this.config,
+      startTime: from,
+      startSample: this.clock.toSamples(from),
+      trigger: parent === null ? "attack" : "pitchChange",
+      frequencyHz,
+      originPitch,
+      confidence: activation?.confidence ?? segment.confidence,
+      rms: parent?.rms ?? 0,
+      peak: parent?.maxPeak ?? 0,
+    });
+    record.deepResolved = true;
+    record.deepStructural = true;
+    record.lastVoicedAt = to;
+    record.lastAudibleAt = to;
+    record.lastSeenAt = to;
+    record.frames = Math.max(1, segment.windows);
+    record.confidenceSum = record.frames * (activation?.confidence ?? 0.5);
+    record.maxRms = parent?.maxRms ?? 0;
+    if (parent !== null) {
+      record.polyphonic = parent.polyphonic;
+      record.harmonyBloomed = parent.harmonyBloomed;
+      record.harmonyLabel = parent.harmonyLabel;
+      record.harmonyRoot = parent.harmonyRoot;
+      record.harmonyQuality = parent.harmonyQuality;
+      record.harmonyConfidence = parent.harmonyConfidence;
+      record.estimatedVoiceCount = parent.estimatedVoiceCount;
+    }
+
+    this.notes.set(record.id, record);
+    // A backdated end must not move the floor future backdating is measured
+    // against: this Note is being closed in the past, not now.
+    const floor = this.lastEndedAt;
+    // `end` announces a Note that was never announced, which is every Note born
+    // this way — a consumer must see it start before it sees it finish, even
+    // though both facts arrive at once and both are backdated.
+    this.end(record, to, out);
+    this.lastEndedAt = floor;
+    return record;
+  }
+
   /** The harmony a Note currently answers to, for segmentation decisions. */
   currentHarmonyOf(noteId: string): string | null {
     return this.notes.get(noteId)?.harmonyLabel ?? null;
   }
 
-  /** Ends every open Note. Called on stop, and at the end of offline input. */
-  flush(at: SourceTimeMs): TrackerEmission[] {
+  /**
+   * Stop every Note that is still sounding, without letting any of them go.
+   *
+   * Separate from `flush` so the engine can close the take's last Notes, have
+   * the deep lane rule on the region they live in, and only then release them.
+   * The last event of a recording is exactly the one whose region has not
+   * settled, and it should not be the one event that never gets a verdict.
+   */
+  closeOpenNotes(at: SourceTimeMs): TrackerEmission[] {
     const out: TrackerEmission[] = [];
     for (const record of [...this.notes.values()]) {
       this.end(record, Math.max(at, record.startTime), out);
     }
     this.publish(out);
-    this.releaseClosed(EMPTY_SET, out);
+    return out;
+  }
+
+  /** Ends every open Note. Called on stop, and at the end of offline input. */
+  flush(at: SourceTimeMs): TrackerEmission[] {
+    const out = this.closeOpenNotes(at);
+    this.releaseClosed(EMPTY_SET, out, true);
     return out;
   }
 
@@ -1140,11 +1560,18 @@ export class NoteTracker {
    * Emit the held closing events for every Note the deep lane is done with.
    *
    * @param busy ids the deep lane still has queued work for
+   * @param force release even Notes nobody has ruled on — the end of a take
    */
-  releaseClosed(busy: ReadonlySet<string>, out: TrackerEmission[]): void {
+  releaseClosed(busy: ReadonlySet<string>, out: TrackerEmission[], force = false): void {
     for (let i = this.closing.length - 1; i >= 0; i--) {
       const record = this.closing[i] as NoteRecord;
-      if (busy.has(record.id)) continue;
+      if (!force) {
+        if (busy.has(record.id)) continue;
+        // A Note nobody has re-analysed is not finished, whatever the queue
+        // says. Holding it here is what makes the region reach back over it:
+        // once it is gone from `closing` there is nothing left to correct.
+        if (!record.deepResolved) continue;
+      }
       this.closing.splice(i, 1);
 
       if (!record.resolvedAnnounced) {
@@ -1196,6 +1623,27 @@ export class NoteTracker {
     }
     return undefined;
   }
+}
+
+/** A MIDI note's pitch class as a number, or null. */
+function pitchClassIndex(midi: number | null): number | null {
+  return midi === null ? null : ((midi % 12) + 12) % 12;
+}
+
+/** The Note whose span contains `at`, latest first. */
+function ownerOf(records: readonly NoteRecord[], at: SourceTimeMs): NoteRecord | null {
+  let best: NoteRecord | null = null;
+  for (const record of records) {
+    if (record.startTime > at) continue;
+    if ((record.endTime ?? Number.POSITIVE_INFINITY) <= at) continue;
+    if (best === null || record.startTime > best.startTime) best = record;
+  }
+  return best;
+}
+
+/** True when any of `records` is sounding at `at`. */
+function coveredBy(records: readonly NoteRecord[], at: SourceTimeMs): boolean {
+  return ownerOf(records, at) !== null;
 }
 
 function castHarmonyVote(

@@ -101,9 +101,24 @@ function holds(
 ): boolean {
   if (index + holdWindows > windows.length) return false;
   for (let k = index; k < index + holdWindows; k++) {
-    if ((windows[k] as RegionWindowReading).dominantMidi !== candidate) return false;
+    if (pitchClassOf((windows[k] as RegionWindowReading).dominantMidi) !== candidate) return false;
   }
   return true;
+}
+
+/**
+ * A leader's pitch class, or null when there is no leader.
+ *
+ * Compared by CLASS rather than by MIDI note, for the same reason the fast lane
+ * does: an octave-sized jump is the best-known failure mode of every pitch
+ * estimator, harmonic-sum peak-picking included — the cancellation pass keeps
+ * whichever of a fundamental and its octave carried more weight in this
+ * particular window, and on one ringing string that flips freely. Treating a
+ * flip as a boundary splits a sustained note in two, and the half that keeps
+ * the true octave then reads as a second event nobody played.
+ */
+function pitchClassOf(midi: number | null): number | null {
+  return midi === null ? null : ((midi % 12) + 12) % 12;
 }
 
 /** Collapse the windows `[from, to)` into one segment. */
@@ -179,7 +194,7 @@ export function segmentRegion(
 
   let segmentFrom = 0;
   let segmentStartSample = boundarySample(windows[0] as RegionWindowReading, windowSize);
-  let segmentMidi = (windows[0] as RegionWindowReading).dominantMidi;
+  let segmentClass = pitchClassOf((windows[0] as RegionWindowReading).dominantMidi);
   let trough = (windows[0] as RegionWindowReading).rms;
   let boundaryKind: RegionSegment["boundary"] = "regionStart";
 
@@ -187,12 +202,13 @@ export function segmentRegion(
     const window = windows[i] as RegionWindowReading;
     const at = boundarySample(window, windowSize);
 
+    const windowClass = pitchClassOf(window.dominantMidi);
     let kind: RegionSegment["boundary"] | null = null;
     if (
-      window.dominantMidi !== null &&
-      segmentMidi !== null &&
-      window.dominantMidi !== segmentMidi &&
-      holds(windows, i, window.dominantMidi, holdWindows)
+      windowClass !== null &&
+      segmentClass !== null &&
+      windowClass !== segmentClass &&
+      holds(windows, i, windowClass, holdWindows)
     ) {
       kind = "pitchChange";
     } else if (trough > 0 && window.rms >= trough * riseRatio) {
@@ -215,13 +231,13 @@ export function segmentRegion(
       );
       segmentFrom = i;
       segmentStartSample = at;
-      segmentMidi = window.dominantMidi;
+      segmentClass = windowClass;
       trough = window.rms;
       boundaryKind = kind;
       continue;
     }
 
-    if (segmentMidi === null) segmentMidi = window.dominantMidi;
+    if (segmentClass === null) segmentClass = windowClass;
     if (window.rms < trough) trough = window.rms;
   }
 

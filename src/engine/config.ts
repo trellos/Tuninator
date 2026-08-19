@@ -366,6 +366,18 @@ export type EngineConfig = {
     /** Hard ceiling on windows per region, whatever the hop works out to. */
     maxRegionWindows: number;
     /**
+     * Audio that must have arrived after the last Note in a region before the
+     * region is analysed.
+     *
+     * A boundary is only visible once a window has seen what comes AFTER it, so
+     * a region that stops at the moment its last Note ended cannot locate its
+     * own final boundary. This is not the latency the findings measured and
+     * rejected: that one delayed applying a fixed window ending at "now", which
+     * buys nothing. This delays the analysis until the audio it is about has
+     * finished arriving, which is the only version of waiting that helps.
+     */
+    regionSettleMs: number;
+    /**
      * Shortest span the region segmenter will call an event.
      *
      * Below this a "boundary" is the analysis window sliding across an existing
@@ -489,6 +501,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     regionHopSamples: 1024,
     maxRegionMs: 1200,
     maxRegionWindows: 96,
+    regionSettleMs: 200,
     minSegmentMs: 90,
     segmentHoldWindows: 2,
     segmentRiseRatio: 2.0,

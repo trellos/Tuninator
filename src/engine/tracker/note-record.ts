@@ -159,6 +159,30 @@ export class NoteRecord {
   closing = false;
 
   /**
+   * The deep lane has ruled on the region this Note lives in.
+   *
+   * `NoteLifecycle`'s `resolved` state has always existed and has only ever
+   * meant "the deep lane has no work outstanding for this id". That was a
+   * statement about a queue, not about the music. It now means what it says:
+   * a whole span of audio was re-analysed as a sequence, this Note was
+   * compared against what that sequence contained, and the recognizer is done
+   * changing its mind about it.
+   */
+  deepResolved = false;
+
+  /**
+   * The region lane changed this Note's extent, or created it outright.
+   *
+   * Narrower than `deepResolved` on purpose. A Note the region merely confirmed
+   * is still an ordinary Note and may still be absorbed into the strum it turns
+   * out to be a fragment of — blocking that shattered every chord whose attack
+   * fragments the region had happened to look at first. A Note the region
+   * SPLIT, or one it created for an event nobody emitted, is a decided event:
+   * letting a neighbouring chord swallow it would undo the re-segmentation.
+   */
+  deepStructural = false;
+
+  /**
    * This Note turned out to be part of another one and has been absorbed.
    *
    * Its already-delivered events stand — history is never rewritten — but the

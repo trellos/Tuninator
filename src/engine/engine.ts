@@ -48,6 +48,8 @@ export class RecognitionEngine {
   private readonly scratch: FastFrame[] = [];
   /** Deep jobs whose audio had aged out. Reported, never silently swallowed. */
   private droppedDeepJobs = 0;
+  /** Regions the deep lane could not analyse. Same contract, same honesty. */
+  private droppedDeepRegions = 0;
 
   constructor(sampleRate: number, config: EngineConfig, originContextTime?: number) {
     this.clock = new SampleClock(sampleRate, originContextTime);
@@ -89,11 +91,17 @@ export class RecognitionEngine {
     this.deep.clear();
     this.tracker.reset();
     this.droppedDeepJobs = 0;
+    this.droppedDeepRegions = 0;
   }
 
   /** Deep jobs dropped because their audio aged out of the ring. */
   get droppedDeepJobCount(): number {
     return this.droppedDeepJobs;
+  }
+
+  /** Regions dropped because they outgrew the ring before being analysed. */
+  get droppedDeepRegionCount(): number {
+    return this.droppedDeepRegions;
   }
 
   /**
@@ -129,6 +137,7 @@ export class RecognitionEngine {
       }
       for (const emission of this.tracker.process(frame)) emissions.push(emission);
       this.requestDeepWork(frame);
+      this.requestRegionWork(frame);
       this.applyDeepResults(frame.at, emissions);
       this.tracker.releaseClosed(this.deep.busyNoteIds(), emissions);
     }
@@ -139,12 +148,26 @@ export class RecognitionEngine {
   /** Ends every open Note. Idempotent. */
   flush(): EngineOutput {
     const emissions: TrackerEmission[] = [];
+    // Stop what is still sounding FIRST, so the take's last Notes are inside
+    // the region the deep lane is about to rule on. The last event of a
+    // recording is exactly the one whose region has not settled yet, and it
+    // should not be the one event that never gets a verdict.
+    for (const emission of this.tracker.closeOpenNotes(this.now)) emissions.push(emission);
+
+    const region = this.tracker.pendingRegion();
+    if (region !== null && region.fromSample < this.ring.writeIndex) {
+      this.deep.requestRegion({
+        fromSample: region.fromSample,
+        toSample: this.ring.writeIndex,
+        notBefore: Number.NEGATIVE_INFINITY,
+        holdNoteIds: region.noteIds,
+      });
+    }
     // Deep work still in flight describes audio that has already been heard, so
     // it is applied before the Notes it concerns are closed. Dropping it would
     // discard the very evidence that names the last chord of a take.
     this.applyDeepResults(Number.POSITIVE_INFINITY, emissions);
-    this.tracker.releaseClosed(this.deep.busyNoteIds(), emissions);
-    for (const emission of this.tracker.flush(this.now)) emissions.push(emission);
+    this.tracker.releaseClosed(this.deep.busyNoteIds(), emissions, true);
     return { emissions, frames: [], fast: [] };
   }
 
@@ -175,9 +198,42 @@ export class RecognitionEngine {
     }
   }
 
+  /**
+   * Queue a re-segmentation of everything nobody has ruled on yet.
+   *
+   * The fast lane proposes and the deep lane decides, so the question the deep
+   * lane is asked is no longer "what is Note n7" but "what happened between
+   * here and here". The region is bounded twice over: it ends when its Notes
+   * have stopped and their audio has finished arriving, and it ends anyway once
+   * it has grown long enough that waiting would risk it outrunning the ring.
+   */
+  private requestRegionWork(frame: FastFrame): void {
+    const region = this.tracker.pendingRegion();
+    if (region === null) return;
+    if (region.fromSample >= frame.sampleIndex) return;
+
+    const deep = this.config.deep;
+    const settled = frame.at - region.lastEndTime >= deep.regionSettleMs;
+    const grown = frame.at - this.clock.toMs(region.fromSample) >= deep.maxRegionMs;
+    if (!settled && !grown) return;
+
+    this.deep.requestRegion({
+      fromSample: region.fromSample,
+      toSample: frame.sampleIndex,
+      notBefore: frame.at + deep.latencyMs,
+      holdNoteIds: region.noteIds,
+    });
+  }
+
   private applyDeepResults(now: number, out: TrackerEmission[]): void {
     const drain = this.deep.drain(now, this.ring);
     this.droppedDeepJobs += drain.dropped;
+    for (const region of drain.droppedRegions) {
+      // The audio is gone. Say so by letting its Notes finish unrevised rather
+      // than holding them open for a verdict that can never arrive.
+      this.droppedDeepRegions++;
+      this.tracker.resolveRegion(region.holdNoteIds);
+    }
     for (const result of drain.results) {
       for (const emission of this.tracker.applyHarmony(
         result.noteId,
@@ -188,6 +244,9 @@ export class RecognitionEngine {
       )) {
         out.push(emission);
       }
+    }
+    for (const segmentation of drain.segmentations) {
+      for (const emission of this.tracker.applySegmentation(segmentation)) out.push(emission);
     }
   }
 

@@ -91,6 +91,11 @@ export function projectEmissions(emissions: readonly TrackerEmission[]): EvalPro
   /**
    * Notes absorbed into another Note by a structural revision.
    *
+   * Only the absorbing direction. A structural revision that SPLIT a Note
+   * carries the ids of the events it turned out to contain, and dropping those
+   * would delete notes somebody played — the exact opposite of what dropping an
+   * absorbed fragment is for.
+   *
    * Their `noteStarted`/`noteEnded` were really delivered and stand as history,
    * but the recognizer's final position is that they were part of a larger
    * event. Scoring them as separate detections would count one chord's attack
@@ -111,7 +116,10 @@ export function projectEmissions(emissions: readonly TrackerEmission[]): EvalPro
       }
       case "changed": {
         changeCount.set(note.id, (changeCount.get(note.id) ?? 0) + 1);
-        if (emission.change.type === "structuralRevision") {
+        if (
+          emission.change.type === "structuralRevision" &&
+          (emission.change.relation ?? "absorbed") === "absorbed"
+        ) {
           for (const id of emission.change.relatedNoteIds ?? []) absorbed.add(id);
         }
         const history = labelHistory.get(note.id);
