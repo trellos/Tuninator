@@ -79,11 +79,16 @@ function queueTransitions(record: NoteRecord, transitions: HypothesisTransition[
 const RMS_BASELINE_ALPHA = 0.25;
 
 /**
- * Weight of the newest deep reading in the room's polyphony estimate. Slow
- * enough that one confused window during an attack transient does not convince
- * the tracker a chord became a single note.
+ * Time constant of the room's harmonic-context estimate, in ms.
+ *
+ * Slow enough that one confused window during an attack transient does not
+ * convince the tracker a chord became a single note, fast enough to notice a
+ * player putting the pick down.
  */
-const POLYPHONY_CONTEXT_ALPHA = 0.2;
+const POLYPHONY_CONTEXT_TAU_MS = 250;
+
+/** Ceiling on that estimate's step, however long the gap between readings. */
+const POLYPHONY_CONTEXT_MAX_ALPHA = 0.2;
 
 /** Confidence movement below this is not worth an event. */
 const CONFIDENCE_EPSILON = 0.15;
@@ -116,6 +121,7 @@ export class NoteTracker {
    * the next split. So a new Note inherits the room's polyphony.
    */
   private contextHarmonic = 0;
+  private contextUpdatedAt: SourceTimeMs | null = null;
   /**
    * When the audio last *became* harmonic, or null while it is not.
    *
@@ -144,6 +150,7 @@ export class NoteTracker {
     this.lastAttack = null;
     this.lastEndedAt = null;
     this.contextHarmonic = 0;
+    this.contextUpdatedAt = null;
     this.harmonicSince = null;
     this.pitchChange.reset();
   }
@@ -373,8 +380,20 @@ export class NoteTracker {
       meanConfidence <= this.config.harmony.maxMonophonicConfidence
         ? 1
         : 0;
-    this.contextHarmonic =
-      this.contextHarmonic * (1 - POLYPHONY_CONTEXT_ALPHA) + harmonicNow * POLYPHONY_CONTEXT_ALPHA;
+    // Time-based rather than per-reading, so the estimate describes the music
+    // and not how often the deep lane happens to be sampled. A per-reading
+    // smoothing constant silently makes the whole notion of "harmonic context"
+    // a function of `harmony.hopDivisor`, which is a performance knob.
+    const elapsed = this.contextUpdatedAt === null ? 0 : Math.max(0, at - this.contextUpdatedAt);
+    // Capped, so a long gap in the readings cannot snap the estimate onto a
+    // single window. After silence the recognizer should be uncertain about
+    // what is sounding, not instantly confident.
+    const alpha = Math.min(
+      POLYPHONY_CONTEXT_MAX_ALPHA,
+      1 - Math.exp(-elapsed / POLYPHONY_CONTEXT_TAU_MS)
+    );
+    this.contextUpdatedAt = at;
+    this.contextHarmonic = this.contextHarmonic * (1 - alpha) + harmonicNow * alpha;
     record.polyphonic = this.contextHarmonic >= 0.5;
 
     if (reading.isConfident && reading.root !== null && reading.chordName !== null) {
@@ -748,7 +767,14 @@ export class NoteTracker {
     record.addContourPoint(t, hz, frame.pitch.confidence);
 
     const nearest = describeFrequency(hz);
-    record.noteVotes.set(nearest.midi, (record.noteVotes.get(nearest.midi) ?? 0) + 1);
+    // Weighted by the confidence of the reading, not counted. A hop where YIN
+    // was sure and a hop where it barely cleared the gate are not equal
+    // evidence, and in a fast run the uncertain hops cluster at the boundaries,
+    // where the window is straddling two notes.
+    record.noteVotes.set(
+      nearest.midi,
+      (record.noteVotes.get(nearest.midi) ?? 0) + frame.pitch.confidence
+    );
     record.hypotheses.observe("pitch", nearest.name, frame.pitch.confidence, t);
 
     /* Bend. The label keeps the ORIGIN note across a bend and the excursion

@@ -328,7 +328,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     fftSize: 4096,
     floor: 0.55,
     margin: 0.08,
-    minEvidenceHops: 2,
+    minEvidenceHops: 3,
     minChordDurationMs: 250,
     minPolyphony: 2,
     minVoiceSpreadSemitones: 7,

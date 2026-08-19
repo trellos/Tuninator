@@ -93,10 +93,10 @@ export class NoteRecord {
   readonly decay = new VoiceDecay();
 
   /**
-   * How many voiced frames landed on each MIDI note. The Note is labeled from
-   * the mode of this, not from the newest frame: a Note whose boundary is off
-   * by part of a note bleeds into its neighbour, and labelling from the last
-   * frame hands it the neighbour's name.
+   * Confidence-weighted evidence for each MIDI note. The Note is labeled from
+   * the strongest, not from the newest frame: a Note whose boundary is off by
+   * part of a note bleeds into its neighbour, and labelling from the last frame
+   * hands it the neighbour's name.
    */
   readonly noteVotes = new Map<number, number>();
 
@@ -218,7 +218,7 @@ export class NoteRecord {
     this.sustainedRms = options.rms;
 
     if (options.originPitch !== null) {
-      this.noteVotes.set(options.originPitch.midi, 1);
+      this.noteVotes.set(options.originPitch.midi, options.confidence);
       this.hypotheses.observe("pitch", options.originPitch.name, options.confidence, options.startTime);
     }
   }
