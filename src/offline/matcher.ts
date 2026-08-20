@@ -700,11 +700,18 @@ export function checkThresholds(stats: EvalStats, thresholds: Thresholds): Thres
   ): void => {
     if (limit === undefined) return;
     if (actual === null) {
+      // Two different things produce a null accuracy and they deserve opposite
+      // verdicts. If labels were in scope and none of them scored, the detector
+      // answered nothing about material it was asked about, and passing that
+      // would let a detector that emits nothing clear every gate. If no labels
+      // were in scope at all - every section of this fixture marked
+      // informational - there is nothing to be right or wrong about, and
+      // failing it reports a defect that does not exist.
+      const nothingInScope = stats.labelCount === 0;
       checks.push({
         name, actual, limit, comparison: "min",
-        // Nothing scored is only acceptable when the gate demands nothing.
-        passed: limit <= 0,
-        note: note ?? "no scored labels",
+        passed: nothingInScope || limit <= 0,
+        note: note ?? (nothingInScope ? "no labels in scope" : "no scored labels"),
       });
       return;
     }
