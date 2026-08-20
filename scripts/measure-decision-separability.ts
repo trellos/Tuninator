@@ -137,11 +137,105 @@ export type Row = {
   labelId: string | null;
   /** Whether the matcher gave that label a detection in the end. */
   labelMatched: boolean | null;
+  /**
+   * The nearest label within the window, positive or not. A negative row with
+   * a label here is a decision AT a labelled stroke that some open Note
+   * already accounts for — the population `build-relabel-kit.ts` needs for
+   * "detector and target disagree at a label".
+   */
+  nearLabelId: string | null;
+  nearLabelStartMs: number | null;
 };
 
 /* -------------------------------------------------------------------------- */
 /* Collection                                                                  */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * The decision rows of ONE fixture, from its trace and labels. Extracted from
+ * `collect` unchanged so `build-relabel-kit.ts` can build the identical row
+ * population inside its own single pass over the corpus.
+ */
+export function collectFixture(
+  stem: string,
+  labels: readonly LabeledEvent[],
+  events: readonly TrackerTraceEvent[],
+  matched: ReadonlySet<string>
+): Row[] {
+  const rows: Row[] = [];
+
+  /**
+   * The boundaries already found when each decision is taken, accumulated in
+   * TRACE ORDER rather than by timestamp.
+   *
+   * It has to be trace order. A split backdates its successor to the first
+   * transient of the attack burst, which can be earlier than the hop that
+   * decided -- so an accepted decision would find its OWN successor sitting
+   * before it on the timeline and mark itself already covered. That is the
+   * circularity this target exists to avoid, and it is silent: it does not
+   * make the numbers look wrong, it just deletes the true positives.
+   */
+  const openedSoFar: number[] = [];
+
+  for (const event of events) {
+    if (event.kind === "opened") {
+      openedSoFar.push(event.at);
+      continue;
+    }
+    if (event.kind !== "rearticulation") continue;
+    const t = event.at;
+
+    // The nearest label to this decision, if any is near enough.
+    let near: LabeledEvent | null = null;
+    for (const label of labels) {
+      const d = Math.abs(label.startMs - t);
+      if (d > WINDOW_MS) continue;
+      if (near === null || d < Math.abs(near.startMs - t)) near = label;
+    }
+
+    // Already accounted for? A Note opened before this decision and within
+    // the window of that label IS the boundary the label needed.
+    let covered = false;
+    if (near !== null) {
+      for (const at of openedSoFar) {
+        if (Math.abs(at - near.startMs) <= WINDOW_MS) {
+          covered = true;
+          break;
+        }
+      }
+    }
+    const positive = near !== null && !covered;
+
+    rows.push({
+      stem,
+      at: t,
+      noteId: event.noteId,
+      accepted: event.accepted,
+      reason: event.reason,
+      settled: event.settled,
+      x: [
+        event.sharpness,
+        event.heldSharpness,
+        event.fluxRatio,
+        event.heldFluxRatio,
+        event.riseRatio,
+        event.envelopeOverBaseline,
+        event.decayExcess ?? 0,
+        event.soundedMs,
+        event.pitchDiffers ? 1 : 0,
+        event.gliding ? 1 : 0,
+        event.kernelOnset ? 1 : 0,
+        event.bloomed ? 1 : 0,
+      ],
+      y: positive ? 1 : 0,
+      labelId: positive && near !== null ? near.id : null,
+      labelMatched: positive && near !== null ? matched.has(near.id) : null,
+      nearLabelId: near !== null ? near.id : null,
+      nearLabelStartMs: near !== null ? near.startMs : null,
+    });
+  }
+  return rows;
+}
 
 export function collect(): Row[] {
   const rows: Row[] = [];
@@ -155,75 +249,7 @@ export function collect(): Row[] {
     const detections = projectEmissions(analysis.emissions).final;
     const labels = fixture.label.events as LabeledEvent[];
     const matched = new Set(matchEvents(labels, detections).matches.map((m) => m.label.id));
-
-    /**
-     * The boundaries already found when each decision is taken, accumulated in
-     * TRACE ORDER rather than by timestamp.
-     *
-     * It has to be trace order. A split backdates its successor to the first
-     * transient of the attack burst, which can be earlier than the hop that
-     * decided -- so an accepted decision would find its OWN successor sitting
-     * before it on the timeline and mark itself already covered. That is the
-     * circularity this target exists to avoid, and it is silent: it does not
-     * make the numbers look wrong, it just deletes the true positives.
-     */
-    const openedSoFar: number[] = [];
-
-    for (const event of events) {
-      if (event.kind === "opened") {
-        openedSoFar.push(event.at);
-        continue;
-      }
-      if (event.kind !== "rearticulation") continue;
-      const t = event.at;
-
-      // The nearest label to this decision, if any is near enough.
-      let near: LabeledEvent | null = null;
-      for (const label of labels) {
-        const d = Math.abs(label.startMs - t);
-        if (d > WINDOW_MS) continue;
-        if (near === null || d < Math.abs(near.startMs - t)) near = label;
-      }
-
-      // Already accounted for? A Note opened before this decision and within
-      // the window of that label IS the boundary the label needed.
-      let covered = false;
-      if (near !== null) {
-        for (const at of openedSoFar) {
-          if (Math.abs(at - near.startMs) <= WINDOW_MS) {
-            covered = true;
-            break;
-          }
-        }
-      }
-      const positive = near !== null && !covered;
-
-      rows.push({
-        stem: fixture.stem,
-        at: t,
-        noteId: event.noteId,
-        accepted: event.accepted,
-        reason: event.reason,
-        settled: event.settled,
-        x: [
-          event.sharpness,
-          event.heldSharpness,
-          event.fluxRatio,
-          event.heldFluxRatio,
-          event.riseRatio,
-          event.envelopeOverBaseline,
-          event.decayExcess ?? 0,
-          event.soundedMs,
-          event.pitchDiffers ? 1 : 0,
-          event.gliding ? 1 : 0,
-          event.kernelOnset ? 1 : 0,
-          event.bloomed ? 1 : 0,
-        ],
-        y: positive ? 1 : 0,
-        labelId: positive && near !== null ? near.id : null,
-        labelMatched: positive && near !== null ? matched.has(near.id) : null,
-      });
-    }
+    rows.push(...collectFixture(fixture.stem, labels, events, matched));
   }
   return rows;
 }
