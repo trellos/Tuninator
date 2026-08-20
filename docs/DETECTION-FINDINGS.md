@@ -1837,3 +1837,137 @@ strokes on each power-chord take have no rise by construction. `SEPARATED` in
 `measure-mute-witness.ts` is the evidence that all of them are real. Only
 inaudibility or an absent pitch class can put a label on the exception list,
 and that list is unchanged at three.
+## The pitch path does not lag on the material that misnames — measured
+
+This document has named "the pitch path runs about 90ms behind the transient
+path" three times, and the reasoning behind it is sound as far as it goes: a
+frame is stamped at the END of the window it analysed, the long YIN window is
+2048 samples (43ms at 48kHz), and the temporal median needs several hops to
+turn over. From that it follows that a Note opening on an attack spends its
+first hops voting on its predecessor's audio.
+
+The hypothesis that follows from it is testable: **a frame whose analysis window
+straddles a Note's own start is not evidence about either Note and should not
+vote.** It is derivable rather than fitted — the window length is the
+estimator's own and `PitchEvidence.source` says which window won — so it costs
+no new constant. It was built, measured on the whole corpus, and it is wrong in
+both of its premises.
+
+### The window is not 43ms on the material that misnames
+
+`scripts/measure-pitch-lag.ts` reports, per fixture, the confidence-weighted
+vote mass from hops whose window reaches back past the Note's own start:
+
+| take | vote mass straddling | of it, wrong | short window wins |
+|---|---|---|---|
+| lead line amped triplet | 9.8% | 23.8% | **88%** |
+| lead line DI triplet | 9.3% | 31.9% | **90%** |
+| lead line mic triplet | 8.0% | 59.0% | **91%** |
+| sixteenths mic / DI / amped | 11.3 / 9.4 / 11.6% | 26.7 / 5.0 / 16.2% | **89 / 84 / 88%** |
+| `clean-lead` 120bpm | 6.0% | 46.5% | 42% |
+| the chord takes | 1.5 - 6.7% | 0 - 78% | 0 - 21% |
+
+On every lead take, 84-91% of voiced hops are decided by the SHORT window: 512
+samples, **10.7ms**, which is shorter than the 12ms hop. The 43ms window only
+wins on low or unconfident material — the chord takes — where an event lasts
+seconds and 43ms of contamination is nothing. So the quantity the argument is
+built on is 10.7ms wide exactly where the misnaming is, and only 6-12% of the
+vote mass straddles anything at all.
+
+### And the Notes are not named late
+
+The eval already records when each Note first said what it finally says
+(`revisions.timeToFinalLabelMs`). On the six 140bpm lead takes:
+
+```
+  amped triplet     82 Notes,  4 corrected      DI triplet     76 Notes,  2 corrected
+  amped sixteenths  38 Notes,  0 corrected      DI sixteenths  42 Notes,  0 corrected
+  mic triplet       65 Notes, 11 corrected      mic sixteenths 39 Notes,  2 corrected
+```
+
+96-100% of Notes on the lead takes name themselves correctly at their first
+emission and never revise. The lag is real on the CHORD takes — 120 to 1666ms
+to a final label there — and it is harmless, because a chord is seconds long.
+
+### Measured end to end, and it makes naming worse
+
+Two forms, both parameter-free: discard a straddling frame's vote outright, and
+weight it by the fraction of its window that lies inside the Note. They measure
+identically.
+
+| | detections | missed | false positives | `clean-lead` gated pitch class |
+|---|---|---|---|---|
+| now | 515 | 35 | — | **92.9%** |
+| straddling votes discarded | +1 | +0 | +1 | **89.3%**, required gate FAILS |
+| straddling votes weighted by overlap | +1 | +0 | +1 | **89.3%**, required gate FAILS |
+
+Not one label is recovered, one false positive is added, and the required gate
+fails. `scripts/measure-pitch-lag.ts` predicts it: of the Notes whose name
+would change, most would be renamed to their SUCCESSOR's pitch, not to their
+own — the early hops were carrying the Note's own attack-region pitch, and
+removing them lets the next event's bleed decide instead.
+
+This also explains why `pitch.voteLagMs` measured inert at every value: moving
+a vote's ownership and removing the vote both assume the vote is wrong, and on
+this material it is right.
+
+### What the split shapes actually are
+
+`measure-splits.ts --detail` prints, for the amped triplet take, twenty-one
+lines that read like a naming lag — `e16 D5 @16308: C5 + D5`, the previous
+note's pitch and then the right one. `scripts/measure-split-shape.ts` asks the
+one question that separates the readings: where did that leading Note BEGIN?
+
+| shape | corpus | amped triplet |
+|---|---|---|
+| the leading Note began >45ms BEFORE this label — it is the PREVIOUS event's Note | **49** | **21** |
+| ...and of those, it carries the previous label's own name | 24 | 15 |
+| began here, named as the note before — the pitch-lag shape | **9** | 3 |
+| began here, named as this label — a boundary the player did not put there | 13 | 3 |
+| named as neither | 12 | 0 |
+| **split events** | **83** | **27** |
+
+The assignment rule is `measure-splits.ts`' own, so the two agree on which
+events are split before they disagree about why. Read note by note, the amped
+triplet's eighth-note run is unambiguous:
+
+```
+  labels   e2 B4 @13312    e3 C5 @13492    e4 D5 @13679    e5 C5 @13894
+  Notes    13320-13440 B4  13507-13627 C5  13693-13827 D5  13907-14040 C5
+           13440-13507 B4  13627-13693 C5  13827-13907 E5  14040-14107 C5
+```
+
+Every event is emitted twice: a correctly-named ~130ms Note, then a ~70ms tail
+fragment at the same pitch. The tail fragment starts nearer to the NEXT label
+than to its own, so the nearest-label rule charges it there, and the pair reads
+as "the previous pitch, then the right one". Nothing was misnamed. The hop
+table for one of them, from `measure-pitch-lag.ts --detail`, is flat:
+
+```
+  14507-14573 named A4     (label e7 is A4 @14334; label e8 is B4 @14550)
+    +0ms A4 conf 0.49   +13ms A4 0.43   +27ms A4 0.91
+    +40ms A4 0.39       +53ms A4 0.88   +67ms B4 0.87   <- the next Note starts
+```
+
+**So the defect behind the largest block of splits is a same-pitch boundary
+inside one event, not a name arriving late.** That is a segmentation question
+and it is where the effort belongs.
+
+### `one onset, two readings`, re-measured against this baseline
+
+The section above this one records the mechanism and says it should be re-tried
+once the lag was closed. There is no lag to close, and re-run as it stands on
+the current tree it no longer pays at all — its former headline win,
+`power-chords-di` 12 detections to 16 with 4 missed to 0, has since been banked
+by other changes and that take now sits at 16/16 with 0 missed without it.
+
+| | detections | missed | false positives | required failures |
+|---|---|---|---|---|
+| now | 515 | 35 | — | 0 |
+| one onset, two readings | **-1** | **+1** | +0 | **2** |
+
+`clean-lead`'s gated pitch class goes 92.9% to 86.7% and `power-chords` 120bpm
+fails `maxMedianOnsetErrorMs`. The one take it still helps is
+`power-chords-amped`: 15 detections to 17, 3 missed to 1, pitch class 78.6% to
+92.9%. Everything else is neutral or worse. Recorded, and closed: it is not
+waiting on the pitch path.
