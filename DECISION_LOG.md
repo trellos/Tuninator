@@ -42,7 +42,16 @@ are what keep later work from repeating them.
   and the hop-grid alignment finding stay committed and reproducible; the
   external number (0.88 across six players and six signal paths) establishes
   the decision is learnable while the derivation number says
-  GuitarSet-plus-augmentation is not yet this corpus. Named routes forward:
+  GuitarSet-plus-augmentation is not yet this corpus. A post-hoc grouping of
+  the derivation rows by deciding branch (recorded in
+  `docs/DETECTION-FINDINGS.md`) adds a design finding independent of this
+  model: only six of the 59 derivation positives sat in the pool the fusion
+  scope allowed the witness to overturn, so the ledger's missed-label upside
+  was capped at six labels before any question of model quality. Any next
+  attempt should set the scope from where the positives live and state that
+  reachable ceiling before training. The same grouping shows two per-take
+  cells previously tabulated (power chords, spicy chords) rest on 48 pairs
+  and zero positives respectively and carry no signal. Named routes forward:
   closer-domain training data (EGDB DI, or self-recorded labelled electric
   takes), and the second independent labelling pass — the model ranks chord
   re-articulations at 0.90–1.00 while `clean-lead-120bpm` reads 0.605,

@@ -3450,3 +3450,74 @@ either), and the **second independent labelling pass** the previous section
 already argued for: `clean-lead-120bpm` at 0.605 under a model that ranks
 chord re-articulations near-perfectly is also consistent with the
 annotation-noise fraction of the ceiling living exactly there.
+
+### The per-take ordering is mostly branch composition, and two of its cells are not measurements
+
+The per-take table above invites a musical reading — "better on chords than
+on power chords" — and this project has produced a false finding that way at
+least four times. Bootstrapped (2000 draws, resampling rows within take,
+same frozen reads):
+
+```
+take                                       rows  pos  neg  pairs   AUC   [95% CI]
+chords-a-bm-g-d-2x-120bpm                    25   10   15    150  1.000  [1.000, 1.000]
+cowboy-chords-c-d-em-g-c-d-em-am-120bpm      28    9   19    171  0.901  [0.750, 1.000]
+power-chords-c-a-g-e-c-d-fsharp-e-120bpm     26    2   24     48  0.708  [0.480, 0.913]
+clean-lead-120bpm                            71   38   33   1254  0.605  [0.469, 0.733]
+spicy-chords-cmaj9-g-am11                    11    0   11     -      -
+```
+
+**The power-chords cell is 48 pairs and its interval spans chance to
+near-perfect: it is not a measurement**, and neither is `spicy-chords`, which
+has no positives at all. Nothing about power chords as a voicing can be read
+from it. What does survive is the contrast the section above rests on:
+`cowboy` [0.750, 1.000] and `clean-lead` [0.469, 0.733] just fail to
+overlap, and `chords-a-bm-g-d` is 1.000 in every draw.
+
+The takes differ far more in WHICH CASCADE BRANCH produced their rows than in
+anything musical. Power chords are 15 of 26 rows `chord-past-muted-window`
+with 1 positive; `spicy-chords` is 6 of 11 the same branch with none. Both
+takes are ones where the tracker already finds its boundaries by other means,
+so almost nothing in them is load-bearing for this decision — which is why
+they have two positives between them, not because a power chord is hard.
+
+### The fusion scope capped the ledger upside at six labels, before any model quality
+
+Grouping all 161 derivation rows by the branch that decided them, against the
+scope the decision-level fusion was given (`rearticulation.ts`, commit
+bfce0ad):
+
+```
+branch                        rows  pos   the learned witness could...
+chord-past-muted-window         36    5   nothing — guard, out of reach
+envelope-rise                   26    6   veto
+sharpness                       24   15   veto
+no-energy-not-sharp             15    3   override to accept
+chord-decay-excess              13    8   nothing — strong-evidence accept
+gated                           10    7   nothing — sub-gate, no Note may open
+ring-out-not-sharp              10    2   override to accept
+chord-sharpness                  9    7   veto
+ring-out-below-floor             8    5   nothing — guard, out of reach
+chord-not-sharp                  5    1   override to accept
+glide-rise                       3    0   nothing — guard, out of reach
+new-pitch                        2    0   nothing — strong-evidence accept
+```
+
+**Six of the 59 derivation positives sit in the accept-override pool.**
+Twenty-five sit behind branches the fusion deliberately kept out of the
+witness's reach — seven of them `gated`, where the fast lane refuses to act
+on sub-gate audio at all (a different question, already measured elsewhere),
+five behind `ring-out-below-floor` and five behind `chord-past-muted-window`,
+each of which was measured into place for reasons recorded above. The veto
+side is larger: 31 negatives sit in accept branches a veto could suppress,
+against 28 positives it could destroy.
+
+So even a PERFECT learned witness, under the scope it was given, could have
+recovered at most six derivation labels — and falsifier 3, the ledger run,
+was never going to see a large missed-label win no matter how good the model
+was. That is a design finding independent of this model's failure, and it is
+the first thing to fix in any next attempt: decide the scope from where the
+positives actually live, and state the reachable ceiling BEFORE training,
+not after. Widening it is not free — every branch listed as out of reach is a
+guard some earlier experiment put there — but a fusion whose reachable upside
+is six labels should be recognised as such while it is still cheap to change.
