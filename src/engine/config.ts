@@ -337,6 +337,51 @@ export type EngineConfig = {
      */
     mutedRestrumWindowMs: number;
     /**
+     * How long a re-articulation rejected for a weak transient is held open,
+     * waiting to see whether the chord is stopped rather than left to ring.
+     *
+     * A mute is the end of something somebody played, so a rejected transient
+     * followed by a mute is a rejection the mute contradicts. The evidence
+     * arrives after the decision, which is what the structural-revision
+     * protocol is for. Long enough to reach the collapse: on the three power
+     * chord takes the hand comes down 308-319ms after the strike it answers.
+     */
+    muteWitnessWindowMs: number;
+    /**
+     * Least separation between the rejected transient and the collapse, ms.
+     *
+     * Without it the mute's own hand noise is its own candidate, and the rule
+     * manufactures a Note out of a single strike that was stopped. The measured
+     * separation on the fixtures is 308ms and more, so this bars nothing real
+     * while ruling out the degenerate case.
+     */
+    muteWitnessGapMs: number;
+    /**
+     * How near its own peak the chord must still have been when the transient
+     * was refused, as a fraction of the Note's loudest frame.
+     *
+     * The same claim `mutedRestrumWindowMs` makes in time, made in energy
+     * instead, which is the axis that survives the signal path. A transient
+     * landing on a chord that has already fallen to a third of its peak is
+     * finger noise on a dying string; it is not a stroke somebody played, and
+     * resurrecting it because the chord was stopped later invents a Note. The
+     * measured separation is total: the strokes this rule exists to recover
+     * land at 0.85, 0.96 and 1.00 of their Note's peak, and every transient it
+     * must refuse lands at 0.63 or below.
+     */
+    muteWitnessLiveFraction: number;
+    /**
+     * How far below its own fitted decay the signal has to fall to count as
+     * muted. 1 is exactly on the curve.
+     *
+     * Read against `VoiceDecay` and never against an absolute level, because
+     * the absolute one measures the recording: `scripts/measure-mute-witness.ts`
+     * separates 48 of 48 strokes WITHIN each file and the columns do not
+     * transfer between paths — the direct take's answered strokes sit below the
+     * amp take's muted ones.
+     */
+    muteCollapseExcess: number;
+    /**
      * Total pitch motion across the glide window that counts as an active
      * glide, in cents. Bending sweeps the spectrum, which spikes flux AND lifts
      * RMS, so both attack tests pass mid-bend; an attack only means "new note"
@@ -700,6 +745,10 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,
     mutedRestrumWindowMs: 1000,
+    muteWitnessWindowMs: 400,
+    muteWitnessGapMs: 160,
+    muteWitnessLiveFraction: 0.75,
+    muteCollapseExcess: 0.75,
     glideMinCents: 25,
     glideWindowHops: 5,
     glideRiseOverride: 1.6,

@@ -558,6 +558,16 @@ export class NoteTracker {
           bloomed: active.harmonyBloomed,
         });
       }
+      // A muted restrum refused for a weak transient is the one rejection in
+      // this detector that later evidence can overturn. Hold it.
+      if (!rearticulated && settled && verdict.reason === "chord-not-sharp") {
+        active.rejectedRestrum = {
+          at: frame.attack.at,
+          atSample: frame.attack.atSample,
+          excess: active.decay.excess(frame.at, frame.rms),
+          rms: frame.rms,
+        };
+      }
       if (rearticulated && settled) {
         // The boundary is the FIRST attack of this burst, not the one that
         // finally cleared the bar. A pick crossing six strings, or a pick
@@ -580,6 +590,11 @@ export class NoteTracker {
         splitFrom = active;
         active = null;
       }
+    }
+
+    /* (a2) A rejected restrum the mute has since contradicted. */
+    if (active !== null && active.rejectedRestrum !== null) {
+      active = this.answerRejectedRestrum(active, frame, out);
     }
 
     /* (b) A confirmed pitch step with no attack: a legato move. The boundary is
@@ -1379,6 +1394,80 @@ export class NoteTracker {
     }
 
     return out;
+  }
+
+  /**
+   * Make the boundary a mute says was there after all.
+   *
+   * The three power-chord takes play one figure: a chord on the 1, the same
+   * chord again on the 2, then the hand comes down and stops it. That second
+   * strike is a MUTED restrum — it damps the strings, so it puts total energy
+   * DOWN while plainly re-articulating the chord — and only its transient gives
+   * it away. On the amp-sim path the compression flattens the transient until
+   * `sharpEnough` cannot see it, and three of those strikes are lost. The
+   * accepted and the rejected strokes are the same event played the same way;
+   * held sharpness reads 0.73, 0.84 and 1.60 against a bar of 0.9 for the three
+   * that fail and 2.28, 1.71 and 1.65 for the three that pass, and no bar
+   * reaches the first group without admitting the chord's own sustain.
+   *
+   * The mute that follows is not flattened by anything. A mute REMOVES energy,
+   * and a compressor, a room and a decaying string can all imitate an arrival
+   * but none of them can imitate a removal — which is why
+   * `scripts/measure-mute-witness.ts` separates 48 of 48 strokes on all three
+   * signal paths where every witness at the boundary itself overlaps.
+   *
+   * So the rejection is held and the boundary made retroactively, backdated to
+   * the transient that was refused. Two things this must not become:
+   *
+   *  - It cannot invent a Note out of a mute. A rejected TRANSIENT has to
+   *    exist; a single strike left to ring and then stopped has nothing to
+   *    resurrect, which is what `rejectedRestrum` being null means.
+   *  - The mute's own hand noise must not be the candidate it resurrects.
+   *    `muteWitnessGapMs` requires real separation between the two, and the
+   *    measured separation on the fixtures is 308ms and more.
+   *
+   * Read against the Note's own fitted decay rather than any absolute level.
+   * The absolute reading measures the recording: the direct take's ANSWERED
+   * strokes collapse further than the amp take's MUTED ones, so a bar chosen
+   * across paths says nothing about the playing.
+   */
+  private answerRejectedRestrum(
+    active: NoteRecord,
+    frame: FastFrame,
+    out: TrackerEmission[]
+  ): NoteRecord {
+    const pending = active.rejectedRestrum;
+    if (pending === null) return active;
+    const config = this.config.transient;
+    const age = frame.at - pending.at;
+
+    // Closed unanswered: the chord was left to ring, so the rejection stands.
+    if (age > config.muteWitnessWindowMs) {
+      active.rejectedRestrum = null;
+      return active;
+    }
+    if (age < config.muteWitnessGapMs) return active;
+
+    // The chord has to have been ringing when the transient landed. A refused
+    // transient on a chord already down to a fraction of its own peak is finger
+    // noise on a dying string, and resurrecting it because the chord is stopped
+    // later invents a Note nobody played.
+    if (pending.rms < active.maxRms * config.muteWitnessLiveFraction) return active;
+
+    const excess = active.decay.excess(frame.at, frame.rms);
+    if (excess === null || excess >= config.muteCollapseExcess) return active;
+
+    active.rejectedRestrum = null;
+    const previous = active;
+    this.end(active, pending.at, out);
+    return this.begin(
+      "attack",
+      frame,
+      out,
+      { at: pending.at, atSample: pending.atSample, frequencyHz: frame.pitch.frequencyHz },
+      previous,
+      false
+    );
   }
 
   /**

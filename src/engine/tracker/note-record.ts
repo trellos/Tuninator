@@ -223,6 +223,28 @@ export class NoteRecord {
   restruck = false;
 
   /**
+   * The most recent re-articulation over this Note that was rejected for
+   * having too weak a transient, kept in case a mute contradicts it.
+   *
+   * A muted restrum damps the strings, so it puts total energy DOWN while
+   * plainly re-articulating the chord, and only its transient gives it away —
+   * which is exactly the witness an amp sim's compression flattens. Nothing
+   * available at the moment of the decision separates the three strokes lost
+   * that way on the amped power-chord take from the three accepted ones: they
+   * are the same event played the same way, and the flux figures alone decide.
+   *
+   * What follows them does separate. Held here until it does or the window
+   * closes; see `transient.muteWitnessWindowMs`.
+   */
+  rejectedRestrum: {
+    at: SourceTimeMs;
+    atSample: number;
+    /** How the chord was travelling when the transient was refused. */
+    excess: number | null;
+    rms: number;
+  } | null = null;
+
+  /**
    * This Note turned out to be part of another one and has been absorbed.
    *
    * Its already-delivered events stand — history is never rewritten — but the
