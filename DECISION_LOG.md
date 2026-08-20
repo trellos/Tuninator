@@ -7,6 +7,125 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-019]: Ledger cause attribution requires the nearest label, not any label within 70ms
+* **Date:** 2026-08-20
+* **Status:** Accepted
+* **Owner:** Evaluation methodology
+* **Context:** `measure-downstream-ledger.ts` attributed any trace event
+  within ±70ms to the missed label being classified. Six missed labels sit
+  55-77ms after their neighbour (rushed pairs, closer than the window), so
+  the neighbour's own correct boundary was read as this label's "split made;
+  successor paired with a neighbouring label" — the fifth instance of the
+  window-wider-than-the-spacing error class, and the first inside the
+  diagnostic that directs the project's effort.
+* **Decision:** `classify` attributes an event to a label only when that
+  label is the event's nearest. MISSED stays 32 (attribution only); the
+  cause table redraws: "no transient within the window" 4 → 10, "band-only"
+  1 → 4, "split-pairing" 8 → 2. The brief's "23 of 32 are bookkeeping"
+  premise was partly this artifact — ~14 of 32 are upstream evidence losses,
+  most of them the second stroke of a rushed pair inside the onset kernel's
+  60ms dead time.
+* **Alternatives Considered:** Leaving the diagnostic as it was and noting
+  the caveat in prose — rejected; this ledger names where effort goes next,
+  and it had already sent this session to the wrong cause once.
+* **Consequences:** Future tracker work aims at the real bookkeeping
+  residue (~10 labels), not at 23. The rushed pairs are a kernel dead-time
+  question and carry the same risk profile as every documented
+  more-willing-to-fire change.
+
+#### [DECISION-018]: Revert announce credit for stubs the same attack opened (per-change bar)
+* **Date:** 2026-08-20
+* **Status:** Rejected
+* **Owner:** Tracker semantics
+* **Context:** `absorbedRenaming` discounts an absorbed step-split stub's
+  span from the announcement clock, arguing the stub is the previous note's
+  tail. Traced at room-mic sixteenths s45: the stub was opened by this
+  stroke's OWN attack (same `burstAt` as the survivor), the "step" was the
+  estimator reading the new pitch 40ms late, and the survivor died
+  unannounced at 53ms counted against a real 93ms span.
+* **Decision:** Crediting the stub's span when it was attack-opened at the
+  survivor's own burst recovers 3 real labels (32 → 29 missed, each
+  confirmed by the DECISION-016 annotation pass) but exposes one
+  pre-existing premature boundary as a new extra Note (107 → 108). The
+  pre-stated Task-3 bar — strictly improve one axis, no worse on the other —
+  fails on the extras axis. Reverted; mechanism and diff recorded in
+  `docs/DETECTION-FINDINGS.md`.
+* **Alternatives Considered:** Also re-dating boundaries opened on a
+  transient several times weaker than an attack arriving inside the settle
+  window (would clear the exposed extra) — not attempted: it needs a
+  strength-ratio constant the five derivation takes may not exercise, and
+  the adjacent too-young ground has three documented failures.
+* **Consequences:** The announce accounting is now known-wrong for
+  own-attack stubs, with three labels waiting on it. It becomes shippable
+  the moment the premature-weak-boundary shape is repaired; that pairing is
+  the highest-value small change left in the tracker.
+
+#### [DECISION-017]: Reject the millisecond click (compactness) witness for the same-pitch decision
+* **Date:** 2026-08-20
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** The one physical cue no experiment had touched: a pick's
+  1-5ms broadband click, measured at its own timescale (2-8kHz causal
+  biquad cascade, 1ms envelope — `kernels/click.ts`) instead of smeared
+  into a 23ms window on a 12ms hop. Falsifier stated in advance: best
+  single compactness witness clears 0.73 AUC on the derivation decision
+  rows and holds on the room-mic path, or the line closes.
+* **Decision:** Measured without touching the engine
+  (`scripts/measure-click-separability.ts`, identical decision-row
+  population, ±12ms sub-hop alignment, adjacent-label onsets masked from
+  every surround ring). The falsifier fired: best witness 0.586, and both
+  compactness readings point the wrong way — re-picks read LONGER above
+  half peak than churn. A positive control in the same script (label onsets
+  vs mid-sustain, same code paths) reads 0.838, so the pipeline sees the
+  click; the decision population kills it — the negatives are hops an
+  energy witness already fired on, and their churn carries 2-8kHz spikes
+  too. Ninth converging negative on this decision.
+* **Alternatives Considered:** Rescue variants beyond the pre-named witness
+  set (higher bands, alternative rings) — excluded by the falsifier's own
+  terms. Sub-hop boundary LOCALISATION by the fine envelope — not refuted,
+  untested, explicitly left open.
+* **Consequences:** The last untouched physical cue at this decision is
+  closed as a discriminator. Together with DECISION-016's finding that the
+  missed labels are real, the remaining routes are tracker bookkeeping and
+  the annotation ambiguity of the extras axis, not new witnesses.
+
+#### [DECISION-016]: The label ceiling is measured — the misses are real; the extras axis carries annotation ambiguity
+* **Date:** 2026-08-20
+* **Status:** Accepted
+* **Owner:** Evaluation methodology
+* **Context:** Eight converging negatives put ~0.73 AUC on the same-pitch
+  decision, and the literature (Dixon DAFx-06; the 2022 soft-onset
+  string-ensemble study) says part of such a ceiling can be label noise.
+  Every later experiment is graded against these labels, so the fraction
+  had to be bounded first. Decision rule stated in advance: ≥95% control
+  agreement validates an annotator; <10% contested disagreement means label
+  noise is not binding; >30% concentrated on muted strums/room mic means
+  the ceiling is substantially annotation.
+* **Decision:** Built the blind listening kit (302 anonymised snippets: 248
+  contested moments, 54 controls; `build-relabel-kit.ts`) and ran the
+  machine pass (`machine-annotate-relabel.ts`, flux at 5ms + 2-8kHz fine
+  envelope, reading only the anonymised audio; control bar passed at
+  96.3%). Verdict by kind: the 32 missed labels are REAL (91% agreement at
+  50ms, 97% at 70ms — the under-10% branch fires; threshold work against
+  them is founded, and the consensus subset for witness studies equals the
+  full derivation set, 161/161). The extra-Note axis is NOT clean: at 55 of
+  106 extra-Note boundaries the independent pass hears a corroborated onset
+  the labels lack, spread across signal paths. Calibration itself measured
+  the wall: no corroboration gate (envelope rise, click, prominence) keeps
+  95% of CLEAR strokes — clear-stroke p5s are rise 0.80, click 1.45,
+  prominence 2.35 — the engine's own recall/precision wall, reproduced from
+  the annotator's side with different features at a different timescale.
+* **Alternatives Considered:** Editing labels the pass disputes — forbidden
+  and not done; disagreements are proposals only. Trusting the machine pass
+  to settle the extras axis — rejected: a signal-driven annotator cannot
+  distinguish "note" from "articulation-like event"; the human pass (kit
+  ready, `.cache/relabel/`, ~20-30 minutes) arbitrates.
+* **Consequences:** Miss-side headroom under the 0.73 ceiling is real, not
+  annotation noise. Extras-side gains must be read with the ambiguity in
+  mind: an extra Note where an independent annotator hears an articulation
+  is not unambiguously a detector error, and 55 of 107 extras sit at such
+  moments. The human pass is the open follow-up.
+
 #### [DECISION-015]: Reject cycle dissimilarity (and YIN aperiodicity) as re-articulation witnesses
 * **Date:** 2026-08-20
 * **Status:** Rejected

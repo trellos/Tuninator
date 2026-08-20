@@ -179,9 +179,29 @@ export function classify(
   events: readonly TrackerTraceEvent[],
   fates: ReadonlyMap<string, Fate>,
   /** Notes the matcher already gave to some OTHER label. */
-  spokenFor: ReadonlySet<string>
+  spokenFor: ReadonlySet<string>,
+  /**
+   * Every label onset in the fixture. A trace event within the window is only
+   * this label's when this label is the NEAREST one — six of the corpus's
+   * missed labels sit 55-77ms after their neighbour (rushed pairs, closer
+   * than the 70ms window), and without the nearest-label test the
+   * neighbour's own correct boundary was attributed to the missed stroke,
+   * reading a kernel dead-time loss as a split-pairing defect. The fifth
+   * instance of the window-wider-than-the-spacing error class in this
+   * project, this time inside the diagnostic itself.
+   */
+  allLabelStarts: readonly number[] = []
 ): Cause {
-  const near = events.filter((e) => Math.abs(e.at - labelStart) <= WINDOW_MS);
+  const nearestToThis = (at: number): boolean => {
+    for (const other of allLabelStarts) {
+      if (Math.abs(other - labelStart) < 1) continue;
+      if (Math.abs(at - other) < Math.abs(at - labelStart)) return false;
+    }
+    return true;
+  };
+  const near = events.filter(
+    (e) => Math.abs(e.at - labelStart) <= WINDOW_MS && nearestToThis(e.at)
+  );
 
   // 1. A Note opened on this stroke. Whatever else happened, the boundary was
   //    found; what is missing is a detection carrying it.
@@ -301,7 +321,13 @@ function run(stems: (stem: string) => boolean): FixtureLedger[] {
         id: label.id,
         startMs: label.startMs,
         label: label.label,
-        ...classify(label.startMs, events, fates, spokenFor),
+        ...classify(
+          label.startMs,
+          events,
+          fates,
+          spokenFor,
+          labels.map((l) => l.startMs)
+        ),
       })),
     });
   }

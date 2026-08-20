@@ -150,12 +150,13 @@ function main(): void {
     const candidates: Candidate[] = [];
 
     // 1. Misses, with their ledger cause.
+    const labelStarts = labels.map((l) => l.startMs);
     for (const { label } of result.missed) {
       candidates.push({
         stem: fixture.stem,
         momentMs: label.startMs,
         kind: "miss",
-        cause: classify(label.startMs, events, fates, spokenFor).cause,
+        cause: classify(label.startMs, events, fates, spokenFor, labelStarts).cause,
         labelId: label.id,
         priority: 0,
       });
