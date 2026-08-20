@@ -329,6 +329,106 @@ off on measurement.
 | past `mutedRestrumWindowMs`, allow a re-strum on a high flux ratio instead of rejecting outright | recovers `cowboy-di` c6 and takes the power DI/amped takes closer to 16 events, but costs two splits on the 120bpm fixtures at every ratio tried (2.5, 3.0, 3.4). Not kept |
 | require the flux ratio on the weakest sharpness fallback as well | the genuine fast re-picks in `clean-lead` measure 1.07-1.15 there, so any ratio that removes the amped fragments (1.02-1.15) removes real notes too |
 
+## The half-rate reading: picking faster than one articulation
+
+The sixteenths take came out at half its real rate — 27 Notes for 48 played on
+the room mic, 34 on the direct input and 34 on the amp sim. It reproduces
+identically on all three signal paths, so it is the detector rather than the
+room, and the Notes it did emit were spaced at the *eighth* note: one Note per
+pair of strokes.
+
+The cause is two devices that exist because a pick is not one transient. The
+fast lane opens a Note on the first, and whatever fires over the next few tens
+of milliseconds is the same pick still landing — a strum crossing six strings,
+or pick noise and then the string speaking. So a split's boundary is backdated
+to the FIRST transient of the burst, and a Note the burst shed on the way is
+absorbed into the articulation that shed it.
+
+Both stop being true the moment the player picks faster than the burst window.
+The boundary then lands at or before the start of the Note it is meant to end;
+`end()` clamps it, the Note is zero length, being zero length it is never
+announced, and the successor absorbs it and takes its start. Two picks, one
+Note, silently. At 140bpm the strokes are 107ms apart and the quieter ones
+measure 80ms — comfortably inside `transient.articulationMs`, which is sized so
+a 120bpm strum's fragments are absorbed.
+
+Neither repair is a threshold:
+
+- **A Note cannot end before it began.** When the burst that would place the
+  boundary is the same one this Note starts on, that burst has already been
+  spent, and the boundary is the transient in hand.
+- **A Note that had already begun to decay was not a stub.** A fragment of a
+  forming articulation is interrupted by the same pick still arriving, so it is
+  at its own peak when it dies; a note answered by a second pick had peaked and
+  started to fall first. That is the Note measured against itself, so it reads
+  the same at any level, on any signal path and at any tempo — which is exactly
+  what a duration cannot claim.
+
+| sixteenths, detections / 48 | before | after |
+|---|---|---|
+| room mic | 27 | **32** |
+| direct input | 34 | **37** |
+| amp sim | 34 | 34 (one fewer false positive) |
+
+The five 120bpm fixtures are bit-identical: same detections, same misses, same
+false positives, 11 of 78 events split and 13 extra Notes. Every required
+fixture still meets every threshold. The cowboy 140bpm takes are unchanged on
+all three paths.
+
+## The attack band: built, measured, rejected
+
+The remaining sixteenths are the quiet upstrokes. The performer's own
+annotation of that take says how it was resolved by hand: a 5kHz-highpassed
+1ms RMS envelope shows four attacks per beat where a broadband onset function
+shows two. The physics behind that is real — a pick is an impulse and spreads
+its energy flat, while a string already ringing is a few narrow low partials —
+and the recogniser's broadband flux is compared against a floor proportional to
+the whole frame's magnitude, so a quiet pick landing on a loud ringing note has
+to beat a bar set by the ringing note.
+
+A second, band-limited flux was built on that argument: the same rectified flux
+summed above `attackBandHz`, with its own running median, so a transient could
+clear the floor up high instead of broadband. Swept on the five 120bpm fixtures
+alone, the band edge behaves exactly as the physics predicts — the flux at a
+labelled attack relative to the signal's own recent flux climbs from 33x
+broadband to 87x above 2kHz, 191x above 3kHz and 498x above 4kHz, while the
+same figure away from any label stays flat at about 5x. Raw onset coverage over
+the whole corpus went 390/459 labels to 425/459.
+
+**It does not survive contact with the tracker, and the reason is worth
+recording.** Every downstream constant was fitted to the attack rate the
+broadband detector produces, and the extra transients cost more than they buy:
+
+| variant | sixteenths mic/DI/amp | clean-lead FP (gate 3) | chords-a-bm missed | lead mic detections (55 labels) |
+|---|---|---|---|---|
+| without the band | 32 / 37 / 34 | 1 | 0 | 74 |
+| band at 4kHz | 34 / 37 / 35 | 6 | 1 | 74 |
+| + superseding a band-only onset with a broadband one | 36 / 38 / 35 | 11 | 0 | 77 |
+| + a band re-articulation escape at every ratio 10..150 | 36 / 38 / 35 | 5-11 | 0 | 77 |
+
+Three separate containments were built and measured, and none of them helped:
+keeping a band-only transient out of the attack burst (worse on every axis),
+refusing to let one open a Note out of silence (worse still), and stopping one
+from clearing the pitch estimator's history (inert). The band's own escape in
+the re-articulation path turned out not to matter at all — disabling it left
+the sixteenths unchanged — so what the band buys is the extra transients and
+what it costs is the extra transients.
+
+**And the band edge cannot be chosen honestly on this corpus.** Sweeping it
+upward keeps improving the sixteenths (mic 38 at 12kHz, 40 at 10kHz) while
+leaving the 120bpm fixtures bit-identical, which looks like a free win and is
+not one. Measured, the fraction of total magnitude above 12kHz is 0.0006-0.003
+on every 120bpm fixture and on every DI and amp-sim take — those files are
+lossy-coded and have nothing up there — against 0.20-0.43 on the three room-mic
+140bpm takes. A room mic take that is 43% of its magnitude above 12kHz is
+hiss, not music. So a high band "wins" by measuring the modulation of one
+recording's noise floor, and the originals only look untouched because their
+band is empty. That is precisely the kind of accident that held-out data exists
+to catch.
+
+Not kept. The 5kHz highpass is a sound way to annotate one file by hand; it is
+not a detector rule that transfers to a direct input.
+
 ## What is left
 
 Two shapes now. The first is `s4`/`s9`/`s11` above: the region lane can see
