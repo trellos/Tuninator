@@ -13,13 +13,23 @@ import type { Note, PitchFrame, RecognizerOptions } from "../types.js";
 import { RecognitionEngine } from "../engine/engine.js";
 import { RENDER_QUANTUM, resolveEngineConfig } from "../engine/config.js";
 import type { FastFrame } from "../engine/contracts.js";
-import type { TrackerEmission } from "../engine/tracker/note-tracker.js";
+import type {
+  TrackerEmission,
+  TrackerTraceEvent,
+} from "../engine/tracker/note-tracker.js";
 
 export { RENDER_QUANTUM };
 
 export type AnalyzeOptions = Pick<RecognizerOptions, "engine" | "diagnostics"> & {
   /** Collect every PitchFrame. Off by default — 20s at 12ms is ~1700 frames. */
   captureFrames?: boolean;
+  /**
+   * Receive every segmentation decision the tracker makes. Diagnostic, and the
+   * reason it is routed through here rather than through a second copy of this
+   * loop: a ledger built on a re-implementation of the run is a ledger about
+   * code that does not exist.
+   */
+  trackerTrace?: (event: TrackerTraceEvent) => void;
 };
 
 export type AnalyzeResult = {
@@ -67,6 +77,7 @@ function run(
     ...(wantFrames ? { pitchFrames: true } : {}),
   });
   const engine = new RecognitionEngine(sampleRate, config);
+  if (options?.trackerTrace !== undefined) engine.setTrackerTrace(options.trackerTrace);
 
   const frames: PitchFrame[] = [];
   const trace: TraceRow[] = [];

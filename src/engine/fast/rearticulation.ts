@@ -21,7 +21,12 @@
  */
 
 import type { EngineConfig } from "../config.js";
-import type { AttackEvidence, FastFrame, IRearticulationDetector } from "../contracts.js";
+import type {
+  AttackEvidence,
+  FastFrame,
+  IRearticulationDetector,
+  RearticulationVerdict,
+} from "../contracts.js";
 
 /**
  * Is this transient sharp enough to carry a re-articulation on its own?
@@ -68,10 +73,41 @@ export class RearticulationDetector implements IRearticulationDetector {
     pitchDiffers: boolean,
     decayExcess: number | null,
     polyphonic: boolean,
-    /** How long the sounding Note has already lasted, ms. */
     soundedMs: number
   ): boolean {
-    if (frame.gated) return false;
+    return this.verdict(
+      attack,
+      frame,
+      gliding,
+      sustainedRms,
+      pitchDiffers,
+      decayExcess,
+      polyphonic,
+      soundedMs
+    ).accepted;
+  }
+
+  /**
+   * The same decision, with the test that made it named.
+   *
+   * `isRearticulation` is this, thresholded. The reason is not for the tracker
+   * — which needs the boolean and nothing else — but for the ledger script,
+   * which has to be able to say WHICH line discarded a played note rather than
+   * that one of them did. Keeping the two in one function is the point: a
+   * separate explain-only copy would drift from the code that decides.
+   */
+  verdict(
+    attack: AttackEvidence,
+    frame: FastFrame,
+    gliding: boolean,
+    sustainedRms: number,
+    pitchDiffers: boolean,
+    decayExcess: number | null,
+    polyphonic: boolean,
+    /** How long the sounding Note has already lasted, ms. */
+    soundedMs: number
+  ): RearticulationVerdict {
+    if (frame.gated) return { accepted: false, reason: "gated" };
 
     const t = this.config.transient;
 
@@ -81,7 +117,9 @@ export class RearticulationDetector implements IRearticulationDetector {
     // the energy already in the string rather than adding any, so it cannot
     // lift the envelope severalfold. A pick landing during a bend, or during
     // the pitch wobble a fast run produces, can and does.
-    if (gliding && attack.riseRatio < t.glideRiseOverride) return false;
+    if (gliding && attack.riseRatio < t.glideRiseOverride) {
+      return { accepted: false, reason: "glide-rise" };
+    }
 
     // A new pitch arriving on an attack is strong evidence: the player fretted
     // somewhere else and picked. It still has to be an attack rather than the
@@ -89,7 +127,9 @@ export class RearticulationDetector implements IRearticulationDetector {
     // over tens of milliseconds — but the bar is much lower than at an
     // unchanging pitch, because in a fast run the new note is routinely quieter
     // than the one still ringing.
-    if (pitchDiffers && attack.sharpness >= t.newPitchSharpness) return true;
+    if (pitchDiffers && attack.sharpness >= t.newPitchSharpness) {
+      return { accepted: true, reason: "new-pitch" };
+    }
 
     // At the same pitch the question is whether the string was struck again.
     //
@@ -104,7 +144,9 @@ export class RearticulationDetector implements IRearticulationDetector {
     // damps the strings, so it puts the total energy DOWN even as it plainly
     // re-articulates the chord. Only its sharpness gives that away.
     if (polyphonic) {
-      if (decayExcess !== null && decayExcess >= t.restrumDecayExcess) return true;
+      if (decayExcess !== null && decayExcess >= t.restrumDecayExcess) {
+        return { accepted: true, reason: "chord-decay-excess" };
+      }
       // Deliberately NOT falling through to the rolling-baseline test below.
       // A decaying chord drags its own baseline down with it, so ordinary
       // sustain ripple clears any fixed multiple of it every few hundred
@@ -120,8 +162,12 @@ export class RearticulationDetector implements IRearticulationDetector {
       // a ring-out is the chord itself — finger noise, a string re-seating —
       // and treating those as re-strums is how one strum kept shedding Notes
       // until it faded. See `transient.mutedRestrumWindowMs`.
-      if (soundedMs > t.mutedRestrumWindowMs) return false;
-      return sharpEnough(attack, t);
+      if (soundedMs > t.mutedRestrumWindowMs) {
+        return { accepted: false, reason: "chord-past-muted-window" };
+      }
+      return sharpEnough(attack, t)
+        ? { accepted: true, reason: "chord-sharpness" }
+        : { accepted: false, reason: "chord-not-sharp" };
     }
 
     // A single note whose decay has been measured and which is sitting on that
@@ -143,18 +189,24 @@ export class RearticulationDetector implements IRearticulationDetector {
       // no louder than what it interrupted. Far below it, nothing was added:
       // the note is dying faster than its own fit expected and the transient is
       // the string, not the pick. See `transient.ringOutDecayFloor`.
-      if (decayExcess < t.ringOutDecayFloor) return false;
-      return (
-        attack.heldSharpness >= t.restrumSharpness &&
+      if (decayExcess < t.ringOutDecayFloor) {
+        return { accepted: false, reason: "ring-out-below-floor" };
+      }
+      return attack.heldSharpness >= t.restrumSharpness &&
         attack.heldFluxRatio >= t.ringOutFluxRatio
-      );
+        ? { accepted: true, reason: "ring-out-sharpness" }
+        : { accepted: false, reason: "ring-out-not-sharp" };
     }
 
     // With no usable fit the weaker witnesses are the right ones. A monophonic
     // Note is routinely bent, vibratoed and re-fingered, all of which move the
     // envelope without any new energy arriving, and a fast run gives the fit
     // too little to work with.
-    if (frame.rms >= sustainedRms * t.rearticulationRiseRatio) return true;
-    return attack.sharpness >= t.rearticulationSharpness;
+    if (frame.rms >= sustainedRms * t.rearticulationRiseRatio) {
+      return { accepted: true, reason: "envelope-rise" };
+    }
+    return attack.sharpness >= t.rearticulationSharpness
+      ? { accepted: true, reason: "sharpness" }
+      : { accepted: false, reason: "no-energy-not-sharp" };
   }
 }

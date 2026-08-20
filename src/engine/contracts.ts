@@ -249,6 +249,17 @@ export interface IPitchChangeDetector {
   reset(): void;
 }
 
+/**
+ * A re-articulation decision with the test that made it named.
+ *
+ * The `reason` is diagnostic only — no engine code branches on it. It exists so
+ * a ledger can say which line discarded a played note.
+ */
+export type RearticulationVerdict = {
+  accepted: boolean;
+  reason: string;
+};
+
 export interface IRearticulationDetector {
   /**
    * Is this attack a genuine re-articulation over what is already sounding?
@@ -275,6 +286,18 @@ export interface IRearticulationDetector {
     /** How long the sounding Note has already lasted, ms. */
     soundedMs: number
   ): boolean;
+
+  /** The same decision with its deciding test named. See `RearticulationVerdict`. */
+  verdict(
+    attack: AttackEvidence,
+    frame: FastFrame,
+    gliding: boolean,
+    sustainedRms: number,
+    pitchDiffers: boolean,
+    decayExcess: number | null,
+    polyphonic: boolean,
+    soundedMs: number
+  ): RearticulationVerdict;
 }
 
 /* -------------------------------------------------------------------------- */

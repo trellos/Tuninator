@@ -47,6 +47,20 @@ export class NoteRecord {
   readonly hypotheses: StatefulHypothesisTracker;
 
   startTime: SourceTimeMs;
+  /**
+   * Where this Note's own evidence begins, which is where it started before
+   * anything was absorbed into it.
+   *
+   * `startTime` moves backward when a Note absorbs the stub of the
+   * articulation that shed it: the boundary belongs on the attack. The
+   * announcement bar must not move with it. Absorbing a fragment relocates a
+   * boundary; it does not add a single hop of evidence that this Note sounded,
+   * and a 40ms stub plus a 53ms tail must not add up to a Note where neither
+   * was one.
+   */
+  readonly ownStartTime: SourceTimeMs;
+  /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
+  absorbedRenaming = false;
   startSample: number;
   endTime: SourceTimeMs | null = null;
   lifecycle: NoteLifecycle = "started";
@@ -246,6 +260,7 @@ export class NoteRecord {
     this.config = options.config;
     this.hypotheses = new StatefulHypothesisTracker(options.id);
     this.startTime = options.startTime;
+    this.ownStartTime = options.startTime;
     this.startSample = options.startSample;
     this.trigger = options.trigger;
     this.originPitch = options.originPitch;
@@ -272,6 +287,21 @@ export class NoteRecord {
   /** How long the Note has actually sounded, not how long ago it began. */
   get soundedMs(): number {
     return Math.max(this.lastVoicedAt, this.lastAudibleAt) - this.startTime;
+  }
+
+  /**
+   * `soundedMs` for the announcement decision.
+   *
+   * The merged span everywhere except when this Note absorbed a stub a pitch
+   * STEP shed. An attack-split stub is this event's own attack still arriving,
+   * so its hops are evidence that this Note sounded. A step-split stub is the
+   * note BEFORE this one still ringing while the estimator caught up — audio
+   * that belongs to its predecessor. Counting it toward the bar lets a 40ms
+   * stub and a 53ms tail add up to a Note where neither was one.
+   */
+  get announceSoundedMs(): number {
+    const from = this.absorbedRenaming ? this.ownStartTime : this.startTime;
+    return Math.max(this.lastVoicedAt, this.lastAudibleAt) - from;
   }
 
   /** The bar this Note has to clear to be announced. See the config comments. */

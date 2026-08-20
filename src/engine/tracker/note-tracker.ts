@@ -60,6 +60,63 @@ export type TrackerEmission =
   | { type: "ended"; note: Note };
 
 /**
+ * One segmentation decision, as it was made.
+ *
+ * Diagnostic only: nothing in the engine reads these, and with no sink
+ * installed nothing is allocated. It exists because "the tracker lost this
+ * played note" is not an answer — the answer is which test rejected it and on
+ * what numbers, and reconstructing that from the outside means reimplementing
+ * the tracker, which is how a ledger comes to describe code that no longer
+ * exists. See `scripts/measure-downstream-ledger.ts`.
+ */
+export type TrackerTraceEvent =
+  | {
+      kind: "onset";
+      at: SourceTimeMs;
+      /** The fast lane may not act on a gated hop, nor on a band-only one. */
+      gated: boolean;
+      broadband: boolean;
+      band: boolean;
+      sharpness: number;
+      heldSharpness: number;
+      fluxRatio: number;
+      heldFluxRatio: number;
+      riseRatio: number;
+    }
+  | {
+      kind: "rearticulation";
+      at: SourceTimeMs;
+      noteId: string;
+      accepted: boolean;
+      /** Which test in `RearticulationDetector.verdict` decided. */
+      reason: string;
+      /** Old enough to be ENDED. A rejection here loses the arriving note. */
+      settled: boolean;
+      soundedMs: number;
+      settleBarMs: number;
+      pitchDiffers: boolean;
+      gliding: boolean;
+      decayExcess: number | null;
+      sharpness: number;
+      heldSharpness: number;
+      fluxRatio: number;
+      heldFluxRatio: number;
+      riseRatio: number;
+      bloomed: boolean;
+    }
+  | { kind: "opened"; at: SourceTimeMs; noteId: string; trigger: NoteOriginTrigger }
+  | { kind: "absorbed"; at: SourceTimeMs; noteId: string; intoId: string }
+  | {
+      kind: "ended";
+      at: SourceTimeMs;
+      noteId: string;
+      startedAt: SourceTimeMs;
+      announced: boolean;
+      soundedMs: number;
+      announceBarMs: number;
+    };
+
+/**
  * State moves worth telling a consumer about.
  *
  * Reaching `contender` is bookkeeping — every reading passes through it — while
@@ -221,6 +278,13 @@ export class NoteTracker {
   /** End of the most recently closed Note, so backdating cannot overlap it. */
   private lastEndedAt: SourceTimeMs | null = null;
 
+  /**
+   * Where segmentation decisions go when anybody is listening. Null in every
+   * production path, and checked rather than called, so tracing costs one
+   * comparison per decision and allocates nothing.
+   */
+  trace: ((event: TrackerTraceEvent) => void) | null = null;
+
   constructor(clock: SampleClock, config: EngineConfig) {
     this.clock = clock;
     this.config = config;
@@ -300,6 +364,20 @@ export class NoteTracker {
     // answers is visible to the band and to nothing else.
     if (frame.attack !== null || frame.bandOnset) {
       const at = frame.attack?.at ?? frame.at;
+      if (this.trace !== null) {
+        this.trace({
+          kind: "onset",
+          at,
+          gated: frame.gated,
+          broadband: frame.attack !== null,
+          band: frame.bandOnset,
+          sharpness: frame.attack?.sharpness ?? 0,
+          heldSharpness: frame.attack?.heldSharpness ?? 0,
+          fluxRatio: frame.attack?.fluxRatio ?? 0,
+          heldFluxRatio: frame.attack?.heldFluxRatio ?? 0,
+          riseRatio: frame.riseRatio,
+        });
+      }
       const last = this.attackTimes[this.attackTimes.length - 1];
       if (last === undefined || at > last) {
         this.attackTimes.push(at);
@@ -354,6 +432,19 @@ export class NoteTracker {
         frame.pitch.frequencyHz !== null &&
         Math.abs(centsBetween(frame.pitch.frequencyHz, active.lastVoicedHz)) <
           config.pitch.stepThresholdCents;
+      // ...and by a real step in cents, not merely by rounding to a different
+      // name. `nearest` quantises: a note sitting 40 cents sharp of D5 reads
+      // as D#5, so a held note with vibrato on it changes name every few hops
+      // without the frequency having gone anywhere. Measured on the direct-
+      // input lead take, that is what splits sustained quarter notes — a D5
+      // held for 428ms sheds a "D#5" 280ms in, on an arriving pitch 50 cents
+      // from the one it is already sounding. `pitch.stepThresholdCents` is
+      // already the answer to "how far is a step", and the bend guard directly
+      // below has always measured in cents for exactly this reason.
+      const arrivingCents =
+        frame.pitch.frequencyHz === null || sounding === null
+          ? null
+          : Math.abs(centsBetween(frame.pitch.frequencyHz, midiToFrequency(sounding)));
       const pitchDiffers =
         // Never on a Note that has bloomed into a chord. A chord's pitch is not
         // one pitch: YIN reports whichever string dominates the window and
@@ -368,8 +459,10 @@ export class NoteTracker {
         arriving !== null &&
         sounding !== null &&
         (((arriving - sounding) % 12) + 12) % 12 !== 0 &&
+        arrivingCents !== null &&
+        arrivingCents >= config.pitch.stepThresholdCents &&
         frame.pitch.confidence >= config.pitch.splitConfidence;
-      const rearticulated = this.rearticulation.isRearticulation(
+      const verdict = this.rearticulation.verdict(
         frame.attack,
         frame,
         gliding,
@@ -394,6 +487,7 @@ export class NoteTracker {
         active.harmonyBloomed,
         active.soundedMs
       );
+      const rearticulated = verdict.accepted;
       // A harmonically-named Note has proved it is a chord, and a chord's own
       // ring-out is full of transient-looking energy for hundreds of
       // milliseconds. A Note that has only ever been a single pitch has no such
@@ -402,6 +496,30 @@ export class NoteTracker {
         active.harmonyLabel !== null
           ? active.lastSeenAt - active.startTime >= config.transient.minRestrumMs
           : active.soundedMs >= config.tracking.minStableMs;
+      if (this.trace !== null) {
+        this.trace({
+          kind: "rearticulation",
+          at: frame.attack.at,
+          noteId: active.id,
+          accepted: rearticulated,
+          reason: verdict.reason,
+          settled,
+          soundedMs: active.soundedMs,
+          settleBarMs:
+            active.harmonyLabel !== null
+              ? config.transient.minRestrumMs
+              : config.tracking.minStableMs,
+          pitchDiffers,
+          gliding,
+          decayExcess: active.decay.excess(frame.at, frame.rms),
+          sharpness: frame.attack.sharpness,
+          heldSharpness: frame.attack.heldSharpness,
+          fluxRatio: frame.attack.fluxRatio,
+          heldFluxRatio: frame.attack.heldFluxRatio,
+          riseRatio: frame.riseRatio,
+          bloomed: active.harmonyBloomed,
+        });
+      }
       if (rearticulated && settled) {
         // The boundary is the FIRST attack of this burst, not the one that
         // finally cleared the bar. A pick crossing six strings, or a pick
@@ -451,6 +569,37 @@ export class NoteTracker {
         (this.contextHarmonic >= config.harmony.octaveFlipContext &&
           this.harmonicSince !== null));
 
+    // A step that ends a Note too young to have been announced is not ending
+    // an event. It is renaming a stub.
+    //
+    // The attack transient is the least periodic part of a note, so for the
+    // first tens of milliseconds the pitch reported belongs to whatever was
+    // ringing before. The estimator then catches up, and what it reports is a
+    // step. The Note is ended two hops old, dropped for never having cleared
+    // `minStableMs` — a start with no end is worse than nothing — and its
+    // successor, which is the same event, begins late with none of the stub's
+    // span. That is the same shape as a burst boundary landing on a Note's own
+    // start, and the same repair applies: the stub is a fragment of the
+    // articulation that shed it, so the Note that follows takes its start time
+    // and keeps its own pitch evidence. Boundary from the stub, name from the
+    // frames that describe what was played.
+    //
+    // Bounded by the consequence rather than by a duration: only while the
+    // Note the step would end is too young to be ANNOUNCED. A Note that has
+    // earned its announcement is an event somebody played and a step across it
+    // is a real boundary — the clean-lead sixteenth run says so directly, and
+    // it loses a labelled note at every longer bound tried.
+    //
+    // And the reading it is leaving has to be one it cannot defend: see
+    // `wearsPredecessorsName`. Without that the lead takes gain three split
+    // events and two extra Notes, because a stub in a triplet run is
+    // sometimes a real note that simply arrived quietly.
+    const pitchStillArriving =
+      active !== null &&
+      active.soundedMs < active.announceThresholdMs &&
+      pitchChange !== null &&
+      this.wearsPredecessorsName(active, pitchChange.fromHz);
+
     if (
       active !== null &&
       pitchChange !== null &&
@@ -482,7 +631,8 @@ export class NoteTracker {
         frame,
         out,
         { at, atSample, frequencyHz: pitchChange.toHz },
-        previous
+        previous,
+        pitchStillArriving
       );
     }
 
@@ -872,6 +1022,14 @@ export class NoteTracker {
     if (end === null) return;
     if (Math.abs(end - survivor.startTime) > this.config.harmony.mergeMaxGapMs) return;
 
+    if (this.trace !== null) {
+      this.trace({
+        kind: "absorbed",
+        at: predecessor.startTime,
+        noteId: predecessor.id,
+        intoId: survivor.id,
+      });
+    }
     predecessor.merged = true;
     survivor.startTime = predecessor.startTime;
     survivor.startSample = predecessor.startSample;
@@ -912,6 +1070,14 @@ export class NoteTracker {
       }
       if (previous === null) break;
       previous.merged = true;
+      if (this.trace !== null) {
+        this.trace({
+          kind: "absorbed",
+          at: previous.startTime,
+          noteId: previous.id,
+          intoId: survivor.id,
+        });
+      }
       absorbed.push(previous.id);
       earliest = previous;
     }
@@ -1619,8 +1785,16 @@ export class NoteTracker {
     });
     record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
     if (predecessor !== null) record.decay.adopt(predecessor.decay);
-    if (absorbPredecessor) this.absorbArticulationFragment(record, predecessor);
+    if (absorbPredecessor) {
+      // A step-split stub lends its boundary but not its evidence. See
+      // `NoteRecord.announceSoundedMs`.
+      if (trigger === "pitchChange") record.absorbedRenaming = true;
+      this.absorbArticulationFragment(record, predecessor);
+    }
     this.notes.set(record.id, record);
+    if (this.trace !== null) {
+      this.trace({ kind: "opened", at, noteId: record.id, trigger });
+    }
     if (frequencyHz !== null) this.pitchChange.clearAfterSplit(frequencyHz, at);
     void out;
     return record;
@@ -1754,7 +1928,7 @@ export class NoteTracker {
         // Measure over how long the Note SOUNDED, not wall-clock since it
         // started: a Note in release still ages, so a 24ms blip could otherwise
         // cross a 45ms stability gate purely by sitting in its release grace.
-        if (record.soundedMs < record.announceThresholdMs) continue;
+        if (record.announceSoundedMs < record.announceThresholdMs) continue;
         record.announced = true;
         record.lastEmitted = {
           label: record.currentLabel(),
@@ -1844,12 +2018,24 @@ export class NoteTracker {
     this.lastEndedAt = endAt;
     record.endTime = endAt;
 
+    if (this.trace !== null) {
+      this.trace({
+        kind: "ended",
+        at: endAt,
+        noteId: record.id,
+        startedAt: record.startTime,
+        announced: record.announced || record.announceSoundedMs >= record.announceThresholdMs,
+        soundedMs: record.announceSoundedMs,
+        announceBarMs: record.announceThresholdMs,
+      });
+    }
+
     if (!record.announced) {
       // Never announced: too short to have been a Note. Drop it rather than
       // emit an end with no matching start. Measured over how long it SOUNDED,
       // the same bar `publish` uses — a blip that spent its whole life in
       // release grace must not qualify just because the grace is long.
-      if (record.soundedMs < record.announceThresholdMs) return;
+      if (record.announceSoundedMs < record.announceThresholdMs) return;
       record.announced = true;
       record.lastEmitted = {
         label: record.currentLabel(),
@@ -1912,6 +2098,29 @@ export class NoteTracker {
    * run that is most of the run. Attributing it to whatever is sounding NOW
    * instead is what gave each Note a share of its predecessor's pitch.
    */
+  /**
+   * Is the pitch this Note is stepping AWAY from the name of the Note before
+   * it, rather than one of its own?
+   *
+   * The evidence that a young Note's reading belongs to its predecessor, made
+   * checkable instead of assumed. A pick landing while the note before it is
+   * still ringing gives the estimator the old note for a hop or two, so a step
+   * out of that reading is the new note arriving. A step out of a pitch the
+   * predecessor never sounded is a move the player made, however young the
+   * Note is.
+   */
+  private wearsPredecessorsName(active: NoteRecord, fromHz: number): boolean {
+    const predecessor = this.recordSoundingAt((active.startTime - 1) as SourceTimeMs);
+    // Nothing in front of it: the reading it is leaving is the attack
+    // transient's own, which is the least periodic part of a note and belongs
+    // to nobody. There is no name to defend, so there is nothing to argue with.
+    if (predecessor === undefined || predecessor.id === active.id) return true;
+    const name = predecessor.dominantMidi();
+    if (name === null) return true;
+    const from = describeFrequency(fromHz).midi;
+    return ((((from - name) % 12) + 12) % 12) === 0;
+  }
+
   private recordSoundingAt(at: SourceTimeMs): NoteRecord | undefined {
     let best: NoteRecord | undefined;
     const consider = (record: NoteRecord): void => {

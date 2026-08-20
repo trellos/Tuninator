@@ -23,7 +23,11 @@ import type { FastFrame } from "./contracts.js";
 import { DeepLane } from "./deep/deep-lane.js";
 import { FastLane } from "./fast/fast-lane.js";
 import { AudioRing } from "./ring-buffer.js";
-import { NoteTracker, type TrackerEmission } from "./tracker/note-tracker.js";
+import {
+  NoteTracker,
+  type TrackerEmission,
+  type TrackerTraceEvent,
+} from "./tracker/note-tracker.js";
 
 export type EngineOutput = {
   emissions: TrackerEmission[];
@@ -83,6 +87,14 @@ export class RecognitionEngine {
 
   getNote(id: string): Note | undefined {
     return this.tracker.getNote(id);
+  }
+
+  /**
+   * Watch the tracker's segmentation decisions. Diagnostic; see
+   * `TrackerTraceEvent`. Pass null to stop.
+   */
+  setTrackerTrace(sink: ((event: TrackerTraceEvent) => void) | null): void {
+    this.tracker.trace = sink;
   }
 
   reset(): void {
