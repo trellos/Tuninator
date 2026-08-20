@@ -166,8 +166,13 @@ re-deriving the same conclusions from scratch.
 ## 4. Constraints that bind every change
 
 - **Engine isolation** (§2, above). Enforced by `tests/engine/isolation.test.ts`.
-- **No npm runtime dependencies, no neural-network runtime.** Fitted constants
-  or a small weight vector are shippable; a trained model is not.
+- **No npm runtime dependencies.** A learned component is shippable only as
+  fixed weights (≤ ~25,000 parameters) executed by plain TypeScript over
+  `Float32Array` inside `src/engine/**` — no runtime dependency, no dynamic
+  loading, no training at runtime. The training pipeline lives outside the
+  shipped library (`training/`), may use any tooling, and is never imported
+  by `src/**`. A trained model larger than this, or one requiring a runtime,
+  remains out of bounds.
 - **Causal by default.** The fast lane must answer from past audio only. Only
   the deep lane, explicitly, may look at buffered history — never at audio that
   hasn't arrived yet, even offline, because the offline harness exists to

@@ -7,6 +7,40 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-016]: Amend the no-runtime constraint to admit fixed-weight learned components
+* **Date:** 2026-08-20
+* **Status:** Accepted
+* **Owner:** Project owner (amendment approved by project owner)
+* **Context:** The same-pitch re-articulation decision has a measured ceiling
+  under everything hand-built: best single witness 0.728 AUC, a fitted
+  twelve-witness model collapsing 0.808 in-sample → 0.434 leave-one-take-out,
+  and eight closed directions (DECISION-009 through 015). The collapse says 78
+  derivation events cannot support fitting anything; the field's standing
+  answer at this exact wall is a small learned function trained on large
+  external labelled corpora (GuitarSet, EGDB — thousands of labelled
+  same-pitch re-articulations). AGENTS.md §4 read "No npm runtime
+  dependencies, no neural-network runtime", which barred that path outright.
+* **Decision:** §4 now reads: a learned component is shippable only as fixed
+  weights (≤ ~25,000 parameters) executed by plain TypeScript over
+  `Float32Array` inside `src/engine/**` — no runtime dependency, no dynamic
+  loading, no training at runtime. The training pipeline lives outside the
+  shipped library (`training/`), may use any tooling, and is never imported
+  by `src/**`. A trained model larger than this, or one requiring a runtime,
+  remains out of bounds. Approved by project owner.
+* **Alternatives Considered:** Keeping the ban and iterating further on
+  hand-built features — eight converging negatives say that line is spent.
+  Admitting a runtime (onnxruntime-web, tfjs) — rejected: it would break the
+  zero-dependency guarantee and the engine-isolation invariant that makes the
+  offline harness predictive. Larger models — rejected; ~25K parameters is
+  the Basic Pitch scale, demonstrated real-time on CPU, and capacity is not
+  the measured constraint (data is).
+* **Consequences:** The engine stays zero-dependency and isolation-testable;
+  determinism and causality constraints are unchanged. A `training/` tree may
+  now exist with its own tooling, never imported by `src/**`. The twelve
+  140bpm held-out takes gain a stricter rule: never trained or validated on,
+  in addition to never fitted. Weight provenance (training-run hash, dataset
+  manifest) must ship alongside exported weights.
+
 #### [DECISION-015]: Reject cycle dissimilarity (and YIN aperiodicity) as re-articulation witnesses
 * **Date:** 2026-08-20
 * **Status:** Rejected
