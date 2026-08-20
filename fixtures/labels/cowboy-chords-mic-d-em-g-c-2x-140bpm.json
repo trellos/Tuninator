@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "title": "Cowboy chords room mic D Em G C 2x 140bpm Les Paul",
+  "sourceAudio": "../audio/Cowboy Chords Mic D Em G C D Em G C 140bpm LP.m4a",
+  "instrument": "guitar-amp-mic",
+  "tempoBpm": 140,
+  "tuning": ["E2", "A2", "D3", "G3", "B3", "E4"],
+  "timingNotes": "Onsets are the first sustained rise of each strum's attack, measured on a 1.5kHz-highpassed 1ms RMS envelope (threshold = local floor + 15% of the attack peak), cross-checked against the raw 2ms RMS waveform and a 1024/64 spectral-flux backtrack; the three methods agree within ~15ms on this take. Measured bar length runs 1617-1848ms around the 1714ms theoretical measure at 140bpm -- real strum timing, not a tempo change. Chord identity comes from FFT peak picking and a chroma template match on 16384-point windows taken 120ms after each attack; all eight are standard open-position voicings. No detector output was used to derive any value here. This is the room-mic capture of the same performance as the DI and amped files; it is a separate device, so it carries its own start offset of about +737ms relative to the DI (measured chord-by-chord, spread 728-749ms, which includes the acoustic path to the mic). Onsets 1-6 and 8 are measured on this file directly; onset 7 (13580ms) is taken from the DI plus the offset because the room decay of chord 6 masks its attack threshold here -- the raw envelope confirms a strum attack starting at 13582ms. The last chord rings until the strings are muted at ~16970ms.",
+  "events": [
+    { "id": "c1", "startMs": 3190, "endMs": 4929, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c2", "startMs": 4929, "endMs": 6643, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c3", "startMs": 6643, "endMs": 8395, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c4", "startMs": 8395, "endMs": 10112, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
+    { "id": "c5", "startMs": 10112, "endMs": 11730, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c6", "startMs": 11730, "endMs": 13580, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c7", "startMs": 13580, "endMs": 15239, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c8", "startMs": 15239, "endMs": 16970, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "title": "Power chords amped B B A A G G F# F# B B A A G G E E 140bpm Les Paul",
+  "sourceAudio": "../audio/Power Chords Amped BBAAGGF#F#BBAAGGEE 140bpm LP.mp3",
+  "instrument": "guitar-amp-sim",
+  "tempoBpm": 140,
+  "tuning": ["E2", "A2", "D3", "G3", "B3", "E4"],
+  "timingNotes": "Same performance as the DI take, re-amped through a Marshall Plexi sim. The two files are the same length and cross-correlate at a lag of +0.25ms (r=0.68 on a 300Hz-highpassed 1ms envelope over the whole file), which is below this file's 1ms label resolution, so these onsets are the DI onsets unshifted rather than an independent per-attack estimate on this file. That is deliberate: the amp sim's compression flattens the envelope so far that no transient in this file stands 60x above its own noise floor, where the DI of the same take has eight that do, so a threshold-on-attack-peak measurement drifts here. Onsets are measured on THIS file: a 1024/64 log-spectral-flux peak (150Hz-12kHz) per strum, then backtracked on a three-pole 1.5kHz-highpassed 1ms RMS envelope to local floor + 15% of the attack peak. Sixteen strums, inter-onset intervals 815-918ms (mean 857.3ms). STRUCTURE, decided on this file and cross-checked on the mic capture: events here are 857ms apart, which is a HALF note at the session's 140bpm rather than a quarter: the performer struck only on alternate beats. In his words, he played only on note boundaries. Each bar is chord X on beat 1, X again on beat 2 then muted, chord Y on beat 3, Y again on beat 4 then muted: B B A A | G G F# F# | B B A A | G G E E. That is exactly what the performer described. The odd-numbered strums ring until the next strum (measured 839-918ms); the even-numbered ones fall below 15% of their attack peak after 256-327ms, which is the mute, and the bar's second half then starts from near silence. There is no quieter re-strum hiding between these sixteen. Two independent tests say so on this file, whose noise floor is 3.3e-5 against strum peaks of 0.79: (1) every flux peak in the take that is not one of the sixteen is followed by a FALL in 30ms RMS of 2-22dB, where each of the sixteen is followed by a rise of 12-55dB -- those in-between peaks are the muting hand, not a pick; (2) a targeted scan of the quarter-note midpoint after each strum (+428.6ms +-120ms) finds a maximum 60ms RMS rise of 1.6-5.0dB and a 4kHz-band peak 2.1-5.5x the window median after the first strum of each pair, against 18-60dB and 8-524x at the strums themselves. Chord identity is FFT peak picking on 16384-point windows 120ms after each attack; every shape is root+fifth+octave on the low E and A strings, and the strong partial two octaves and a major third above each root is the fifth harmonic, not a third in the voicing. No detector output was used to derive any value here.",
+  "events": [
+    { "id": "p1", "startMs": 3952, "endMs": 4839, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p2", "startMs": 4839, "endMs": 5094, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p3", "startMs": 5654, "endMs": 6502, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p4", "startMs": 6502, "endMs": 6794, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p5", "startMs": 7357, "endMs": 8222, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p6", "startMs": 8222, "endMs": 8505, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p7", "startMs": 9087, "endMs": 9948, "kind": "chord", "label": "F#5", "pitches": ["F#2", "C#3", "F#3"], "required": true },
+    { "id": "p8", "startMs": 9948, "endMs": 10212, "kind": "chord", "label": "F#5", "pitches": ["F#2", "C#3", "F#3"], "required": true },
+    { "id": "p9", "startMs": 10798, "endMs": 11637, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p10", "startMs": 11637, "endMs": 11954, "kind": "chord", "label": "B5", "pitches": ["B2", "F#3", "B3"], "required": true },
+    { "id": "p11", "startMs": 12502, "endMs": 13377, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p12", "startMs": 13377, "endMs": 13704, "kind": "chord", "label": "A5", "pitches": ["A2", "E3", "A3"], "required": true },
+    { "id": "p13", "startMs": 14208, "endMs": 15098, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p14", "startMs": 15098, "endMs": 15371, "kind": "chord", "label": "G5", "pitches": ["G2", "D3", "G3"], "required": true },
+    { "id": "p15", "startMs": 15920, "endMs": 16838, "kind": "chord", "label": "E5", "pitches": ["E2", "B2", "E3"], "required": true },
+    { "id": "p16", "startMs": 16838, "endMs": 17132, "kind": "chord", "label": "E5", "pitches": ["E2", "B2", "E3"], "required": true }
+  ]
+}

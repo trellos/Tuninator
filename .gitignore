@@ -37,3 +37,8 @@ temp/
 
 # Eval + decode cache
 .cache/
+
+# Agent worktrees. Transient checkouts of this same repository, created for
+# isolated parallel work and removed afterwards; committing them would nest a
+# copy of the repo inside itself.
+.claude/worktrees/

@@ -5,22 +5,29 @@
  * `tuninator/src/**` is an API bug, not a workaround.
  */
 
-export { createTuninator } from "./tuninator.js";
+export { createRecognizer } from "./browser/recognizer.js";
+export { RecognizerError, type RecognizerErrorCode } from "./errors.js";
 
 export type {
-  EventPitch,
-  MusicEvent,
-  MusicEventKind,
-  MusicEventState,
+  DetectedPitch,
+  EngineTuning,
+  Hypothesis,
+  HypothesisKind,
+  HypothesisState,
+  Note,
+  NoteChange,
+  NoteChangeType,
+  NoteLifecycle,
+  NoteOriginTrigger,
   PitchClass,
   PitchFrame,
   PitchNote,
-  Tuninator,
-  TuninatorError,
-  TuninatorErrorCode,
-  TuninatorEventHandler,
-  TuninatorEventName,
-  TuninatorMode,
-  TuninatorOptions,
-  TuninatorState,
+  Recognizer,
+  RecognizerErrorLike,
+  RecognizerEventMap,
+  RecognizerEventName,
+  RecognizerOptions,
+  RecognizerState,
+  SourceTimeMs,
+  Timebase,
 } from "./types.js";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { OnsetDetector } from "../src/core/onset.js";
-import { YinDetector } from "../src/core/yin.js";
+import { OnsetDetector } from "../src/engine/kernels/onset.js";
+import { YinDetector } from "../src/engine/kernels/yin.js";
 
 const SR = 44100;
 const FFT = 1024;
@@ -233,6 +233,58 @@ describe("a steady unbroken tone", () => {
   });
 });
 
+/**
+ * The failure the reference's memory exists to prevent.
+ *
+ * At `fftSize` 1024 and 44.1kHz a bin is 43Hz wide, so the harmonics of a low
+ * E (82.4Hz, 1.9 bins apart) are unresolved: their main lobes overlap and beat
+ * against each other as the analysis window advances, at a rate set by the
+ * hop rather than by anything in the music. Measured against a plain
+ * previous-frame reference, the flux of a perfectly steady low E swings
+ * between 0.003 and 0.68 on alternate hops -- as large as a real pick attack.
+ *
+ * The reference is therefore a per-bin maximum over several hops rather than
+ * over one. This test is here because the memory has to stay long enough to
+ * cover that beating and short enough not to hide a pick, and the pressure on
+ * that constant only ever runs one way: every recall problem in this detector
+ * argues for shortening it. If it is ever shortened past the beating, this is
+ * the test that says so.
+ */
+describe("a steady low E does not beat itself into onsets", () => {
+  /** A low string's first several harmonics at a constant amplitude. */
+  function steadyPartials(f0: number, durationMs: number, amp: number): Float32Array {
+    const amplitudes = [1, 0.7, 0.5, 0.35, 0.25, 0.18, 0.12, 0.09];
+    const phases = amplitudes.map((_, i) => i * 0.7 + 0.3);
+    const signal = new Float32Array(Math.round((durationMs / 1000) * SR));
+    for (let i = 0; i < signal.length; i++) {
+      let v = 0;
+      for (let h = 0; h < amplitudes.length; h++) {
+        v += (amplitudes[h] as number) * Math.sin(2 * Math.PI * f0 * (h + 1) * (i / SR) + (phases[h] as number));
+      }
+      signal[i] = v * amp;
+    }
+    return signal;
+  }
+
+  it("reports the note starting and nothing after it", () => {
+    for (const f0 of [82.41, 87.31, 92.5, 98]) {
+      for (const hop of HOPS) {
+        for (const amp of [0.03, 0.08, 0.2]) {
+          const { onsetsMs } = collectOnsets(steadyPartials(f0, 3000, amp), hop);
+          expect(onsetsMs.length, `${f0}Hz hop=${hop} amp=${amp}`).toBe(1);
+        }
+      }
+    }
+  });
+
+  it("holds for the whole sustain, not just the first second", () => {
+    // The beat period is tens of hops long, so a short window can pass by
+    // accident. Six seconds is hundreds of beats.
+    const { onsetsMs } = collectOnsets(steadyPartials(82.41, 6000, 0.08), 512);
+    expect(onsetsMs).toHaveLength(1);
+  });
+});
+
 describe("minIntervalMs", () => {
   it("suppresses a double trigger inside the interval", () => {
     // Two attacks only 40ms apart.
@@ -345,3 +397,111 @@ function makeDetectorWith(over: Partial<ConstructorParameters<typeof OnsetDetect
     ...over,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* The band-limited witness                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A loud low drone with a quiet broadband click landing on top of it.
+ *
+ * This is alternate picking in miniature: the click carries a fraction of the
+ * drone's energy, so broadband it never clears a threshold set as a fraction of
+ * the frame's own magnitude. In the band where the pick lives and the drone's
+ * partials do not, the same click is the only thing there.
+ */
+function droneWithQuietClick(options: {
+  droneHz: number;
+  clickMs: number;
+  clickAmp: number;
+  durationMs: number;
+}): Float32Array {
+  const { droneHz, clickMs, clickAmp, durationMs } = options;
+  const signal = new Float32Array(Math.round((durationMs / 1000) * SR));
+  for (let i = 0; i < signal.length; i++) {
+    signal[i] = 0.5 * sawSample(droneHz, i / SR, 4);
+  }
+  const start = Math.round((clickMs / 1000) * SR);
+  // A short noise burst: flat across the spectrum, which is what a pick is.
+  let seed = 12345;
+  for (let i = start; i < Math.min(signal.length, start + Math.round(0.004 * SR)); i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const noise = (seed / 0x7fffffff) * 2 - 1;
+    const envelope = 1 - (i - start) / (0.004 * SR);
+    signal[i] = signal[i]! + clickAmp * envelope * noise;
+  }
+  return signal;
+}
+
+describe("OnsetDetector band limiting", () => {
+  const options = {
+    sampleRate: SR,
+    fftSize: FFT,
+    minIntervalMs: 70,
+    medianWindow: 17,
+    sensitivity: 1.35,
+  };
+
+  function firedNear(detector: OnsetDetector, signal: Float32Array, atMs: number): boolean {
+    const hop = 512;
+    let fired = false;
+    for (let end = FFT; end <= signal.length; end += hop) {
+      const timestampMs = (end / SR) * 1000;
+      const result = detector.process(signal.subarray(end - FFT, end), timestampMs);
+      if (result.isOnset && Math.abs(timestampMs - atMs) <= 40) fired = true;
+    }
+    return fired;
+  }
+
+  const bandWitness = (): OnsetDetector =>
+    new OnsetDetector({ ...options, bandLoHz: 1000, bandHiHz: 6000, floorFactor: 0.08 });
+
+  it("hears a quiet pick over a loud drone, broadband, at the level a pick lands", () => {
+    // This case used to be the broadband detector's ceiling and the whole
+    // reason for the band witness: a click carrying 2% of the drone's
+    // amplitude could not clear a bar set as a fraction of the frame's own
+    // magnitude, because the drone set that bar. Judged band by band the
+    // drone is loud only where it lives, and the click is audible everywhere
+    // else, so the broadband detector hears it too.
+    const signal = droneWithQuietClick({
+      droneHz: 110,
+      clickMs: 500,
+      clickAmp: 0.012,
+      durationMs: 900,
+    });
+
+    expect(firedNear(new OnsetDetector(options), signal, 500)).toBe(true);
+    expect(firedNear(bandWitness(), signal, 500)).toBe(true);
+  });
+
+  it("still reaches further down than the broadband detector", () => {
+    // The band witness has not been made redundant: restricted to where the
+    // pick lives and the drone's partials do not, it hears a click six times
+    // quieter than the one above, which broadband does not.
+    const signal = droneWithQuietClick({
+      droneHz: 110,
+      clickMs: 500,
+      clickAmp: 0.002,
+      durationMs: 900,
+    });
+
+    expect(firedNear(new OnsetDetector(options), signal, 500)).toBe(false);
+    expect(firedNear(bandWitness(), signal, 500)).toBe(true);
+  });
+
+  it("rejects a band whose edges are inverted rather than silently reordering", () => {
+    expect(() => new OnsetDetector({ ...options, bandLoHz: 6000, bandHiHz: 1000 })).toThrow();
+  });
+
+  it("is unchanged by a band that spans the whole spectrum", () => {
+    const { signal } = repeatedAttacks({ hz: 196, count: 4, spacingMs: 250, decayMs: 220 });
+    const plain = new OnsetDetector(options);
+    const spanning = new OnsetDetector({ ...options, bandLoHz: 0, bandHiHz: SR / 2 });
+    const hop = 512;
+    for (let end = FFT; end <= signal.length; end += hop) {
+      const timestampMs = (end / SR) * 1000;
+      const frame = signal.subarray(end - FFT, end);
+      expect(spanning.process(frame, timestampMs)).toEqual(plain.process(frame, timestampMs));
+    }
+  });
+});

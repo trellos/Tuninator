@@ -14,7 +14,7 @@ import {
   DEFAULT_CHORD_MARGIN,
   matchChord,
   type ChordQuality,
-} from "../src/core/chords.js";
+} from "../src/engine/kernels/chords.js";
 
 const QUALITIES: ChordQuality[] = [
   "5", "maj", "min", "7", "m7", "maj7", "maj9", "m11", "sus2", "sus4",

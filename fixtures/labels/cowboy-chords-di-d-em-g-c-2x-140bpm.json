@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "title": "Cowboy chords DI D Em G C 2x 140bpm Les Paul",
+  "sourceAudio": "../audio/Cowboy Chords DI D Em G C D Em G C 140bpm LP.mp3",
+  "instrument": "guitar-di",
+  "tempoBpm": 140,
+  "tuning": ["E2", "A2", "D3", "G3", "B3", "E4"],
+  "timingNotes": "Onsets are the first sustained rise of each strum's attack, measured on a 1.5kHz-highpassed 1ms RMS envelope (threshold = local floor + 15% of the attack peak), cross-checked against the raw 2ms RMS waveform and a 1024/64 spectral-flux backtrack; the three methods agree within ~15ms on this take. Measured bar length runs 1617-1848ms around the 1714ms theoretical measure at 140bpm -- real strum timing, not a tempo change. Chord identity comes from FFT peak picking and a chroma template match on 16384-point windows taken 120ms after each attack; all eight are standard open-position voicings. No detector output was used to derive any value here. This is the direct-input capture of the performance; the amped and mic files are the same take. The last chord rings until the strings are muted at ~16230ms.",
+  "events": [
+    { "id": "c1", "startMs": 2453, "endMs": 4192, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c2", "startMs": 4192, "endMs": 5904, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c3", "startMs": 5904, "endMs": 7649, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c4", "startMs": 7649, "endMs": 9376, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true },
+    { "id": "c5", "startMs": 9376, "endMs": 10993, "kind": "chord", "label": "D", "pitches": ["D3", "A3", "D4", "F#4"], "required": true },
+    { "id": "c6", "startMs": 10993, "endMs": 12841, "kind": "chord", "label": "Em", "pitches": ["E2", "B2", "E3", "G3", "B3", "E4"], "required": true },
+    { "id": "c7", "startMs": 12841, "endMs": 14500, "kind": "chord", "label": "G", "pitches": ["G2", "B2", "D3", "G3", "B3", "G4"], "required": true },
+    { "id": "c8", "startMs": 14500, "endMs": 16230, "kind": "chord", "label": "C", "pitches": ["C3", "E3", "G3", "C4", "E4"], "required": true }
+  ]
+}

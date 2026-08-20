@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { YinDetector, peak, rms, zeroCrossingRateHz } from "../src/core/yin.js";
-import { centsBetween } from "../src/core/notes.js";
+import { YinDetector, peak, rms, zeroCrossingRateHz } from "../src/engine/kernels/yin.js";
+import { centsBetween } from "../src/engine/kernels/notes.js";
 
 const SR = 44100;
 const LONG_WINDOW = 2048;

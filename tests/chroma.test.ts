@@ -9,8 +9,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ChromaAnalyzer } from "../src/core/chroma.js";
-import { matchChord } from "../src/core/chords.js";
+import { ChromaAnalyzer } from "../src/engine/kernels/chroma.js";
+import { matchChord } from "../src/engine/kernels/chords.js";
 
 const SAMPLE_RATE = 48000;
 const FFT_SIZE = 4096; // policy.chords.fftSize

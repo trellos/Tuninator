@@ -646,6 +646,30 @@ describe("checkThresholds", () => {
     expect(checkThresholds(stats, { maxFalseLabels: 0 })[0]?.passed).toBe(true);
   });
 
+  it("distinguishes nothing in scope from nothing scored", () => {
+    // Every section of a held-out fixture marked informational leaves the gated
+    // subset empty. There is nothing to be right or wrong about, so failing the
+    // accuracy gate would report a defect that does not exist.
+    const empty = scoreMatches(matchEvents([], []));
+    const nothingInScope = checkThresholds(empty, { minLabelAccuracy: 0.9 });
+    expect(nothingInScope[0]).toMatchObject({
+      passed: true,
+      note: "no labels in scope",
+    });
+
+    // Labels in scope that all abstained is the opposite case: the detector
+    // answered nothing about material it was asked about, and passing that
+    // would let a detector that emits nothing clear every gate.
+    const abstained = scoreMatches(
+      matchEvents([label("a", 1000, 1500, "B2")], [detected("d1", 1050, 1550, "unknown")])
+    );
+    const nothingScored = checkThresholds(abstained, { minLabelAccuracy: 0.9 });
+    expect(nothingScored[0]).toMatchObject({
+      passed: false,
+      note: "no scored labels",
+    });
+  });
+
   it("emits no checks when nothing is configured", () => {
     expect(checkThresholds(stats, {})).toHaveLength(0);
   });
