@@ -89,6 +89,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { analyzeSamples } from "../src/offline/analyzer.js";
 import { projectEmissions } from "../src/offline/eval-adapter.js";
 import { matchEvents, type LabeledEvent } from "../src/offline/matcher.js";
@@ -106,7 +107,7 @@ import { decodeFixtures } from "./decode-fixtures.js";
 const WINDOW_MS = 70;
 
 /** The witnesses `verdict()` has in hand. Booleans enter as 0/1. */
-const FEATURES = [
+export const FEATURES = [
   "sharpness",
   "heldSharpness",
   "fluxRatio",
@@ -123,7 +124,7 @@ const FEATURES = [
 
 const D = FEATURES.length;
 
-type Row = {
+export type Row = {
   stem: string;
   at: number;
   noteId: string;
@@ -142,7 +143,7 @@ type Row = {
 /* Collection                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function collect(): Row[] {
+export function collect(): Row[] {
   const rows: Row[] = [];
   for (const fixture of decodeFixtures({ quiet: true })) {
     const wav = readWav(readFileSync(fixture.wavPath));
@@ -233,7 +234,7 @@ function collect(): Row[] {
 /* -------------------------------------------------------------------------- */
 
 /** Rank-based ROC AUC, ties averaged. 0.5 is a coin toss, 1.0 is perfect. */
-function auc(scores: readonly number[], y: readonly number[]): number {
+export function auc(scores: readonly number[], y: readonly number[]): number {
   const order = scores.map((s, i) => [s, i] as const).sort((a, b) => a[0] - b[0]);
   const rank = new Array<number>(scores.length).fill(0);
   for (let i = 0; i < order.length; ) {
@@ -258,9 +259,9 @@ function auc(scores: readonly number[], y: readonly number[]): number {
   return (sumRank - (pos * (pos + 1)) / 2) / (pos * neg);
 }
 
-type Standardiser = { mean: number[]; sd: number[] };
+export type Standardiser = { mean: number[]; sd: number[] };
 
-function standardiser(rows: readonly Row[], cols: readonly number[]): Standardiser {
+export function standardiser(rows: readonly Row[], cols: readonly number[]): Standardiser {
   const mean: number[] = [];
   const sd: number[] = [];
   for (const c of cols) {
@@ -276,7 +277,7 @@ function standardiser(rows: readonly Row[], cols: readonly number[]): Standardis
   return { mean, sd };
 }
 
-function design(rows: readonly Row[], cols: readonly number[], s: Standardiser): number[][] {
+export function design(rows: readonly Row[], cols: readonly number[], s: Standardiser): number[][] {
   return rows.map((r) =>
     cols.map((c, k) => ((r.x[c] as number) - (s.mean[k] as number)) / (s.sd[k] as number))
   );
@@ -295,7 +296,7 @@ function design(rows: readonly Row[], cols: readonly number[], s: Standardiser):
  * lr 0.3 and lambda 10 is -2: the fit diverges to NaN and every downstream AUC
  * silently becomes a comparison between NaNs.
  */
-function fitLogistic(
+export function fitLogistic(
   X: readonly number[][],
   y: readonly number[],
   lambda: number,
@@ -331,7 +332,7 @@ function fitLogistic(
   return w;
 }
 
-function score(X: readonly number[][], w: readonly number[]): number[] {
+export function score(X: readonly number[][], w: readonly number[]): number[] {
   const d = w.length - 1;
   return X.map((xi) => {
     let z = w[d] as number;
@@ -347,7 +348,7 @@ function score(X: readonly number[][], w: readonly number[]): number[] {
  * number of Notes a rule at that operating point would invent in order to lose
  * no labelled stroke.
  */
-function zeroCost(
+export function zeroCost(
   scores: readonly number[],
   y: readonly number[]
 ): { threshold: number; falseAccepts: number; negatives: number } {
@@ -383,7 +384,7 @@ function stratifiedFolds(y: readonly number[], k: number): number[] {
  * fitting it on everything leaks the held-out take's own scale -- which is the
  * exact quantity under investigation.
  */
-function outOfFold(
+export function outOfFold(
   rows: readonly Row[],
   cols: readonly number[],
   folds: readonly number[],
@@ -456,7 +457,7 @@ const f2 = (x: number): string => x.toFixed(2);
 const f3 = (x: number): string => x.toFixed(3);
 
 /** The derivation set: everything that is not one of the twelve 140bpm takes. */
-const isHeldOut = (stem: string): boolean => stem.includes("140bpm");
+export const isHeldOut = (stem: string): boolean => stem.includes("140bpm");
 
 function main(): void {
   const dumpRows = process.argv.includes("--rows");
@@ -742,4 +743,7 @@ function main(): void {
   console.log("");
 }
 
-main();
+// Runs when invoked, stays quiet when imported: `measure-rig-profile.ts`
+// reuses the decision table above to test a calibrated normaliser against the
+// same leave-one-take-out fit, and importing this file must not re-run it.
+if (process.argv[1] === fileURLToPath(import.meta.url)) main();

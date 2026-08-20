@@ -2443,3 +2443,167 @@ Falsifiable: a combination whose leave-one-take-out AUC clears the best single
 witness by more than the spread across folds AND holds on the twelve held-out
 takes, or a zero-label operating point whose held-out false accepts fall
 materially below 252 of 254. The script prints both columns every run.
+
+## The rig is measurable, but it is not what the witnesses are scaled by
+
+`scripts/measure-rig-profile.ts`, `src/engine/rig-profile.ts`.
+
+The proposal this pass tests: stop hunting for a constant that works on every
+signal chain and calibrate to the chain that is actually present, the way
+`NoiseFloorTracker` already derives the amplitude gate from the rig's own
+measured noise floor instead of assuming 0.008 means the same thing everywhere.
+
+`RigProfileEstimator` accumulates, per hop and from the evidence the fast lane
+already computes, quantiles of what a rig does: each transient witness at the
+hops the detector was confident about against the hops it was not, the share of
+magnitude above 2kHz and inside the guitar's fundamental range, crest factor,
+and the decay time constant of a struck note fitted by the tracker's own
+`VoiceDecay`. Bounded rings and quantiles throughout — one loud stroke must not
+move a profile. It decides nothing; this pass measures whether it COULD.
+
+The corpus is what makes the question answerable. Four groups, each a fixed
+chain, and the four takes inside an LP group are the same guitar in the same
+session playing four different things. So spread WITHIN a group is what the
+playing does to a statistic and spread BETWEEN groups is what the rig does.
+
+### What separates, and what only looks like it does
+
+Two statistics of twenty-four qualify, and they are one statistic measured two
+ways: the FLOOR of the flux family, which is what the spectrum does on the hops
+where nothing was struck.
+
+| statistic | 120bpm | LP DI | LP mic | LP amped | within | between | sep |
+|---|---|---|---|---|---|---|---|
+| `sharpness.floor` | 0.70-1.10 | 0.91-1.27 | 1.31-2.04 | 1.87-2.60 | 1.58x | 2.95x | **1.87** |
+| `heldSharpness.floor` | 0.366-0.484 | 0.276-0.389 | 0.607-0.939 | 0.718-1.148 | 1.60x | 2.96x | **1.85** |
+| `heldFluxRatio.floor` | 0.543-0.873 | 0.429-0.520 | 0.628-0.876 | 0.829-1.024 | 1.61x | 1.84x | 1.14 |
+| `crest` | 2.19-2.71 | 2.59-2.85 | 2.77-3.47 | 2.93-3.13 | 1.25x | 1.35x | 1.08 |
+| `sharpness.attack` | 0.90-3.50 | 2.61-5.66 | 2.81-9.17 | 2.63-5.43 | 3.88x | 3.56x | 0.92 |
+| `brightness` | 0.028-0.107 | 0.007-0.178 | 0.216-0.681 | 0.387-0.488 | 25.4x | 8.86x | 0.35 |
+| `bassShare` | 0.664-0.899 | 0.213-0.694 | 0.051-0.494 | 0.099-0.299 | 9.73x | 3.57x | 0.37 |
+| `decayTauMs` | 249-1161 | 80-1028 | 235-747 | 80-1943 | 24.3x | 5.91x | 0.24 |
+
+`within` is the widest max/min ratio inside any one chain, `between` the ratio
+of the four chain medians, `sep` their quotient. The full twenty-four-row table
+is what the script prints.
+
+Read the failures, they are more informative than the successes:
+
+- Everything measured AT an attack fails. `sharpness.attack` moves 3.88x within
+  one chain against 3.56x between chains: it is a statistic of the playing
+  wearing a rig's clothes. Every `*.attack`, `*.attackLow` and `*.contrast`
+  column lands at sep 1.5 or below.
+- `brightness` and `bassShare` separate the chain MEDIANS by 8.9x and 3.6x — a
+  room mic really is brighter than a direct input, and the amp sim really does
+  take the fundamental — and they have the FEWEST overlapping group pairs of
+  anything measured. They still fail, because a sixteenths run on the top two
+  strings and a cowboy chord are not the same spectrum, and that difference is
+  25x inside one rig. A statistic can be a true fact about the chain and still
+  be useless for calibrating one, and this is what that looks like.
+- The decay time constant varies 24x within a chain. It is a property of the
+  note that was struck, not of the rig that carried it.
+
+The two floors that do qualify tell the two clean paths (originals, DI) from the
+two coloured ones (room mic, amp sim) and do not tell mic from amp: of the six
+group pairs, the two that overlap are exactly those.
+
+### The decisive question, answered directly
+
+Leave-one-take-out failed at 0.434 in `measure-decision-separability.ts` while
+take-mixing folds reached 0.758, and takes within a chain are different takes.
+So the question is not only whether a statistic separates BETWEEN chains, it is
+whether the flux scale is tight WITHIN one chain across four performances.
+
+| flux-family statistic | widest within one chain | between chain medians |
+|---|---|---|
+| `sharpness.floor` | 1.58x | 2.95x |
+| `heldSharpness.floor` | 1.60x | 2.96x |
+| `heldFluxRatio.floor` | 1.61x | 1.84x |
+| `fluxRatio.floor` | 1.84x | 1.56x |
+| `sharpness.attack` | 3.88x | 3.56x |
+| `heldSharpness.attack` | 3.09x | 2.24x |
+| `fluxRatio.attack` | 2.88x | 3.12x |
+| `heldFluxRatio.attack` | 2.26x | 1.92x |
+
+The floors are the only place the rig leads the playing by a clear margin, and
+even there a factor of 1.6 between two performances on ONE rig is most of the
+factor of 3 between rigs. Measured at the attacks, the playing leads outright.
+
+### Built, measured, NOT kept: rescaling the decision by the profile
+
+The premise proved or disproved end to end. Every row of
+`measure-decision-separability.ts`'s decision table, with the six scale-carrying
+witnesses rescaled by a profile, under the same twelve-witness L2 fit at the
+same lambda, scored leave-one-take-out.
+
+| calibration | derivation LOTO AUC | FP at zero label cost | all 17 takes LOTO |
+|---|---|---|---|
+| raw, nothing calibrated | 0.434 | 94 / 102 | 0.727 |
+| same-take, divide by floor — UPPER BOUND | 0.359 | 94 / 102 | 0.709 |
+| same-take, affine floor-to-attack — UPPER BOUND | 0.373 | 96 / 102 | 0.626 |
+| cross-take within chain, divide by floor | 0.451 | 94 / 102 | 0.715 |
+| cross-take within chain, affine | 0.518 | 97 / 102 | 0.683 |
+| all-other takes regardless of chain, divide | 0.444 | 94 / 102 | 0.728 |
+
+The number to beat is 0.758, what the same rows and the same fit reach when the
+folds are allowed to mix takes. Nothing here comes near it. The best honest
+calibration moves leave-one-take-out from 0.434 to 0.518, still below the best
+single raw witness held out (0.667), and the zero-label operating point is
+unmoved: 94 to 97 of 102 rejections admitted, whatever is done.
+
+The line that settles it is the upper bound. Calibrating on the very take being
+scored — which no deployed system could do, and which nothing honest can beat —
+makes the fit WORSE, at 0.359 against 0.434 raw. If the per-take scale defeating
+this model were the scale a rig profile measures, that row would be the best in
+the table. It is the worst. Whatever varies from take to take here is not the
+signal chain's contribution, and dividing by the chain's floor removes real
+information along with it.
+
+`cross-take within chain` also fails to beat `all-other takes regardless of
+chain` by any margin worth the name (0.451 against 0.444). That was the control,
+and it says the small movement is a global rescaling rather than anything
+rig-specific.
+
+### The warm-up, since it was asked
+
+Source time before a statistic stays within 15% of its final value, median over
+the seventeen takes / worst take:
+
+```
+  brightness, bassShare, crest         8s / 15-20s
+  the flux floors                     10s / 20-30s
+  the attack quantiles               8-10s / 20-30s
+  decayTauMs                          15s / 30s
+```
+
+Nothing is available in the first two seconds and little is settled before six.
+This is a ten-second proposition at best, which matters for the product
+question: a profile cannot help the opening bars of a session, only the rest of
+it. And on dense playing it may not be available at all — at the 60ms attack
+holdoff the three sixteenths takes retain 183-225 hops that belong to no attack,
+just above the 200 the estimate requires, and at an 80ms holdoff they fall below
+it and have no floor to report. The material a re-articulation gate most needs
+calibrating for is the material that leaves least room to calibrate from.
+
+### Verdict
+
+The premise half holds, and the useful half fails.
+
+- A rig IS measurable: the flux floor is a real property of the signal chain,
+  tight enough within a chain (1.6x) against its spread between chains (3.0x)
+  to be worth reporting, and it settles in about ten seconds.
+- It is NOT what the re-articulation witnesses are scaled by. Rescaling by it,
+  in the honest cross-take form or in the same-take form that cannot be beaten,
+  does not restore comparability across takes and does not move the operating
+  point that costs zero labels.
+- So a per-rig calibration layer should not be wired into the decision. What the
+  leave-one-take-out collapse is really saying, now that a per-rig normaliser
+  has been ruled out as the fix, is that the varying quantity is per-PASSAGE
+  rather than per-rig — a much shorter time constant than anything in this file.
+
+Falsifiable: a normaliser whose cross-take-within-chain leave-one-take-out AUC
+clears the raw 0.434 by more than the 0.084 measured here AND cuts the zero-cost
+false accepts below 94 of 102. The script prints both columns every run. The
+estimator stays in the tree because it costs nothing, decides nothing, and its
+floors are the honest starting point for anyone who wants to try; the invariants
+it has to hold are in `tests/engine/rig-profile.test.ts`.
