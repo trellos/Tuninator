@@ -233,6 +233,58 @@ describe("a steady unbroken tone", () => {
   });
 });
 
+/**
+ * The failure the reference's memory exists to prevent.
+ *
+ * At `fftSize` 1024 and 44.1kHz a bin is 43Hz wide, so the harmonics of a low
+ * E (82.4Hz, 1.9 bins apart) are unresolved: their main lobes overlap and beat
+ * against each other as the analysis window advances, at a rate set by the
+ * hop rather than by anything in the music. Measured against a plain
+ * previous-frame reference, the flux of a perfectly steady low E swings
+ * between 0.003 and 0.68 on alternate hops -- as large as a real pick attack.
+ *
+ * The reference is therefore a per-bin maximum over several hops rather than
+ * over one. This test is here because the memory has to stay long enough to
+ * cover that beating and short enough not to hide a pick, and the pressure on
+ * that constant only ever runs one way: every recall problem in this detector
+ * argues for shortening it. If it is ever shortened past the beating, this is
+ * the test that says so.
+ */
+describe("a steady low E does not beat itself into onsets", () => {
+  /** A low string's first several harmonics at a constant amplitude. */
+  function steadyPartials(f0: number, durationMs: number, amp: number): Float32Array {
+    const amplitudes = [1, 0.7, 0.5, 0.35, 0.25, 0.18, 0.12, 0.09];
+    const phases = amplitudes.map((_, i) => i * 0.7 + 0.3);
+    const signal = new Float32Array(Math.round((durationMs / 1000) * SR));
+    for (let i = 0; i < signal.length; i++) {
+      let v = 0;
+      for (let h = 0; h < amplitudes.length; h++) {
+        v += (amplitudes[h] as number) * Math.sin(2 * Math.PI * f0 * (h + 1) * (i / SR) + (phases[h] as number));
+      }
+      signal[i] = v * amp;
+    }
+    return signal;
+  }
+
+  it("reports the note starting and nothing after it", () => {
+    for (const f0 of [82.41, 87.31, 92.5, 98]) {
+      for (const hop of HOPS) {
+        for (const amp of [0.03, 0.08, 0.2]) {
+          const { onsetsMs } = collectOnsets(steadyPartials(f0, 3000, amp), hop);
+          expect(onsetsMs.length, `${f0}Hz hop=${hop} amp=${amp}`).toBe(1);
+        }
+      }
+    }
+  });
+
+  it("holds for the whole sustain, not just the first second", () => {
+    // The beat period is tens of hops long, so a short window can pass by
+    // accident. Six seconds is hundreds of beats.
+    const { onsetsMs } = collectOnsets(steadyPartials(82.41, 6000, 0.08), 512);
+    expect(onsetsMs).toHaveLength(1);
+  });
+});
+
 describe("minIntervalMs", () => {
   it("suppresses a double trigger inside the interval", () => {
     // Two attacks only 40ms apart.

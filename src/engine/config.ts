@@ -678,7 +678,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     envelopeBaselineMs: 80,
     envelopeRiseRatio: 1.35,
     rearticulationRiseRatio: 1.2,
-    rearticulationSharpness: 1.1,
+    rearticulationSharpness: 1.6,
     restrumSharpness: 0.9,
     restrumFluxRatio: 1.3,
     ringOutMs: 250,

@@ -30,14 +30,23 @@ import type { AttackEvidence, FastFrame } from "../../src/engine/contracts.js";
 const detector = new RearticulationDetector(DEFAULT_ENGINE_CONFIG);
 
 /**
- * The measured vectors below are readings against the flux kernel's LONG
- * memory — a decaying per-bin peak hold — which is the reading the re-strum
- * tests are made against and the scale they were fitted on. The short-memory
- * reading the same kernel reports alongside answers a different question and
- * is not what these numbers describe, so it is left at the same values rather
- * than invented: nothing in this file consults it.
+ * A measured transient, on BOTH the scales the flux kernel reports.
+ *
+ * `sharpness`/`fluxRatio` are taken against the short reference the onset
+ * decision uses — "how much arrived since a few hops ago" — and
+ * `heldSharpness`/`heldFluxRatio` against the decaying peak hold — "how much
+ * of this frame is new since the note began". Every vector in this file was
+ * read off the recording named beside it by running the engine over it, so a
+ * change that moves them is a change to what the recognizer believes about
+ * real audio.
  */
-function attack(sharpness: number, fluxRatio: number, riseRatio = 1): AttackEvidence {
+function attack(
+  sharpness: number,
+  fluxRatio: number,
+  heldSharpness: number,
+  heldFluxRatio: number,
+  riseRatio = 1
+): AttackEvidence {
   return {
     at: 1000,
     atSample: 48000,
@@ -47,8 +56,8 @@ function attack(sharpness: number, fluxRatio: number, riseRatio = 1): AttackEvid
     riseRatio,
     sharpness,
     fluxRatio,
-    heldSharpness: sharpness,
-    heldFluxRatio: fluxRatio,
+    heldSharpness,
+    heldFluxRatio,
     strength: 0.8,
   };
 }
@@ -94,30 +103,41 @@ function overRingingChord(
 }
 
 describe("an amp sim's sustain is not a re-strum", () => {
-  // Ten separate re-articulations were accepted inside four ringing chords on
-  // `cowboy-chords-amped-d-em-g-c-2x-140bpm`, every one of them with a rise
-  // ratio of about 1.00 — no energy arrived at all. These are their measured
-  // evidence vectors.
-  const measured: Array<[number, number, number]> = [
-    [1.49, 1.21, 1.04],
-    [1.33, 1.05, 1.04],
-    [1.26, 1.17, 1.13],
-    [1.40, 1.01, 0.97],
-    [1.28, 1.02, 0.97],
-    [1.37, 1.02, 1.01],
-    [1.53, 1.13, 1.07],
-    [1.53, 1.07, 0.94],
-    [1.26, 1.05, 1.03],
-    [1.32, 1.10, 0.99],
+  // Transients accepted inside the ringing chords of
+  // `cowboy-chords-amped-d-em-g-c-2x-140bpm`, every one with a rise ratio of
+  // about 1.00 — no energy arrived at all. Each clears `restrumSharpness` on
+  // the held reading, which is the reading the re-strum test is made against,
+  // so sharpness alone would let all of them through.
+  //
+  // Honest about what this does NOT cover: a twenty-first transient on the
+  // same take reads [3.74, 1.07, 2.62, 1.64] and clears both held bars. It is
+  // one of that fixture's three false positives, and no threshold on these two
+  // figures separates it from the strums below.
+  const measured: Array<[number, number, number, number, number]> = [
+    [3.01, 0.9, 1.46, 0.96, 1.04],
+    [2.74, 0.92, 1.15, 0.85, 0.95],
+    [2.74, 0.98, 0.91, 0.71, 0.97],
+    [2.08, 0.75, 1.33, 1.05, 1.04],
+    [2.33, 0.77, 1.0, 0.73, 1.05],
+    [2.1, 1.1, 1.12, 1.29, 0.76],
+    [2.46, 0.86, 1.12, 0.86, 1.01],
+    [2.42, 0.87, 1.01, 0.8, 0.94],
+    [3.05, 0.91, 1.51, 0.99, 1.0],
+    [2.9, 0.88, 1.12, 0.75, 1.04],
+    [2.48, 0.8, 1.14, 0.81, 1.02],
+    [2.38, 0.82, 1.1, 0.83, 0.91],
+    [2.37, 0.72, 1.1, 0.74, 0.93],
   ];
 
   it.each(measured)(
-    "rejects sustain measured at sharpness %f, flux ratio %f",
-    (sharpness, fluxRatio, riseRatio) => {
+    "rejects sustain measured at held sharpness %#",
+    (sharpness, fluxRatio, heldSharpness, heldFluxRatio, riseRatio) => {
       // Every one of these clears `restrumSharpness` on its own.
-      expect(sharpness).toBeGreaterThanOrEqual(DEFAULT_ENGINE_CONFIG.transient.restrumSharpness);
+      expect(heldSharpness).toBeGreaterThanOrEqual(
+        DEFAULT_ENGINE_CONFIG.transient.restrumSharpness
+      );
       expect(
-        overRingingChord(attack(sharpness, fluxRatio, riseRatio), {
+        overRingingChord(attack(sharpness, fluxRatio, heldSharpness, heldFluxRatio, riseRatio), {
           rms: 0.065,
           sustainedRms: 0.064,
           decayExcess: 1.05,
@@ -129,17 +149,22 @@ describe("an amp sim's sustain is not a re-strum", () => {
 });
 
 describe("a real strum on the same signal path still gets through", () => {
-  // From the same file and the 120bpm fixtures the escape was fitted on.
-  const genuine: Array<[string, number, number]> = [
-    ["cowboy amped, the C on beat 1", 4.5, 3.17],
-    ["cowboy amped, mid-bar restrum", 2.26, 1.75],
-    ["chords-a-bm, a muted upstrum", 1.26, 1.78],
-    ["chords-a-bm, a muted upstrum", 0.99, 1.58],
+  // From the same file and from `chords-a-bm-g-d-2x-120bpm`, whose second
+  // strum of every pair is a muted upstrum quieter than what it interrupts.
+  const genuine: Array<[string, number, number, number, number]> = [
+    ["cowboy amped, the C on beat 1", 8.6, 2.46, 8.64, 5.44],
+    ["cowboy amped, a mid-bar restrum", 4.63, 1.39, 4.05, 2.67],
+    ["cowboy amped, a mid-bar restrum", 3.39, 1.2, 2.73, 2.13],
+    ["cowboy amped, a mid-bar restrum", 3.27, 1.07, 2.69, 1.94],
+    ["cowboy amped, a mid-bar restrum", 2.83, 1.05, 1.82, 1.49],
+    ["chords-a-bm, a muted upstrum", 1.26, 0.91, 0.99, 1.58],
+    ["chords-a-bm, a muted upstrum", 1.85, 1.18, 1.26, 1.78],
+    ["chords-a-bm, a muted upstrum", 1.77, 1.02, 1.08, 1.38],
   ];
 
-  it.each(genuine)("accepts %s", (_name, sharpness, fluxRatio) => {
+  it.each(genuine)("accepts %s", (_name, sharpness, fluxRatio, heldSharpness, heldFluxRatio) => {
     expect(
-      overRingingChord(attack(sharpness, fluxRatio, 1.05), {
+      overRingingChord(attack(sharpness, fluxRatio, heldSharpness, heldFluxRatio, 1.05), {
         rms: 0.065,
         sustainedRms: 0.064,
         decayExcess: 1.0,
@@ -153,7 +178,7 @@ describe("a real strum on the same signal path still gets through", () => {
     // measured curve had to come from outside, whatever the transient looks
     // like, and that is how a re-strum is caught when its pick noise is buried.
     expect(
-      overRingingChord(attack(0.1, 1.0, 1.4), {
+      overRingingChord(attack(0.1, 1.0, 0.1, 1.0, 1.4), {
         rms: 0.09,
         sustainedRms: 0.064,
         decayExcess: 1.66,
@@ -168,7 +193,7 @@ describe("a chord the recognizer could not NAME is still a chord", () => {
   // long before it defeats the evidence that six strings are ringing, so the
   // protection has to key on the Note having bloomed, not on it having a name.
   it("takes the strict polyphonic route rather than the monophonic fallback", () => {
-    const evidence = attack(1.53, 1.13, 1.07);
+    const evidence = attack(3.05, 0.91, 1.51, 0.99, 1.0);
     const state = { rms: 0.065, sustainedRms: 0.064, decayExcess: null, soundedMs: 400 };
 
     // Treated as a chord: sustain is rejected.
