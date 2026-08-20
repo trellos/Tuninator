@@ -31,12 +31,11 @@
  */
 
 import { closeSync, openSync, readFileSync, writeSync } from "node:fs";
-import { RealFFT, hannWindow } from "../src/engine/kernels/fft.js";
 import { DEFAULT_ENGINE_CONFIG, snapHop } from "../src/engine/config.js";
 import {
   BAND_COUNT,
   PATCH_HOPS,
-  WhitenedBandExtractor,
+  WhitenedBandPipeline,
 } from "../src/engine/kernels/whitened-bands.js";
 import type { TrackerTraceEvent } from "../src/engine/tracker/note-tracker.js";
 
@@ -106,15 +105,8 @@ export function collectPatches(
     else list.push(wi);
   });
 
-  const fft = new RealFFT(fftSize);
-  const hann = hannWindow(fftSize);
-  const windowed = new Float32Array(fftSize);
-  const magnitude = new Float32Array(fft.bins);
-  let windowSum = 0;
-  for (let i = 0; i < fftSize; i++) windowSum += hann[i] as number;
-  const magnitudeScale = windowSum > 0 ? 2 / windowSum : 1;
-
-  const extractor = new WhitenedBandExtractor(sampleRate, fftSize, fft.bins, referenceFrames);
+  const pipeline = new WhitenedBandPipeline(sampleRate, fftSize, referenceFrames);
+  const window = new Float32Array(fftSize);
   const out = new Map<number, PatchAt>();
 
   for (let hopIndex = 1; hopIndex * hop <= mono.length; hopIndex++) {
@@ -122,17 +114,15 @@ export function collectPatches(
     const start = end - fftSize;
     for (let i = 0; i < fftSize; i++) {
       const s = start + i;
-      windowed[i] = (s >= 0 ? (mono[s] as number) : 0) * (hann[i] as number);
+      window[i] = s >= 0 ? (mono[s] as number) : 0;
     }
-    fft.magnitudes(windowed, magnitude);
-    for (let k = 0; k < fft.bins; k++) magnitude[k] = (magnitude[k] as number) * magnitudeScale;
-    extractor.push(magnitude);
+    pipeline.push(window);
 
     const wis = byHop.get(hopIndex);
     if (wis === undefined) continue;
     const at = (end / sampleRate) * 1000;
-    const patch = extractor.patch(new Float32Array(PATCH_SIZE));
-    const flux = extractor.whitenedFlux();
+    const patch = pipeline.patch(new Float32Array(PATCH_SIZE));
+    const flux = pipeline.whitenedFlux();
     const wflux = Float32Array.of(flux.wFlux, flux.wFluxNorm, flux.wHeldFlux, flux.wHeldNorm);
     for (const wi of wis) out.set(wi, { at, patch, wflux });
   }

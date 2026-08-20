@@ -28,6 +28,8 @@
  * `src/engine/`, so no DOM, no globals, no clock reads, no npm imports.
  */
 
+import { RealFFT, hannWindow } from "./fft.js";
+
 /** Whitening memory: per-bin running peak decays by this per hop. */
 export const WHITEN_M = 0.99;
 /** Whitening floor: silence whitens to (tiny / floor), not to 0 / 0. */
@@ -100,6 +102,56 @@ export function bandWeights(
     offsets[b + 1] = indices.length;
   }
   return { indices: Int32Array.from(indices), offsets, weights: Float32Array.from(weights) };
+}
+
+/**
+ * The extractor plus the transform that feeds it: Hann window, real FFT, and
+ * the flux kernel's own magnitude scaling (2 / window-sum). One class so the
+ * fast lane and the training pipeline run the SAME code from raw samples to
+ * patch — the only thing a caller supplies is the window of `fftSize` samples
+ * ending at the hop.
+ */
+export class WhitenedBandPipeline {
+  private readonly fft: RealFFT;
+  private readonly hann: Float32Array;
+  private readonly windowed: Float32Array;
+  private readonly magnitude: Float32Array;
+  private readonly magnitudeScale: number;
+  readonly extractor: WhitenedBandExtractor;
+
+  constructor(sampleRate: number, fftSize: number, referenceFrames: number) {
+    this.fft = new RealFFT(fftSize);
+    this.hann = hannWindow(fftSize);
+    this.windowed = new Float32Array(fftSize);
+    this.magnitude = new Float32Array(this.fft.bins);
+    let windowSum = 0;
+    for (let i = 0; i < fftSize; i++) windowSum += this.hann[i] as number;
+    this.magnitudeScale = windowSum > 0 ? 2 / windowSum : 1;
+    this.extractor = new WhitenedBandExtractor(sampleRate, fftSize, this.fft.bins, referenceFrames);
+  }
+
+  /** Consume one hop's window (length `fftSize`, ending at the hop). */
+  push(window: Float32Array): void {
+    const n = this.windowed.length;
+    for (let i = 0; i < n; i++) this.windowed[i] = (window[i] as number) * (this.hann[i] as number);
+    this.fft.magnitudes(this.windowed, this.magnitude);
+    for (let k = 0; k < this.magnitude.length; k++) {
+      this.magnitude[k] = (this.magnitude[k] as number) * this.magnitudeScale;
+    }
+    this.extractor.push(this.magnitude);
+  }
+
+  patch(out: Float32Array): Float32Array {
+    return this.extractor.patch(out);
+  }
+
+  whitenedFlux(): WhitenedFlux {
+    return this.extractor.whitenedFlux();
+  }
+
+  reset(): void {
+    this.extractor.reset();
+  }
 }
 
 export class WhitenedBandExtractor {

@@ -103,6 +103,24 @@ export type AttackEvidence = {
   heldFluxRatio: number;
   /** 0..1 blend of both witnesses. */
   strength: number;
+  /**
+   * The adaptively whitened context of the hop this attack landed on, for the
+   * learned re-articulation witness: the causal log-band patch ending at this
+   * hop and the four whitened flux readings. See
+   * `kernels/whitened-bands.ts`. Absent on attacks fabricated by tests; the
+   * fast lane always attaches it.
+   */
+  whitened?: WhitenedAttackContext;
+};
+
+/** See `AttackEvidence.whitened`. */
+export type WhitenedAttackContext = {
+  /** `PATCH_HOPS x BAND_COUNT`, row-major, oldest hop first. */
+  patch: Float32Array;
+  wFlux: number;
+  wFluxNorm: number;
+  wHeldFlux: number;
+  wHeldNorm: number;
 };
 
 /** A pitch that has moved, and how. */
