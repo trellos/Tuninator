@@ -2243,3 +2243,203 @@ On the wider candidate set the oracle rate holds everything it held before: 66
 Notes removed at 0.40 with no label touched, 70 at the best label-safe
 threshold, and still flat under rate errors from half the true value to a
 quarter above it.
+
+## Does any COMBINATION of the witnesses separate accept from reject? No
+
+`scripts/measure-decision-separability.ts`.
+
+Every threshold this project has swept has been a threshold on one witness, and
+each one has failed the same way: attack contrast varies 2.0x to 24.2x across
+the corpus and up to 106x within a single take, so a bar that works on one take
+measures the recording on the next. `heldFluxRatio` separates cleanly on eight
+takes and inverts on the ninth. The question that had never been asked is
+whether the witnesses TOGETHER carry information none of them carries alone —
+because if they do, a learned combination is worth building, and if they do not,
+a large planned effort dies here for the cost of one script.
+
+They do not. The answer is no, and the way it is no is more informative than the
+answer: a fitted combination reproduces the single-witness failure exactly, one
+level up. It learns each take's own scale.
+
+### The table
+
+The tracker's `rearticulation` trace fires before the `settled` gate and before
+the tracker acts, so these are the decisions that COULD be taken rather than the
+ones that were. One row per attack that reached `RearticulationDetector.verdict`
+over a sounding Note, carrying the twelve witnesses the verdict has in hand.
+
+A row is a POSITIVE when a labelled event begins within 70ms of it and no Note
+opened BEFORE it (in trace order) sits within 70ms of that label — the
+attribution `measure-downstream-ledger.ts` uses, where a Note opened inside the
+window means the boundary was already found. Trace order rather than timestamp
+order is load-bearing: a split backdates its successor to the first transient of
+the attack burst, so a decision compared by timestamp finds its own successor
+sitting before it and marks itself already covered, which silently deletes every
+true positive. That bug was present in the first run of this script and it did
+not look like a bug; it looked like a table with fifteen positives.
+
+| set | takes | rows | positives | base rate | distinct labels |
+|---|---|---|---|---|---|
+| derivation (120bpm) | 5 | 161 | 59 | 0.366 | 48 |
+| held out (140bpm) | 12 | 564 | 310 | 0.550 | 282 |
+
+What the current code scores on the same table, as the thing to beat:
+
+| | TP | FP | FN | TN |
+|---|---|---|---|---|
+| derivation, verdict only | 36 | 38 | 23 | 64 |
+| derivation, splits acted | 32 | 16 | 27 | 86 |
+| held out, verdict only | 264 | 176 | 46 | 78 |
+| held out, splits acted | 240 | 67 | 70 | 187 |
+
+The population is conditioned on the current code in one way that cannot be
+removed: a row exists only where the fast lane found a transient AND a Note was
+open to decide about. The four strokes lost to `no transient within the window`
+are not in this table, and no rule fitted on it could recover them.
+
+### Single witnesses, for the baseline
+
+Pooled over the five derivation takes, in-sample, oriented so a witness that
+separates by being LOW counts as well as one that separates by being high.
+
+| witness | AUC | oriented | dir | FP at zero label cost |
+|---|---|---|---|---|
+| sharpness | 0.728 | 0.728 | high | 102 / 102 |
+| fluxRatio | 0.701 | 0.701 | high | 101 / 102 |
+| heldSharpness | 0.658 | 0.658 | high | 100 / 102 |
+| heldFluxRatio | 0.590 | 0.590 | high | 100 / 102 |
+| decayExcess | 0.558 | 0.558 | high | 102 / 102 |
+| soundedMs | 0.456 | 0.544 | low | 91 / 102 |
+| kernelOnset | 0.543 | 0.543 | high | 102 / 102 |
+| gliding | 0.472 | 0.528 | low | 102 / 102 |
+| pitchDiffers | 0.480 | 0.520 | low | 98 / 102 |
+| riseRatio | 0.515 | 0.515 | high | 97 / 102 |
+| bloomed | 0.488 | 0.512 | low | 102 / 102 |
+| envelopeOverBaseline | 0.497 | 0.503 | low | 101 / 102 |
+
+The last column is the number that matters and it is already fatal. The loosest
+bar on the best witness that keeps every played stroke also keeps 102 of the 102
+rejections. Nine of the twelve witnesses are within 0.06 of a coin toss.
+
+### The witnesses are not twelve readings
+
+| pair | r |
+|---|---|
+| sharpness / heldSharpness | 0.954 |
+| riseRatio / envelopeOverBaseline | 0.881 |
+| fluxRatio / heldFluxRatio | 0.867 |
+| sharpness / fluxRatio | 0.862 |
+| heldSharpness / heldFluxRatio | 0.832 |
+| heldSharpness / fluxRatio | 0.824 |
+| sharpness / heldFluxRatio | 0.723 |
+| soundedMs / bloomed | 0.550 |
+
+`sharpness` and `heldSharpness` are two divisions of the same flux and correlate
+at 0.954. Six of the twelve columns are one measurement — spectral flux, scaled
+four ways — plus the envelope, scaled two ways. There is no twelve-dimensional
+space here to find a hyperplane in.
+
+### All twelve together
+
+Plain L2-regularised logistic regression, standardised inputs, gradient descent,
+no dependency. Cross-validated two ways: stratified 5-fold, which mixes takes,
+and leave-one-take-out, which does not.
+
+| lambda | in-sample AUC | 5-fold AUC | leave-one-take-out AUC | FP at zero label cost |
+|---|---|---|---|---|
+| 0.01 | 0.808 | 0.758 | **0.434** | 94 / 102 |
+| 0.1 | 0.783 | 0.736 | 0.428 | 94 / 102 |
+| 1 | 0.745 | 0.707 | 0.398 | 97 / 102 |
+| 10 | 0.735 | 0.697 | 0.335 | 97 / 102 |
+
+The gap between the two cross-validation columns IS the finding. Folds that mix
+takes score 0.758 — better than any single witness, which is what a hopeful
+reading would stop at. Folds that hold out a whole take score 0.434, which is
+worse than a coin toss. Everything the combination appeared to learn was each
+take's own scale.
+
+That is not the same as the model learning nothing. Scored within the take it
+was held out from, it is a fair-to-poor classifier; pooled across takes it
+inverts, because each take's scores sit at a different offset:
+
+| take | pos | neg | sharpness AUC | 12-witness in-sample | 12-witness held-out fold |
+|---|---|---|---|---|---|
+| chords-a-bm-g-d-2x-120bpm | 10 | 15 | 0.760 | 0.680 | 0.260 |
+| clean-lead-120bpm | 38 | 33 | 0.695 | 0.790 | 0.709 |
+| cowboy-chords-c-d-em-g-c-d-em-am-120bpm | 9 | 19 | 0.661 | 0.766 | 0.561 |
+| power-chords-c-a-g-e-c-d-fsharp-e-120bpm | 2 | 24 | 0.667 | 0.625 | 0.500 |
+| spicy-chords-cmaj9-g-am11 | 0 | 11 | - | - | - |
+
+This is the trap `measure-mute-witness.ts` documents in its own header, met
+again: a quantity can separate within every file and still have no bar across
+files. Twelve witnesses combined do not escape it — they land in it faster,
+because a fitted offset is exactly the thing that does not transfer.
+
+### Two at a time
+
+All 66 pairs, leave-one-take-out.
+
+| pair | leave-one-take-out AUC | FP at zero label cost |
+|---|---|---|
+| heldSharpness + fluxRatio | 0.599 | 102 / 102 |
+| fluxRatio + pitchDiffers | 0.596 | 97 / 102 |
+| fluxRatio + gliding | 0.581 | 96 / 102 |
+| fluxRatio + kernelOnset | 0.581 | 101 / 102 |
+| sharpness + fluxRatio | 0.580 | 101 / 102 |
+| fluxRatio + heldFluxRatio | 0.571 | 102 / 102 |
+
+The best pair beats the twelve-witness fit across takes (0.599 against 0.434) —
+fewer parameters, less scale to memorise — and still loses to reading
+`sharpness` on its own in-sample. No pair reaches a usable operating point:
+every one of them accepts at least 96 of the 102 rejections in order to keep
+every played stroke.
+
+### Held out: the twelve 140bpm takes
+
+Fitted on the five derivation takes, standardised on their statistics, scored on
+the twelve held-out takes with nothing refitted and nothing tuned. The operating
+point is the derivation set's own zero-label-cost threshold, carried over
+unchanged.
+
+| rule | derivation AUC | held-out AUC | positives kept | labels lost | false accepts |
+|---|---|---|---|---|---|
+| all twelve witnesses | 0.808 | 0.647 | 295 / 310 | 15 | 240 / 254 |
+| best pair: heldSharpness + fluxRatio | 0.701 | 0.700 | 309 / 310 | 1 | 247 / 254 |
+| best single: sharpness | 0.728 | 0.667 | 310 / 310 | 0 | 252 / 254 |
+
+The twelve-witness fit drops from 0.808 to 0.647 and ends up BELOW the single
+witness it was supposed to improve on (0.667). The transferred operating point
+accepts 94% of the held-out rejections and still loses fifteen strokes. There is
+no version of this where the combination is the thing to build.
+
+### Verdict
+
+No. No combination of the witnesses we already compute separates the
+accept-from-reject decision.
+
+- The best single witness, `sharpness`, reads 0.728 in-sample and 0.667 held
+  out. A twelve-witness fit reads 0.434 across derivation takes and 0.647 held
+  out — worse on both honest measures than the one witness it was built to beat.
+- The apparent gain (5-fold 0.758) comes entirely from folds that share a take.
+  Hold the take out and it is gone. The fit is learning the recording, which is
+  the same defect every hand-tuned threshold has hit, arrived at faster.
+- No operating point costs zero labels at a tolerable price. On held-out data
+  the cheapest such point admits 240 to 252 of 254 rejections.
+- The twelve columns are not twelve measurements. Four of them are one flux
+  divided four ways (r up to 0.954), two are one envelope, and nine of the
+  twelve are within 0.06 AUC of a coin toss on their own.
+
+The consequence for planning: a learned or fitted re-articulation gate over the
+CURRENT witness set should not be built. What would change the answer is a new
+witness that is physically different rather than another scaling of the flux —
+the mute (`measure-mute-witness.ts`) is the existing example, and it works for
+the reason the flux witnesses do not: a mute REMOVES energy, and removal is not
+something a compressor, a room, or a decaying string can imitate. Evidence of
+that kind arrives after the decision, which is why the retroactive path exists.
+Adding a thirteenth reading of the same spectral flux will not separate anything
+these twelve do not.
+
+Falsifiable: a combination whose leave-one-take-out AUC clears the best single
+witness by more than the spread across folds AND holds on the twelve held-out
+takes, or a zero-label operating point whose held-out false accepts fall
+materially below 252 of 254. The script prints both columns every run.
