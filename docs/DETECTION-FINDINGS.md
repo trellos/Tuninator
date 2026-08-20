@@ -1640,3 +1640,44 @@ transient it would corroborate.
 
 Not yet implemented. Recorded with its measurement so the implementation starts
 from evidence rather than from the idea.
+
+## The room mic names a power chord as a triad, and it is an octave error
+
+The two remaining informational eval failures are both `minLabelAccuracy
+(exact)` on power chords, and neither is a detection failure — every strike is
+found. They are naming failures, and the room-mic take is the clear one: of its
+seven scored labels, three are named `B`, `B` and `E` where the player fretted
+`B5`, `B5` and `E5`. Naming a triad is a claim about a third nobody played.
+
+One performance, three signal paths, three answers: direct 15 of 16 exact,
+amp sim 11 of 13, room mic 4 of 7.
+
+`scripts/measure-chord-voicing.ts` prints what the multi-pitch analyser finds
+at each chord, with register. The direct and mic takes on the same strike:
+
+```
+  direct  p1 B5   B2(+0,root)  F#3(+7,fifth)
+  mic     p1 B5   F#3(+0,fifth) B3(+5,root)  D#5(+21,THIRD,s=0.37)
+```
+
+The mic take has no `B2`. Its lowest activation is the FIFTH, an octave and a
+fifth above where the direct take finds the root. And `D#5` sits exactly 28
+semitones above the missing `B2`, which is its fifth partial — a partial of a
+fundamental the analyser never detected, so cancellation had nothing to
+subtract it from. The `Esus2` and `Gsus2` misnames are the same shape one
+harmonic along: `A4` is 19 semitones above `D3`, the third partial of the
+fifth.
+
+**Three discriminants were measured and none of them separates.**
+
+| tried | why it fails |
+|---|---|
+| the third's chroma strength relative to the root | amp-sim power chords carry a third at 0.60–1.08 of the root; real cowboy triads carry one at 0.66–1.26. The populations overlap almost completely, because on an amplified guitar the fifth partial is as strong as a fretted note |
+| the third's register above the bass | false thirds sit at +16 and +21 semitones; real fretted thirds in the corpus sit at +4, +8, +9, +15 and +16. +16 is on both sides |
+| the third's salience among the activations | false thirds 0.29–0.62, real thirds 0.29–0.86. Overlapping |
+| "an activation at an integer harmonic of a lower activation is a partial" | correct in principle and inert here: the fundamental these partials belong to is the one that was NOT detected. There is nothing lower to test them against |
+
+The mechanism is understood exactly and the fix is not a rule in the
+interpreter. It is upstream: the mic take's bass is detected an octave and a
+fifth high, and every downstream error follows from that one miss. Recorded
+here so the next attempt starts at the octave error rather than at the third.
