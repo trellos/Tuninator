@@ -109,7 +109,17 @@ export type TrackerTraceEvent =
       bloomed: boolean;
     }
   | { kind: "opened"; at: SourceTimeMs; noteId: string; trigger: NoteOriginTrigger }
-  | { kind: "absorbed"; at: SourceTimeMs; noteId: string; intoId: string }
+  | {
+      kind: "absorbed";
+      at: SourceTimeMs;
+      noteId: string;
+      intoId: string;
+      /** The absorbed Note's own span, and the pick each side came off. */
+      durationMs: number;
+      intoStartTime: SourceTimeMs;
+      burstAt: number | null;
+      intoBurstAt: number | null;
+    }
   | {
       kind: "ended";
       at: SourceTimeMs;
@@ -757,6 +767,7 @@ export class NoteTracker {
     this.contextUpdatedAt = at;
     this.contextHarmonic = this.contextHarmonic * (1 - alpha) + harmonicNow * alpha;
     record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
+    record.burstAt = this.attackBurstStart?.at ?? null;
     // When the ROOM entered its current harmonic stretch.
     //
     // Declared, read, and never once written before now, so the thing it gates
@@ -980,6 +991,7 @@ export class NoteTracker {
       peak: predecessor.maxPeak,
     });
     record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
+    record.burstAt = this.attackBurstStart?.at ?? null;
     // Born because the harmony changed, so it is a chord from its first hop.
     // Making it re-earn that leaves it open to the pitch-step segmentation a
     // bloomed Note is protected from, and a chord whose Note has just been
@@ -1040,6 +1052,10 @@ export class NoteTracker {
         at: predecessor.startTime,
         noteId: predecessor.id,
         intoId: survivor.id,
+        durationMs: predecessor.durationMs,
+        intoStartTime: survivor.startTime,
+        burstAt: predecessor.burstAt,
+        intoBurstAt: survivor.burstAt,
       });
     }
     predecessor.merged = true;
@@ -1078,6 +1094,19 @@ export class NoteTracker {
         if (candidate.endTime > earliest.startTime + config.mergeMaxGapMs) continue;
         if (candidate.endTime < earliest.startTime - config.mergeMaxGapMs) continue;
         if (survivor.startTime - candidate.startTime > config.mergeLookbackMs) continue;
+        // A fragment of this attack came off the same pick this Note did. Two
+        // Notes opened under different attack bursts are two strokes, and this
+        // loop walks backwards through contiguous candidates: without the
+        // check, one Note arriving after a run of short ones swallows the whole
+        // run. On a triplet at 140bpm that is six played notes absorbed into
+        // the seventh. See `NoteRecord.burstAt`.
+        if (
+          candidate.burstAt !== null &&
+          survivor.burstAt !== null &&
+          candidate.burstAt !== survivor.burstAt
+        ) {
+          continue;
+        }
         if (previous === null || candidate.startTime > previous.startTime) previous = candidate;
       }
       if (previous === null) break;
@@ -1088,6 +1117,10 @@ export class NoteTracker {
           at: previous.startTime,
           noteId: previous.id,
           intoId: survivor.id,
+          durationMs: previous.durationMs,
+          intoStartTime: survivor.startTime,
+          burstAt: previous.burstAt,
+          intoBurstAt: survivor.burstAt,
         });
       }
       absorbed.push(previous.id);
@@ -1796,6 +1829,7 @@ export class NoteTracker {
       peak: frame.peak,
     });
     record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
+    record.burstAt = this.attackBurstStart?.at ?? null;
     if (predecessor !== null) record.decay.adopt(predecessor.decay);
     if (absorbPredecessor) {
       // A step-split stub lends its boundary but not its evidence. See

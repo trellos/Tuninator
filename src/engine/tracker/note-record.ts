@@ -197,6 +197,21 @@ export class NoteRecord {
   deepStructural = false;
 
   /**
+   * When the attack burst this Note was opened under began, or null if no
+   * attack had been seen yet.
+   *
+   * A burst is one pick: attacks closer together than `transient.articulationMs`
+   * are the same stroke still arriving (see the burst grouping in
+   * `note-tracker.ts`). The value exists so that absorbing a fragment can ask
+   * whether the fragment and its survivor came off the SAME pick. Duration
+   * alone cannot answer that — a genuine sixteenth at 140bpm sounds for about
+   * as long as a fragment of a forming articulation does — but two strokes
+   * 107ms apart are two bursts, and a fragment and the note it is a fragment of
+   * are always one.
+   */
+  burstAt: number | null = null;
+
+  /**
    * This Note turned out to be part of another one and has been absorbed.
    *
    * Its already-delivered events stand — history is never rewritten — but the
