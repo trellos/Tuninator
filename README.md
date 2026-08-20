@@ -513,8 +513,10 @@ inside its gates — of the fourteen takes that score it, seven have a median ab
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.
 - **Fast single-note lines also produce extra Notes.** The triplet takes emit 64–80 Notes for 55
-  labels. `npx tsx scripts/measure-splits.ts` puts the corpus at 79 of 459 events split with 81
-  extra Notes, and 54 of those 79 are the three triplet takes.
+  labels. `npx tsx scripts/measure-splits.ts` puts the corpus at 99 of 459 events split with 107
+  extra Notes, and 63 of those 99 are the three triplet takes. The shape is one thing: a
+  correctly-named Note followed by a short SAME-PITCH tail fragment, so a single played event
+  comes out as two.
 
 The reason both are hard is measurable and is the same one: **attack contrast varies 2.0×–24.2×
 across the corpus and up to 106× within a single take.** No single threshold separates a genuine
