@@ -49,3 +49,32 @@ if (problems.length > 0) {
 
 const kb = (source.length / 1024).toFixed(1);
 console.log(`OK: dist/tuninator-worklet.js is self-contained (${kb} kB).`);
+
+// The engine worker has a different requirement. It is a module worker, so
+// imports are fine; what must hold is that the bundle exists, carries the
+// engine rather than a stub, and installs a message handler. A worker that
+// loads and never answers looks exactly like a recognizer that hears nothing.
+const workerPath = join(root, "dist", "tuninator-engine-worker.js");
+
+let worker;
+try {
+  worker = await readFile(workerPath, "utf8");
+} catch {
+  console.error(`FAIL: ${workerPath} was not produced by the build.`);
+  process.exit(1);
+}
+
+const workerProblems = [];
+if (!/onmessage\s*=/.test(worker)) {
+  workerProblems.push("never installs an onmessage handler");
+}
+if (!/RecognitionEngine|processChunk/.test(worker)) {
+  workerProblems.push("does not contain the recognition engine");
+}
+if (workerProblems.length > 0) {
+  console.error(`FAIL: dist/tuninator-engine-worker.js ${workerProblems.join(", ")}.`);
+  process.exit(1);
+}
+
+const workerKb = (worker.length / 1024).toFixed(1);
+console.log(`OK: dist/tuninator-engine-worker.js carries the engine (${workerKb} kB).`);

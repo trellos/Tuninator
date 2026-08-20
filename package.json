@@ -18,7 +18,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./worklet": "./dist/tuninator-worklet.js"
+    "./worklet": "./dist/tuninator-worklet.js",
+    "./engine-worker": "./dist/tuninator-engine-worker.js"
   },
   "types": "./dist/index.d.ts",
   "module": "./dist/index.js",

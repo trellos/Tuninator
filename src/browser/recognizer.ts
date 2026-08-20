@@ -118,9 +118,14 @@ class BrowserRecognizer implements Recognizer {
         },
       });
 
-      const engine =
+      const engine: EnginePort =
         this.options.host === "worker"
-          ? createWorkerHost()
+          ? createWorkerHost(
+              this.options.engineUrl,
+              context.sampleRate,
+              config,
+              context.currentTime
+            )
           : new InlineEngineHost(context.sampleRate, config, context.currentTime);
 
       engine.onOutput((output) => this.deliver(output.emissions, output.frames));

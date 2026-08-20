@@ -27,4 +27,15 @@ export default defineConfig([
     // tsup appends .global.js for iife by default; force the documented name.
     outExtension: () => ({ js: ".js" }),
   },
+  {
+    // Engine worker build: ESM, because a module worker has a module loader and
+    // the same engine code should be shipped, not a second copy of it inlined.
+    entry: { "tuninator-engine-worker": "src/browser/engine-worker-entry.ts" },
+    format: ["esm"],
+    dts: false,
+    clean: false,
+    sourcemap: true,
+    target: "es2022",
+    platform: "browser",
+  },
 ]);

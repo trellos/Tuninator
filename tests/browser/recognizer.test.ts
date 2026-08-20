@@ -283,10 +283,42 @@ describe("wiring", () => {
     expect(recycles).toHaveLength(3);
   });
 
-  it('rejects host: "worker" rather than silently running inline', async () => {
+  it('host: "worker" without an engineUrl says so rather than running inline', async () => {
     // Falling back would leave the caller believing their main thread is free.
     const recognizer = createRecognizer({ host: "worker" });
     await expect(recognizer.start()).rejects.toMatchObject({ code: "engine-load-failed" });
+  });
+
+  it('host: "worker" builds a module worker from the url it was given', async () => {
+    const constructed: Array<{ url: string; type: string | undefined }> = [];
+    class FakeWorker {
+      onmessage: unknown = null;
+      onerror: unknown = null;
+      constructor(url: string | URL, options?: { type?: string }) {
+        constructed.push({ url: String(url), type: options?.type });
+      }
+      postMessage(): void {}
+      terminate(): void {}
+    }
+    const previous = (globalThis as { Worker?: unknown }).Worker;
+    (globalThis as { Worker?: unknown }).Worker = FakeWorker;
+    try {
+      const recognizer = createRecognizer({
+        host: "worker",
+        engineUrl: "https://example.test/tuninator-engine-worker.js",
+      });
+      await recognizer.start();
+      expect(constructed).toEqual([
+        { url: "https://example.test/tuninator-engine-worker.js", type: "module" },
+      ]);
+      // And the timebase is answerable without a round trip, so a caller that
+      // reads it immediately after start() is not told "null" by the host that
+      // happens to be asynchronous.
+      expect(recognizer.getTimebase()?.sampleRate).toBe(48000);
+      await recognizer.dispose();
+    } finally {
+      (globalThis as { Worker?: unknown }).Worker = previous;
+    }
   });
 });
 
