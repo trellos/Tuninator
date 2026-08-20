@@ -2011,3 +2011,137 @@ are fragments of an event that was sounding at the time.
 The defect that remains is one thing, stated correctly at last: **a same-pitch
 boundary inside a single event**, shedding a short tail after a correctly-named
 Note.
+So the idea survives the cheap test that killed the pace hypothesis, and the
+oracle gives the target to build against: at the true rate the gate must reach
+64 of the 75 spurious Notes without touching a label. Recorded as a confirmed
+lead rather than a change — the estimator is not built here, and the numbers
+above are what it has to be measured against when it is.
+
+## The missing fundamental: the bass read from the spacing, not from the lowest peak
+
+The room mic has 5% of the `123.5Hz` fundamental the direct input has, and no
+amount of better cancellation recovers audio that is not in the file. The
+partials that survive still name the note — 247, 370, 494 and 741 are the 2nd,
+3rd, 4th and 6th of 123.5 — so the estimate now comes from their spacing.
+
+`src/engine/kernels/missing-fundamental.ts` is the whole of it, and
+`chroma.ts` calls it once per frame, after `findBass()` and before
+cancellation, over the same peak list.
+
+**Subharmonic summation, not harmonic product.** HPS multiplies the spectrum
+decimated by 1, 2, 3..., so a single absent harmonic drives the product to zero
+— and the case being solved is *defined* by an absent harmonic. A sum degrades
+gracefully: the missing term contributes nothing and the four that are present
+carry the estimate. The 5th partial makes the same argument a second time. On
+the low string it holds a few percent of the 3rd's energy (`n=5` is 0.069 of
+the frame's loudest partial on the mic take, 0.005 on the amp sim), which is
+plenty as a *peak* — the whitened spectrum finds it prominent — and nothing at
+all as a factor in a product.
+
+### What it asks of a candidate
+
+Fundamental absent (else the peak pickers own the answer), the 2nd and 3rd
+partials present, four partials present in total among `h = 2..8`, and both the
+3rd and the 5th present. Candidates run from `E2` up to the top of the existing
+bass range.
+
+### The guard, and it is doing work
+
+Every harmonic of `f` is also a harmonic of `f/2`, so a subharmonic estimator
+will invent a note an octave below a real one unless something stops it. Three
+things stop this one, and each was measured by removing it:
+
+| guard removed | derivation set | held out |
+|---|---|---|
+| **odd support 2 -> 1** (accept the 3rd alone) | `chords-a-bm` 11/12 exact -> 11/14; three labels it used to abstain on become confidently wrong | mic power chords 8/11 -> 8/12 |
+| **7th admitted as odd evidence** | synthesized `Cmaj9` (`C3 E3 B3 D4 E4`) is renamed `Em7`: the `D5` at 588Hz sits 34 cents from `E2`'s 7th, inside a 45-cent window, and invents an `E2` under the chord. `tests/chroma.test.ts` catches it | mic cowboy chords 6/8 -> 7/8, which is one label bought with a fiction |
+| **range floor `E2` -> `C2`** | `cowboy-120` false positives 4 -> 1, pitch class 87.5% -> 100% | `cowboy-di` 6/8 -> 5/8 exact and 100% -> 87.5% pitch class |
+
+The odd-harmonic test is what a power chord makes hard: its fifth sits exactly
+at `3f/2`, so the 3rd partial of an octave-below fiction is always there and
+proves nothing. The 5th is not a chord tone of anything a guitar is likely to
+be playing over `f`, and requiring it is what separates the two.
+
+The range floor is the guard against the *root-position major triad*, which
+beats the odd-harmonic test outright: under an open C, `C2`'s 3rd partial is
+the chord's fifth and its 5th partial is the third two octaves up, 14 cents
+away. Scanning the derivation fixtures for candidates that clear every other
+bar turned up exactly two, `C2` (65.4Hz) under an open C and `D2` (73.4Hz)
+under an open D — neither of them a note a standard-tuned guitar can sound.
+The floor is set from the instrument, at `E2`, and NOT from the eval: the
+derivation set mildly prefers `C2` (see the table), the held-out DI take is
+worse for it, and a fundamental below the lowest string is a fiction whichever
+way the labels fall. A drop tuning would need the floor two semitones lower and
+would re-admit the open-D reading.
+
+### Measured, end to end
+
+`npm run eval`, per fixture, exact and pitch class. Fifteen of the seventeen
+fixtures are byte-identical before and after; only these two moved, and both up:
+
+| fixture | before | after |
+|---|---|---|
+| `chords-a-bm-g-d-2x-120bpm` (derivation, required) | 10/12 exact, 83.3%, pc 100% | **11/12, 91.7%**, pc 100% |
+| `power-chords-b-a-g-fsharp-b-a-g-e-140bpm` (room mic, held out) | 4/7 exact, 57.1%, pc 100% | **8/11, 72.7%**, pc 100% |
+
+The derivation fixture is the more interesting of the two. Its last `D` was
+being named `D5/A` — a power chord over the fifth — because the bass read as
+`A3` and the third never made it into the name. The estimate finds the `D`
+below it and the chord is named `D`. Two `G` strums stop being `G/D` for the
+same reason. That is the same octave error as the mic's, on a 120bpm fixture
+recorded direct, which is worth recording: the missing fundamental is not only
+a microphone's problem.
+
+On the mic take, `scripts/measure-chord-voicing.ts` now prints the bass
+alongside the activations. Across its sixteen strikes the bass pitch class went
+from 8 of 16 correct to 14 of 16, and where it is inferred it is reported at the
+grid frequency (`123.5Hz` exactly) rather than at a measured peak, because there
+is no peak to measure:
+
+```
+        before                       after
+  p1    bass=F#@184.3Hz              bass=B @123.5Hz
+  p5    bass=D @149.7Hz              bass=G @98.0Hz
+  p9    bass=F#@183.0Hz              bass=B @123.5Hz
+  p11   bass=D#@159.4Hz              bass=A @110.0Hz
+  p15   bass=E @164.8Hz              bass=E @82.4Hz
+```
+
+`p14` still reads `D` under a `G5` and `p16` still reads `B` under an `E5`;
+in both the fifth's own fundamental is present and the root's series does not
+clear the bar.
+
+`scripts/measure-downstream-ledger.ts --all` is unchanged in every cell: 515
+detections, 35 MISSED, the same cause for each. The bass change costs no
+detections.
+
+### Also measured in this pass, and NOT kept
+
+**Seeding cancellation with the estimate.** The obvious next step, and the one
+the previous entry predicted: record the inferred fundamental as a detected
+note and let it cancel its own partials, so the `D#5` that turns `B5` into a
+triad is spent against the `B2` it belongs to. It does exactly that — the mic
+take's `p1` voicing becomes `B2 F#3`, matching the direct input, and `p1` is
+named `B5` instead of `B`. It also costs a label on the derivation set, which
+decides it: `chords-a-bm`'s last `D` loses its third and is named `D5`, 11/12
+-> 10/12. On the held-out takes it was a wash (mic power chords 8/11 either
+way: `p1` gained, `p13` lost to `Gsus2`), so there was nothing to weigh against
+the derivation-set regression. Reverted; the estimate changes the bass reading
+and nothing else. The chord matcher already takes the bass as evidence, and
+that turns out to be enough to move the labels.
+
+**Searching only up to 125Hz.** The rolloff a speaker and a room impose is a
+low-frequency phenomenon, so the search was tried bounded at `B2` rather than at
+the existing 200Hz bass ceiling. It loses the derivation-set corrections above
+(`chords-a-bm` back to 10/12) and gains nothing. Bounds of 150Hz and 200Hz give
+identical results on all seventeen fixtures, so the existing
+`BASS_MAX_FREQUENCY_HZ` is reused rather than a new constant introduced.
+
+### What this does not fix
+
+The amp-sim power-chord take is untouched at 11/14: its fundamentals are all
+present (`n=1` is 0.714 there, against 0.726 direct), so there is nothing to
+infer, and its three missed labels are `rejected: chord-not-sharp` in the
+ledger — a segmentation cause, not a naming one. The mic take remains an
+informational FAIL at 72.7% against an 80% bar, with `p14` and `p16` above
+still misnaming and two labels named as triads.

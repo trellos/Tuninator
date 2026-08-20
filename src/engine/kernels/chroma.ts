@@ -20,7 +20,10 @@
  *      as a note. A plain fold cannot do this, and on a strummed guitar it turns
  *      every power chord into a ninth.
  *   5. The surviving fundamentals are folded to 12 pitch classes, normalised to
- *      max = 1. The bass is read separately, off the uncancelled peaks.
+ *      max = 1. The bass is read separately, off the uncancelled peaks — or,
+ *      where a speaker and a room have taken the bottom string's fundamental
+ *      away entirely, off the spacing of the partials above it
+ *      (`missing-fundamental.ts`).
  *
  * CONTRACT FILE — signatures fixed; implementation owned by the chord
  * workstream. Depends on `RealFFT` and `hannWindow` from `./fft.js`.
@@ -29,6 +32,7 @@
  */
 
 import { RealFFT, hannWindow } from "./fft.js";
+import { estimateMissingFundamental } from "./missing-fundamental.js";
 
 export type ChromaOptions = {
   sampleRate: number;
@@ -333,9 +337,19 @@ export class ChromaAnalyzer {
     // The bass is read off the untouched peaks, before cancellation eats them.
     this.resetWorkingWeights();
     const bassGrid = this.findBass();
+    // ...and where there is no peak to read, off the spacing of the ones above
+    // it. A speaker and a room take the bottom string's fundamental away; the
+    // rest of its series is still there and still names it.
+    const missingGrid = this.findMissingFundamental(bassGrid);
+
     let bassFrequencyHz: number | null = null;
     let bassPitchClass: number | null = null;
-    if (bassGrid >= 0) {
+    if (missingGrid >= 0) {
+      // No measured frequency: the whole point is that the peak is absent, so
+      // the grid position is the only honest answer.
+      bassFrequencyHz = this.candidateHz[missingGrid]!;
+      bassPitchClass = (((GRID_MIN_MIDI + missingGrid) % 12) + 12) % 12;
+    } else if (bassGrid >= 0) {
       const gridHz = this.candidateHz[bassGrid]!;
       const own = this.strongestPartialNear(gridHz);
       // Report what was measured, but name the note from the grid: below ~150Hz
@@ -524,6 +538,46 @@ export class ChromaAnalyzer {
       this.cancel(this.candidateHz[bestIndex]!);
     }
     return found;
+  }
+
+  /**
+   * The lowest note the spacing of the partials implies, when its own
+   * fundamental is not in the recording — or -1, which is the normal answer.
+   *
+   * Delegated to `missing-fundamental.ts`, which carries the reasoning and the
+   * guard against the octave-below fiction. Two conditions are imposed here:
+   * the estimate is only used when it is *lower* than the bass that was read
+   * directly (otherwise the peaks won and should have), and the search stops at
+   * the top of the bass range, because above it the fundamental is present and
+   * there is nothing to infer.
+   *
+   * It changes the bass reading and nothing else. Seeding cancellation with the
+   * estimate as well — so that the partials of the note nobody could see stop
+   * being spent on notes nobody played — was built and measured, and it costs a
+   * label on the derivation set: it strips the third off `chords-a-bm`'s last
+   * `D` while gaining nothing there. See `docs/DETECTION-FINDINGS.md`.
+   *
+   * Cost is sixteen candidates against a binary search each, on a lane that
+   * already runs a fifty-three-semitone cancellation loop per hop.
+   */
+  private findMissingFundamental(bassGrid: number): number {
+    const estimate = estimateMissingFundamental(
+      {
+        hz: this.peakHz,
+        weight: this.workingWeight,
+        count: this.peakCount,
+        presenceThreshold: this.presenceThreshold,
+        binHz: this.binHz,
+        maxFrequencyHz: this.maxFrequencyHz,
+      },
+      Math.min(GRID_MAX_MIDI, Math.floor(12 * Math.log2(BASS_MAX_FREQUENCY_HZ / A4_HZ)) + A4_MIDI)
+    );
+    if (estimate === null) return -1;
+
+    const grid = estimate.midi - GRID_MIN_MIDI;
+    if (grid < 0 || grid >= this.gridSize) return -1;
+    if (bassGrid >= 0 && grid >= bassGrid) return -1;
+    return grid;
   }
 
   /**

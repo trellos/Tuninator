@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { DEFAULT_ENGINE_CONFIG } from "../src/engine/config.js";
 import { SpectralAnalyzer } from "../src/engine/deep/spectral.js";
 import { MultiPitchAnalyzer } from "../src/engine/deep/multi-pitch.js";
-import { nameToMidi } from "../src/engine/kernels/notes.js";
+import { nameToMidi, PITCH_CLASSES } from "../src/engine/kernels/notes.js";
 import { type LabeledEvent } from "../src/offline/matcher.js";
 import { downmixToMono, readWav } from "../src/offline/wav.js";
 import { decodeFixtures } from "./decode-fixtures.js";
@@ -47,11 +47,19 @@ for (const fixture of decodeFixtures({ quiet: true })) {
     const acts = mp.activations(ev);
     if (acts.length === 0) { console.log(`  ${l.id.padEnd(4)} ${String(l.label).padEnd(6)} (no activations)`); continue; }
     const bass = Math.min(...acts.map((a) => a.midi));
+    // The bass the chroma kernel reports, which is not always the lowest
+    // activation: where the fundamental is missing from the recording it is
+    // inferred from the spacing of the partials instead.
+    const bassPc =
+      ev.bassPitchClass === null ? "--" : PITCH_CLASSES[ev.bassPitchClass];
+    const bassHz = ev.bassFrequencyHz === null ? "" : `@${ev.bassFrequencyHz.toFixed(1)}Hz`;
     const desc = acts
       .slice()
       .sort((a, b) => a.midi - b.midi)
       .map((a) => `${a.pitchClass}${a.octave}(+${a.midi - bass},${((a.midi - pc) % 12 + 12) % 12}deg,s=${a.salience.toFixed(2)})`)
       .join(" ");
-    console.log(`  ${l.id.padEnd(4)} ${String(l.label).padEnd(6)} ${desc}`);
+    console.log(
+      `  ${l.id.padEnd(4)} ${String(l.label).padEnd(6)} bass=${String(bassPc).padEnd(2)}${bassHz.padEnd(9)} ${desc}`
+    );
   }
 }
