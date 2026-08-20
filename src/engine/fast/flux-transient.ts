@@ -55,12 +55,20 @@ export class FluxTransientDetector implements ITransientDetector {
   constructor(sampleRate: number, config: EngineConfig, hopSamples: number) {
     this.config = config;
     this.windowSize = config.transient.fluxFftSize;
+    // The kernel counts hops; how long a hop is belongs to whoever schedules
+    // them. `fluxReferenceMs` is the span the reference is meant to remember.
+    const hopMs = (hopSamples / sampleRate) * 1000;
+    const referenceFrames = Math.max(
+      1,
+      Math.round(config.transient.fluxReferenceMs / Math.max(hopMs, 1e-6))
+    );
     this.flux = new OnsetDetector({
       sampleRate,
       fftSize: config.transient.fluxFftSize,
       minIntervalMs: config.transient.minIntervalMs,
       medianWindow: config.transient.fluxMedianWindow,
       sensitivity: config.transient.fluxSensitivity,
+      referenceFrames,
     });
     this.band = new OnsetDetector({
       sampleRate,
@@ -71,6 +79,7 @@ export class FluxTransientDetector implements ITransientDetector {
       bandLoHz: config.transient.attackBandLoHz,
       bandHiHz: config.transient.attackBandHiHz,
       floorFactor: config.transient.attackBandFloorFactor,
+      referenceFrames,
     });
     this.baselineFrames = Math.max(
       1,
@@ -121,12 +130,17 @@ export class FluxTransientDetector implements ITransientDetector {
     this.rmsHistory.push(shortRms);
     if (this.rmsHistory.length > this.baselineFrames * 2) this.rmsHistory.shift();
 
-    const fluxResult = this.flux.process(spectralWindow, at);
+    // Each detector is told the gate its own output is judged against, so its
+    // dead time is only ever spent on an onset this lane could have used.
+    const fluxResult = this.flux.process(spectralWindow, at, shortRms >= gate);
     // Runs unconditionally, and unconditionally decides nothing: the band is a
     // witness the region lane corroborates against, never a reason to act.
-    const bandResult = this.band.process(spectralWindow, at);
-    this.lastBandOnset =
-      bandResult.isOnset && shortRms >= gate * BAND_GATE_FRACTION;
+    const bandResult = this.band.process(
+      spectralWindow,
+      at,
+      shortRms >= gate * BAND_GATE_FRACTION
+    );
+    this.lastBandOnset = bandResult.isOnset;
     // Normalised by the frame's own level, so the same figure means the same
     // thing in a loud passage and a quiet one.
     let energy = 0;
@@ -136,10 +150,12 @@ export class FluxTransientDetector implements ITransientDetector {
     }
     const windowRms = Math.sqrt(energy / spectralWindow.length);
     const sharpness = fluxResult.flux / Math.max(windowRms, 1e-9);
+    const heldSharpness = fluxResult.heldFlux / Math.max(windowRms, 1e-9);
     // Against the kernel's own adaptive threshold, which is a running median of
     // this signal's recent flux: "sharper than this signal usually is" rather
     // than "sharp" in units that a microphone or an amp sim can move.
     const fluxRatio = fluxResult.flux / Math.max(fluxResult.threshold, 1e-12);
+    const heldFluxRatio = fluxResult.heldFlux / Math.max(fluxResult.heldThreshold, 1e-12);
 
     const audible = shortRms >= gate;
     const envelope = audible && riseRatio >= t.envelopeRiseRatio;
@@ -166,6 +182,8 @@ export class FluxTransientDetector implements ITransientDetector {
       riseRatio,
       sharpness,
       fluxRatio,
+      heldSharpness,
+      heldFluxRatio,
       strength,
     };
   }

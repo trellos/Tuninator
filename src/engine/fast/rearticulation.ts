@@ -26,6 +26,15 @@ import type { AttackEvidence, FastFrame, IRearticulationDetector } from "../cont
 /**
  * Is this transient sharp enough to carry a re-articulation on its own?
  *
+ * Read against the flux kernel's LONG memory, deliberately. This test exists
+ * to admit a muted upstrum over a chord that is still ringing and to refuse
+ * that chord's own sustain, and the question that separates those two is "has
+ * anything been added since the chord was struck" — not "did the spectrum move
+ * since three hops ago", which a compressed chord's sustain answers yes to
+ * every hop of its life. The short reading is what lets the detector SEE a
+ * quiet arrival at all; this one is what decides whether a chord was struck
+ * again. See `AttackEvidence.heldSharpness`.
+ *
  * Two readings of the same flux, and both have to agree. `sharpness` divides it
  * by the frame's RMS, which is level-independent but not path-independent: an
  * amp sim's compression holds the level flat while the spectrum keeps churning,
@@ -39,7 +48,9 @@ import type { AttackEvidence, FastFrame, IRearticulationDetector } from "../cont
  * whose adaptive threshold has collapsed re-articulates on nothing.
  */
 function sharpEnough(attack: AttackEvidence, t: EngineConfig["transient"]): boolean {
-  return attack.sharpness >= t.restrumSharpness && attack.fluxRatio >= t.restrumFluxRatio;
+  return (
+    attack.heldSharpness >= t.restrumSharpness && attack.heldFluxRatio >= t.restrumFluxRatio
+  );
 }
 
 export class RearticulationDetector implements IRearticulationDetector {
@@ -133,7 +144,10 @@ export class RearticulationDetector implements IRearticulationDetector {
       // the note is dying faster than its own fit expected and the transient is
       // the string, not the pick. See `transient.ringOutDecayFloor`.
       if (decayExcess < t.ringOutDecayFloor) return false;
-      return sharpEnough(attack, t);
+      return (
+        attack.heldSharpness >= t.restrumSharpness &&
+        attack.heldFluxRatio >= t.ringOutFluxRatio
+      );
     }
 
     // With no usable fit the weaker witnesses are the right ones. A monophonic

@@ -29,6 +29,14 @@ import type { AttackEvidence, FastFrame } from "../../src/engine/contracts.js";
 
 const detector = new RearticulationDetector(DEFAULT_ENGINE_CONFIG);
 
+/**
+ * The measured vectors below are readings against the flux kernel's LONG
+ * memory — a decaying per-bin peak hold — which is the reading the re-strum
+ * tests are made against and the scale they were fitted on. The short-memory
+ * reading the same kernel reports alongside answers a different question and
+ * is not what these numbers describe, so it is left at the same values rather
+ * than invented: nothing in this file consults it.
+ */
 function attack(sharpness: number, fluxRatio: number, riseRatio = 1): AttackEvidence {
   return {
     at: 1000,
@@ -39,6 +47,8 @@ function attack(sharpness: number, fluxRatio: number, riseRatio = 1): AttackEvid
     riseRatio,
     sharpness,
     fluxRatio,
+    heldSharpness: sharpness,
+    heldFluxRatio: fluxRatio,
     strength: 0.8,
   };
 }

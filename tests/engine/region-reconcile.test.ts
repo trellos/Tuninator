@@ -82,6 +82,8 @@ function frame(
             riseRatio: 3,
             sharpness: 0.6,
             fluxRatio: 2,
+            heldSharpness: 0.6,
+            heldFluxRatio: 2,
             strength: 0.9,
           }
         : null,

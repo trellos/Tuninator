@@ -401,7 +401,16 @@ describe("OnsetDetector band limiting", () => {
     return fired;
   }
 
-  it("hears a quiet pick over a loud drone that the broadband flux misses", () => {
+  const bandWitness = (): OnsetDetector =>
+    new OnsetDetector({ ...options, bandLoHz: 1000, bandHiHz: 6000, floorFactor: 0.08 });
+
+  it("hears a quiet pick over a loud drone, broadband, at the level a pick lands", () => {
+    // This case used to be the broadband detector's ceiling and the whole
+    // reason for the band witness: a click carrying 2% of the drone's
+    // amplitude could not clear a bar set as a fraction of the frame's own
+    // magnitude, because the drone set that bar. Judged band by band the
+    // drone is loud only where it lives, and the click is audible everywhere
+    // else, so the broadband detector hears it too.
     const signal = droneWithQuietClick({
       droneHz: 110,
       clickMs: 500,
@@ -409,16 +418,23 @@ describe("OnsetDetector band limiting", () => {
       durationMs: 900,
     });
 
-    const broadband = new OnsetDetector(options);
-    const band = new OnsetDetector({
-      ...options,
-      bandLoHz: 1000,
-      bandHiHz: 6000,
-      floorFactor: 0.08,
+    expect(firedNear(new OnsetDetector(options), signal, 500)).toBe(true);
+    expect(firedNear(bandWitness(), signal, 500)).toBe(true);
+  });
+
+  it("still reaches further down than the broadband detector", () => {
+    // The band witness has not been made redundant: restricted to where the
+    // pick lives and the drone's partials do not, it hears a click six times
+    // quieter than the one above, which broadband does not.
+    const signal = droneWithQuietClick({
+      droneHz: 110,
+      clickMs: 500,
+      clickAmp: 0.002,
+      durationMs: 900,
     });
 
-    expect(firedNear(broadband, signal, 500)).toBe(false);
-    expect(firedNear(band, signal, 500)).toBe(true);
+    expect(firedNear(new OnsetDetector(options), signal, 500)).toBe(false);
+    expect(firedNear(bandWitness(), signal, 500)).toBe(true);
   });
 
   it("rejects a band whose edges are inverted rather than silently reordering", () => {

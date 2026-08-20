@@ -85,6 +85,22 @@ export type AttackEvidence = {
    * path in the corpus.
    */
   fluxRatio: number;
+  /**
+   * The same two readings taken against the flux kernel's LONG memory — a
+   * decaying per-bin peak hold rather than the last few hops.
+   *
+   * `sharpness` and `fluxRatio` above answer "how much arrived just now",
+   * which is the reading that can see a quiet pick land on a ringing note.
+   * These answer "how much of this frame is new since the note began", which
+   * is the reading that can see that a compressed chord's sustain, however
+   * busy it looks hop to hop, has added nothing since it was struck. A
+   * detector that has only the first chops ringing chords; one that has only
+   * the second cannot hear an upstroke. The tracker uses each where it
+   * belongs.
+   */
+  heldSharpness: number;
+  /** See `heldSharpness`. */
+  heldFluxRatio: number;
   /** 0..1 blend of both witnesses. */
   strength: number;
 };

@@ -107,6 +107,18 @@ export type EngineConfig = {
     fluxSensitivity: number;
     fluxMedianWindow: number;
     /**
+     * How far back the flux reference spectrum remembers, ms.
+     *
+     * The kernel holds the per-bin MAXIMUM over this span and compares the
+     * arriving frame against it, so unresolved low harmonics beating against
+     * each other read as nothing new while a pick still reads as an arrival.
+     * Long enough to cover that beating, short enough that a note ringing for
+     * a second does not set the bar its own re-pick has to clear — which is
+     * exactly what the decaying peak hold this replaced did. See
+     * `REFERENCE_FRAMES` in `kernels/onset.ts` for the derivation.
+     */
+    fluxReferenceMs: number;
+    /**
      * Lower edge of a SECOND, band-limited flux the detector runs alongside the
      * broadband one, Hz.
      *
@@ -250,6 +262,22 @@ export type EngineConfig = {
      * came out as two.
      */
     ringOutDecayFloor: number;
+    /**
+     * How far above the flux the signal has been showing since the note began
+     * a *single* ringing note's re-pick must stand.
+     *
+     * The companion of `restrumFluxRatio` for the monophonic ring-out branch,
+     * and separate from it because the two cases are not alike. Over a chord
+     * the escape exists for a muted upstrum, which answers its downstrum inside
+     * a beat and arrives while six strings are still moving. Over one note
+     * ringing out past `ringOutMs` the same escape is the last thing standing
+     * between a long decay and a Note per twitch, and with the onset detector
+     * now able to see a quiet arrival over a sounding note there are far more
+     * twitches to say no to. Derived on the five 120bpm fixtures: `clean-lead`
+     * sheds a false positive inside a held quarter note at 1.8 and another at
+     * 2.4, and its labelled re-picks are untouched at both.
+     */
+    ringOutFluxRatio: number;
     /**
      * Transient sharpness a *pitch-changing* attack needs before it starts a
      * new Note.
@@ -641,20 +669,22 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     fluxFftSize: 1024,
     fluxSensitivity: 1.35,
     fluxMedianWindow: 17,
+    fluxReferenceMs: 32,
     attackBandLoHz: 1000,
     attackBandHiHz: 6000,
     attackBandFloorFactor: 0.08,
-    minIntervalMs: 70,
+    minIntervalMs: 60,
     envelopeWindowMs: 20,
     envelopeBaselineMs: 80,
     envelopeRiseRatio: 1.35,
     rearticulationRiseRatio: 1.2,
-    rearticulationSharpness: 0.65,
+    rearticulationSharpness: 1.1,
     restrumSharpness: 0.9,
     restrumFluxRatio: 1.3,
     ringOutMs: 250,
     ringOutDecayFloor: 0.6,
-    newPitchSharpness: 0.3,
+    ringOutFluxRatio: 2.4,
+    newPitchSharpness: 0.6,
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,
     mutedRestrumWindowMs: 800,
