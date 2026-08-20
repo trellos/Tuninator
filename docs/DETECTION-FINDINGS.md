@@ -1577,3 +1577,66 @@ transient path.
 | change | result |
 |---|---|
 | `HELD_CORROBORATION` 0.45 -> 0.35, the other end of the band this document derives it in | the five 120bpm fixtures are bit-identical, exactly as recorded, and the held-out takes go +5 detections, -2 missed, **+3 false positives**. It does not reach `s28` — the engine's hop grid puts no hop where the mirror's does — so it is a change with no derivation-set evidence for it, fitted to held-out data, that loses more Notes than it finds. Not kept |
+
+## The mute is the cleanest witness in the corpus, and nothing reads it
+
+Three labels on the amped power-chord take are lost to
+`rearticulation.ts: polyphonic && !sharpEnough()`. Every decision on that take,
+hit and miss, with the bars at `restrumSharpness` 0.9 and `restrumFluxRatio`
+1.3:
+
+```
+  MISS p2  held=0.73 hfr=0.77   rise=1.04 env=1.07
+  MISS p8  held=0.84 hfr=0.75   rise=1.10 env=1.02
+  MISS p16 held=1.60 hfr=1.17   rise=1.07 env=1.01
+  ok   p4  held=2.28 hfr=1.50   rise=1.01 env=1.00
+  ok   p10 held=2.87 hfr=2.10   rise=0.92 env=1.01
+  ok   p12 held=1.71 hfr=1.61   rise=0.95 env=1.02
+  ok   p14 held=1.65 hfr=1.42   rise=1.13 env=1.09
+```
+
+The accepted and rejected strokes are the same event played the same way — a
+muted restrum, energy flat or down on every one of them, which is why only
+sharpness can carry the case. The amp sim's compression has taken the flux
+down on three of them and there is no other witness in the branch. Lowering
+either bar to reach `p16` at 1.17 leaves `p2` and `p8` at 0.77 and 0.75, and
+the sweeps that end at this frontier are recorded above.
+
+**The evidence is not in the strike. It is in the mute that follows it.**
+`scripts/measure-mute-witness.ts` measures the energy 40ms after each stroke
+against the lowest over the following third of a second:
+
+```
+  path        odd strikes (answered)   even strikes (muted)   gap
+  amp sim     0.885 - 1.061            0.243 - 0.641          0.641 | 0.885
+  room mic    0.932 - 1.498            0.229 - 0.538          0.538 | 0.932
+  direct      0.455 - 0.604            0.037 - 0.140          0.140 | 0.455
+```
+
+Forty-eight strokes, forty-eight on the correct side, on all three signal
+paths. Nothing else measured in this project separates that cleanly, and the
+reason is physical rather than statistical: a mute REMOVES energy, and removal
+is not something a compressor, a room, or a decaying string can imitate. Every
+other witness tried here asks whether energy ARRIVED, which is the question the
+recording path distorts most.
+
+Read within a file only. The direct take's ANSWERED strokes sit at 0.455, below
+the amp take's MUTED ones at 0.641, so a bar chosen across paths measures the
+recording — the trap this document records several previous versions of.
+
+**What to do with it.** A mute is the end of something somebody played. A
+transient that the re-articulation detector rejected for being too weak,
+followed by a mute, is a rejection the mute contradicts. The contradiction
+arrives after the decision, which is exactly the case the deep lane and the
+structural-revision protocol exist for: hold the rejected candidate, and when
+the chord is stopped rather than left to ring, make the boundary retroactively
+with a backdated start.
+
+The guard that keeps this from inventing notes is that a rejected TRANSIENT has
+to exist: a single strike left to ring and then stopped has nothing to
+resurrect. The mute's own hand noise must not be the candidate either, which
+the gap makes checkable — the measured collapse is 160ms or more after the
+transient it would corroborate.
+
+Not yet implemented. Recorded with its measurement so the implementation starts
+from evidence rather than from the idea.
