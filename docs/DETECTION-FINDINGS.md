@@ -2017,6 +2017,14 @@ oracle gives the target to build against: at the true rate the gate must reach
 lead rather than a change — the estimator is not built here, and the numbers
 above are what it has to be measured against when it is.
 
+> **Corrected below.** That count is of merge CANDIDATES, not of Notes anybody
+> saw. Most of them never cleared the announcement bar and were never
+> detections, so removing them changes no reported figure. The oracle's true
+> ceiling is eight emitted Notes, not sixty-four. See "The causal rate
+> estimator: built, measured, reverted".
+
+
+
 ## The missing fundamental: the bass read from the spacing, not from the lowest peak
 
 The room mic has 5% of the `123.5Hz` fundamental the direct input has, and no
@@ -2243,6 +2251,11 @@ On the wider candidate set the oracle rate holds everything it held before: 66
 Notes removed at 0.40 with no label touched, 70 at the best label-safe
 threshold, and still flat under rate errors from half the true value to a
 quarter above it.
+
+> **Corrected below.** "66 Notes removed" counts merge candidates; only eight of
+> them were ever emitted. And the flatness under rate error is flatness in the
+> COST — the benefit collapses to nothing by 0.7. See "The causal rate
+> estimator: built, measured, reverted".
 
 ## Does any COMBINATION of the witnesses separate accept from reject? No
 
@@ -2607,3 +2620,132 @@ false accepts below 94 of 102. The script prints both columns every run. The
 estimator stays in the tree because it costs nothing, decides nothing, and its
 floors are the honest starting point for anyone who wants to try; the invariants
 it has to hold are in `tests/engine/rig-profile.test.ts`.
+
+### The causal rate estimator: built, measured, reverted — and the oracle target was overstated
+
+The oracle result above justified building a causal estimator. One was built and
+measured end to end, and it does not pay. The interesting part is not that it
+fell short but WHERE, because the shortfall is not where the earlier sweep said
+to look — and correcting that sweep changes what the oracle was ever promising.
+
+#### What was built
+
+`PaceEstimator`: a ring of the last eight inter-onset gaps, read at a quantile,
+gaps under `transient.minIntervalMs` dropped, the reading discarded after 1.5s
+of silence and null until three gaps are in hand. Null is a real answer meaning
+"no opinion", and the consumer leaves the boundary alone.
+
+Two choices were derived on the five 120bpm fixtures only, against an oracle
+rate read off their labels:
+
+- **Fed once per attack BURST, not per transient.** Feeding every accepted
+  transient reads a passage as several times faster than it is played, because
+  one pick crossing six strings is one stroke with several transients. Measured,
+  that took the amped triplet take to a third of its true rate. The burst
+  grouping already in `note-tracker.ts` is the tracker's own answer to "how many
+  strokes was that", so the pace is read off the same decision. This alone moved
+  whole-corpus extras 107 -> 102.
+- **Quantile 0.25**, chosen by the asymmetry rather than by best fit. Reading a
+  passage as SLOWER than it is merges Notes somebody played; reading it as
+  faster only declines merges. So the quantity to control is the upper tail:
+
+  | quantile | p10 | median | p90 |
+  |---|---|---|---|
+  | 0.15 | 0.37 | 0.64 | 0.84 |
+  | 0.25 | 0.39 | 0.64 | **1.12** |
+  | 0.35 | 0.40 | 0.72 | 1.27 |
+  | 0.50 | 0.48 | 0.80 | 1.60 |
+
+#### The spread is not sampling noise
+
+Widening the ring from 8 to 12, 16 and 24 leaves the distribution unchanged —
+p10 0.39/0.40, median 0.64, p90 1.12 at every size. There is nothing to average
+away. These takes deliberately mix quarters, eighths, triplets and sixteenths,
+so "the local stroke length" is genuinely multi-valued, and on top of that the
+estimator's onsets are denser than the labelled events. That is the circularity
+the pace refutation named, now confirmed for the ratio form: the rate estimate
+is corrupted by the over-segmentation it exists to correct, and the onsets it
+would have to ignore are exactly the ones the gate exists to remove.
+
+#### The estimator lands inside the flat band and still underperforms
+
+Against the oracle, at the 101 candidates the gate is offered:
+
+```
+  causal / oracle rate:  p10 0.32   median 0.82   p90 1.01
+                         below 0.5: 18 of 83      above 1.25: 4 of 83
+```
+
+A median of 0.82 is squarely inside the 0.5-to-1.25 region the earlier sweep
+called flat. It still achieves almost nothing:
+
+| | merges | of which were EMITTED Notes |
+|---|---|---|
+| oracle rate | 69 | **13** |
+| causal rate | 48 | **2** |
+
+#### Why: the earlier sweep measured the wrong quantity
+
+**The "64 of 75 spurious Notes removed" figure reported earlier is wrong, and
+this is the correction.** That sweep counted merge CANDIDATES and measured cost
+in missed labels. Most of what this gate merges never cleared the announcement
+bar and was never a detection at all, so removing it changes nothing anybody can
+see. Re-run with an emitted column, the oracle's true ceiling is **8 emitted
+Notes at 0.40**, not 64 — and the flat band is flat only in the cost:
+
+| rate multiplied by | missed | merges | of which emitted |
+|---|---|---|---|
+| 0.50 | 32 (+0) | 37 | **0** |
+| 0.70 | 32 (+0) | 51 | 1 |
+| 0.80 | 32 (+0) | 59 | 5 |
+| 0.90 | 32 (+0) | 64 | 8 |
+| 1.00 | 32 (+0) | 66 | 8 |
+| 1.25 | 32 (+0) | 74 | 15 |
+| 1.50 | 33 (+1) | 82 | 17 |
+
+The cost is flat from 0.5 to 1.25. The BENEFIT collapses to nothing by 0.7. The
+usable band is not 0.5-1.25 but roughly 0.9-1.25, and the causal median of 0.82
+sits below it.
+
+The mechanism is a threshold, not a slope. The gate removes something visible
+only when `0.40 x rate` clears the announcement bar, which runs 55-90ms — so
+only when the rate reads 138ms or more. The oracle's median rate at these
+candidates is 154ms, giving a gate of 61ms, just above the bar. The causal
+median is 120ms, giving 48ms, just below it. An 0.82 factor is harmless
+everywhere except across that edge, and that edge is where the whole benefit
+lives.
+
+#### End to end, and why it was reverted
+
+Whole corpus, burst feed at quantile 0.25:
+
+| | split | extras | strays | detections | missed |
+|---|---|---|---|---|---|
+| before | 99 / 459 | 107 | 10 | 519 | 32 |
+| after | 98 / 459 | 106 | 10 | 517 | 32 |
+
+The totals hide a shuffle rather than a gain. Per fixture, the amped triplet
+take goes 27 extras to 25 with no label cost, the room-mic triplet take goes 15
+extras to 16 AND 2 missed to 3, and the room-mic sixteenths take goes 9 missed
+to 8. One label lost and one gained on different takes, one net Note removed.
+The label lost is the upper tail doing what the asymmetry predicted: four of the
+83 readings exceed 1.25 even at quantile 0.25.
+
+Reverted. Not because it is a loss — it is a wash — but because a wash that
+conceals a per-fixture regression is not worth a subsystem.
+
+#### What this says about the idea
+
+The ratio itself is not refuted: with a rate it can trust, the gate removes
+Notes at zero label cost where every duration bar costs four. What is refuted is
+reaching it from a windowed estimate built on the detector's own onsets, for two
+compounding reasons — the estimate is biased low by roughly a fifth and cannot
+be de-biased without pushing its upper tail into the region that costs labels,
+and the benefit it is reaching for turns out to be about eight Notes rather than
+sixty-four.
+
+That is a small enough prize that the next attempt should be judged against it
+honestly. A rate not derived from the onsets being corrected would be the
+interesting version; so would dropping the rate entirely and comparing a
+fragment against its two immediate neighbours, which is the only per-passage
+quantity in this that does not require knowing the subdivision.

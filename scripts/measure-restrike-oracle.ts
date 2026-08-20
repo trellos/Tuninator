@@ -166,13 +166,22 @@ function collect(): Take[] {
  * span grows, and the matcher then re-pairs around it. That second-order effect
  * is where the label loss came from last time, so counting candidates is not
  * enough — the matcher has to be re-run over the merged list.
+ *
+ * Two counts, and the difference between them matters more than either. Most of
+ * what this gate merges never reached the announcement bar and so was never a
+ * detection at all: removing it changes nothing anybody can see. `removed`
+ * counts every merge; `removedEmitted` counts only the ones that were emitted,
+ * and that is the number the fragmentation figure moves by. An earlier version
+ * of this script reported only the first, which overstated what the gate can
+ * buy by a factor of five.
  */
-function endToEnd(takes: readonly Take[], gate: (c: Candidate) => boolean): {
-  missed: number;
-  removed: number;
-} {
+function endToEnd(
+  takes: readonly Take[],
+  gate: (c: Candidate) => boolean
+): { missed: number; removed: number; removedEmitted: number } {
   let missed = 0;
   let removed = 0;
+  let removedEmitted = 0;
   for (const take of takes) {
     const merged = new Map<string, number>();
     const drop = new Set<string>();
@@ -180,6 +189,7 @@ function endToEnd(takes: readonly Take[], gate: (c: Candidate) => boolean): {
       if (!gate(c)) continue;
       drop.add(c.id);
       removed++;
+      if (take.detections.some((d) => d.id === c.id)) removedEmitted++;
       const fragment = take.detections.find((d) => d.id === c.id);
       const end = fragment?.endedAt ?? null;
       if (end !== null) merged.set(c.previousId, Math.max(merged.get(c.previousId) ?? 0, end));
@@ -192,7 +202,7 @@ function endToEnd(takes: readonly Take[], gate: (c: Candidate) => boolean): {
       });
     missed += matchEvents(take.labels, after).missed.length;
   }
-  return { missed, removed };
+  return { missed, removed, removedEmitted };
 }
 
 function span(values: number[]): string {
@@ -280,7 +290,8 @@ function main(): void {
     const delta = r.missed - base.missed;
     console.log(
       `    ${name.padEnd(37)} missed ${String(r.missed).padStart(3)}` +
-        ` (${delta >= 0 ? "+" : ""}${delta})  removed ${r.removed}`
+        ` (${delta >= 0 ? "+" : ""}${delta})  merged ${String(r.removed).padStart(3)}` +
+        `  of which emitted ${r.removedEmitted}`
     );
   };
   report("sounded < 80 (the reverted rule)", (c) => c.soundedMs < 80);
@@ -303,7 +314,8 @@ function main(): void {
     const delta = r.missed - base.missed;
     console.log(
       `    rate x ${factor.toFixed(2)}   missed ${String(r.missed).padStart(3)}` +
-        ` (${delta >= 0 ? "+" : ""}${delta})  removed ${r.removed}`
+        ` (${delta >= 0 ? "+" : ""}${delta})  merged ${String(r.removed).padStart(3)}` +
+        `  of which emitted ${r.removedEmitted}`
     );
   }
   console.log("");
