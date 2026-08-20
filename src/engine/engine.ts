@@ -161,6 +161,7 @@ export class RecognitionEngine {
         toSample: this.ring.writeIndex,
         notBefore: Number.NEGATIVE_INFINITY,
         holdNoteIds: region.noteIds,
+        attackSamples: this.tracker.transientSamplesIn(region.fromSample, this.ring.writeIndex),
       });
     }
     // Deep work still in flight describes audio that has already been heard, so
@@ -222,6 +223,7 @@ export class RecognitionEngine {
       toSample: frame.sampleIndex,
       notBefore: frame.at + deep.latencyMs,
       holdNoteIds: region.noteIds,
+      attackSamples: this.tracker.transientSamplesIn(region.fromSample, frame.sampleIndex),
     });
   }
 

@@ -146,12 +146,24 @@ export type EngineConfig = {
      * as a note decays the adaptive median falls with it, so ordinary sustain
      * ripple keeps clearing the threshold and halves the note. A real re-pick
      * puts energy back into the string, which is what this tests for.
+     *
+     * Re-derived once the region lane began acting on transients the fast lane
+     * had recorded and refused. Swept downward on the five 120bpm fixtures
+     * until one of them moves: they are bit-identical at 1.2 and `clean-lead`
+     * sheds three false positives at 1.15. This is the most sensitive setting
+     * that material supports, which is the right side to err on — a played
+     * note that never appears cannot be recovered later, an extra one can.
      */
     rearticulationRiseRatio: number;
     /**
      * Transient sharpness (flux / RMS) at which an attack counts as a genuine
      * re-articulation even though it is no louder than what it interrupts.
      * A muted upstrum over a ringing chord is exactly that case.
+     *
+     * Swept downward on the five 120bpm fixtures until one of them moves: they
+     * are bit-identical at 0.65 and `spicy-chords` sheds two false positives at
+     * 0.60. Four of the picks the sixteenths run loses on a direct input sit
+     * between 0.60 and 0.68 on this figure.
      */
     rearticulationSharpness: number;
     /**
@@ -264,6 +276,23 @@ export type EngineConfig = {
     /** Hops of pitch history the glide test looks back over. */
     glideWindowHops: number;
     /**
+     * Envelope rise at which an attack is a re-articulation even mid-glide.
+     *
+     * The glide guard exists because bending sweeps the spectrum, which fires
+     * both attack witnesses repeatedly inside what is musically one note. But a
+     * bend does not put energy into a string, it redistributes what is already
+     * there, so no amount of bending lifts the envelope severalfold. Measured
+     * on the sixteenths run, picks rejected purely for arriving mid-glide carry
+     * rise ratios up to 13.5 — a figure a bend cannot produce.
+     *
+     * Derived on the 120bpm fixtures by sweeping downward until one of them
+     * moves. They are bit-identical from 1.6 upwards; at 1.5 `clean-lead`
+     * sheds a false positive and at 1.25 it sheds five, which is the bend the
+     * guard exists for coming apart again. 1.6 is the most sensitive setting
+     * this material will support.
+     */
+    glideRiseOverride: number;
+    /**
      * How long one articulation lasts, ms — the window in which a Note that has
      * just been ended by an attack is still the *same* thing being played.
      *
@@ -284,7 +313,14 @@ export type EngineConfig = {
   };
 
   tracking: {
-    /** How long a Note must sound before it is announced. */
+    /**
+     * How long a Note must sound before it is announced.
+     *
+     * Swept on the five 120bpm fixtures: bit-identical at 55, and at 50
+     * `clean-lead` gains three false positives. The findings already record the
+     * other side — above 60 the sixteenth run starts losing real notes — so the
+     * usable band is narrow and this sits at the sensitive end of it.
+     */
     minStableMs: number;
     /**
      * How long a Note with no measurable pitch must sound before it is
@@ -484,6 +520,18 @@ export type EngineConfig = {
      */
     segmentRiseRatio: number;
     /**
+     * Envelope rise a boundary needs when the fast lane saw a transient there.
+     *
+     * `segmentRiseRatio` is the bar for a rise with no other witness, so it
+     * carries the whole burden of proof on its own. When the fast lane already
+     * saw energy arrive at an exact moment, the only remaining question is
+     * whether anything followed it, and the bar is correspondingly lower — it
+     * has to be, because the region's windows are 85ms long and a quiet
+     * upstroke 107ms after its downstroke shares most of its window with the
+     * tail of that downstroke, so its full rise is never visible in one window.
+     */
+    segmentAttackRiseRatio: number;
+    /**
      * Let the deep lane absorb Notes the fast lane over-segmented.
      *
      * Splitting is additive — it can only turn one detection into two — while
@@ -558,8 +606,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     envelopeWindowMs: 20,
     envelopeBaselineMs: 80,
     envelopeRiseRatio: 1.35,
-    rearticulationRiseRatio: 1.25,
-    rearticulationSharpness: 0.7,
+    rearticulationRiseRatio: 1.2,
+    rearticulationSharpness: 0.65,
     restrumSharpness: 0.9,
     restrumFluxRatio: 1.3,
     ringOutMs: 250,
@@ -570,10 +618,11 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     mutedRestrumWindowMs: 800,
     glideMinCents: 25,
     glideWindowHops: 5,
+    glideRiseOverride: 1.6,
     articulationMs: 90,
   },
   tracking: {
-    minStableMs: 60,
+    minStableMs: 55,
     minUnpitchedStableMs: 90,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
@@ -609,6 +658,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minSegmentMs: 90,
     segmentHoldWindows: 2,
     segmentRiseRatio: 2.0,
+    segmentAttackRiseRatio: 1.25,
     regionMerge: false,
     regionCorrectPitch: false,
   },

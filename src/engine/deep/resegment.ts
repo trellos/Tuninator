@@ -44,6 +44,26 @@ export type SegmentOptions = {
   holdWindows: number;
   /** Envelope rise over the segment's trough that counts as a re-articulation. */
   riseRatio: number;
+  /**
+   * Where the fast lane saw energy arrive, in absolute samples, ascending.
+   *
+   * Every transient it saw, including the ones it was not allowed to act on —
+   * a quiet upstroke 107ms after the downstroke it answers is exactly that.
+   * These are proposals, not boundaries: each one still has to be answered by
+   * the envelope staying up afterwards.
+   */
+  attackSamples: readonly number[];
+  /**
+   * Envelope rise a boundary needs when the fast lane already saw a transient
+   * at that exact moment.
+   *
+   * Lower than `riseRatio`, and it has to be: the rise is the only witness
+   * `riseRatio` has, so it carries the whole burden of proof, while here the
+   * question is only whether anything followed the pick. An 85ms window cannot
+   * show a quiet upstroke's full rise anyway — it still holds most of the
+   * downstroke that came 107ms before it.
+   */
+  attackRiseRatio: number;
   /** Samples in one analysis window, for placing a boundary in time. */
   windowSize: number;
   /** Samples per millisecond, so this file never touches a clock. */
@@ -191,6 +211,9 @@ export function segmentRegion(
   const { minSegmentMs, holdWindows, riseRatio, windowSize, samplesPerMs } = options;
   const minSegmentSamples = minSegmentMs * samplesPerMs;
   const segments: RegionSegment[] = [];
+  const attacks = options.attackSamples;
+  /** Next unconsidered proposal from the fast lane. */
+  let attackIndex = 0;
 
   let segmentFrom = 0;
   let segmentStartSample = boundarySample(windows[0] as RegionWindowReading, windowSize);
@@ -200,7 +223,20 @@ export function segmentRegion(
 
   for (let i = 1; i < windows.length; i++) {
     const window = windows[i] as RegionWindowReading;
-    const at = boundarySample(window, windowSize);
+    let at = boundarySample(window, windowSize);
+
+    // A transient the fast lane saw between the previous window and this one.
+    // The pick localises it; this window says whether anything followed it.
+    let proposed: number | null = null;
+    while (
+      attackIndex < attacks.length &&
+      (attacks[attackIndex] as number) <= boundarySample(windows[i - 1] as RegionWindowReading, windowSize)
+    ) {
+      attackIndex++;
+    }
+    if (attackIndex < attacks.length && (attacks[attackIndex] as number) <= at) {
+      proposed = attacks[attackIndex] as number;
+    }
 
     const windowClass = pitchClassOf(window.dominantMidi);
     let kind: RegionSegment["boundary"] | null = null;
@@ -213,6 +249,16 @@ export function segmentRegion(
       kind = "pitchChange";
     } else if (trough > 0 && window.rms >= trough * riseRatio) {
       kind = "energyRise";
+    } else if (
+      proposed !== null &&
+      trough > 0 &&
+      window.rms >= trough * options.attackRiseRatio
+    ) {
+      // The boundary is the transient, not the window that noticed it. That is
+      // the whole reason for asking the fast lane: 21ms of hop localises a
+      // boundary to 21ms at best, and a pick localises to one sample.
+      kind = "attack";
+      at = proposed;
     }
 
     // A boundary that would carve out less than one note's worth of audio is

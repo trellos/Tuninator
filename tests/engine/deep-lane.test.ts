@@ -206,7 +206,7 @@ describe("region re-segmentation", () => {
       fromSample: 0,
       toSample: window * 2,
       notBefore: 0,
-      holdNoteIds: ["n1"],
+      holdNoteIds: ["n1"], attackSamples: [],
     });
 
     const drain = deep.drain(1e9, ring);
@@ -222,7 +222,7 @@ describe("region re-segmentation", () => {
     const window = DEFAULT_ENGINE_CONFIG.harmony.fftSize;
     ring.write(chord([60], window * 2));
     deep.requestRegion({
-      fromSample: 0, toSample: window * 2, notBefore: 0, holdNoteIds: ["n1"],
+      fromSample: 0, toSample: window * 2, notBefore: 0, holdNoteIds: ["n1"], attackSamples: [],
     });
     const segmentation = deep.drain(1e9, ring).segmentations[0];
     expect(segmentation).toBeDefined();
@@ -236,7 +236,7 @@ describe("region re-segmentation", () => {
     ring.write(chord([69], window * 3));
     ring.write(chord([74], window * 3));
     deep.requestRegion({
-      fromSample: 0, toSample: window * 6, notBefore: 0, holdNoteIds: [],
+      fromSample: 0, toSample: window * 6, notBefore: 0, holdNoteIds: [], attackSamples: [],
     });
 
     const segments = deep.drain(1e9, ring).segmentations[0]?.segments ?? [];
@@ -252,7 +252,7 @@ describe("region re-segmentation", () => {
     const { deep, ring } = lane();
     ring.write(chord([60], 8192));
     deep.requestRegion({
-      fromSample: 0, toSample: 8192, notBefore: 500, holdNoteIds: ["n1", "n2"],
+      fromSample: 0, toSample: 8192, notBefore: 500, holdNoteIds: ["n1", "n2"], attackSamples: [],
     });
     expect([...deep.busyNoteIds()].sort()).toEqual(["n1", "n2"]);
     deep.drain(500, ring);
@@ -266,10 +266,10 @@ describe("region re-segmentation", () => {
     const { deep, ring } = lane();
     ring.write(chord([60], 16384));
     deep.requestRegion({
-      fromSample: 0, toSample: 8192, notBefore: 0, holdNoteIds: ["n1"],
+      fromSample: 0, toSample: 8192, notBefore: 0, holdNoteIds: ["n1"], attackSamples: [],
     });
     deep.requestRegion({
-      fromSample: 0, toSample: 16384, notBefore: 0, holdNoteIds: ["n2"],
+      fromSample: 0, toSample: 16384, notBefore: 0, holdNoteIds: ["n2"], attackSamples: [],
     });
     expect([...deep.busyNoteIds()].sort()).toEqual(["n1", "n2"]);
     const drain = deep.drain(1e9, ring);
@@ -285,7 +285,7 @@ describe("region re-segmentation", () => {
     const ring = new AudioRing(16384);
     ring.write(chord([60], 16384));
     deep.requestRegion({
-      fromSample: 0, toSample: 16384, notBefore: 0, holdNoteIds: ["n1"],
+      fromSample: 0, toSample: 16384, notBefore: 0, holdNoteIds: ["n1"], attackSamples: [],
     });
     ring.write(chord([62], 16384));
 
@@ -303,7 +303,7 @@ describe("region re-segmentation", () => {
     const { deep, ring } = lane();
     ring.write(chord([60], 8192));
     deep.requestRegion({
-      fromSample: 0, toSample: 1024, notBefore: 0, holdNoteIds: ["n1"],
+      fromSample: 0, toSample: 1024, notBefore: 0, holdNoteIds: ["n1"], attackSamples: [],
     });
     const drain = deep.drain(1e9, ring);
     expect(drain.segmentations).toHaveLength(0);
@@ -320,7 +320,7 @@ describe("region re-segmentation", () => {
     const ring = new AudioRing(SAMPLE_RATE * 4);
     ring.write(chord([60], SAMPLE_RATE * 2));
     deep.requestRegion({
-      fromSample: 0, toSample: SAMPLE_RATE * 2, notBefore: 0, holdNoteIds: [],
+      fromSample: 0, toSample: SAMPLE_RATE * 2, notBefore: 0, holdNoteIds: [], attackSamples: [],
     });
     const segmentation = deep.drain(1e9, ring).segmentations[0];
     expect(segmentation?.windowCount).toBeLessThanOrEqual(8);
@@ -334,7 +334,7 @@ describe("region re-segmentation", () => {
       ring.write(chord([69], 16384));
       ring.write(chord([74], 16384));
       deep.requestRegion({
-        fromSample: 0, toSample: 32768, notBefore: 0, holdNoteIds: [],
+        fromSample: 0, toSample: 32768, notBefore: 0, holdNoteIds: [], attackSamples: [],
       });
       return JSON.stringify(deep.drain(1e9, ring).segmentations);
     };
@@ -345,7 +345,7 @@ describe("region re-segmentation", () => {
     const { deep, ring } = lane();
     ring.write(chord([60], 8192));
     deep.requestRegion({
-      fromSample: 0, toSample: 8192, notBefore: 0, holdNoteIds: ["n1"],
+      fromSample: 0, toSample: 8192, notBefore: 0, holdNoteIds: ["n1"], attackSamples: [],
     });
     expect(deep.hasPendingRegion).toBe(true);
     deep.clear();

@@ -79,6 +79,15 @@ export type DeepRegionRequest = {
   notBefore: SourceTimeMs;
   /** Notes held open until the region is ruled on. Not part of the answer. */
   holdNoteIds: readonly string[];
+  /**
+   * Every transient the fast lane saw inside the span, ascending.
+   *
+   * Not an instruction and not a partition — the fast lane's own segmentation
+   * is exactly what the region is being asked to rule on. These are the moments
+   * energy demonstrably arrived, which is the one thing an 85ms window cannot
+   * establish for itself.
+   */
+  attackSamples: readonly number[];
 };
 
 /** A region the deep lane could not analyse, so its Notes can be let go. */
@@ -187,11 +196,13 @@ export class DeepLane {
       return;
     }
     const held = new Set<string>([...previous.holdNoteIds, ...request.holdNoteIds]);
+    const attacks = new Set<number>([...previous.attackSamples, ...request.attackSamples]);
     this.pendingRegion = {
       fromSample: Math.min(previous.fromSample, request.fromSample),
       toSample: Math.max(previous.toSample, request.toSample),
       notBefore: Math.min(previous.notBefore, request.notBefore),
       holdNoteIds: [...held],
+      attackSamples: [...attacks].sort((a, b) => a - b),
     };
   }
 
@@ -365,6 +376,8 @@ export class DeepLane {
       minSegmentMs: deep.minSegmentMs,
       holdWindows: deep.segmentHoldWindows,
       riseRatio: deep.segmentRiseRatio,
+      attackSamples: request.attackSamples,
+      attackRiseRatio: deep.segmentAttackRiseRatio,
       windowSize,
       samplesPerMs,
     });

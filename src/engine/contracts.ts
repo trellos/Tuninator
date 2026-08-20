@@ -351,8 +351,17 @@ export type RegionSegment = {
   windows: number;
   /** How sure the analyser is that this is one event. */
   confidence: number;
-  /** Why the segment began. The first segment of a region is "regionStart". */
-  boundary: "regionStart" | "pitchChange" | "energyRise";
+  /**
+   * Why the segment began. The first segment of a region is "regionStart".
+   *
+   * `"attack"` is the one the fast lane proposed and the region agreed to: the
+   * fast lane saw energy arrive at an exact moment and was not allowed to act
+   * on it, and the region confirmed that the envelope stayed up afterwards.
+   * Neither witness is sufficient alone — a transient localises perfectly and
+   * cannot tell a pick from a decay's ripple, an 85ms window sees the envelope
+   * rise and cannot say within 40ms where — and together they are unambiguous.
+   */
+  boundary: "regionStart" | "pitchChange" | "energyRise" | "attack";
 };
 
 /** What the deep lane concluded about a whole region of audio. */

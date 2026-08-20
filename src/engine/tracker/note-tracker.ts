@@ -194,6 +194,8 @@ export class NoteTracker {
    * that arrival was a new event — and neither witness alone is enough.
    */
   private readonly attackTimes: SourceTimeMs[] = [];
+  /** The same transients as sample indices, so the deep lane can address them. */
+  private readonly attackSamples: number[] = [];
   /**
    * How polyphonic the audio has been lately, independent of any one Note.
    *
@@ -234,6 +236,7 @@ export class NoteTracker {
     this.lastAttack = null;
     this.attackBurstStart = null;
     this.attackTimes.length = 0;
+    this.attackSamples.length = 0;
     this.lastEndedAt = null;
     this.contextHarmonic = 0;
     this.contextUpdatedAt = null;
@@ -298,8 +301,14 @@ export class NoteTracker {
     if (frame.attack !== null || frame.bandOnset) {
       const at = frame.attack?.at ?? frame.at;
       const last = this.attackTimes[this.attackTimes.length - 1];
-      if (last === undefined || at > last) this.attackTimes.push(at);
-      if (this.attackTimes.length > ATTACK_HISTORY) this.attackTimes.shift();
+      if (last === undefined || at > last) {
+        this.attackTimes.push(at);
+        this.attackSamples.push(frame.attack?.atSample ?? frame.sampleIndex);
+      }
+      if (this.attackTimes.length > ATTACK_HISTORY) {
+        this.attackTimes.shift();
+        this.attackSamples.shift();
+      }
     }
 
     if (frame.attack !== null && !frame.gated) {
@@ -946,6 +955,22 @@ export class NoteTracker {
   }
 
   /**
+   * Every transient recorded inside `[fromSample, toSample)`, ascending.
+   *
+   * The half of the answer the region lane cannot produce for itself. Its own
+   * windows are 85ms long at a hop of 21ms, which localises a boundary to about
+   * a fifth of a 140bpm sixteenth; a pick localises to one sample. What the
+   * region adds is whether anything followed the pick.
+   */
+  transientSamplesIn(fromSample: number, toSample: number): number[] {
+    const out: number[] = [];
+    for (const sample of this.attackSamples) {
+      if (sample >= fromSample && sample < toSample) out.push(sample);
+    }
+    return out;
+  }
+
+  /**
    * Let a region's Notes go without a verdict.
    *
    * Called when the audio aged out of the ring before the deep lane reached it.
@@ -1019,34 +1044,68 @@ export class NoteTracker {
 
 
 
-    const owned = new Map<string, RegionSegment[]>();
-    const orphans: RegionSegment[] = [];
-    for (const segment of segments) {
+    // The region has decided how many events its span contains and where each
+    // of them began. Everything from here reconciles the Notes onto THAT
+    // decision rather than proposing boundaries into the partition the fast
+    // lane already made — which is the difference between a lane that can
+    // improve a partition and one that owns it. A boundary landing 61ms before
+    // the end of the Note in front of it used to become a split candidate too
+    // short to survive, and the event it described was lost; now the Note in
+    // front of it ends there.
+    const min = this.config.deep.minSegmentMs;
+    /** Every segment after the first is a claim that an event began there. */
+    const claims: RegionSegment[] = [];
+    for (let i = 1; i < segments.length; i++) claims.push(segments[i] as RegionSegment);
+
+    /** Split points inside a Note, by Note id, in time order. */
+    const inside = new Map<string, RegionSegment[]>();
+
+    for (const segment of claims) {
       const owner = ownerOf(open, segment.from);
       if (owner === null) {
+        // Inside a Note that has named its own chord, the witnesses that find
+        // a fresh note in a line fire all through one strum. Nothing to do.
         if (coveredBy(named, segment.from)) continue;
-        orphans.push(segment);
+        this.insertFromSegment(segment, candidates, out);
         continue;
       }
-      const list = owned.get(owner.id);
-      if (list === undefined) owned.set(owner.id, [segment]);
-      else list.push(segment);
+      if (!this.isRealBoundary(owner, segment)) continue;
+      const from = Math.max(segment.from, owner.startTime);
+      // The fast lane already put a boundary here; the region agrees with it.
+      if (from - owner.startTime < min) continue;
+
+      const end = owner.endTime as SourceTimeMs;
+      if (end - from >= min) {
+        const list = inside.get(owner.id);
+        if (list === undefined) inside.set(owner.id, [segment]);
+        else list.push(segment);
+        continue;
+      }
+
+      // The boundary lands in the last few tens of milliseconds of the Note
+      // that owns it. That Note is not two events — it is one event whose end
+      // the fast lane placed a little late, followed by an event it never
+      // opened at all. Truncate it and carve out the successor.
+      // Only a boundary the fast lane witnessed as a transient may shorten a
+      // Note the recognizer already stood behind. A leader that changes sixty
+      // milliseconds before a Note ends is the analysis window straddling the
+      // boundary that is already there — the next note bleeding into the
+      // window — and truncating on that costs three false positives on the
+      // 140bpm lead take while recovering nothing anywhere. A transient is
+      // localised to the sample, and it is the only witness that can be.
+      if (segment.boundary !== "attack") continue;
+      this.carveAfter(owner, segment, candidates, out);
     }
 
-    for (const record of open) {
-      const mine = (owned.get(record.id) ?? []).filter(
-        (segment, index) => index === 0 || this.isRealBoundary(record, segment)
-      );
-      if (mine.length < 2) continue;
-      this.splitAtSegments(record, mine, out);
+    for (const [id, mine] of inside) {
+      const record = open.find((candidate) => candidate.id === id);
+      if (record === undefined || record.merged) continue;
+      const owned = ownerOfSegment(segments, record.startTime);
+      this.splitAtSegments(record, [owned ?? mine[0] as RegionSegment, ...mine], out);
     }
 
     if (this.config.deep.regionMerge) {
       for (const segment of segments) this.mergeWithinSegment(segment, open, out);
-    }
-
-    for (const segment of orphans) {
-      this.insertFromSegment(segment, candidates, out);
     }
 
     // Corrections last, and applied to Notes that have already been let go as
@@ -1293,6 +1352,66 @@ export class NoteTracker {
     // The revision lands before the Notes it announces, so a consumer learns
     // that the Note it is holding has become several BEFORE the first of them
     // arrives.
+    for (const emission of announcements) out.push(emission);
+  }
+
+  /**
+   * End a Note where the region says the next event began, and carve that event
+   * out of the audio behind it.
+   *
+   * The case this exists for is the one the region lane could see and could not
+   * act on. Over the sixteenths run the region reads a leader of B4 -> A4 -> B4
+   * and the A4 stretch is an event the fast lane emitted nothing at all for —
+   * but the boundary estimate lands a few tens of milliseconds before the Note
+   * in front of it stopped, so that Note *owned* the boundary and it became a
+   * split candidate far too short to survive. Owning the partition means the
+   * answer is the other way round: the region decided an event began there, so
+   * the Note in front of it ends there and the event is carved out of what
+   * follows.
+   *
+   * The successor is bounded by the next thing anybody emitted, not by the
+   * segment alone. Letting a carved event run the region's full length was
+   * measured and is worse — it overlaps the Note after it and reads as a false
+   * positive.
+   */
+  private carveAfter(
+    record: NoteRecord,
+    segment: RegionSegment,
+    neighbours: readonly NoteRecord[],
+    out: TrackerEmission[]
+  ): void {
+    const min = this.config.deep.minSegmentMs;
+    const from = Math.max(segment.from, record.startTime) as SourceTimeMs;
+    // Both sides have to survive: a truncation that leaves a stub behind is the
+    // analysis window sliding across a boundary that is already there.
+    if (from - record.startTime < min) return;
+
+    let to = segment.to;
+    for (const neighbour of [...neighbours, ...this.notes.values()]) {
+      if (neighbour === record || neighbour.merged) continue;
+      if (neighbour.startTime > from) to = Math.min(to, neighbour.startTime) as SourceTimeMs;
+    }
+    if (to - from < min) return;
+
+    const announcements: TrackerEmission[] = [];
+    const successor = this.beginFromSegment(segment, from, to, record, announcements);
+    record.endTime = from;
+    record.deepStructural = true;
+
+    if (record.announced) {
+      const revisionNumber = record.bump("structuralRevision");
+      out.push({
+        type: "changed",
+        note: record.snapshot(),
+        change: {
+          type: "structuralRevision",
+          at: from,
+          revisionNumber,
+          relation: "split",
+          relatedNoteIds: [successor.id],
+        },
+      });
+    }
     for (const emission of announcements) out.push(emission);
   }
 

@@ -60,10 +60,17 @@ export class RearticulationDetector implements IRearticulationDetector {
     /** How long the sounding Note has already lasted, ms. */
     soundedMs: number
   ): boolean {
-    if (gliding) return false;
     if (frame.gated) return false;
 
     const t = this.config.transient;
+
+    // Mid-glide, only an unmistakable arrival of energy counts. Bending sweeps
+    // the spectrum and fires both attack witnesses repeatedly inside one note,
+    // which is why the glide guard exists at all — but a bend redistributes
+    // the energy already in the string rather than adding any, so it cannot
+    // lift the envelope severalfold. A pick landing during a bend, or during
+    // the pitch wobble a fast run produces, can and does.
+    if (gliding && attack.riseRatio < t.glideRiseOverride) return false;
 
     // A new pitch arriving on an attack is strong evidence: the player fretted
     // somewhere else and picked. It still has to be an attack rather than the

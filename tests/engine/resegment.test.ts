@@ -23,6 +23,8 @@ const OPTIONS: SegmentOptions = {
   minSegmentMs: 90,
   holdWindows: 2,
   riseRatio: 2,
+  attackSamples: [],
+  attackRiseRatio: 1.25,
   windowSize: WINDOW,
   samplesPerMs: SAMPLES_PER_MS,
 };
@@ -258,5 +260,73 @@ describe("determinism", () => {
       { pitches: [69], rms: 0.01 },
     ]);
     expect(segmentRegion(sequence, OPTIONS)[0]?.dominantMidi).toBe(69);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Quiet alternate picking: the fast lane proposes, the region disposes         */
+/* -------------------------------------------------------------------------- */
+
+describe("transients the fast lane recorded and could not act on", () => {
+  /**
+   * A run of same-pitch sixteenths at 140bpm — 107ms apart — where every other
+   * stroke is a quiet upstroke. Nothing in the spectrum separates the strokes:
+   * they are the same note, so the leader never moves, and an 85ms window
+   * straddling a 107ms boundary never sees the envelope double. The only thing
+   * that says a second stroke happened is that a transient landed there.
+   */
+  function alternatePicking(count: number): {
+    sequence: RegionWindowReading[];
+    attacks: number[];
+  } {
+    const strokeMs = 107;
+    const entries: { pitches: readonly number[]; rms: number }[] = [];
+    const attacks: number[] = [];
+    const totalWindows = Math.ceil((count * strokeMs * SAMPLES_PER_MS) / HOP);
+    for (let i = 0; i < totalWindows; i++) {
+      const at = ((WINDOW + i * HOP - WINDOW) / SAMPLES_PER_MS);
+      const stroke = Math.floor(at / strokeMs);
+      const into = at - stroke * strokeMs;
+      // Loud downstroke, quieter upstroke, each decaying across its own
+      // stroke. The rises this produces — 1.38 into an upstroke and 1.91 into
+      // the downstroke that answers it — both sit below `riseRatio`, so the
+      // envelope alone finds nothing here. That is the point: at 107ms an 85ms
+      // window still holds most of the stroke before the one it is about.
+      const peak = stroke % 2 === 0 ? 1 : 0.85;
+      entries.push({ pitches: [64], rms: peak * Math.exp(-into / 220) });
+    }
+    for (let s = 1; s < count; s++) attacks.push(Math.round(s * strokeMs * SAMPLES_PER_MS));
+    return { sequence: windows(entries), attacks };
+  }
+
+  it("finds a stroke the spectrum cannot see, at the sample the pick landed", () => {
+    const { sequence, attacks } = alternatePicking(6);
+    const without = segmentRegion(sequence, OPTIONS);
+    const withAttacks = segmentRegion(sequence, { ...OPTIONS, attackSamples: attacks });
+
+    expect(without.length).toBeLessThan(withAttacks.length);
+    // Every boundary the attacks bought sits exactly on a transient, not on the
+    // start of whichever 85ms window happened to notice it.
+    for (const segment of withAttacks.slice(1)) {
+      if (segment.boundary !== "attack") continue;
+      expect(attacks).toContain(segment.fromSample);
+    }
+  });
+
+  it("does not invent a boundary where no transient was recorded", () => {
+    const { sequence } = alternatePicking(6);
+    const segments = segmentRegion(sequence, { ...OPTIONS, attackSamples: [] });
+    expect(segments.every((segment) => segment.boundary !== "attack")).toBe(true);
+  });
+
+  it("still requires the envelope to answer the pick", () => {
+    // The same transients over an envelope that only ever falls: a pick that
+    // put nothing into the string is a pick that landed on a muted string, or
+    // a transient that was never a pick at all.
+    const entries = [];
+    for (let i = 0; i < 30; i++) entries.push({ pitches: [64], rms: Math.exp(-i / 8) });
+    const attacks = [1, 2, 3, 4].map((s) => Math.round(s * 107 * SAMPLES_PER_MS));
+    const segments = segmentRegion(windows(entries), { ...OPTIONS, attackSamples: attacks });
+    expect(segments.every((segment) => segment.boundary !== "attack")).toBe(true);
   });
 });
