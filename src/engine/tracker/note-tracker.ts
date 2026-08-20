@@ -584,11 +584,14 @@ export class NoteTracker {
     // and keeps its own pitch evidence. Boundary from the stub, name from the
     // frames that describe what was played.
     //
-    // Bounded by the consequence rather than by a duration: only while the
-    // Note the step would end is too young to be ANNOUNCED. A Note that has
-    // earned its announcement is an event somebody played and a step across it
-    // is a real boundary — the clean-lead sixteenth run says so directly, and
-    // it loses a labelled note at every longer bound tried.
+    // Bounded by the consequence rather than by a duration: while the Note the
+    // step would end is too young to be ANNOUNCED, or while every hop it has
+    // ever seen said the same indefensible thing. The first is the ordinary
+    // case; the second is the one a duration cannot reach, because a stub in a
+    // slower passage can sit five hops on its predecessor's pitch and clear
+    // the announcement bar without ever having described itself. Widening the
+    // duration to reach it instead costs `clean-lead` a labelled note, which
+    // is what pins this bound from the other side.
     //
     // And the reading it is leaving has to be one it cannot defend: see
     // `wearsPredecessorsName`. Without that the lead takes gain three split
@@ -596,8 +599,11 @@ export class NoteTracker {
     // sometimes a real note that simply arrived quietly.
     const pitchStillArriving =
       active !== null &&
-      active.soundedMs < active.announceThresholdMs &&
       pitchChange !== null &&
+      (active.soundedMs < active.announceThresholdMs ||
+        // Every vote it holds is for the reading it is now leaving: this Note
+        // has accumulated no evidence of its own at all.
+        active.dominantMidi() === describeFrequency(pitchChange.fromHz).midi) &&
       this.cannotDefendReading(active, pitchChange.fromHz, pitchChange.toHz);
 
     if (
