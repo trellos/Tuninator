@@ -1681,3 +1681,35 @@ The mechanism is understood exactly and the fix is not a rule in the
 interpreter. It is upstream: the mic take's bass is detected an octave and a
 fifth high, and every downstream error follows from that one miss. Recorded
 here so the next attempt starts at the octave error rather than at the third.
+
+### The mic has 5% of the fundamental, and that is not a detector defect
+
+Following the octave error above to its source. Measuring the partial series of
+the same `B5` strike on all three signal paths, each normalised within its own
+file (`scripts/measure-missing-fundamental.ts`):
+
+```
+  partial of B2   direct   amp sim   room mic
+  n=1  123.5Hz     0.726    0.714    0.037    <- the fundamental
+  n=2  246.9Hz     0.439    0.641    0.619
+  n=3  370.4Hz     1.000    1.000    1.000
+  n=4  493.9Hz     0.775    0.601    0.384
+  n=6  740.8Hz     0.437    0.611    0.966
+```
+
+The room mic has 5% of the fundamental the direct input has. Nothing in the
+recognizer did that: a guitar speaker and a room rolled 123Hz off before the
+signal reached the file, and the multi-pitch analyser is correctly reporting
+what is present. Chasing this at the interpreter, at cancellation, or at the
+bass picker would all be chasing audio that is not in the recording.
+
+The remaining partials still determine the note — 247, 370, 494 and 741 are the
+2nd, 3rd, 4th and 6th of 123.5, and no other fundamental in the guitar's range
+explains all four. So the answer is the classic missing-fundamental inference:
+estimate the bass from the SPACING of the partials rather than from the lowest
+peak. Harmonic-product-spectrum or subharmonic summation is the standard shape.
+
+This is worth more than the three labels it currently costs. Microphone input
+is the case this library exists for, and a mic is exactly where the fundamental
+goes missing — the same rolloff will move every bass-dependent answer on any
+mic'd rig: inversions, slash names, and the register in `detectedPitches`.
