@@ -2911,3 +2911,191 @@ or fewer — that is, anywhere strictly inside the baseline on both axes — fro
 profile pooled over a chain. `measure-rig-ceiling.ts` prints both columns, per
 chain and per fixture, and the control row must reproduce 32 / 99 / 107 / 10
 exactly or the run means nothing.
+
+## Segmenting a region JOINTLY, by dynamic programming: measured, refuted
+
+`scripts/measure-dp-segmentation.ts`. No engine change; the script wraps
+`DeepLane.analyzeRegion` for the length of a run and restores it, so the
+recognizer under measurement is the one the library ships.
+
+Four directions closed before this one failed the same way: the accept/reject
+decision at a single candidate boundary is not locally separable. The natural
+next move is to stop deciding one boundary at a time — choose the whole
+partition of a region at once, minimising
+
+```
+  sum over segments of (how badly this span is explained as ONE note)
+    + price * (number of cuts)
+```
+
+by optimal partitioning: `best[x] = min over y of best[y] + cost(y,x) + price`,
+back-pointers, O(N^2), the provable optimum rather than a greedy sweep. The
+mechanism it is meant to exploit, on the dominant defect: a 190ms played event
+that comes out as a ~130ms Note plus a ~70ms same-pitch tail. Both halves are
+the same pitch and the tail is the head's own decay continuing, so the cut buys
+almost no reduction in misfit and cannot pay its price; a genuine re-pick cannot
+be explained by any single monotonic decay, so cutting at its envelope trough
+buys a lot and pays easily. One rule, opposite answers, no threshold on flux.
+
+### What was measured, over which regions, with which streams
+
+253 regions — every region the deep lane actually analysed across the seventeen
+takes, none refused, none too sparse — covering 454 of the 459 labels. The five
+labels outside every region are unreachable by any segmentation rule and are
+excluded from every row. 41.5 candidate boundary positions per region at
+`deep.regionHopSamples: 1024` = 21.3ms, 6,643 distinct span costs per region,
+7.9s of DP for a 22-price sweep over all 253 regions. Cost is not what makes
+this idea expensive.
+
+Three streams, each at the resolution where it is strong:
+
+```
+  envelope   fine RMS over the raw audio, 21ms window / 5.3ms hop
+  pitch      the fast lane's own per-hop YIN estimates, by pitch class
+  chroma     the 85ms deep readings
+```
+
+Per segment the misfit is `0.5 * decay-residual + 0.3 * pitch-instability +
+0.2 * chroma-instability`, each term in [0,1], multiplied by the segment's
+duration in seconds — so the price is one dimensionless constant in seconds of
+misfit per cut. The decay residual is fitted from the span's PEAK forward, the
+way `VoiceDecay` fits a Note, with a positive slope clamped flat; it is
+normalised by ln(2), so "off the fitted curve by a factor of two on average" is
+a fully unexplained span. `deep.minSegmentMs: 90` is deliberately not inherited
+— the fragments this has to judge are 67-70ms and a partition that cannot
+express them cannot be asked whether they are worth their price. The floor here
+is 45ms.
+
+Every row is scored by one rule: a segment start is a detection, a label is
+found when a detection lands within 70ms of its onset, an unmatched detection is
+an extra. The shipped recognizer's own Notes and the current greedy
+`segmentRegion()` go through that identical scorer over those identical regions,
+because a DP compared against a number produced a different way proves nothing.
+Under it the shipped recognizer reads 63 missed / 125 extras and the greedy
+region segmenter reads 71 / 611 — the segmenter over-proposes and the tracker
+discards most of it, which is why the greedy row is not comparable to 107.
+
+### The price curve — CEILING, price chosen fit-on-test on the whole corpus
+
+| price | MISSED | found | extras | segments |
+|---|---|---|---|---|
+| 0.001 | 35 | 419 | 1476 | 1895 |
+| 0.004 | 65 | 389 | 965 | 1354 |
+| 0.006 | 71 | 383 | 823 | 1206 |
+| 0.012 | 97 | 357 | 578 | 935 |
+| 0.026 | 135 | 319 | 391 | 710 |
+| 0.033 | 152 | 302 | 336 | 638 |
+| 0.053 | 185 | 269 | 256 | 525 |
+| 0.085 | 214 | 240 | 199 | 439 |
+| 0.135 | 223 | 231 | 151 | 382 |
+| 0.215 | 238 | 216 | 116 | 332 |
+| 0.340 | 250 | 204 | 84 | 288 |
+| 0.540 | 253 | 201 | 61 | 262 |
+
+No point on it is strictly inside 32 missed and 107 extras on both axes. It is
+not close, and the falsifier stated in advance is met. The curve is worse than
+its own like-for-like controls at every matched level: at 383 found the greedy
+rule spends 611 extras and the DP spends 823; the shipped recognizer reaches 391
+found for 125 extras, which the DP does not approach at any price. At the top of
+the range the DP has stopped cutting at all — 262 segments against 253 regions
+is nine cuts in the whole corpus — so nothing is hiding beyond the sweep.
+
+### Sensitivity to the cost function, and it does not rescue it
+
+Each variant at its own best price, and the fewest labels it can miss while
+holding extras under 107:
+
+| cost | MISSED | extras | fewest missed under 107 extras |
+|---|---|---|---|
+| envelope only | 231 | 130 | 241 |
+| pitch only | 135 | 196 | 249 |
+| chroma only | 135 | 268 | 234 |
+| envelope + pitch (.6/.4) | 138 | 360 | 250 |
+| equal thirds | 138 | 305 | 246 |
+| as chosen (.5/.3/.2) | 152 | 336 | 247 |
+
+The spread across weightings is large in extras and small in the thing that
+decides: no weighting gets under 234 missed labels at the baseline's extras
+count. The result is insensitive to the choice in the only direction that would
+have mattered.
+
+### The decisive number: the mechanism, asked directly
+
+The DP is not a better search — the partition it returns is optimal. Its whole
+claim is that the QUANTITY separates. That is measurable without any price at
+all: at every candidate boundary the greedy rule proposes, the misfit the cut
+buys against its two neighbouring boundaries,
+`cost(prev,next) - (cost(prev,here) + cost(here,next))`, split by whether a
+label is annotated within 70ms. 342 on-label candidates, 473 off-label.
+
+| cost | median on | median off | AUC |
+|---|---|---|---|
+| as chosen (.5/.3/.2) | 0.0198 | 0.0090 | 0.570 |
+| **envelope only** | 0.0132 | 0.0117 | **0.469** |
+| pitch only | 0.0224 | 0.0000 | 0.689 |
+| chroma only | 0.0184 | 0.0060 | 0.713 |
+
+The decay-residual term — the exact mechanism this direction rests on, the claim
+that a same-pitch tail is its own head's decay and a re-pick is not — is at
+chance. 0.469 over 815 candidates, computed from a 5.3ms envelope where time
+resolution cannot be the excuse. Pitch and chroma reach 0.689 and 0.713, which
+is the same band as the best single LOCAL witness already measured at 0.73 and
+no better than it. Weighting the at-chance term at 0.5 is why the chosen cost
+lands at 0.570, and that is a real finding about the cost rather than a slip:
+the term the hypothesis was built on is the one carrying no information.
+
+### Derivation and held out, reported anyway
+
+Price derived on the five 120bpm takes at `3*missed + extras`, then applied
+unchanged to the twelve 140bpm takes:
+
+| set | MISSED | found | extras | segments |
+|---|---|---|---|---|
+| derivation five, price 0.540 | 32 | 43 | 22 | 65 |
+| held-out twelve | 221 | 158 | 39 | 197 |
+| held-out, greedy control | 67 | 312 | 447 | 759 |
+| held-out, shipped Notes | 50 | 329 | 103 | 432 |
+
+The derived price is the top of the swept range, which is itself the answer: on
+the derivation takes the best thing this cost can do is never cut. Held out it
+then finds 158 of 379 reachable labels. There is no gap to report between a real
+gain and an apparent one, because there is no gain.
+
+Per signal chain, held out, DP at the derived price against the two controls:
+
+| chain | DP missed / extras | greedy | shipped |
+|---|---|---|---|
+| LP DI | 72 / 8 | 20 / 137 | 7 / 26 |
+| LP room mic | 73 / 20 | 22 / 140 | 23 / 36 |
+| LP amp sim | 76 / 11 | 25 / 170 | 20 / 41 |
+
+The failure is uniform across the three chains, to within four labels. It is not
+a rig effect and there is no path on which this works.
+
+### Verdict
+
+Joint segmentation by dynamic programming does not beat 32 missed / 107 extras,
+at its fit-on-test ceiling or anywhere else. The best point on the ceiling curve
+that holds extras under the baseline misses 234 labels where the recognizer
+misses 32.
+
+What is refuted is narrower than "global beats local", and worth stating
+precisely, because the DP itself is not the thing that failed. Optimal
+partitioning did exactly what it promises — the optimum is found, at 6,643 span
+costs and 7.9s for the whole corpus across 22 prices, so the search is neither
+approximate nor expensive. What failed is the cost. "How badly is this span
+explained as ONE note" was supposed to be the quantity that answers the
+same-pitch tail and the re-pick with one rule, and measured directly at the
+boundaries in question its envelope half is at chance, while its spectral halves
+reproduce the 0.73 the best single local witness already had. Making the
+decision global does not create information that the local witnesses did not
+have; it only spends it differently, and spending it in a partition is worse
+than the greedy rule's spending because a partition must commit to covering the
+whole region with segments while the tracker is free to discard proposals.
+
+Falsifiable, and cheaply: a per-span misfit whose cut gain separates on-label
+from off-label candidates above 0.80 AUC on the table above. Below that, no
+price exists that turns it into a segmentation, and the sweep is a waste of the
+run. `measure-dp-segmentation.ts --controls` must reproduce 63 / 125 for the
+shipped Notes and 71 / 611 for the greedy segmenter, or the regions being
+measured are not the ones the deep lane produces.
