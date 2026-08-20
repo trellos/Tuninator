@@ -24,11 +24,6 @@ import type { FastFrame, ITransientDetector, PitchEvidence } from "../contracts.
 import { SampleClock } from "../clock.js";
 import { AudioRing } from "../ring-buffer.js";
 import { peak as windowPeak, rms as windowRms } from "../kernels/yin.js";
-import {
-  BAND_COUNT,
-  PATCH_HOPS,
-  WhitenedBandPipeline,
-} from "../kernels/whitened-bands.js";
 import { FluxTransientDetector } from "./flux-transient.js";
 import { NoiseFloorTracker } from "./noise-floor.js";
 import { YinEstimator } from "./yin-estimator.js";
@@ -49,8 +44,6 @@ export class FastLane {
   private readonly rmsWindow: Float32Array;
 
   private readonly noiseFloor: NoiseFloorTracker;
-  /** See the constructor: the learned witness's whitened-band context. */
-  private readonly whitened: WhitenedBandPipeline;
 
   private samplesSinceHop = 0;
   private hop = 0;
@@ -74,17 +67,6 @@ export class FastLane {
     this.rmsWindow = new Float32Array(
       Math.max(1, clock.durationSamples(config.transient.envelopeWindowMs))
     );
-
-    // The learned witness's input. Fed EVERY hop from the first — not gated
-    // on warm-up like the transient detector — so its whitening state is a
-    // pure function of the hop grid, which is what lets the training pipeline
-    // compute bit-identical patches from the same audio offline.
-    const hopMs = (this.hopSamples / clock.sampleRate) * 1000;
-    this.whitened = new WhitenedBandPipeline(
-      clock.sampleRate,
-      config.transient.fluxFftSize,
-      Math.max(1, Math.round(config.transient.fluxReferenceMs / Math.max(hopMs, 1e-6)))
-    );
   }
 
   /** Samples of history the fast lane needs before it can produce a frame. */
@@ -98,7 +80,6 @@ export class FastLane {
     this.estimator.reset();
     this.transient.reset();
     this.noiseFloor.reset();
-    this.whitened.reset();
   }
 
   /**
@@ -143,23 +124,10 @@ export class FastLane {
     const at = this.clock.toMs(endSample);
 
     readEndingAt(ring, this.fluxWindow, endSample);
-    // Advance the whitened context BEFORE the attack is judged, so a snapshot
-    // taken on this hop ends at this hop.
-    this.whitened.push(this.fluxWindow);
     const attack = warmedUp
       ? this.transient.observe(this.fluxWindow, shortRms, at, endSample, gate)
       : null;
-    if (attack !== null) {
-      this.estimator.clearHistory();
-      const flux = this.whitened.whitenedFlux();
-      attack.whitened = {
-        patch: this.whitened.patch(new Float32Array(PATCH_HOPS * BAND_COUNT)),
-        wFlux: flux.wFlux,
-        wFluxNorm: flux.wFluxNorm,
-        wHeldFlux: flux.wHeldFlux,
-        wHeldNorm: flux.wHeldNorm,
-      };
-    }
+    if (attack !== null) this.estimator.clearHistory();
 
     let pitch: PitchEvidence = SILENT_PITCH;
     if (!gated && warmedUp) {

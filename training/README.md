@@ -66,8 +66,14 @@ bun training/train.ts --rows training/out/rows --corpus training/out/corpus \
     # are loaded with every 140bpm take FILTERED OUT AT LOAD and provide a
     # printed curve, nothing more
 
+bun training/score-falsifiers.ts --model training/out/model
+    # falsifiers 1-2, model frozen: the derivation bar is 0.73
+
 bun training/export-weights.ts --model training/out/model
-    # codegen: src/engine/kernels/onset-head-weights.ts + provenance JSON
+    # codegen: src/engine/kernels/onset-head-weights.ts + provenance JSON.
+    # ONLY for a model that passed its falsifiers — the 2026-08 run did not
+    # (0.7157 against the 0.73 bar; see docs/DETECTION-FINDINGS.md and
+    # DECISION-017), so nothing is currently exported or wired.
 ```
 
 Features per row: a 9-hop × 60-band causal patch of the adaptively whitened

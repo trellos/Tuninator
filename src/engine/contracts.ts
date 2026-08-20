@@ -103,24 +103,6 @@ export type AttackEvidence = {
   heldFluxRatio: number;
   /** 0..1 blend of both witnesses. */
   strength: number;
-  /**
-   * The adaptively whitened context of the hop this attack landed on, for the
-   * learned re-articulation witness: the causal log-band patch ending at this
-   * hop and the four whitened flux readings. See
-   * `kernels/whitened-bands.ts`. Absent on attacks fabricated by tests; the
-   * fast lane always attaches it.
-   */
-  whitened?: WhitenedAttackContext;
-};
-
-/** See `AttackEvidence.whitened`. */
-export type WhitenedAttackContext = {
-  /** `PATCH_HOPS x BAND_COUNT`, row-major, oldest hop first. */
-  patch: Float32Array;
-  wFlux: number;
-  wFluxNorm: number;
-  wHeldFlux: number;
-  wHeldNorm: number;
 };
 
 /** A pitch that has moved, and how. */
@@ -276,14 +258,6 @@ export interface IPitchChangeDetector {
 export type RearticulationVerdict = {
   accepted: boolean;
   reason: string;
-  /**
-   * The learned witness's score for this decision, when it was computed —
-   * a sigmoid probability. `null` when the witness is disabled, the attack
-   * carries no whitened context, or the cascade ended on a branch outside
-   * the witness's reach. Carried for the trace and the ledger; the boolean
-   * above is already fused.
-   */
-  learnedScore?: number | null;
 };
 
 export interface IRearticulationDetector {

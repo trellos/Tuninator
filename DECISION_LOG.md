@@ -7,6 +7,48 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-017]: Reject wiring the learned onset head; the external-data bet failed its ranking falsifier
+* **Date:** 2026-08-20
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** Under the DECISION-016 amendment, a 19,833-parameter
+  convolutional scorer was trained on 248,993 decision rows extracted by
+  running this engine over GuitarSet (six players, mic + pickup flavours,
+  three augmentation chains; EGDB unreachable under the environment's egress
+  policy), labelled by the exact target rule of the baseline separability
+  study, split grouped by player, early-stopped on external validation only.
+  Falsifier stated in advance: the frozen model must clear 0.73 AUC (best
+  existing single witness) on the derivation decision table, or stop.
+* **Decision:** The falsifier fired. Frozen reads on the derivation table:
+  0.7157 (full inputs; external val 0.8820), 0.6260 (patch + whitened flux),
+  0.6291 (patch only), against sharpness at 0.7281 on the same rows. All
+  derivation reads taken are reported in `docs/DETECTION-FINDINGS.md`;
+  variant selection read external validation only. Nothing is wired; the
+  runtime fusion machinery built for the win condition was removed again
+  (recoverable at bfce0ad); the engine is bit-identical to baseline and the
+  twelve 140bpm held-out takes were never read, so the once-only held-out
+  read remains unspent.
+* **Alternatives Considered:** Selecting the training epoch or variant by
+  derivation AUC (epoch 12 of the full run brushed 0.7288) — rejected as
+  tuning on the falsifier's own rows. Proceeding to the ledger anyway on the
+  grounds that falsifier 3 "is the only bar that matters" — rejected: the
+  ranking bar exists precisely to keep the held-out read from being spent on
+  a candidate no better than the incumbent witness. Iterating further
+  variants against the derivation table — rejected as the garden of forking
+  paths; the two ablations run were pre-planned and their prediction was
+  refuted (the witnesses carry transferable signal; removing them hurt both
+  domains).
+* **Consequences:** The pipeline (`training/`), the whitened band kernel,
+  and the hop-grid alignment finding stay committed and reproducible; the
+  external number (0.88 across six players and six signal paths) establishes
+  the decision is learnable while the derivation number says
+  GuitarSet-plus-augmentation is not yet this corpus. Named routes forward:
+  closer-domain training data (EGDB DI, or self-recorded labelled electric
+  takes), and the second independent labelling pass — the model ranks chord
+  re-articulations at 0.90–1.00 while `clean-lead-120bpm` reads 0.605,
+  consistent with the annotation-noise hypothesis living exactly where the
+  ceiling does.
+
 #### [DECISION-016]: Amend the no-runtime-dependency constraint to admit fixed-weight learned components
 * **Date:** 2026-08-20
 * **Status:** Accepted

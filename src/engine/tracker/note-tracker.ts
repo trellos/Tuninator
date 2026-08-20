@@ -109,8 +109,6 @@ export type TrackerTraceEvent =
       /** The onset kernel itself fired on this hop, as against the envelope witness. */
       kernelOnset: boolean;
       bloomed: boolean;
-      /** The learned witness's score, when it was computed. See `RearticulationVerdict`. */
-      learnedScore: number | null;
     }
   | { kind: "opened"; at: SourceTimeMs; noteId: string; trigger: NoteOriginTrigger }
   | {
@@ -558,7 +556,6 @@ export class NoteTracker {
           envelopeOverBaseline: frame.rms / Math.max(active.sustainedRms, 1e-9),
           kernelOnset: frame.attack.flux,
           bloomed: active.harmonyBloomed,
-          learnedScore: verdict.learnedScore ?? null,
         });
       }
       // A muted restrum refused for a weak transient is the one rejection in

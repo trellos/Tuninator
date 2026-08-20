@@ -3304,3 +3304,149 @@ fraction of that ceiling (Dixon 2006; non-percussive onsets carry high
 annotator variance) is increasingly the live hypothesis: the next cheap
 experiment is not another feature but a second, independent labelling pass
 over a few takes to measure the human–human AUC on exactly these decisions.
+
+## A learned onset head, trained on external data: the bet, run to its falsifier
+
+The eight converging negatives above say the same-pitch re-articulation
+decision cannot be improved by better logic over 78 derivation events. The
+standing answer in the field — Basic Pitch's ~17K parameters trained on large
+labelled corpora — is a small learned function whose unlock is DATA, not
+architecture. `docs/learned-onset-head-prompt.md` specified the experiment;
+DECISION-016 amended the dependency constraint to admit fixed weights (≤ ~25K
+parameters, plain TypeScript over `Float32Array`) so a win could actually
+ship. The falsifier was stated before anything was trained: **the frozen
+model must clear 0.73 AUC — the best existing single witness — on this
+repo's derivation decision table, nothing tuned on those rows, or the bet
+fails.** It failed. The numbers, and what was learned, follow.
+
+### The setup, honestly capable of winning
+
+The population rule is the decisive lesson of DECISION-015 applied: training
+rows are not "onsets vs decay in the abstract" but the engine's OWN
+`rearticulation` trace events, produced by driving the real
+`RecognitionEngine` over GuitarSet (360 excerpts, six players, comping and
+soloing; Zenodo 3371780), labelled by the exact target rule of the baseline
+study's `collect()` — 70ms window, trace-order covered-check, per-string
+`note_midi` onsets merged at 30ms to match this repo's strum-level labels.
+EGDB, the closest-domain corpus, was unreachable (its official host is a
+Google Drive folder; the environment's egress policy denies it) — recorded,
+not substituted with synthesis. Both GuitarSet mono flavours were used (the
+room mic, and the summed hexaphonic pickup as the DI-adjacent signal), each
+through three deterministic per-take augmentation chains (`training/augment.ts`:
+clean, amp-like drive+cab+compression, synthetic-room convolution), because
+the corpus this must transfer to is electric heard three ways.
+
+Yield: **248,993 decision rows, 174,379 positive (base rate 0.70), from
+18.28 hours of augmented audio — 13.6K rows/hour** against this corpus's
+~2.6K/hour and 725 rows total. A 343× larger population of exactly the
+decision under study.
+
+Features per row: a causal 9-hop × 60-band patch of the adaptively whitened
+spectrogram (m = 0.99, floor = 0.01 — the DECISION-014 machinery, scale-free
+in [0,1] by construction), ending AT the decision hop on the engine's own
+grid; the twelve existing witnesses; four whitened flux readings. One
+alignment fact mattered and is worth keeping: the engine's flux windows END
+at hop boundaries (`readEndingAt`), while the whitening study's standalone
+grid (windows STARTING at hop multiples) sits 5.33ms off it at 48kHz — a
+silent train/serve skew if trained on. `training/features.ts` extracts on
+the engine grid, through the same `src/engine/kernels/whitened-bands.ts`
+class the engine would run live, and a bit-for-bit parity test held while
+the runtime integration existed (commit d836ec9).
+
+The model: 19,833 parameters — conv 3×3×8 / pool / conv 3×3×16 / pool /
+dense 24 over the patch, dense 16 over the scalars, merged to a sigmoid —
+trained in `training/train.ts` (hand-rolled Adam over `Float32Array`, a
+finite-difference gradient check in CI reach, deterministic seeded runs).
+Split grouped by PLAYER (04 and 05 held out), early stopping reading the
+external validation AUC only; the derivation five appeared as a printed
+curve and influenced nothing; the twelve 140bpm takes were never loaded by
+anything under `training/`. Forward pass, measured: 190µs per decision —
+under 2% of a core at the corpus's worst-case 83 decisions/second.
+
+### What the external data taught, and what it did not
+
+On its own domain the model is good, uniformly across every signal path it
+was shown — external validation AUC at the early stop, players never trained
+on:
+
+```
+overall           0.8820
+mic-clean         0.8730      pickup-clean      0.8900
+mic-amp           0.8384      pickup-amp        0.8616
+mic-room          0.8966      pickup-room       0.9194
+```
+
+Frozen and scored on this repo's derivation decision table (161 rows, 59
+positives — the same rows, same target, as every number in the ceiling
+studies):
+
+```
+model                                  external val   derivation AUC   (bar 0.73; sharpness reads 0.7281 on the same rows)
+full: patch + 12 witnesses + 4 wflux         0.8820           0.7157   FAILED
+wflux: patch + 4 wflux only                  0.8215           0.6260   FAILED
+none: patch only                             0.8175           0.6291   FAILED
+```
+
+The two ablations were pre-planned (the `--scalar-mode` flag predates any
+result) and selection between variants read external validation only; every
+derivation read taken is in the table above. The ablation prediction — that
+the twelve witnesses' take-dependent scale would poison transfer, so
+dropping them would cost a little external AUC and transfer better — was
+**refuted on both ends**: removing them cost six points externally AND nine
+points on the derivation table. The witnesses carry real, transferable
+signal; the patch alone is weaker everywhere.
+
+Falsifier 2's shape, for the full model:
+
+```
+take                                       rows   pos   AUC
+chords-a-bm-g-d-2x-120bpm                    25    10   1.000
+cowboy-chords-c-d-em-g-c-d-em-am-120bpm      28     9   0.901
+power-chords-c-a-g-e-c-d-fsharp-e-120bpm     26     2   0.708
+clean-lead-120bpm                            71    38   0.605
+spicy-chords-cmaj9-g-am11                    11     0     -
+pooled 0.7157; leave-one-take-out calibrated 0.5133
+zero-label-cost operating point: 101 of 102 negatives admitted
+```
+
+Three things are true at once. The model does not collapse the way the
+fitted twelve-witness model did (0.808 → 0.434): fitted on zero rows of this
+corpus, it lands at 0.716 across an acoustic→electric domain change, which
+is transfer the fitted models never had. Its failure is *localised*: chords
+rank at 0.90–1.00 while `clean-lead-120bpm` — 44% of the table, the dense
+same-pitch re-picking the whole problem is about — reads 0.605. And its
+score LOCATIONS shift per take even where ranking is good: recalibrating a
+single threshold across takes (the LOTO logistic over the score alone)
+collapses the pooled figure to 0.513, and keeping every derivation positive
+admits 101 of 102 negatives. Even had the ranking bar been cleared, no
+usable operating point exists on this corpus today.
+
+### Verdict, and the state of the ledger
+
+**The falsifier fired: 0.7157 against a bar of 0.73, with the best
+hand-built witness at 0.7281 on the same rows.** Per the protocol stated
+before the run: written up, logged (DECISION-017), stopped. Nothing is
+wired; the runtime integration built for the win condition was removed
+again (the plumbing survives in this branch's history at bfce0ad); the
+engine is bit-identical to baseline — eval PASS, ledger 32 missed / 99
+split / 107 extras, 494 tests, `npm pack` contents unchanged. **The twelve
+140bpm held-out takes were never read** — not in training, not in
+validation, not in any falsifier — so the once-only held-out read remains
+unspent for a future attempt that clears the derivation bar first.
+
+What survives for that attempt: the full pipeline under `training/`
+(extraction, augmentation, trainer, falsifier scoring — deterministic and
+committed), the whitened band kernel in `src/engine/kernels/`, the engine
+hop-grid alignment fact, and a trained baseline (rebuild with
+`bun training/train.ts --rows training/out/rows --corpus training/out/corpus`)
+whose external number says the DECISION is learnable — six players, six
+signal paths, 0.88 — while its derivation number says GuitarSet-plus-
+augmentation is not yet this corpus. The two named routes forward, in order
+of expected value per hour: **closer-domain training data** (EGDB DI when
+the egress policy allows it, or a few minutes of self-recorded electric
+takes labelled the way the fixtures are — the augmentation chains did not
+close the clean-electric-lead gap and more of the same GuitarSet will not
+either), and the **second independent labelling pass** the previous section
+already argued for: `clean-lead-120bpm` at 0.605 under a model that ranks
+chord re-articulations near-perfectly is also consistent with the
+annotation-noise fraction of the ceiling living exactly there.
