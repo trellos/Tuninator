@@ -123,5 +123,8 @@ const summary = {
   rowsPerHour: hours > 0 ? totalRows / hours : 0,
   droppedNoHop,
 };
-writeFileSync(join(outDir, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
+writeFileSync(
+  join(outDir, `summary-${flavors.join("+")}-${chains.join("+")}.json`),
+  JSON.stringify(summary, null, 2) + "\n"
+);
 console.log(JSON.stringify(summary, null, 2));

@@ -276,6 +276,14 @@ export interface IPitchChangeDetector {
 export type RearticulationVerdict = {
   accepted: boolean;
   reason: string;
+  /**
+   * The learned witness's score for this decision, when it was computed —
+   * a sigmoid probability. `null` when the witness is disabled, the attack
+   * carries no whitened context, or the cascade ended on a branch outside
+   * the witness's reach. Carried for the trace and the ledger; the boolean
+   * above is already fused.
+   */
+  learnedScore?: number | null;
 };
 
 export interface IRearticulationDetector {

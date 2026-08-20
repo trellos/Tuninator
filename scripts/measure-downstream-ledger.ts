@@ -66,6 +66,8 @@ const SITES: Readonly<Record<string, string>> = {
   "rejected: no-energy-not-sharp":
     "rearticulation.ts: rms < sustainedRms * rearticulationRiseRatio && sharpness < rearticulationSharpness",
   "rejected: gated": "rearticulation.ts: frame.gated",
+  "rejected: learned-veto":
+    "rearticulation.ts: learned witness score <= learnedVetoThreshold overturned an accept",
   "band-only transient": "the fast lane may not act on FastFrame.bandOnset",
   "split made; no successor opened":
     "note-tracker.ts process(): the boundary was made and nothing sounded after it",

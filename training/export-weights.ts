@@ -140,5 +140,10 @@ writeFileSync(
   JSON.stringify(manifest, null, 2) + "\n"
 );
 
-console.log(`wrote ${outTs} (${(lines.join("\n").length / 1024).toFixed(0)}KB) and provenance JSON`);
+// The parity references travel with the tests, so the pinned logits survive
+// into any checkout without the training outputs.
+const references = readFileSync(join(modelDir, "references.json"), "utf8");
+writeFileSync("tests/engine/onset-head-references.json", references);
+
+console.log(`wrote ${outTs} (${(lines.join("\n").length / 1024).toFixed(0)}KB), provenance JSON, test references`);
 console.log(`weights sha256 ${weightsHash}`);

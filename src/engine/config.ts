@@ -356,6 +356,26 @@ export type EngineConfig = {
      */
     mutedRestrumWindowMs: number;
     /**
+     * The learned re-articulation witness (see `kernels/onset-head.ts`),
+     * fused at the decision level: a terminal sharpness REJECTION
+     * (`no-energy-not-sharp`, `chord-not-sharp`, `ring-out-not-sharp`) is
+     * overturned when the learned score reaches `learnedAcceptThreshold`, and
+     * a terminal sharpness/envelope ACCEPTANCE (`sharpness`,
+     * `envelope-rise`, `chord-sharpness`, `ring-out-sharpness`) is overturned
+     * when it falls at or below `learnedVetoThreshold`. The guards
+     * (`gated`, `glide-rise`, `chord-past-muted-window`,
+     * `ring-out-below-floor`) and the strong-evidence accepts (`new-pitch`,
+     * `chord-decay-excess`) stay outside its reach: they answer different
+     * questions than the one the model was trained on. `null` disables the
+     * witness entirely — no forward pass runs.
+     *
+     * Thresholds are derived on the five 120bpm derivation takes only, like
+     * every other bar in this block.
+     */
+    learnedAcceptThreshold: number | null;
+    /** See `learnedAcceptThreshold`. */
+    learnedVetoThreshold: number | null;
+    /**
      * How long a re-articulation rejected for a weak transient is held open,
      * waiting to see whether the chord is stopped rather than left to ring.
      *
@@ -779,6 +799,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,
     mutedRestrumWindowMs: 1000,
+    learnedAcceptThreshold: null,
+    learnedVetoThreshold: null,
     muteWitnessWindowMs: 400,
     muteWitnessGapMs: 160,
     muteWitnessLiveFraction: 0.75,

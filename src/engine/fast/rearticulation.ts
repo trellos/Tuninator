@@ -27,6 +27,12 @@ import type {
   IRearticulationDetector,
   RearticulationVerdict,
 } from "../contracts.js";
+import {
+  onsetHeadScore,
+  onsetHeadTransform,
+  ONSET_HEAD_SCALARS,
+} from "../kernels/onset-head.js";
+import { ONSET_HEAD_PARAMS } from "../kernels/onset-head-weights.js";
 
 /**
  * Is this transient sharp enough to carry a re-articulation on its own?
@@ -90,9 +96,33 @@ function calibrate(config: EngineConfig): Bars {
   };
 }
 
+/**
+ * Where the learned witness may speak, stated as the reasons it may overturn.
+ *
+ * Only the terminal sharpness/envelope tests of the same-pitch cascade — the
+ * decision whose ceiling was measured (best hand-built witness 0.728 AUC,
+ * DECISION-009..015) and the population the model was trained on. The guards
+ * and the strong-evidence accepts answer different questions and stay
+ * untouched; see `EngineConfig.transient.learnedAcceptThreshold`.
+ */
+const LEARNED_MAY_OVERTURN_REJECT: ReadonlySet<string> = new Set([
+  "no-energy-not-sharp",
+  "chord-not-sharp",
+  "ring-out-not-sharp",
+]);
+const LEARNED_MAY_OVERTURN_ACCEPT: ReadonlySet<string> = new Set([
+  "sharpness",
+  "envelope-rise",
+  "chord-sharpness",
+  "ring-out-sharpness",
+]);
+
 export class RearticulationDetector implements IRearticulationDetector {
   /** `config.transient`, with the rig calibration folded in. See `Bars`. */
   private readonly bars: Bars;
+  /** Scratch for the learned witness's scalar inputs; reused per decision. */
+  private readonly learnedRaw = new Float32Array(ONSET_HEAD_SCALARS);
+  private readonly learnedScalars = new Float32Array(ONSET_HEAD_SCALARS);
 
   constructor(config: EngineConfig) {
     this.bars = calibrate(config);
@@ -128,8 +158,71 @@ export class RearticulationDetector implements IRearticulationDetector {
    * which has to be able to say WHICH line discarded a played note rather than
    * that one of them did. Keeping the two in one function is the point: a
    * separate explain-only copy would drift from the code that decides.
+   *
+   * The hand-built cascade decides first; the learned witness (when enabled)
+   * may then overturn only its terminal sharpness tests — decision-level
+   * fusion, Holzapfel-style, so the reasons stay named for the ledger and the
+   * cascade's guards keep their jurisdiction.
    */
   verdict(
+    attack: AttackEvidence,
+    frame: FastFrame,
+    gliding: boolean,
+    sustainedRms: number,
+    pitchDiffers: boolean,
+    decayExcess: number | null,
+    polyphonic: boolean,
+    soundedMs: number
+  ): RearticulationVerdict {
+    const base = this.cascade(
+      attack,
+      frame,
+      gliding,
+      sustainedRms,
+      pitchDiffers,
+      decayExcess,
+      polyphonic,
+      soundedMs
+    );
+    const t = this.bars;
+    const acceptBar = t.learnedAcceptThreshold;
+    const vetoBar = t.learnedVetoThreshold;
+    if ((acceptBar === null && vetoBar === null) || attack.whitened === undefined) return base;
+    const overridable = !base.accepted && LEARNED_MAY_OVERTURN_REJECT.has(base.reason);
+    const vetoable = base.accepted && LEARNED_MAY_OVERTURN_ACCEPT.has(base.reason);
+    if (!overridable && !vetoable) return base;
+
+    const w = attack.whitened;
+    const raw = this.learnedRaw;
+    raw[0] = attack.sharpness;
+    raw[1] = attack.heldSharpness;
+    raw[2] = attack.fluxRatio;
+    raw[3] = attack.heldFluxRatio;
+    raw[4] = frame.riseRatio;
+    raw[5] = frame.rms / Math.max(sustainedRms, 1e-9);
+    raw[6] = decayExcess ?? 0;
+    raw[7] = soundedMs;
+    raw[8] = pitchDiffers ? 1 : 0;
+    raw[9] = gliding ? 1 : 0;
+    raw[10] = attack.flux ? 1 : 0;
+    raw[11] = polyphonic ? 1 : 0;
+    raw[12] = w.wFlux;
+    raw[13] = w.wFluxNorm;
+    raw[14] = w.wHeldFlux;
+    raw[15] = w.wHeldNorm;
+    onsetHeadTransform(raw, this.learnedScalars);
+    const score = onsetHeadScore(ONSET_HEAD_PARAMS, w.patch, this.learnedScalars);
+
+    if (overridable && acceptBar !== null && score >= acceptBar) {
+      return { accepted: true, reason: "learned-accept", learnedScore: score };
+    }
+    if (vetoable && vetoBar !== null && score <= vetoBar) {
+      return { accepted: false, reason: "learned-veto", learnedScore: score };
+    }
+    return { ...base, learnedScore: score };
+  }
+
+  private cascade(
     attack: AttackEvidence,
     frame: FastFrame,
     gliding: boolean,
