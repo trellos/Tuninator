@@ -96,6 +96,8 @@ export type TrackerTraceEvent =
       settleBarMs: number;
       pitchDiffers: boolean;
       gliding: boolean;
+      /** Net displacement across the glide window, cents. See `glideCents()`. */
+      glideCents: number;
       decayExcess: number | null;
       sharpness: number;
       heldSharpness: number;
@@ -525,6 +527,7 @@ export class NoteTracker {
               : config.tracking.minStableMs,
           pitchDiffers,
           gliding,
+          glideCents: this.pitchChange.glideCents(),
           decayExcess: active.decay.excess(frame.at, frame.rms),
           sharpness: frame.attack.sharpness,
           heldSharpness: frame.attack.heldSharpness,

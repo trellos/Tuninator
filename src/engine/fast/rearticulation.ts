@@ -111,13 +111,28 @@ export class RearticulationDetector implements IRearticulationDetector {
 
     const t = this.config.transient;
 
-    // Mid-glide, only an unmistakable arrival of energy counts. Bending sweeps
-    // the spectrum and fires both attack witnesses repeatedly inside one note,
-    // which is why the glide guard exists at all — but a bend redistributes
-    // the energy already in the string rather than adding any, so it cannot
-    // lift the envelope severalfold. A pick landing during a bend, or during
-    // the pitch wobble a fast run produces, can and does.
-    if (gliding && attack.riseRatio < t.glideRiseOverride) {
+    // Mid-glide, energy has to have ARRIVED rather than merely moved. Bending
+    // sweeps the spectrum and fires both attack witnesses repeatedly inside one
+    // note, which is why the glide guard exists at all — but a bend
+    // redistributes the energy already in the string rather than adding any.
+    //
+    // Two witnesses can say that, and the guard used to accept only the
+    // weaker one. `riseRatio` is the broadband envelope over a fixed 80ms
+    // baseline, and in a run picked at 107ms that baseline already contains
+    // the stroke before this one, so the ratio is structurally compressed
+    // exactly where the guard is asked the hardest question: the three strokes
+    // it discarded across the corpus measure 1.16, 1.20 and 1.37 against a bar
+    // of 1.6, while their transients read sharpness 2.4-10.5.
+    //
+    // The onset kernel answers the same question without a baseline. It
+    // decides band by band, and a band only votes when it is LOUDER than its
+    // own recent peak — which is precisely "energy arrived here" as against
+    // "energy moved from the bin next door". That test was put there for
+    // vibrato, which sweeps every partial across its neighbours and makes no
+    // band louder, and a bend is the slow monotonic form of the same thing:
+    // `tests/engine/articulation.test.ts` holds a synthetic A3->B3 bend and a
+    // vibratoed A3 as one Note each with this escape open.
+    if (gliding && attack.riseRatio < t.glideRiseOverride && !attack.flux) {
       return { accepted: false, reason: "glide-rise" };
     }
 

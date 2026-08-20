@@ -90,6 +90,19 @@ export class PitchChangeDetector implements IPitchChangeDetector {
     this.candidateAt = at;
   }
 
+  /**
+   * Net displacement across the glide window, cents. Diagnostic: it is what
+   * `isGliding` measures its threshold against, and a ledger that says a stroke
+   * was rejected "mid-glide" is not saying much until it also says how far the
+   * estimate had actually travelled.
+   */
+  glideCents(): number {
+    if (this.recent.length === 0) return 0;
+    const first = this.recent[0] as number;
+    const last = this.recent[this.recent.length - 1] as number;
+    return centsBetween(last, first);
+  }
+
   isGliding(): boolean {
     const window = this.config.transient.glideWindowHops;
     if (this.recent.length <= window) return false;

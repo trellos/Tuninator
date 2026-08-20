@@ -235,6 +235,8 @@ function classify(
         `${best.noteId} sharp ${fmt(best.sharpness)}/${fmt(best.heldSharpness)}` +
         ` flux ${fmt(best.fluxRatio)}/${fmt(best.heldFluxRatio)}` +
         ` env ${fmt(best.envelopeOverBaseline)} rise ${fmt(best.riseRatio)}` +
+        `${best.gliding ? ` glide ${best.glideCents.toFixed(0)}c` : ""}` +
+        `${best.pitchDiffers ? " new-pitch" : ""}` +
         ` excess ${fmt(best.decayExcess)} kernel ${best.kernelOnset ? "fired" : "envelope only"}` +
         ` sounded ${best.soundedMs.toFixed(0)}`,
     };

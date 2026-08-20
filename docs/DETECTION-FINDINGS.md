@@ -1405,3 +1405,175 @@ labels recovered at the `settled` test are lost again one step downstream. The
 bar is not what is holding these strokes back — what happens to a short Note
 after it is created is. Recorded so the two-millisecond miss is not mistaken
 for an easy win a third time.
+
+## A bend moves energy; a pick brings some. The glide guard could only see one
+
+Three of the ledger's missed labels were discarded by one line — `gliding &&
+riseRatio < glideRiseOverride` — and a fourth on `clean-lead`, the derivation
+fixture, by the same line. The guard is right about what it is for. A bend
+sweeps the spectrum and fires both attack witnesses repeatedly inside one note,
+so an attack arriving mid-glide has to prove that energy ARRIVED rather than
+merely moved.
+
+What it had to prove it with was the wrong witness. `riseRatio` is the
+20ms envelope over an 80ms baseline, and in a run picked at 107ms that baseline
+already contains the stroke before this one, so the ratio is structurally
+compressed exactly where the guard asks its hardest question. Instrumented at
+the four labels it discards:
+
+```
+  fixture           label   glide     rise   sharpness   flux ratio   kernel
+  amped triplet     t12     -74c      1.20   10.51/2.62  3.22/1.77    fired
+  amped sixteenths  s20      43c      1.37    2.36/0.49  1.24/0.57    fired
+  DI sixteenths     s26      29c      1.16    2.72/0.98  1.47/1.16    fired
+  clean-lead        (fast run)         1.21    5.28/-     -           fired
+```
+
+Two of the three "glides" are 29 and 43 cents — the pitch estimate wobbling
+across a fast alternate-picked run, not a bend — and every one of the four has
+a transient the flux kernel fired on.
+
+**The kernel already answers the question the guard is asking.** Its decision is
+made band by band, and a band only votes when it is LOUDER than its own recent
+peak, which is precisely "energy arrived here" as against "energy moved from
+the bin next door". That test exists for vibrato, which sweeps every partial
+across its neighbours and makes no band louder; a bend is the slow monotonic
+form of the same thing. So mid-glide the guard now takes either witness: an
+unmistakable envelope rise, or the kernel having fired at all.
+
+`tests/engine/articulation.test.ts` holds the synthetic A3->B3 bend and the
+vibratoed A3 as one Note each with the escape open, which is the case the guard
+exists for, stated as a signal rather than as a threshold.
+
+### Measured, end to end
+
+| fixture | detections | missed | false positives | gated pitch class |
+|---|---|---|---|---|
+| `clean-lead` 120bpm | 41 -> **42** | 3 -> **2** | 1 -> 1 | 92.6% -> **92.9%** |
+| `chords-a-bm` 120bpm | 16 -> 16 | 0 -> 0 | 0 -> 0 | unchanged |
+| `cowboy` 120, `power-chords` 120, `spicy` | unchanged | unchanged | unchanged | unchanged |
+| lead line amped triplet | 66 -> 68 | 9 -> **8** | 20 -> 21 | — |
+| lead line mic triplet | 63 -> 64 | 3 -> 3 | 11 -> 12 | — |
+| lead line DI triplet | 76 -> 76 | 0 -> 0 | 21 -> 21 | — |
+| sixteenths amped | 37 -> **38** | 14 -> **13** | 3 -> 3 | 70.8% |
+| sixteenths DI | 41 -> **42** | 7 -> **6** | 0 -> 0 | 85.4% -> **87.5%** |
+| sixteenths mic | 38 -> **39** | 10 -> **9** | 0 -> 0 | 72.3% |
+| everything else | unchanged | unchanged | unchanged | unchanged |
+
+Whole corpus: **+7 detections, -5 missed labels, +2 false positives**, both of
+the extra Notes on lead takes that were already over-segmenting. The
+`glide-rise` cause is now zero everywhere, including on the derivation fixture,
+and `npm run eval` still exits 0 with every required fixture meeting every
+gate.
+
+## Where the remaining evidence-side losses actually are
+
+The four causes upstream of the tracker, measured one label at a time with
+`scripts/measure-label-evidence.ts` — a hop-by-hop mirror of `kernels/onset.ts`
+that is checked against the real kernel on every hop of every fixture before
+anything is read off it (`--verify`: 0 disagreements over 26971 hops).
+
+Every contrast below is computed WITHIN one file. Recording levels differ by
+orders of magnitude between the three signal paths, so a figure compared across
+files measures the recording rather than the playing.
+
+### Two of them are not in the audio, and the labels say so themselves
+
+`s14` on the direct-input and amp-sim sixteenths takes. The DI label file's own
+derivation note says it: three of its onsets (`s14`, `s15`, `s34`) "had no flux
+peak within 45ms of where the beat puts them", and their times are an even
+subdivision of the surrounding beat rather than a measurement. The amp-sim
+labels are the DI labels shifted by the measured +2ms, so it is the same
+instant on the same performance.
+
+Measured independently, by the performer's own method — the peak of a 1ms RMS
+envelope of the 5kHz-highpassed signal in [-25, +45]ms of each label, against
+that file's own median:
+
+```
+  direct input   s14  0.56x the file's median   every other stroke  2.4 - 5.1x
+                 s6   0.73x                     (s6 is a miss too)
+  amp sim        s14  1.18x                     every other stroke  1.8 - 2.6x
+```
+
+This is the documented-exception case: analysis shows there is nothing there.
+
+### The other five are real strokes, and each is a hair's breadth
+
+| label | take | evidence at the label | what discarded it |
+|---|---|---|---|
+| `s28` @7462 | mic 16ths | hp5k peak **13.9x** the file's median | kernel: two bands arrived, held corroboration 0.85 of its bar |
+| `s30` @7704 | mic 16ths | **14.1x** | kernel: one band; the second measured `BAND_RISE` 1.04 against 1.05 |
+| `s3` @4891 | mic 16ths | **39.6x** — one of the loudest attacks on the take | `no-energy-not-sharp` on a reading taken 13ms before the string spoke |
+| `s24` @6139 | amp 16ths | **1.80x**, inside the 1.8-2.6 band of the take's real strokes | `no-energy-not-sharp`: env 1.18 against a bar of 1.20 |
+| `s10` @4703 | amp 16ths | **2.36x** | band-only: the broadband kernel's dead time, armed at `s9`, ran to 4686 and it fired nothing after |
+
+For scale, the five strokes the room-mic label file itself places by
+subdivision rather than by measurement (`s6`, `s14`, `s16`, `s18`, `s20`)
+measure 3.3 - 7.5x on the same figure, and the strokes the detector finds run
+9.5 - 56x. All five above sit in the detected population. A listener would call
+every one of them a note.
+
+### The attack is a burst, and the tracker is handed its weakest hop
+
+Three of those five are the same defect, and it is worth stating even though
+the repair measured below was not kept. `s3` is the clearest instance: the
+kernel fires at 4893 with sharpness 0.87, the tracker rejects the
+re-articulation on that reading, and 13ms later the same arrival reads several
+times sharper — but the kernel's `minIntervalMs` dead time, armed by its own
+first firing, suppresses it. A pick is not one hop: pick noise arrives, then
+the string speaks.
+
+### Built, measured, NOT kept: one onset, two readings
+
+The repair keeps `isOnset` as one onset per articulation — `tests/onset.test.ts`
+holds that contract and it is right — and adds a second, separate report:
+`OnsetResult.stronger`, true when a hop cleared the arrival test, was held back
+only by the interval, and is strictly sharper than the burst has already been.
+There is no threshold in it; "sharper than itself" is not a constant. The fast
+lane forwards it as `AttackEvidence.continuation`, which the tracker treats as
+the reading the decision should have been taken on rather than as a second
+pick: it does not extend the attack burst, it does not clear the pitch
+estimator's history a second time, and it may not re-decide an articulation
+already accepted.
+
+It is the largest single move on the held-out data in this document:
+
+| fixture | detections | missed | false positives |
+|---|---|---|---|
+| `power-chords-di` 140 | 12 -> **16** | 4 -> **0** | 0 -> 0 |
+| sixteenths DI | 42 -> 42 | 6 -> 6 | 0 -> 0 |
+| sixteenths mic | 39 -> 39 | 9 -> 9 | 0 -> 0 |
+| sixteenths amped | 38 -> 38 | 13 -> 13 | 3 -> 3 |
+| whole corpus | **+11** | **-7** | +4 |
+
+and it fails the derivation set, which is what decides it. `clean-lead`'s gated
+pitch class goes 92.9% to **86.7%** against a required gate of 90%, and two
+labels change hands: `t4` is lost outright, and `t16` — which this document
+already records as a Note the recognizer is right to ABSTAIN on, because its E5
+is not in the signal — is given a confident `D5` instead. Both are inside the
+triplet run, which is the pitch-path lag this document has named three times.
+
+Requiring the second reading to beat the first by a factor was swept, and the
+sweep is the familiar frontier rather than a way out:
+
+| factor | required failures | `clean-lead` | `chords-a-bm` |
+|---|---|---|---|
+| 1.0 (any stronger reading) | 2 | 42 det, 3 missed, **86.7%** | 16/16, 0 missed |
+| 1.5 | 1 | 42 det, 3 missed, 86.7% | 16/16, 0 missed |
+| 2.0 | 0 | 42 det, 2 missed, 90.0% exactly | **17 det, +1 false positive** |
+| 2.5 | 0 | 42 det, 2 missed, 90.0% exactly | **1 missed, +1 false positive** |
+
+Every value that clears the gate moves a derivation fixture the wrong way and
+leaves `clean-lead` sitting exactly on its bar. Recorded in full rather than
+kept: the mechanism is sound, the evidence it recovers is real, and what stops
+it is that the triplet takes' boundaries and pitch evidence already disagree —
+so making the detector more willing to find boundaries there costs more than it
+buys. It should be re-tried once the pitch path stops running 90ms behind the
+transient path.
+
+### Also measured in this pass, and not kept
+
+| change | result |
+|---|---|
+| `HELD_CORROBORATION` 0.45 -> 0.35, the other end of the band this document derives it in | the five 120bpm fixtures are bit-identical, exactly as recorded, and the held-out takes go +5 detections, -2 missed, **+3 false positives**. It does not reach `s28` — the engine's hop grid puts no hop where the mirror's does — so it is a change with no derivation-set evidence for it, fitted to held-out data, that loses more Notes than it finds. Not kept |
