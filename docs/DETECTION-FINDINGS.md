@@ -2145,3 +2145,101 @@ infer, and its three missed labels are `rejected: chord-not-sharp` in the
 ledger — a segmentation cause, not a naming one. The mic take remains an
 informational FAIL at 72.7% against an 80% bar, with `p14` and `p16` above
 still misnaming and two labels named as triads.
+
+## The mute as a retroactive witness: built, measured, kept
+
+`scripts/measure-mute-witness.ts` found the cleanest separation in the corpus —
+48 of 48 strokes on all three signal paths — and the reason it is clean is
+physical. Every witness this project has tried at a boundary asks whether energy
+ARRIVED, which is the question the signal path distorts most. A mute REMOVES
+energy, and a compressor, a room and a decaying string can all imitate an
+arrival while none of them can imitate a removal.
+
+The rule that follows: a re-articulation rejected for a weak transient, followed
+by a mute, is a rejection the mute contradicts. The contradiction arrives after
+the decision, so the boundary is made retroactively and backdated to the
+transient that was refused.
+
+### What it recovers, and what it costs
+
+| | detections | missed |
+|---|---|---|
+| corpus, before | 515 | 35 |
+| corpus, after | 519 | **32** |
+| `power-chords-amped`, before | 15 / 16 | 3 |
+| `power-chords-amped`, after | 18 / 16 | **0** |
+
+The three recovered labels are exactly the three the brief predicted, and that
+fixture's eval gate goes from FAIL to PASS. Fragmentation is unchanged at 83 of
+459 split, 85 extras, 23 strays. Every other fixture is bit-identical, including
+all five 120bpm originals. One extra Note appears on `cowboy-chords-mic`, at a
+point where that take plausibly has an unlabelled second strum.
+
+### The guard that makes it safe, and the one that does not
+
+The obvious reading of the witness — fire on the first frame that falls far
+enough below the Note's own fitted decay — does not work, and the way it fails
+is worth recording. Raising the required separation between the transient and
+the collapse does not EXCLUDE a false fire, it postpones it: the signal keeps
+falling, so a later frame crosses the same bar at a lower value. "First frame
+past a threshold" is a race that any decaying signal eventually wins, which is
+why the raw measurement gets its separation from a minimum over a fixed window —
+a shape — and a crossing test cannot inherit it.
+
+Nor do the readings at the collapse separate once they are taken through the
+engine rather than off the raw audio. The strokes the rule must recover read
+0.41, 0.60 and 0.67 against their own fitted decay; the fires it must refuse
+read 0.11, 0.47, 0.60, 0.67, 0.70 and 0.74. There is no bar between them.
+
+What separates is a question asked at the CANDIDATE rather than at the collapse:
+how near its own peak was the chord when the transient landed?
+
+| | fraction of the Note's peak |
+|---|---|
+| the three strokes to recover | 0.85, 0.96, 1.00 |
+| every fire to refuse | 0.63, 0.63, 0.60, 0.26, 0.25, 0.14 |
+
+A transient landing on a chord already down to a third of its peak is finger
+noise on a dying string. That is the same claim `mutedRestrumWindowMs` makes in
+time, made in energy instead — and energy is the axis that survives the signal
+path, where an absolute level is not: the direct take's ANSWERED strokes collapse
+further than the amp take's MUTED ones, so any bar chosen across paths measures
+the recording rather than the playing. Without this guard the rule invents nine
+Notes; with it, one.
+
+The result is a plateau rather than a fitted edge. Missed stays at 32 across
+every constant swept: live fraction 0.60 to 0.85, collapse 0.55 to 0.90,
+separation 120 to 250ms.
+
+### The head/tail test, measured and refuted
+
+A candidate discriminator for the reverted same-pitch merge: merge the later
+Note into the earlier only when the earlier is the LONGER of the two, on the
+grounds that a tail is shorter than its head while a real event swallowed by a
+stub is longer than what precedes it. It needs no constant, so it was worth a
+pass.
+
+It has to be measured on an UNFILTERED candidate set. The earlier table capped
+fragments at `transient.articulationMs`, which makes "is it shorter than its
+head" inert by construction — every candidate passes. Collected without that cap:
+
+| gate | labels missed | Notes removed |
+|---|---|---|
+| rule off | 32 | 0 |
+| `soundedMs < 80` — the reverted rule | 36 (+4) | 80 |
+| shorter than what precedes it | **42 (+10)** | 93 |
+| shorter than half what precedes it | 34 (+2) | 64 |
+| `soundedMs / oracle IOI <= 0.40` | **32 (+0)** | 66 |
+
+The head/tail test is worse than the plain duration bar it was meant to replace,
+and by a wide margin. The two populations overlap on it from end to end —
+spurious 0.00 to 1.00, matched 0.38 to 8.71 — and the best threshold on the
+ratio that loses no label removes 56 of 81 against the oracle rate's 70. The
+premise is where it fails: a real event preceded by a stub is not reliably
+longer than that stub, because the stub is often the head of the previous event
+rather than a fragment.
+
+On the wider candidate set the oracle rate holds everything it held before: 66
+Notes removed at 0.40 with no label touched, 70 at the best label-safe
+threshold, and still flat under rate errors from half the true value to a
+quarter above it.
