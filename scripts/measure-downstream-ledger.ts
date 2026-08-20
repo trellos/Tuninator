@@ -124,12 +124,37 @@ function fmt(x: number | null, digits = 2): string {
   return x === null ? "-" : x.toFixed(digits);
 }
 
-/** What happened to a Note that WAS opened for this stroke. */
-function fateOf(fate: Fate, prefix: string): Cause {
+/**
+ * What happened to a Note that WAS opened for this stroke.
+ *
+ * An absorbed Note is followed to whatever absorbed it, because absorption is
+ * not by itself a loss: the survivor inherits the stub's start time, so the
+ * boundary this stroke produced is still on the timeline under another id. What
+ * decides whether the stroke was detected is what became of the SURVIVOR, and
+ * reporting the absorb hides a stroke that was really lost one step later
+ * behind a rule that was doing its job. Only when the survivor is itself gone
+ * does the absorb become the answer, and then it is named as a chain.
+ */
+function fateOf(fate: Fate, prefix: string, fates: ReadonlyMap<string, Fate>): Cause {
   if (fate.absorbedInto !== null) {
+    const chain = [fate.id];
+    let current = fate;
+    for (let guard = 0; guard < 16 && current.absorbedInto !== null; guard++) {
+      const next = fates.get(current.absorbedInto);
+      if (next === undefined) break;
+      chain.push(next.id);
+      current = next;
+    }
+    if (current !== fate && current.absorbedInto === null) {
+      const downstream = fateOf(current, prefix, fates);
+      return {
+        cause: `absorbed, then ${downstream.cause}`,
+        detail: `${chain.join(" -> ")}: ${downstream.detail}`,
+      };
+    }
     return {
       cause: `${prefix}absorbed as an articulation stub`,
-      detail: `${fate.id} -> ${fate.absorbedInto}`,
+      detail: chain.join(" -> "),
     };
   }
   if (fate.announced === false) {
@@ -174,7 +199,7 @@ function classify(
       if (stolen === null) stolen = fate;
       continue;
     }
-    return fateOf(fate, "");
+    return fateOf(fate, "", fates);
   }
 
   // 2. A re-articulation was considered over a sounding Note.
@@ -199,7 +224,7 @@ function classify(
       if (fate.openedAt > accepted.at + WINDOW_MS) continue;
       if (successor === null || fate.openedAt < successor.openedAt) successor = fate;
     }
-    if (successor !== null) return fateOf(successor, "split made; successor ");
+    if (successor !== null) return fateOf(successor, "split made; successor ", fates);
     return { cause: "split made; no successor opened", detail: accepted.noteId };
   }
   if (attempts.length > 0) {
