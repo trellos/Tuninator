@@ -598,7 +598,7 @@ export class NoteTracker {
       active !== null &&
       active.soundedMs < active.announceThresholdMs &&
       pitchChange !== null &&
-      this.wearsPredecessorsName(active, pitchChange.fromHz);
+      this.cannotDefendReading(active, pitchChange.fromHz, pitchChange.toHz);
 
     if (
       active !== null &&
@@ -2099,26 +2099,31 @@ export class NoteTracker {
    * instead is what gave each Note a share of its predecessor's pitch.
    */
   /**
-   * Is the pitch this Note is stepping AWAY from the name of the Note before
-   * it, rather than one of its own?
+   * Can this Note defend the reading it is stepping away from?
    *
-   * The evidence that a young Note's reading belongs to its predecessor, made
-   * checkable instead of assumed. A pick landing while the note before it is
-   * still ringing gives the estimator the old note for a hop or two, so a step
-   * out of that reading is the new note arriving. A step out of a pitch the
-   * predecessor never sounded is a move the player made, however young the
-   * Note is.
+   * The evidence that a young Note's reading belongs to somebody else, made
+   * checkable instead of assumed. Two ways it belongs to somebody else, and a
+   * step out of either is the new note arriving rather than a note moving:
+   *
+   *  - it is the name of the Note in FRONT of it, still ringing while the pick
+   *    that ended it lands;
+   *  - it lies BETWEEN that Note and the pitch now arriving, which is the
+   *    estimator's window straddling the boundary. On the room-mic sixteenths
+   *    an F#5 answered by an E5 gives F5 for two hops — a pitch nobody played,
+   *    and the reading the step is measured from.
+   *
+   * A Note with nothing in front of it has no name to defend either: its first
+   * hops are the attack transient, which is the least periodic part of a note.
    */
-  private wearsPredecessorsName(active: NoteRecord, fromHz: number): boolean {
+  private cannotDefendReading(active: NoteRecord, fromHz: number, toHz: number): boolean {
     const predecessor = this.recordSoundingAt((active.startTime - 1) as SourceTimeMs);
-    // Nothing in front of it: the reading it is leaving is the attack
-    // transient's own, which is the least periodic part of a note and belongs
-    // to nobody. There is no name to defend, so there is nothing to argue with.
     if (predecessor === undefined || predecessor.id === active.id) return true;
     const name = predecessor.dominantMidi();
     if (name === null) return true;
     const from = describeFrequency(fromHz).midi;
-    return ((((from - name) % 12) + 12) % 12) === 0;
+    if (((((from - name) % 12) + 12) % 12) === 0) return true;
+    const to = describeFrequency(toHz).midi;
+    return from > Math.min(name, to) && from < Math.max(name, to);
   }
 
   private recordSoundingAt(at: SourceTimeMs): NoteRecord | undefined {
