@@ -15,6 +15,7 @@
  */
 
 import type { EngineTuning } from "../types.js";
+import { UNCALIBRATED, type RigCalibration } from "./rig-profile.js";
 
 export type EngineConfig = {
   analysis: {
@@ -691,6 +692,20 @@ export type EngineConfig = {
     pitchFrames: boolean;
     contour: boolean;
   };
+
+  /**
+   * What the signal chain in front of the microphone was measured to be doing,
+   * expressed as multipliers on the transient bars. `UNCALIBRATED` — every
+   * multiplier 1 — is the default and the shipped behaviour, and nothing in
+   * `src/` ever sets anything else: the only producer is an offline harness
+   * (`scripts/measure-rig-ceiling.ts`), which is what makes the calibrated path
+   * measurable without shipping it.
+   *
+   * Plain numbers rather than a `RigProfile`, because this crosses the worklet
+   * port and because the engine has no business re-deriving a calibration on
+   * the audio thread. Whoever measures the rig decides; this only applies.
+   */
+  calibration: RigCalibration;
 };
 
 /** Matches the AudioWorklet render quantum. Do not change to "go faster". */
@@ -799,6 +814,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     pitchFrames: false,
     contour: false,
   },
+  calibration: UNCALIBRATED,
 };
 
 /** Deep clone, so a caller's overrides never alias the shared defaults. */
@@ -811,6 +827,7 @@ function clone(config: EngineConfig): EngineConfig {
     harmony: { ...config.harmony },
     deep: { ...config.deep },
     diagnostics: { ...config.diagnostics },
+    calibration: { ...config.calibration },
   };
 }
 

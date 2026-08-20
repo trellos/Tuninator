@@ -187,6 +187,18 @@ export type RigProfileOptions = {
   attackQuantile?: number;
   minHops?: number;
   minAttacks?: number;
+  /**
+   * Hops of background history the quantiles are taken over.
+   *
+   * Live, the default is the right answer and the bound is the point: a rig is
+   * something the player can change mid-session. An offline harness pooling
+   * several takes of one chain into a single profile is the one case where the
+   * bound is wrong rather than protective — four takes overrun it, and the
+   * profile would then describe the takes that happened to come last.
+   */
+  backgroundCapacity?: number;
+  /** Confident attacks the attack quantiles are taken over. See above. */
+  attackCapacity?: number;
 };
 
 /** Confident attacks needed before any attack quantile is reported. */
@@ -252,10 +264,13 @@ type Resolved = Required<RigProfileOptions>;
 
 /** One witness's two populations. */
 class WitnessRings {
-  readonly atAttack = new QuantileRing(ATTACK_CAPACITY);
-  readonly elsewhere = new QuantileRing(BACKGROUND_CAPACITY);
+  readonly atAttack: QuantileRing;
+  readonly elsewhere: QuantileRing;
 
-  constructor(private readonly options: Resolved) {}
+  constructor(private readonly options: Resolved) {
+    this.atAttack = new QuantileRing(options.attackCapacity);
+    this.elsewhere = new QuantileRing(options.backgroundCapacity);
+  }
 
   reset(): void {
     this.atAttack.reset();
@@ -289,10 +304,10 @@ type WitnessName = (typeof WITNESSES)[number];
 export class RigProfileEstimator {
   private readonly options: Resolved;
   private readonly witnesses: Map<WitnessName, WitnessRings>;
-  private readonly highShare = new QuantileRing(BACKGROUND_CAPACITY);
-  private readonly lowShare = new QuantileRing(BACKGROUND_CAPACITY);
-  private readonly crest = new QuantileRing(BACKGROUND_CAPACITY);
-  private readonly tau = new QuantileRing(ATTACK_CAPACITY);
+  private readonly highShare: QuantileRing;
+  private readonly lowShare: QuantileRing;
+  private readonly crest: QuantileRing;
+  private readonly tau: QuantileRing;
 
   private hops = 0;
   private attacks = 0;
@@ -311,7 +326,13 @@ export class RigProfileEstimator {
       attackQuantile: options.attackQuantile ?? ATTACK_QUANTILE,
       minHops: options.minHops ?? MIN_HOPS,
       minAttacks: options.minAttacks ?? MIN_ATTACKS,
+      backgroundCapacity: options.backgroundCapacity ?? BACKGROUND_CAPACITY,
+      attackCapacity: options.attackCapacity ?? ATTACK_CAPACITY,
     };
+    this.highShare = new QuantileRing(this.options.backgroundCapacity);
+    this.lowShare = new QuantileRing(this.options.backgroundCapacity);
+    this.crest = new QuantileRing(this.options.backgroundCapacity);
+    this.tau = new QuantileRing(this.options.attackCapacity);
     this.witnesses = new Map<WitnessName, WitnessRings>(
       WITNESSES.map((name) => [name, new WitnessRings(this.options)])
     );
@@ -413,4 +434,85 @@ export class RigProfileEstimator {
       fluxRatio: witness("fluxRatio"),
     };
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reading the profile back into the decision                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What a rig profile is allowed to do to the transient bars.
+ *
+ * Three multipliers, one per witness family, and every one of them is 1 when
+ * nothing has been calibrated. That is the whole contract: `UNCALIBRATED` must
+ * reproduce the shipped recognizer exactly, so anything measured against it is
+ * a delta rather than a rebuild.
+ *
+ * Multipliers rather than replacement bars, deliberately. The constants in
+ * `EngineConfig.transient` were each derived against a specific failure on the
+ * five 120bpm fixtures and they carry that derivation; a profile that replaced
+ * them would be re-deriving all of it from one quantile. What a profile can
+ * honestly claim to know is the SCALE the witness is being read on — see
+ * `REFERENCE_SHARPNESS_FLOOR` — so scale is all it is allowed to change.
+ */
+export type RigCalibration = {
+  /** Applied to bars read against `AttackEvidence.sharpness`. */
+  sharpnessScale: number;
+  /** Applied to bars read against `AttackEvidence.heldSharpness`. */
+  heldSharpnessScale: number;
+  /** Applied to bars read against the two flux-RATIO witnesses. */
+  fluxRatioScale: number;
+};
+
+/** No calibration. The shipped behaviour, and the control for every delta. */
+export const UNCALIBRATED: RigCalibration = {
+  sharpnessScale: 1,
+  heldSharpnessScale: 1,
+  fluxRatioScale: 1,
+};
+
+/**
+ * `sharpness.floor` on the rig the transient constants were derived on.
+ *
+ * The five 120bpm fixtures pooled into one profile — the same audio every bar
+ * in `EngineConfig.transient` was swept against — so a rig reading this floor
+ * gets a multiplier of exactly 1 and the shipped behaviour back. Any other
+ * rig's bars move by the ratio of its floor to this one, which is the only
+ * claim a floor supports: "the resting flux is twice as high here, so a bar
+ * meant to sit above the resting flux has to be twice as high too".
+ *
+ * `measure-rig-ceiling.ts --reference` prints both, and they are pooled over
+ * the whole chain rather than taken per take because a per-take floor is
+ * measurably a statistic of the performance (1.6x within one chain).
+ */
+export const REFERENCE_SHARPNESS_FLOOR = 0.82;
+
+/** `heldSharpness.floor` on the same pooled 120bpm profile. See above. */
+export const REFERENCE_HELD_SHARPNESS_FLOOR = 0.428;
+
+/** `heldFluxRatio.floor` on the same pooled profile. See `calibrationFrom`. */
+export const REFERENCE_HELD_FLUX_RATIO_FLOOR = 0.737;
+
+/**
+ * The multipliers a measured profile implies.
+ *
+ * A floor the profile could not estimate — too few background hops, which is
+ * what dense playing leaves — yields 1 for that family rather than a guess.
+ * Silence about a rig is not evidence that it is the reference rig, but it is
+ * the only answer that cannot make things worse.
+ */
+export function calibrationFrom(profile: RigProfile): RigCalibration {
+  const scale = (floor: number | null, reference: number): number =>
+    floor === null || floor <= 0 ? 1 : floor / reference;
+  return {
+    sharpnessScale: scale(profile.sharpness.floor, REFERENCE_SHARPNESS_FLOOR),
+    heldSharpnessScale: scale(
+      profile.heldSharpness.floor,
+      REFERENCE_HELD_SHARPNESS_FLOOR
+    ),
+    fluxRatioScale: scale(
+      profile.heldFluxRatio.floor,
+      REFERENCE_HELD_FLUX_RATIO_FLOOR
+    ),
+  };
 }

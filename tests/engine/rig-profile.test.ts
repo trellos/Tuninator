@@ -11,7 +11,19 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { RigProfileEstimator, type RigObservation } from "../../src/engine/rig-profile.js";
+import {
+  REFERENCE_HELD_FLUX_RATIO_FLOOR,
+  REFERENCE_HELD_SHARPNESS_FLOOR,
+  REFERENCE_SHARPNESS_FLOOR,
+  RigProfileEstimator,
+  UNCALIBRATED,
+  calibrationFrom,
+  type RigObservation,
+  type RigProfile,
+} from "../../src/engine/rig-profile.js";
+import { DEFAULT_ENGINE_CONFIG } from "../../src/engine/config.js";
+import { RearticulationDetector } from "../../src/engine/fast/rearticulation.js";
+import type { AttackEvidence, FastFrame } from "../../src/engine/contracts.js";
 
 /** Hop interval used by these sequences, ms. Near the engine's own. */
 const HOP_MS = 13;
@@ -142,5 +154,128 @@ describe("RigProfileEstimator", () => {
       }
     }
     expect(estimator.profile().decayTauMs as number).toBeCloseTo(tau, -1);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Reading a profile back into the decision                                    */
+/* -------------------------------------------------------------------------- */
+
+/** A profile with only the three floors a calibration reads set. */
+function profileWithFloors(
+  sharpness: number | null,
+  heldSharpness: number | null,
+  heldFluxRatio: number | null
+): RigProfile {
+  const witness = (floor: number | null) => ({
+    attack: null,
+    attackLow: null,
+    floor,
+    contrast: null,
+  });
+  return {
+    hops: 0,
+    attacks: 0,
+    backgroundHops: 0,
+    elapsedMs: 0,
+    brightness: null,
+    bassShare: null,
+    crest: null,
+    decayTauMs: null,
+    heldSharpness: witness(heldSharpness),
+    heldFluxRatio: witness(heldFluxRatio),
+    riseRatio: witness(null),
+    sharpness: witness(sharpness),
+    fluxRatio: witness(null),
+  };
+}
+
+describe("rig calibration", () => {
+  it("is the identity on the rig the constants were derived on", () => {
+    const calibration = calibrationFrom(
+      profileWithFloors(
+        REFERENCE_SHARPNESS_FLOOR,
+        REFERENCE_HELD_SHARPNESS_FLOOR,
+        REFERENCE_HELD_FLUX_RATIO_FLOOR
+      )
+    );
+    expect(calibration).toEqual(UNCALIBRATED);
+  });
+
+  it("moves a bar by exactly the ratio of the floors", () => {
+    const calibration = calibrationFrom(
+      profileWithFloors(
+        REFERENCE_SHARPNESS_FLOOR * 2,
+        REFERENCE_HELD_SHARPNESS_FLOOR * 3,
+        REFERENCE_HELD_FLUX_RATIO_FLOOR / 2
+      )
+    );
+    expect(calibration.sharpnessScale).toBeCloseTo(2, 10);
+    expect(calibration.heldSharpnessScale).toBeCloseTo(3, 10);
+    expect(calibration.fluxRatioScale).toBeCloseTo(0.5, 10);
+  });
+
+  it("says nothing about a floor it could not estimate", () => {
+    // Dense playing leaves too few hops belonging to no attack for a floor at
+    // all. Silence about a rig is not evidence that it is the reference rig,
+    // but 1 is the only answer that cannot make things worse.
+    expect(calibrationFrom(profileWithFloors(null, null, null))).toEqual(UNCALIBRATED);
+  });
+
+  it("leaves every re-articulation verdict alone when uncalibrated", () => {
+    // The control the whole measurement rests on: the shipped default must be
+    // the same code path as no calibration at all.
+    const t = DEFAULT_ENGINE_CONFIG.transient;
+    const attack = {
+      at: 1000,
+      atSample: 48000,
+      flux: true,
+      fluxValue: 1,
+      envelope: false,
+      riseRatio: 1,
+      sharpness: t.rearticulationSharpness,
+      fluxRatio: 9,
+      heldSharpness: t.restrumSharpness,
+      heldFluxRatio: t.restrumFluxRatio,
+      strength: 1,
+    } satisfies AttackEvidence;
+    const frame = { gated: false } as FastFrame;
+
+    const plain = new RearticulationDetector(DEFAULT_ENGINE_CONFIG);
+    const calibrated = new RearticulationDetector({
+      ...DEFAULT_ENGINE_CONFIG,
+      calibration: { ...UNCALIBRATED },
+    });
+    const verdict = (detector: RearticulationDetector) =>
+      detector.verdict(attack, frame, false, 1, false, null, true, 10);
+    expect(verdict(calibrated)).toEqual(verdict(plain));
+    expect(verdict(plain).accepted).toBe(true);
+  });
+
+  it("refuses on a rig whose resting flux is where the bar used to be", () => {
+    // Same transient, twice the measured floor: the bar it has to clear moves
+    // with the floor, so a reading that was exactly at the bar no longer is.
+    const t = DEFAULT_ENGINE_CONFIG.transient;
+    const attack = {
+      at: 1000,
+      atSample: 48000,
+      flux: true,
+      fluxValue: 1,
+      envelope: false,
+      riseRatio: 1,
+      sharpness: t.rearticulationSharpness,
+      fluxRatio: 9,
+      heldSharpness: t.restrumSharpness,
+      heldFluxRatio: t.restrumFluxRatio,
+      strength: 1,
+    } satisfies AttackEvidence;
+    const frame = { gated: false } as FastFrame;
+    const detector = new RearticulationDetector({
+      ...DEFAULT_ENGINE_CONFIG,
+      calibration: { sharpnessScale: 2, heldSharpnessScale: 2, fluxRatioScale: 1 },
+    });
+    expect(detector.verdict(attack, frame, false, 1, false, null, true, 10).accepted).toBe(
+      false
+    );
   });
 });

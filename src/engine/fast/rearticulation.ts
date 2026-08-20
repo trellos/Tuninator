@@ -52,17 +52,50 @@ import type {
  * itself every few hundred milliseconds; without the sharpness, a quiet passage
  * whose adaptive threshold has collapsed re-articulates on nothing.
  */
-function sharpEnough(attack: AttackEvidence, t: EngineConfig["transient"]): boolean {
+function sharpEnough(attack: AttackEvidence, t: Bars): boolean {
   return (
     attack.heldSharpness >= t.restrumSharpness && attack.heldFluxRatio >= t.restrumFluxRatio
   );
 }
 
+/**
+ * The five bars this file reads, after the rig calibration has been applied.
+ *
+ * Every one of them is a level on a witness whose SCALE the signal chain sets:
+ * `sharpness` and `heldSharpness` are spectral flux over the frame's RMS, and
+ * what a room mic or an amp sim leaves behind on an ordinary sustaining hop is
+ * two to three times what a direct input leaves. `EngineConfig.calibration`
+ * carries that ratio, measured, so a bar written as "0.9" keeps meaning "this
+ * far above what the chain does when nothing was struck" instead of meaning
+ * one thing on a DI and another on an amp.
+ *
+ * One direction of that is a genuine claim and the other is not, which is why
+ * this is a scale and not a re-derivation: a bar that moves with the measured
+ * floor keeps its ORIGINAL relationship to the resting signal, and the
+ * relationship is what was swept on the fixtures. With `UNCALIBRATED` — the
+ * default, and everything the library ships — every multiplier is 1 and these
+ * are the config's own numbers, unchanged.
+ */
+type Bars = EngineConfig["transient"];
+
+function calibrate(config: EngineConfig): Bars {
+  const c = config.calibration;
+  return {
+    ...config.transient,
+    rearticulationSharpness: config.transient.rearticulationSharpness * c.sharpnessScale,
+    newPitchSharpness: config.transient.newPitchSharpness * c.sharpnessScale,
+    restrumSharpness: config.transient.restrumSharpness * c.heldSharpnessScale,
+    restrumFluxRatio: config.transient.restrumFluxRatio * c.fluxRatioScale,
+    ringOutFluxRatio: config.transient.ringOutFluxRatio * c.fluxRatioScale,
+  };
+}
+
 export class RearticulationDetector implements IRearticulationDetector {
-  private readonly config: EngineConfig;
+  /** `config.transient`, with the rig calibration folded in. See `Bars`. */
+  private readonly bars: Bars;
 
   constructor(config: EngineConfig) {
-    this.config = config;
+    this.bars = calibrate(config);
   }
 
   isRearticulation(
@@ -109,7 +142,7 @@ export class RearticulationDetector implements IRearticulationDetector {
   ): RearticulationVerdict {
     if (frame.gated) return { accepted: false, reason: "gated" };
 
-    const t = this.config.transient;
+    const t = this.bars;
 
     // Mid-glide, energy has to have ARRIVED rather than merely moved. Bending
     // sweeps the spectrum and fires both attack witnesses repeatedly inside one

@@ -2749,3 +2749,165 @@ honestly. A rate not derived from the onsets being corrected would be the
 interesting version; so would dropping the rate entirely and comparing a
 fragment against its two immediate neighbours, which is the only per-passage
 quantity in this that does not require knowing the subdivision.
+
+## Calibrating on the whole signal chain: the ceiling, measured end to end
+
+`scripts/measure-rig-ceiling.ts`, `src/engine/rig-profile.ts`,
+`src/engine/fast/rearticulation.ts`.
+
+The section above refused per-rig calibration on an AUC. AUC is not the product,
+so the refusal deserved the blunt version of the question: if the recogniser
+were told exactly what the signal chain does — profile pooled from every take in
+the chain INCLUDING the one being scored, fully warmed before the first sample —
+does it then analyse that chain accurately? That is the ceiling of the idea. No
+deployed system can fit on the take it is about to score, so the number is an
+upper bound and never an achievement.
+
+### What was wired, and what was deliberately not
+
+`EngineConfig.calibration` carries three multipliers, `UNCALIBRATED` (all ones)
+by default, and `fast/rearticulation.ts` applies them to the five bars that are
+levels on a scale the chain sets:
+
+```
+  sharpnessScale       rearticulationSharpness, newPitchSharpness
+  heldSharpnessScale   restrumSharpness
+  fluxRatioScale       restrumFluxRatio, ringOutFluxRatio
+```
+
+A multiplier of `floor / REFERENCE_FLOOR`, so a bar keeps its original
+relationship to what the chain does when nothing was struck — the same
+one-directional move `NoiseFloorTracker` makes for the amplitude gate. The
+reference floors are the five 120bpm fixtures pooled, which is the audio every
+one of those constants was swept against, so that chain's multipliers come out
+at 1.001 and its numbers are unmoved. That is the first control.
+
+`transient.fluxSensitivity` was left out on the evidence: it multiplies the
+kernel's own running median, so it is already self-normalising and a rig scale
+on top of it would be applied twice. The flux-RATIO family was wired only so it
+could be refused separately, and it was: see the family table.
+
+Nothing in `src/` ever sets a calibration. The library ships `UNCALIBRATED`, and
+the control row below reproduces the shipped numbers exactly, per fixture.
+
+### The answer
+
+| variant | MISSED | named right | events split | extra Notes | strays |
+|---|---|---|---|---|---|
+| control, all ones (= shipped) | 32 | 371 | 99 / 459 | 107 | 10 |
+| **CEILING, fit on the scored take** | **39** | **364** | **83** | **90** | 10 |
+| cross-take within chain, honest | 40 | 362 | 84 | 91 | 10 |
+
+No. Told exactly what the chain is, the recogniser loses seven played events and
+names seven fewer correctly, in exchange for seventeen fewer duplicate Notes. By
+this project's own stated asymmetry — a played note that never appears cannot be
+recovered later, an extra one can, which is how `rearticulationRiseRatio` was
+derived — that is a regression, not a gain. The eval's accuracy column moves the
+same way the label count does, so nothing is being traded for a better name.
+
+Per signal chain, which is where a rig effect would have to show:
+
+| chain | takes | MISSED base -> ceiling | extras base -> ceiling |
+|---|---|---|---|
+| 120bpm original | 5 | 2 -> 2 | 13 -> 13 |
+| LP DI | 4 | 6 -> 6 | 29 -> 28 |
+| LP room mic | 4 | 11 -> 12 | 27 -> 24 |
+| LP amp sim | 4 | 13 -> 19 | 38 -> 25 |
+
+The multipliers the pooled profiles imply are 1.00 / 1.23 / 1.96 / 2.80 on
+`sharpness`, so the whole effect lands on the two coloured paths, and almost all
+of it on the amp sim. That is exactly where a rig story predicts it, and it is
+still a loss.
+
+### The honest number costs nothing extra
+
+Cross-take — profile pooled from the OTHER three takes in the chain, scored on
+the held-out one, rotated — lands within one event of the ceiling everywhere.
+That is worth stating plainly because it is the opposite of the usual failure:
+the gap between fitting on the take and not fitting on it is essentially zero,
+so the chain floor really is estimable from other performances. The idea does
+not fail for want of generalisation. It fails because what it generalises is not
+worth having.
+
+### It is not simply "raise the bars", and that is the only positive result
+
+Raising a sharpness bar trades extras for misses on its own, so the calibration
+has to be told apart from any global rise. `--controls` does that:
+
+| variant | MISSED | extras |
+|---|---|---|
+| control | 32 | 107 |
+| uniform x1.25 everywhere | 37 | 104 |
+| uniform x1.50 | 43 | 100 |
+| uniform x2.00 | 53 | 99 |
+| uniform x2.50 | 60 | 94 |
+| one profile over all 17 takes, no chains | 49 | 98 |
+| **per-chain CEILING** | **39** | **90** |
+
+The per-chain profile is off the uniform curve: at 90 extras a constant rise
+costs about sixty labels and the chain-specific one costs thirty-nine. Pooling
+all seventeen takes into one profile — the control that removes rig-specificity
+and keeps the rescaling — is worse than both on both axes. So the chain
+information is real and it is doing something. What it is doing is buying a
+better exchange rate on a trade this project does not want to make.
+
+### Which family carries it
+
+| family scaled | MISSED | extras |
+|---|---|---|
+| `sharpness` only | 38 | 94 |
+| `heldSharpness` only | 33 | 106 |
+| flux ratios only | 33 | 103 |
+| all three | 39 | 90 |
+
+Essentially all of it is `sharpness`, the witness whose floor separated chains
+best (sep 1.87). `heldSharpness`, which separated just as well (1.85), moves one
+Note. The flux ratios move four, and their multipliers are 0.65-1.15 — near 1,
+as a witness already divided by its own running median should be. No subset is
+free: every extra removed costs a label somewhere.
+
+### Why it cannot work, in one fixture pair
+
+The amp-sim chain gets one multiplier, 2.80, and the four takes it is applied to
+disagree about it:
+
+```
+  lead-line-amped-quarter-eighth-triplet    27 extras -> 18,  0 missed -> 0
+  lead-line-amped-sixteenths-e-fsharp        6 extras ->  4, 13 missed -> 18
+```
+
+Same guitar, same session, same chain, same profile. On the triplet take the
+raised bar removes nine duplicate Notes and costs nothing; on the sixteenths take
+it costs five played events. The quantity that wants a different bar is the
+PASSAGE, not the rig — which is what the leave-one-take-out collapse said before
+a per-rig normaliser was ruled out, and this is that conclusion arriving from the
+other direction, in Notes rather than in AUC.
+
+### Incidentally confirmed
+
+Pooling fixes the estimability problem the warm-up section flagged. A single
+sixteenths take retains 183-225 hops belonging to no attack against the 200 a
+floor requires; pooled per chain the four groups hold 2372-3789, so no chain
+profile in this experiment is near the edge. The shortage is a property of one
+dense take, not of the chain.
+
+### Verdict
+
+Per-rig calibration is finished as a direction. The ceiling — fit on test,
+warmed by construction, the best any version of this could ever do — is a
+regression on the measure that matters, and the honest cross-take version is a
+hair worse than the ceiling rather than a fraction of it. Nothing is left to
+recover by making the estimator better, because the estimator was not the
+limitation.
+
+The mechanism stays in the tree, off: `EngineConfig.calibration` defaults to
+`UNCALIBRATED`, the 487 tests and the eval are bit-identical with it, and
+`tests/engine/rig-profile.test.ts` pins that the default path is the same code
+the library ships. It costs one multiply per bar at construction and it is the
+apparatus any future attempt would need.
+
+Falsifiable, and cheaply: a calibration that reaches 90 extra Notes at 32 missed
+or fewer — that is, anywhere strictly inside the baseline on both axes — from a
+profile pooled over a chain. `measure-rig-ceiling.ts` prints both columns, per
+chain and per fixture, and the control row must reproduce 32 / 99 / 107 / 10
+exactly or the run means nothing.

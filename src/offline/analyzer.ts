@@ -12,6 +12,7 @@
 import type { Note, PitchFrame, RecognizerOptions } from "../types.js";
 import { RecognitionEngine } from "../engine/engine.js";
 import { RENDER_QUANTUM, resolveEngineConfig } from "../engine/config.js";
+import type { RigCalibration } from "../engine/rig-profile.js";
 import type { FastFrame } from "../engine/contracts.js";
 import type {
   TrackerEmission,
@@ -30,6 +31,17 @@ export type AnalyzeOptions = Pick<RecognizerOptions, "engine" | "diagnostics"> &
    * code that does not exist.
    */
   trackerTrace?: (event: TrackerTraceEvent) => void;
+  /**
+   * Run with the transient bars scaled to a measured signal chain.
+   *
+   * Offline only, and deliberately not part of `EngineTuning`: a calibration is
+   * a measurement of a rig rather than a setting, and nothing in the library
+   * produces one. It exists so `scripts/measure-rig-ceiling.ts` can ask what
+   * the recognizer would do if it knew the chain — see
+   * `EngineConfig.calibration`. Omitted, the engine runs `UNCALIBRATED`, which
+   * is bit-identical to not having this parameter at all.
+   */
+  calibration?: RigCalibration;
 };
 
 export type AnalyzeResult = {
@@ -76,6 +88,7 @@ function run(
     ...options?.diagnostics,
     ...(wantFrames ? { pitchFrames: true } : {}),
   });
+  if (options?.calibration !== undefined) config.calibration = { ...options.calibration };
   const engine = new RecognitionEngine(sampleRate, config);
   if (options?.trackerTrace !== undefined) engine.setTrackerTrace(options.trackerTrace);
 

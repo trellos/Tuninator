@@ -91,6 +91,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { RecognitionEngine } from "../src/engine/engine.js";
 import { RENDER_QUANTUM, resolveEngineConfig, snapHop } from "../src/engine/config.js";
 import { OnsetDetector } from "../src/engine/kernels/onset.js";
@@ -127,12 +128,12 @@ const SETTLED_TOLERANCE = 0.15;
  */
 const NORMALISATION_LAMBDA = 0.01;
 
-type Chain = "120bpm original" | "LP DI" | "LP mic" | "LP amped";
+export type Chain = "120bpm original" | "LP DI" | "LP mic" | "LP amped";
 
-const CHAINS: Chain[] = ["120bpm original", "LP DI", "LP mic", "LP amped"];
+export const CHAINS: Chain[] = ["120bpm original", "LP DI", "LP mic", "LP amped"];
 
 /** Which signal chain a fixture stem was recorded through. */
-function chainOf(stem: string): Chain {
+export function chainOf(stem: string): Chain {
   if (stem.includes("120bpm") || stem.includes("spicy")) return "120bpm original";
   if (stem.includes("-di-")) return "LP DI";
   if (stem.includes("-amped-")) return "LP amped";
@@ -161,7 +162,7 @@ type TakeResult = {
  * observations are replayed into estimators afterwards, so a sweep costs one
  * pass over the audio rather than one per setting.
  */
-function observationsOf(
+export function observationsOf(
   samples: Float32Array,
   sampleRate: number
 ): { observations: RigObservation[]; disagreements: number; compared: number } {
@@ -864,4 +865,7 @@ function main(): void {
   reportNormalisation(takes, NORMALISATION_LAMBDA);
 }
 
-main();
+// Runs when invoked, stays quiet when imported: `measure-rig-ceiling.ts` reuses
+// `observationsOf` and the chain grouping above, and importing this file must
+// not re-run the whole survey.
+if (process.argv[1] === fileURLToPath(import.meta.url)) main();
