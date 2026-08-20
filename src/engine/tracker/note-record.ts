@@ -212,6 +212,17 @@ export class NoteRecord {
   burstAt: number | null = null;
 
   /**
+   * The fast lane ended this Note on an accepted re-articulation.
+   *
+   * That is a positive decision that a second stroke arrived over a Note old
+   * enough to be closed, so the Note it closed is a whole event rather than a
+   * fragment of the one that follows. Recorded because a later Note naming a
+   * chord reaches back for the fragments of its own attack, and must not reach
+   * back across a boundary the tracker had already committed to.
+   */
+  restruck = false;
+
+  /**
    * This Note turned out to be part of another one and has been absorbed.
    *
    * Its already-delivered events stand — history is never rewritten — but the

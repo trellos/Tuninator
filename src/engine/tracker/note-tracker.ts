@@ -550,6 +550,7 @@ export class NoteTracker {
         // transient in hand.
         const burst = this.attackBurstStart ?? frame.attack;
         const boundary = burst.at > active.startTime ? burst : frame.attack;
+        active.restruck = true;
         this.end(active, boundary.at, out);
         // The successor is created below, once this hop has decided what it is.
         // It inherits the decay: a restrum re-excites the strings that were
@@ -1088,6 +1089,16 @@ export class NoteTracker {
         // rather than a fragment of a forming articulation. Absorbing it would
         // let a chord that names itself nearby swallow the re-segmentation.
         if (candidate.deepStructural) continue;
+        // Nor a Note the fast lane deliberately ENDED on a re-articulation and
+        // that lived long enough to be announced. The same argument applies: a
+        // re-articulation is a decision that a new stroke began, and the Note it
+        // closed is the stroke before it, already reported to the consumer.
+        // Swallowing it retracts a detection and drags the survivor's start back
+        // over a stroke it did not begin — which is how a run of picked notes
+        // comes out as one long chord. A fragment of a forming articulation is
+        // ended by the pitch settling, not by a second attack, and dies before
+        // the announcement bar, which is what the bar is for.
+        if (candidate.restruck && candidate.announced) continue;
         if (candidate.harmonyLabel !== null) continue;
         if (candidate.endTime === null) continue;
         if (candidate.endTime - candidate.startTime > config.mergeMaxFragmentMs) continue;
