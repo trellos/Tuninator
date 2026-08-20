@@ -1713,3 +1713,81 @@ This is worth more than the three labels it currently costs. Microphone input
 is the case this library exists for, and a mic is exactly where the fundamental
 goes missing — the same rolloff will move every bass-dependent answer on any
 mic'd rig: inversions, slash names, and the register in `detectedPitches`.
+### A same-pitch boundary the next attack contradicts: built, measured, reverted
+
+A same-pitch re-articulation cannot be judged when it is made. In the eighth
+note run at 13.3s of the amped triplet take the tracker cuts B4 in two at
+13440 and every energy witness says nothing arrived — envelope 0.95 against the
+Note's own baseline, rise 1.02, and the string 0.72 of the way below its own
+decay curve — while the flux figures there are HIGHER than at the real attack
+67ms later, because a saturated amp path churns the spectrum in sustain harder
+than a pick does. No threshold at the moment of the decision separates that
+from a player genuinely re-picking a ringing string.
+
+So the boundary was reconsidered afterwards instead, which is what the
+structural-revision machinery exists for. The rule: a Note opened by an
+accepted SAME-pitch re-articulation, ended within one articulation by a
+genuine PITCH-CHANGING attack, and voting the same pitch class as its
+predecessor, was never an event — it goes back into its predecessor the way
+`mergeWithinSegment` does, with the predecessor's end extended and a
+`structuralRevision` emitted.
+
+It works, and it costs more labels than it buys events:
+
+| bar (`soundedMs <`) | events split | extra Notes | labels missed |
+|---|---|---|---|
+| rule off | 83 / 459 | 85 | 35 |
+| 67 / 68 / 80 (`transient.articulationMs`) | 72 / 459 | 74 | **39** |
+| 94 | 66 / 459 | 68 | **43** |
+| 107 | 65 / 459 | 67 | **43** |
+| 120 | 64 / 459 | 66 | **43** |
+| 134 | 63 / 459 | 65 | **45** |
+
+Every value that removes extra Notes loses labels, monotonically, and the
+labels it loses are all on the sixteenths takes: `s4`, `s29` (amped),
+`s5`, `s25`, `s41`, `s45` (room mic), `t2` (room mic triplet). Those takes
+alternate E and F# in groups of four, so a same-pitch re-pick 107ms apart is a
+real event there, and the Note the rule swallows is the label's OWN detection
+sitting +9ms from its annotated onset.
+
+Three discriminators were built and measured against the fifty merges the rule
+performs:
+
+| discriminator | result |
+|---|---|
+| a lower bound on the fragment as well as an upper one (`soundedMs` in [41,80), [54,80), [61,80)) | 71 / 459 split, 73 extras, missed 39 -> 38. The populations overlap: the good merges on the amped triplet take sound 27, 40, 53 and 67ms and the bad ones on the sixteenths takes sound 27, 40, 53 and 67ms |
+| require the boundary to have had no energy behind it (`restrikeEnvelope < 1` AND `decayExcess < 1`) | 75 / 459 split, 77 extras, missed 38. No separation: good merges run env 0.84-1.05, bad ones 0.64-1.15 |
+| undo only a LONE same-pitch boundary, never one whose predecessor was itself the child of a same-pitch split | inert — 72 / 459 split, 74 extras, missed 39, unchanged. The sixteenths predecessors are not same-pitch children, so the chain test never fires |
+
+The trade is real and it is the wrong way round: eleven fewer spurious Notes
+for four fewer detected notes, on a recogniser whose first requirement is to
+detect every labelled note. Reverted rather than kept. What the measurement
+does establish is that the retroactive direction is sound — the boundary IS
+false and the revision machinery does remove it cleanly — and that the missing
+piece is a way to tell a lone artefactual same-pitch split from a real re-pick
+that neither duration, energy, nor chaining supplies. The next thing to try is
+not another witness at the boundary but the inter-onset interval the take has
+established by then: the false split makes a stroke that is half its
+neighbours', and the real re-pick makes one the same length as its neighbours'.
+
+### `transient.articulationMs` is not what holds the attack stubs back
+
+`absorbArticulationFragment()` is meant to swallow a Note that opened before
+its pitch arrived, and the standing guess was that its 80ms bound is simply
+shorter than the estimator's lag. `scripts/measure-articulation-stubs.ts`
+counts every offer made to it, keyed by the call site that made it, and the
+guess does not survive the count:
+
+```
+  attack / too-long              267      pitchChange / ABSORBED         59
+  attack / bloomed                59      pitchChange / already-falling  35
+  attack / already-falling        23      pitchChange / too-long         22
+  attack / ABSORBED                6
+```
+
+The two call sites answer different questions and only the second is about
+stubs. The 267 refusals at the attack site are Notes a re-articulation had just
+ended — whole notes, correctly refused. At the pitch-step site, which is the
+one that offers a stub of the note now arriving, `too-long` fires 22 times with
+a median duration of 293ms; those are not stubs either. Raising
+`articulationMs` reaches almost none of the shape it was supposed to reach.

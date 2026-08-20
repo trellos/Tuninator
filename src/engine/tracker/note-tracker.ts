@@ -123,6 +123,25 @@ export type TrackerTraceEvent =
       intoBurstAt: number | null;
     }
   | {
+      /**
+       * A stub the tracker offered to `absorbArticulationFragment()` and it
+       * declined, with the test that declined it.
+       *
+       * The counterpart of `absorbed`. A ledger that can only see the
+       * absorptions that happened cannot tell a stub nobody offered from one
+       * every guard was asked about and refused, and those want different
+       * repairs.
+       */
+      kind: "declined";
+      at: SourceTimeMs;
+      noteId: string;
+      intoId: string;
+      reason: string;
+      durationMs: number;
+      /** `rms / maxRms` at its death: 1 means it was still rising. */
+      fellTo: number;
+    }
+  | {
       kind: "ended";
       at: SourceTimeMs;
       noteId: string;
@@ -1031,24 +1050,42 @@ export class NoteTracker {
   ): void {
     if (predecessor === null) return;
     if (predecessor.merged) return;
-    if (predecessor.deepStructural) return;
+    const decline = (reason: string): void => {
+      if (this.trace === null) return;
+      this.trace({
+        kind: "declined",
+        at: predecessor.startTime,
+        noteId: predecessor.id,
+        intoId: survivor.id,
+        reason,
+        durationMs: predecessor.durationMs,
+        fellTo: predecessor.maxRms === 0 ? 1 : predecessor.rms / predecessor.maxRms,
+      });
+    };
+    if (predecessor.deepStructural) return decline("deep-structural");
     // A Note that named a chord, or that sustained past one articulation, is an
     // event somebody played. Only the stub of a forming articulation qualifies.
-    if (predecessor.harmonyBloomed) return;
-    if (predecessor.durationMs > this.config.transient.articulationMs) return;
+    if (predecessor.harmonyBloomed) return decline("bloomed");
+    if (predecessor.durationMs > this.config.transient.articulationMs) {
+      return decline("too-long");
+    }
     // And a Note that had already begun to decay was not a stub. See
     // `STILL_RISING_FRACTION`: a fragment of a forming articulation is
     // interrupted by the same pick still arriving, so it is at its own peak
     // when it dies, while a note answered by a second pick had peaked and
     // started to fall. Duration cannot separate those at two tempos; this is
     // the same claim made about the Note against itself.
-    if (predecessor.rms < predecessor.maxRms * STILL_RISING_FRACTION) return;
+    if (predecessor.rms < predecessor.maxRms * STILL_RISING_FRACTION) {
+      return decline("already-falling");
+    }
     // Contiguous by construction when the split ended the predecessor here, but
     // checked rather than assumed: a gap means silence, and silence means two
     // separate events.
     const end = predecessor.endTime;
-    if (end === null) return;
-    if (Math.abs(end - survivor.startTime) > this.config.harmony.mergeMaxGapMs) return;
+    if (end === null) return decline("no-end");
+    if (Math.abs(end - survivor.startTime) > this.config.harmony.mergeMaxGapMs) {
+      return decline("gap");
+    }
 
     if (this.trace !== null) {
       this.trace({
