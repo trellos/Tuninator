@@ -1370,3 +1370,38 @@ above says line by line.
 | in `absorbAttackFragments`, refuse a candidate that had already peaked | chords shatter: `spicy` 3 detections -> 6, `cowboy` 120 10 -> 11, `cowboy` mic 140 8 -> 9, fragmentation 97/105 -> 104/114 |
 | in `absorbAttackFragments`, refuse a candidate YIN was confident about (`maxMonophonicConfidence`) | the originals hold, but the amped triplet take gains ten Notes (66 -> 76) and fragmentation goes 97/105 -> 100/108. The bloomed Note stops eating four notes and the take sheds more elsewhere |
 | accept a same-pitch re-articulation when the onset KERNEL fired, as against the envelope witness | clean-lead's false positives 1 -> 3 and the room-mic lead take 63 -> 70 detections. Qualified by an envelope rise it becomes a new constant the derivation set cannot pin: the five 120bpm fixtures are bit-identical at 1.05, 1.1, 1.15 and 1.2, so any value in that range is fitted to held-out data. At the one value the derivation set does move (1.0, where clean-lead's pitch class goes 91.7% -> 94.4%) the room-mic lead take goes 63 -> 69. Recorded rather than kept: it buys one sixteenth on the room mic for three extra Notes on the room-mic lead take, which is the frontier every previous sweep died on |
+
+### The `settled` bar is two milliseconds off, and closing it costs more than it buys
+
+Ten labels are lost to `note-tracker.ts process()` refusing an ALREADY-ACCEPTED
+re-articulation because the Note it would end was too young. Eight of the ten
+lose by the same two milliseconds:
+
+```
+  s4  E5@4058  n5  opened@3933 attack       sounded=53  bar=55  via envelope-rise
+  s8  F#5@4467 n12 opened@4387 attack       sounded=53  bar=55  via sharpness
+  s12 E5@4903  n16 opened@4813 pitchChange  sounded=27  bar=55  via envelope-rise
+  s18 E5@5504  n19 opened@5387 attack       sounded=53  bar=55  via envelope-rise
+  s26 E5@6353  n25 opened@6227 attack       sounded=53  bar=55  via envelope-rise
+  s30 F#5@6763 n30 opened@6733 pitchChange  sounded=53  bar=55  via sharpness
+  s40 F#5@7828 n39 opened@7747 attack       sounded=53  bar=55  via envelope-rise
+```
+
+That is arithmetic, not evidence. The fast hop is 13.3ms at 48kHz, so a Note
+that sounds for four hops has sounded 53.3ms and `minStableMs: 55` means five
+hops. The bar reads as a duration and behaves as a hop count.
+
+Two ways of closing it were built and both are worse than leaving it:
+
+| change | result |
+|---|---|
+| `minStableMs` 55 -> 50 (four hops) globally | total missed 41 -> 39, but the required `chords-a-bm-g-d` take loses a label for the first time (16/16 -> 15/16 detections, 1 missed), the room-mic cowboy take goes 11 -> 15 detections and the amped triplet take 1 -> 3 missed |
+| `minStableMs` 55 -> 40 globally | total missed 41 -> 37 with the same `chords-a-bm-g-d` regression |
+| a separate `minAttackStableMs: 50` applied only to Notes that opened on their own transient | total missed 41 -> 46. The room-mic sixteenths take goes 10 -> 13 missed and `chords-a-bm-g-d` still loses its label |
+
+The shape is consistent in all three: ending Notes sooner produces more and
+shorter Notes, which are then absorbed or paired with a neighbour, and the
+labels recovered at the `settled` test are lost again one step downstream. The
+bar is not what is holding these strokes back — what happens to a short Note
+after it is created is. Recorded so the two-millisecond miss is not mistaken
+for an easy win a third time.
