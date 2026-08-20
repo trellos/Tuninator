@@ -42,6 +42,8 @@ const FOCUS = ["sixteenths", "quarter-eighth-triplet"];
 const SITES: Readonly<Record<string, string>> = {
   "paired with a neighbouring label":
     "a Note opened here and the matcher gave it the label either side",
+  "no boundary here; the nearest Note is a neighbour's":
+    "no segmentation decision was taken at this stroke at all",
   "split made; successor never announced":
     "note-tracker.ts end(): the split's successor sounded < announceThresholdMs",
   "split made; successor absorbed as an articulation stub":
@@ -65,6 +67,10 @@ const SITES: Readonly<Record<string, string>> = {
     "rearticulation.ts: rms < sustainedRms * rearticulationRiseRatio && sharpness < rearticulationSharpness",
   "rejected: gated": "rearticulation.ts: frame.gated",
   "band-only transient": "the fast lane may not act on FastFrame.bandOnset",
+  "split made; no successor opened":
+    "note-tracker.ts process(): the boundary was made and nothing sounded after it",
+  "absorbed as an articulation stub (into a bloomed Note)":
+    "note-tracker.ts absorbAttackFragments()",
   "transient below the amplitude gate": "fast-lane.ts: frame.gated, no Note may open",
   "no transient within the window": "kernels/onset.ts never fired here",
 };
@@ -145,16 +151,30 @@ function fateOf(fate: Fate, prefix: string): Cause {
 function classify(
   labelStart: number,
   events: readonly TrackerTraceEvent[],
-  fates: ReadonlyMap<string, Fate>
+  fates: ReadonlyMap<string, Fate>,
+  /** Notes the matcher already gave to some OTHER label. */
+  spokenFor: ReadonlySet<string>
 ): Cause {
   const near = events.filter((e) => Math.abs(e.at - labelStart) <= WINDOW_MS);
 
   // 1. A Note opened on this stroke. Whatever else happened, the boundary was
   //    found; what is missing is a detection carrying it.
+  //
+  // Unless that Note is already some other label's. A stroke 107ms from its
+  // neighbours has both of them inside this window, so "a Note opened near
+  // here" is not evidence that anything was detected HERE — and calling it
+  // "the matcher paired it with a neighbour" hides a stroke that produced no
+  // boundary at all behind an accounting complaint.
+  let stolen: Fate | null = null;
   for (const event of near) {
     if (event.kind !== "opened") continue;
     const fate = fates.get(event.noteId);
-    if (fate !== undefined) return fateOf(fate, "");
+    if (fate === undefined) continue;
+    if (fate.emitted && spokenFor.has(fate.id)) {
+      if (stolen === null) stolen = fate;
+      continue;
+    }
+    return fateOf(fate, "");
   }
 
   // 2. A re-articulation was considered over a sounding Note.
@@ -189,12 +209,22 @@ function classify(
       detail:
         `${best.noteId} sharp ${fmt(best.sharpness)}/${fmt(best.heldSharpness)}` +
         ` flux ${fmt(best.fluxRatio)}/${fmt(best.heldFluxRatio)}` +
-        ` rise ${fmt(best.riseRatio)} excess ${fmt(best.decayExcess)}` +
+        ` env ${fmt(best.envelopeOverBaseline)} rise ${fmt(best.riseRatio)}` +
+        ` excess ${fmt(best.decayExcess)} kernel ${best.kernelOnset ? "fired" : "envelope only"}` +
         ` sounded ${best.soundedMs.toFixed(0)}`,
     };
   }
 
-  // 3. Nothing was decided, so nothing reached the decision.
+  // 3. A Note opened near here and belongs to a neighbour, and nothing else
+  //    happened at this stroke: the boundary this label needed was never made.
+  if (stolen !== null) {
+    return {
+      cause: "no boundary here; the nearest Note is a neighbour's",
+      detail: `${stolen.id} @${stolen.openedAt.toFixed(0)}`,
+    };
+  }
+
+  // 4. Nothing was decided, so nothing reached the decision.
   const onsets = near.filter(
     (e): e is Extract<TrackerTraceEvent, { kind: "onset" }> => e.kind === "onset"
   );
@@ -233,6 +263,7 @@ function run(stems: (stem: string) => boolean): FixtureLedger[] {
     const labels = fixture.label.events as LabeledEvent[];
     const result = matchEvents(labels, detections);
     const fates = fatesOf(events, new Set(detections.map((d) => d.id)));
+    const spokenFor = new Set(result.matches.map((m) => m.detection.id));
 
     out.push({
       stem: fixture.stem,
@@ -242,7 +273,7 @@ function run(stems: (stem: string) => boolean): FixtureLedger[] {
         id: label.id,
         startMs: label.startMs,
         label: label.label,
-        ...classify(label.startMs, events, fates),
+        ...classify(label.startMs, events, fates, spokenFor),
       })),
     });
   }
@@ -318,7 +349,7 @@ function main(): void {
 
   console.log("\n  where each cause lives");
   for (const [cause] of ordered) {
-    console.log(`    ${cause.padEnd(38)} ${SITES[cause] ?? "(unattributed)"}`);
+    console.log(`    ${cause.padEnd(54)} ${SITES[cause] ?? "(unattributed)"}`);
   }
 
   if (detail) {

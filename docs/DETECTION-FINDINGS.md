@@ -1214,3 +1214,159 @@ the stroke and the matcher paired it with the label either side, which is the
 pitch-path lag this document has named twice: a Note whose boundary is right
 and whose first hops describe its predecessor. It is why the same takes
 simultaneously miss labels and over-segment, and it is not a duration.
+
+## The downstream ledger: every missed label, and the line that discarded it
+
+The onset kernel reaches 44-45 of the 48 strokes on each sixteenths take and
+the tracker emitted 36-41 Notes, so for the first time in this document the
+losses are entirely downstream of the evidence. `scripts/measure-downstream-ledger.ts`
+is the reproducible version of the hand-built ledgers above: it runs the real
+engine, listens to `NoteTracker.trace` — every onset, every re-articulation
+verdict with the test that decided it, every Note opened, absorbed and ended —
+matches the detections against the labels with the eval's own matcher, and for
+each missed label names the branch that discarded it.
+
+It is built on the tracker's own decisions rather than on a re-implementation
+of its rules, which is the whole point: a ledger that re-derives the rules
+describes a version of the tracker that no longer exists. `npx tsx
+scripts/measure-downstream-ledger.ts --detail` prints it per label, `--all`
+covers every fixture.
+
+### Before this pass
+
+| cause | amp trip | amp 16th | DI trip | DI 16th | mic trip | mic 16th | total |
+|---|---|---|---|---|---|---|---|
+| a Note opened and a pitch step ended it before it could be announced | 6 | 3 | 0 | 0 | 2 | 4 | **15** |
+| a Note opened and the matcher paired it with a neighbour | 1 | 3 | 0 | 4 | 1 | 3 | **12** |
+| re-articulation accepted, the Note too young to be ended | 0 | 5 | 0 | 1 | 0 | 0 | **6** |
+| rejected: gliding, rise below `glideRiseOverride` | 1 | 1 | 0 | 1 | 0 | 0 | **3** |
+| no transient within 70ms | 0 | 1 | 0 | 1 | 0 | 2 | **4** |
+| rejected: chord branch (`chord-not-sharp`, past `mutedRestrumWindowMs`) | 5 | 0 | 0 | 0 | 0 | 0 | **5** |
+| absorbed as an articulation stub | 0 | 1 | 0 | 0 | 0 | 0 | **1** |
+| rejected: no energy arrived and not sharp | 0 | 1 | 0 | 0 | 0 | 1 | **2** |
+| band-only transient | 0 | 1 | 0 | 0 | 0 | 0 | **1** |
+| missed | 13 | 15 | 0 | 7 | 3 | 10 | **48** |
+
+The two partial ledgers this replaces pointed at `minStableMs`, `gliding`,
+articulation stubs, band-only transients and the matcher. All five are real and
+all five together are a minority: **the largest single cause was a pitch step
+ending a Note two or three hops old**, which none of them had named.
+
+### What that is
+
+The attack transient is the least periodic part of a note, so a Note's first
+hops report whatever was ringing before it. The estimator then catches up, and
+what it reports is a *step*. That step ends the Note — which is too young to
+have been announced, so it is dropped rather than emitted — and opens a
+successor that is the same event, starting late with none of the stub's span.
+Two picks, one Note, silently: the same shape as a burst boundary landing on a
+Note's own start, which an earlier pass fixed on the re-articulation path.
+
+Three changes, each derived on the five 120bpm fixtures:
+
+1. **A step that ends a Note too young to be announced is renaming a stub**, so
+   the successor absorbs it: boundary from the stub, name from the frames that
+   describe what was played. Bounded by the announcement bar rather than by a
+   duration — every longer bound tried costs `clean-lead` a labelled note.
+2. **...and the reading it is leaving has to be one it cannot defend**: the
+   name of the Note in front of it, or a pitch between that name and the one
+   now arriving. On the room-mic sixteenths an F#5 answered by an E5 reads F5
+   for two hops — a pitch nobody played. Without this test the lead takes gain
+   three split events and two extra Notes.
+3. **A stub that never described itself is a stub however long it lasted.** On
+   the direct-input lead take an attack fires 52ms before the string speaks and
+   opens a Note that spends its whole 67ms life reporting the pitch still
+   ringing, clears the announcement bar on that, and is then renamed. The
+   second condition is not a duration: every vote the Note holds is for the
+   reading it is now leaving.
+
+Absorbing lends a boundary, not evidence: a stub a step shed is the previous
+note still ringing, so its hops do not count toward the successor's
+announcement (`NoteRecord.announceSoundedMs`). Without that a 40ms stub and a
+53ms tail add up to a Note where neither was one, which
+`tests/engine/note-tracker.test.ts` holds directly.
+
+And separately, **a pitch that "differs" has to differ by a real step in cents
+rather than by rounding to another name.** `pitchDiffers` compared
+`nearest.midi` against the Note's voted name, and a note sitting 40 cents sharp
+of D5 reads as D#5 — so a held quarter note with vibrato on it changed name
+every few hops without the frequency having gone anywhere, and shed a Note when
+it did. The bend guard immediately below it has always measured in cents.
+
+### Measured, end to end
+
+| fixture | detections before | after | missed before/after | fp before/after |
+|---|---|---|---|---|
+| chords-a-bm 120 | 16/16 | 16/16 | 0 / 0 | 0 / 0 |
+| clean-lead 120 | 42/43 | 41/43 | 3 / 3 | 2 / **1** |
+| cowboy 120 | 10/8 | 10/8 | 0 / 0 | 2 / 2 |
+| power-chords 120 | 9/8 | 9/8 | 0 / 0 | 1 / 1 |
+| spicy | 3/3 | 3/3 | 0 / 0 | 0 / 0 |
+| sixteenths mic | 38/48 | 38/48 | 10 / 10 | 0 / 0 |
+| sixteenths DI | 41/48 | 41/48 | 7 / 7 | 0 / 0 |
+| sixteenths amp | 36/48 | **37/48** | 15 / **14** | 3 / 3 |
+| lead line mic | 64/55 | **63/55** | 3 / 3 | 12 / **11** |
+| lead line DI | 78/55 | **76/55** | 0 / 0 | 23 / **21** |
+| lead line amp | 61/55 | 66/55 | 13 / **9** | 19 / 20 |
+| cowboy mic/amp/DI 140 | 8, 11, 9 | unchanged | unchanged | unchanged |
+| power mic/DI/amp 140 | 20, 12, 10 | unchanged | unchanged | unchanged |
+
+`clean-lead`'s gated pitch class (92.6%) and exact accuracy (81.5%) are
+unchanged, every required fixture meets every gate, and the amped sixteenths
+take now passes its own informational gate. Whole-corpus fragmentation goes
+**97 of 459 events split with 107 extra Notes to 97 with 105**.
+
+The amped lead take is the one row that gains detections, and it gains four
+labels with them: 13 missed to 9, against one extra false positive. It is the
+take whose saturation makes a lead line read as harmonic, and the section below
+says what is still eating its notes.
+
+### Where the remaining 43 go
+
+| cause | amp trip | amp 16th | DI trip | DI 16th | mic trip | mic 16th | total |
+|---|---|---|---|---|---|---|---|
+| absorbed as an articulation stub | 6 | 1 | 0 | 0 | 2 | 2 | **11** |
+| the split was made; its Note took a neighbour's label | 0 | 2 | 0 | 4 | 1 | 3 | **10** |
+| re-articulation accepted, the Note too young to be ended | 0 | 5 | 0 | 1 | 0 | 1 | **7** |
+| no transient within 70ms | 0 | 1 | 0 | 1 | 0 | 2 | **4** |
+| rejected: gliding, rise below `glideRiseOverride` | 1 | 1 | 0 | 1 | 0 | 0 | **3** |
+| a Note opened and was never announced | 2 | 1 | 0 | 0 | 0 | 0 | **3** |
+| rejected: no energy arrived and not sharp | 0 | 1 | 0 | 0 | 0 | 1 | **2** |
+| band-only transient / no successor / no boundary | 0 | 2 | 0 | 0 | 0 | 1 | **3** |
+| missed | 9 | 14 | 0 | 7 | 3 | 10 | **43** |
+
+Six of the amped triplet take's nine are one event: a Note that blooms into a
+chord at the end of a phrase reaches back with `absorbAttackFragments` and
+swallows four played notes, each inside `mergeMaxFragmentMs` and inside
+`mergeLookbackMs`. On a saturated amp sim a lead line reads harmonic, so the
+one path that protects a strummed chord's fragments is applied to a run of
+single notes. Two containments were measured and both are worse (below).
+
+### The same-pitch branch is not what loses the sixteenths
+
+Instrumented directly, because it is the obvious suspect and it is innocent.
+Every same-pitch re-articulation decision on the room-mic sixteenths take, in
+the monophonic no-fit fallback:
+
+```
+  44 decisions, 42 accepted, every one of them on a labelled stroke
+  the two rejections:  s3 @4893  env 1.04  sharp 0.87  rise 1.19  (no-energy-not-sharp)
+                          @6200  env 1.08  sharp 5.28  rise 1.21  (glide-rise)
+```
+
+Forty-two of the take's forty-eight strokes get a boundary out of that branch.
+What the take is short of is not boundaries; it is Notes that survive to be
+emitted and land where the matcher can pair them, which is what the ledger
+above says line by line.
+
+### Measured in this pass, and not kept
+
+| change | result |
+|---|---|
+| `arrivalBands`: report how many of the onset kernel's bands showed arrival, and require a broad arrival for a same-pitch re-pick | the count does not separate on-label from off-label onsets on the derivation fixtures (clean-lead: on-label 2:13 3:15 4:5, off-label 2:6 3:9 4:6), and gating on it costs clean-lead nine detections and nine labels at 3 bands. As an ESCAPE instead of a gate it is inert at every reachable value. Built, measured, reverted |
+| let the `settled` test pass when the Note had already peaked (`STILL_RISING_FRACTION`) | recovers strokes and breaks the derivation set: clean-lead 40 detections, 5 missed, gated pitch class 84.0%, required gate FAILS |
+| require the `settled` test to ALSO see a Note past its peak | clean-lead 84.0% pitch class, gate fails again, and the amped triplet take collapses to 47 detections with 21 missed |
+| a pitch step must leave the Note's voted NAME, not merely the last reading | clean-lead 42 -> 41 detections with a labelled note lost, amp sixteenths 37 -> 33, DI sixteenths 41 -> 39 |
+| in `absorbAttackFragments`, refuse a candidate that had already peaked | chords shatter: `spicy` 3 detections -> 6, `cowboy` 120 10 -> 11, `cowboy` mic 140 8 -> 9, fragmentation 97/105 -> 104/114 |
+| in `absorbAttackFragments`, refuse a candidate YIN was confident about (`maxMonophonicConfidence`) | the originals hold, but the amped triplet take gains ten Notes (66 -> 76) and fragmentation goes 97/105 -> 100/108. The bloomed Note stops eating four notes and the take sheds more elsewhere |
+| accept a same-pitch re-articulation when the onset KERNEL fired, as against the envelope witness | clean-lead's false positives 1 -> 3 and the room-mic lead take 63 -> 70 detections. Qualified by an envelope rise it becomes a new constant the derivation set cannot pin: the five 120bpm fixtures are bit-identical at 1.05, 1.1, 1.15 and 1.2, so any value in that range is fitted to held-out data. At the one value the derivation set does move (1.0, where clean-lead's pitch class goes 91.7% -> 94.4%) the room-mic lead take goes 63 -> 69. Recorded rather than kept: it buys one sixteenth on the room mic for three extra Notes on the room-mic lead take, which is the frontier every previous sweep died on |

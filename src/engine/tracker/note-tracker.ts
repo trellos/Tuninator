@@ -102,6 +102,10 @@ export type TrackerTraceEvent =
       fluxRatio: number;
       heldFluxRatio: number;
       riseRatio: number;
+      /** `frame.rms / sustainedRms`: the envelope against the Note's own baseline. */
+      envelopeOverBaseline: number;
+      /** The onset kernel itself fired on this hop, as against the envelope witness. */
+      kernelOnset: boolean;
       bloomed: boolean;
     }
   | { kind: "opened"; at: SourceTimeMs; noteId: string; trigger: NoteOriginTrigger }
@@ -517,6 +521,8 @@ export class NoteTracker {
           fluxRatio: frame.attack.fluxRatio,
           heldFluxRatio: frame.attack.heldFluxRatio,
           riseRatio: frame.riseRatio,
+          envelopeOverBaseline: frame.rms / Math.max(active.sustainedRms, 1e-9),
+          kernelOnset: frame.attack.flux,
           bloomed: active.harmonyBloomed,
         });
       }
