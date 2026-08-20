@@ -3099,3 +3099,208 @@ price exists that turns it into a segmentation, and the sweep is a waste of the
 run. `measure-dp-segmentation.ts --controls` must reproduce 63 / 125 for the
 shipped Notes and 71 / 611 for the greedy segmenter, or the regions being
 measured are not the ones the deep lane produces.
+
+## Three candidate features from the onset literature, measured to their verdicts
+
+The five converging negatives above (best single witness 0.73 AUC; the twelve
+together collapsing 0.808 → 0.434 leave-one-take-out; per-rig calibration,
+joint DP segmentation and the local-rate gate each measured to their ceiling
+and refused) say the same thing: every existing witness is an energy-increase
+detector in some disguise, and the same-pitch re-articulation decision needs
+*different features*, not better logic over these. `docs/onset-features-prompt.md`
+named three candidates with prior art and a falsifier each. All three were
+built and measured in this pass. One falsifier passed, one split, one killed
+its line cleanly. The baseline every number below is judged against: **32
+missed / 99 events split, 107 extra Notes**.
+
+### 1. The frequency-axis maximum filter substitutes for the time memory — and then moves the operating point instead of beating it
+
+The onset kernel's reference is the per-bin maximum over the last three hops —
+the *time* axis — because at fftSize 1024 the harmonics of a low E are 1.9
+bins apart, unresolved, and beat: on a steady synthetic low E the
+successive-frame flux swings as widely as a pick attack. But any time memory
+makes the reference the loudest recent frame, which raises the bar a *quieter*
+re-attack has to clear, and the quiet re-attack is the case the corpus fails.
+SuperFlux (Böck & Widmer, DAFx-13) runs the max across *frequency* instead:
+`diff = spec[t] − maxfilter_over_frequency(spec[t−1])`.
+
+**Design choice.** The reference implementation takes a 3-bin max on a 24
+band/octave triangular filterbank — a musically scaled tolerance. On our
+linear FFT a fixed bin count is a fixed Hz tolerance, so the filter width here
+scales with bin index instead: every bin's neighbourhood is the bins within
+±S semitones, never less than ±1 bin (near DC a musical interval rounds to
+zero bins, and the unresolved-harmonic sloshing lives between *adjacent*
+bins). A filterbank was rejected because it would re-scale every downstream
+constant and rebuild the arrival-band voting structure in the same change;
+the per-bin width gets the musical tolerance without either.
+`kernels/onset.ts` takes `maxFilterSemitones`; `transient.fluxMaxFilterSemitones`
+carries it, **0 (off) by default**.
+
+**The falsifier — passed decisively** (`scripts/measure-freqmax-ripple.ts`,
+steady sawtooth low E, re-pick at 1.5s):
+
+```
+configuration                          steady p50   steady max   attack flux   worst/attack
+time max, 3 frames (current)               0.0009       0.1167        1.7846          0.065
+no memory, no freq max                     0.0016       0.1167        1.8182          0.064
+freq max ±0.5 st, 1 frame                  0.0000       0.0104        1.0941          0.010
+freq max ±1.0 st, 1 frame                  0.0000       0.0078        1.0695          0.007
+freq max ±1.0 st, 2 frames                 0.0000       0.0078        1.0694          0.007
+freq max ±1.0 st, 3 frames                 0.0000       0.0078        1.0669          0.007
+```
+
+With no time memory at all, the frequency max holds the worst steady hop an
+order of magnitude below what the three-frame time max holds it at, and
+adding time memory back changes nothing — the substitution is total. The
+attack keeps ~60% of its flux, still two orders above the ripple. (Note the
+documented alternate-hop swing reproduces here as a *slow* ripple: the beat
+period at 82.41Hz is ~12.1ms against a 11.6ms hop, so the beat aliases across
+many hops — which is also why three frames of time memory never fully
+suppressed it; both configs share the same 0.1167 worst hop.)
+`tests/onset.test.ts` now holds the steady-low-E and same-pitch-re-pick
+properties under `referenceFrames: 1, maxFilterSemitones: 0.5`.
+
+**At the kernel on the corpus** (`scripts/measure-freqmax-sweep.ts`, the
+coverage-vs-off-label rule every kernel constant was derived by):
+
+```
+configuration                        derive covered   off-rate   held-out covered   off-rate
+baseline: time max, 3 frames                62 / 78      1.27%          358 / 381      0.85%
+freq ±0.5 st, 1 frame                       58 / 78      1.31%          361 / 381      0.67%
+freq ±1.0 st, 1 frame                       57 / 78      1.16%          349 / 381      0.48%
+freq ±0.5 st, 1 frame, floor 0.18           61 / 78      1.65%          367 / 381      0.94%
+freq ±0.5 st, 1 frame, floor 0.14           62 / 78      2.49%          375 / 381      1.76%
+```
+
+By the derivation rule (highest coverage at an off-label rate no worse than
+the incumbent) no frequency-max point beats the baseline — the derivation
+loss is entirely `clean-lead-120bpm`. The held-out columns, read but never
+chosen on, say the opposite: ±0.5 st covers *three more* labels at a *21%
+lower* off-label rate. A reversal of that shape is what an incumbent tuned to
+its own derivation set looks like from outside, and it is worth remembering
+when this is next revisited.
+
+**End to end**, filter on at ±0.5 st / one frame, everything downstream
+untouched: **45 missed / 70 split / 77 extras** against 32 / 99 / 107. The
+new misses live in `split made; successor paired with a neighbouring label`
+(8 → 15) and in rearticulation rejections whose witness scale shrank
+(`no-energy-not-sharp` 2 → 5): the short-reference flux runs smaller against
+the higher reference, so `sharpness` and `fluxRatio` shrink — measured at the
+78 derivation labels, to a median 0.849 of baseline. Rescaling the two bars
+that read that scale (`rearticulationSharpness` 1.6 → 1.36,
+`newPitchSharpness` 0.6 → 0.51) recovers only two: **43 missed / 71 split /
+78 extras**. Lowering the kernel floor to 0.18 instead is *worse* (51 missed
+/ 75 split / 83 extras) — more firing feeds the split churn it was supposed
+to relieve.
+
+**Verdict.** The mechanism is real and the substitution claim survives its
+falsifier, but on this corpus the frequency max *moves the operating point*
+(−29 extras for +11 missed at its best) rather than dominating, and the
+project bar is that both axes count. Shipped as a config-gated capability,
+off by default. The condition under which to revisit: any future change that
+attacks the split-pairing and too-young losses directly would change the
+trade's terms, and the held-out reversal above suggests the honest gap is
+smaller than the derivation columns make it look.
+
+### 2. Adaptive whitening fixes the take-scale problem and still cannot make the decision
+
+Stowell & Plumbley (ICMC 2007): per bin, keep a running peak
+`P[f] ← max(|X[f]|, m·P[f], floor)` and divide, so every bin occupies [0, 1]
+regardless of roll-off and dynamics. If the 0.808 → 0.434 LOTO collapse is
+take-dependent feature scale, whitened flux should not collapse.
+
+Measured without touching the engine (`scripts/measure-whitening-separability.ts`:
+identical decision-table population, whitened witnesses computed on the same
+window and hop grid and joined by timestamp; `m` and floor swept on the five
+derivation takes only):
+
+```
+model                                    in-sample   5-fold   leave-one-take-out
+baseline: twelve witnesses                   0.808    0.758                0.434
+whitened only, m=0.99 floor=0.01             0.723    0.688                0.608
+whitened only, m=0.99 floor=0.001            0.702    0.674                0.543
+twelve + whitened, m=0.99 floor=0.001        0.845    0.773                0.414
+```
+
+Three things are true at once:
+
+- **The diagnosis is confirmed.** Whitened-only witnesses barely collapse
+  (0.723 → 0.608 against 0.808 → 0.434): their scale genuinely survives a
+  change of take, which is what the falsifier asked (LOTO materially above
+  0.434 — passed).
+- **Adding them to the twelve does not help** (0.414): the unstable features
+  still poison a jointly fitted model. Fusion, if ever, must be at the
+  decision level — consistent with the Holzapfel result the brief cites.
+- **Stability is not separation.** Held out, fitted on derivation only, the
+  whitened-only rule reads 0.683 AUC (twelve: 0.647; single sharpness:
+  0.667), and at the derivation zero-label-cost threshold it keeps 309 of 310
+  positives while admitting 237 of 254 false candidates. Wired in as a veto
+  on decisions the tracker *acted* on, bar chosen on derivation at zero cost:
+  across all twelve held-out takes it clears **2 false splits and costs 1
+  true one**. That is the ledger answer, and it is nothing.
+
+**Verdict.** The brief's caveat verbatim: a better-behaved feature that still
+cannot make the distinction. Not wired into the engine. What survives is the
+method: any future witness should be judged on its whitened form first, since
+scale-stability is now demonstrated to be cheap to add and the un-whitened
+LOTO number understates every candidate.
+
+### 3. Cycle dissimilarity: the phase-reset argument does not survive contact with the decision population
+
+The one candidate that is not an energy detector: a decaying string satisfies
+`x[n] ≈ α·x[n−T]`, a pluck resets the relative phases, so normalised
+cross-correlation at lag T (searched ±2 samples, T from the previous hop's
+2048-window YIN, N = 2T ≤ 32ms — safely inside a 107ms sixteenth) should drop
+at a re-pick whether it is louder, equal, or muted. Prior art: US 9,646,591
+("in the absence of sufficient envelope follower amplitude changes, phase
+changes become a critical detection criteria"), Zhou & Reiss 2007/2010.
+
+The falsifier was stated before the run: if `D = 1 − r` does not clear the
+best existing witness (0.73 AUC) on the *monophonic derivation* subset, stop.
+Measured (`scripts/measure-cycle-dissimilarity.ts`; 93 monophonic derivation
+rows, 35 positives; ten variants including the gain split `g`, `D·(1−g)` for
+the muted-repick signature, one-hop-late windows, and a running-baseline
+deviation):
+
+```
+witness                              monophonic derivation AUC
+sharpness, same rows                                     0.721
+dExcess (D − 5-hop baseline)                             0.579
+dMax (worst of this hop, next hop)                       0.577
+d0                                                       0.552
+gain g                                                   0.537
+D·(1−g)  (muted-repick signature)                        0.487
+YIN aperiodicity (cmnd), this hop                        0.521
+YIN aperiodicity, hop before                             0.519
+```
+
+Gating harder (not gliding, aperiodicity ≤ 0.25 before the attack — the
+conditions the feature was *designed* for) reaches only dMax 0.628 against
+sharpness's 0.703 on the same 59 rows. **The falsifier fired: 0.577 against
+a bar of 0.73. The line stops.** YIN's own aperiodicity, added because it is
+free and scale-bounded, is at chance too.
+
+Why it fails here, stated as precisely as the data allows: every row in the
+decision table is a hop where an energy witness already fired over a sounding
+Note. The negatives are not clean decay — they are sustain churn, beating and
+compressor pumping that *already look transient* to the flux kernel, and
+cycle continuity breaks at those hops too. And the positives include re-picks
+of a string that was still ringing, where the string keeps most of its state
+through the pick — the phase is *not* fully reset, the patent's clean
+"adjacent cycles are very similar" premise belongs to its hexaphonic,
+per-string pickup, which never sees a neighbour's partials or a room. The
+amplitude-invariance is real; the discontinuity it is invariant *about* is
+simply present on both sides of this decision.
+
+### Where this leaves the same-pitch decision
+
+Three literature mechanisms, three honest verdicts: one substitutes perfectly
+for a component we already had (and buys a different trade, not a better
+one), one fixes the measured statistical defect without touching the decision
+that mattered, one is refuted at its own chosen subset. The 0.73 ceiling on
+this decision now has *eight* converging negatives against it, three of them
+from feature families that are not energy detectors. The annotation-noise
+fraction of that ceiling (Dixon 2006; non-percussive onsets carry high
+annotator variance) is increasingly the live hypothesis: the next cheap
+experiment is not another feature but a second, independent labelling pass
+over a few takes to measure the human–human AUC on exactly these decisions.

@@ -77,7 +77,13 @@ function whiteNoise(n: number, seed: number, amp: number): Float32Array {
 /* Driver                                                                      */
 /* -------------------------------------------------------------------------- */
 
-type Options = Partial<{ minIntervalMs: number; medianWindow: number; sensitivity: number }>;
+type Options = Partial<{
+  minIntervalMs: number;
+  medianWindow: number;
+  sensitivity: number;
+  referenceFrames: number;
+  maxFilterSemitones: number;
+}>;
 
 function makeDetector(options: Options = {}): OnsetDetector {
   return new OnsetDetector({
@@ -86,6 +92,8 @@ function makeDetector(options: Options = {}): OnsetDetector {
     minIntervalMs: options.minIntervalMs ?? 60,
     medianWindow: options.medianWindow ?? 17,
     sensitivity: options.sensitivity ?? 1.6,
+    referenceFrames: options.referenceFrames,
+    maxFilterSemitones: options.maxFilterSemitones,
   });
 }
 
@@ -282,6 +290,36 @@ describe("a steady low E does not beat itself into onsets", () => {
     // accident. Six seconds is hundreds of beats.
     const { onsetsMs } = collectOnsets(steadyPartials(82.41, 6000, 0.08), 512);
     expect(onsetsMs).toHaveLength(1);
+  });
+
+  it("holds under the frequency-axis max filter with NO time memory", () => {
+    // The SuperFlux-style reference: one frame of memory, the maximum taken
+    // across a frequency neighbourhood instead of across hops. This is the
+    // direct check that the frequency max substitutes for the time max at the
+    // job the time max exists for — measured on this same signal, the worst
+    // steady hop reads an order of magnitude LOWER than under the three-frame
+    // time maximum. If this test fails, the substitution claim is dead.
+    for (const f0 of [82.41, 98]) {
+      for (const hop of HOPS) {
+        const detector = makeDetector({ referenceFrames: 1, maxFilterSemitones: 0.5 });
+        const { onsetsMs } = collectOnsets(steadyPartials(f0, 3000, 0.08), hop, detector);
+        expect(onsetsMs.length, `${f0}Hz hop=${hop}`).toBe(1);
+      }
+    }
+  });
+
+  it("still reports every same-pitch re-pick with the frequency max in place", () => {
+    for (const [name, hz] of FREQUENCIES) {
+      const { signal, attacksMs } = repeatedAttacks({ hz, count: 6, spacingMs: 300, decayMs: 220 });
+      const detector = makeDetector({ referenceFrames: 1, maxFilterSemitones: 0.5 });
+      const { onsetsMs } = collectOnsets(signal, 512, detector);
+      for (const attack of attacksMs) {
+        expect(
+          onsetsMs.some((o) => Math.abs(o - attack) <= 60),
+          `${name}: attack at ${attack}ms`
+        ).toBe(true);
+      }
+    }
   });
 });
 

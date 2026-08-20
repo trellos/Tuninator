@@ -7,6 +7,112 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-015]: Reject cycle dissimilarity (and YIN aperiodicity) as re-articulation witnesses
+* **Date:** 2026-08-20
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** The one candidate feature that is not an energy detector: a
+  decaying string satisfies x[n] ≈ α·x[n−T], a pluck resets relative phases,
+  so NCC at lag T should drop at a re-pick regardless of its loudness
+  (US 9,646,591; Zhou & Reiss). Falsifier stated in advance: clear 0.73 AUC
+  (the best existing witness) on the monophonic derivation subset, or stop.
+* **Decision:** Measured (`scripts/measure-cycle-dissimilarity.ts`), ten
+  variants including the gain/shape split and the muted-repick signature
+  D·(1−g): best variant 0.579 AUC on the falsifier subset against sharpness's
+  0.721 on the same rows; 0.628 under the feature's own designed-for gating
+  (monophonic, non-gliding, periodic before the attack) against 0.703. YIN's
+  own aperiodicity: 0.521. The falsifier fired; the line is closed without
+  engine changes.
+* **Alternatives Considered:** The spectral (harmonic-comb phase-prediction)
+  form — not built, because the time-domain form failing at the population
+  level (both decision classes are transient-bearing hops; a still-ringing
+  string keeps most of its phase through a re-pick) applies to it equally.
+* **Consequences:** Third non-energy feature family refuted at this decision.
+  Raises the standing of the annotation-noise hypothesis for the 0.73
+  ceiling; the logged next step is a second independent labelling pass to
+  measure human–human AUC, not another feature.
+
+#### [DECISION-014]: Adaptive whitening confirmed as scale fix, rejected as decision input
+* **Date:** 2026-08-20
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** The 0.808 in-sample → 0.434 leave-one-take-out collapse of the
+  twelve-witness model is the signature of take-dependent feature scale
+  (attack contrast varies 106x within one take). Stowell & Plumbley adaptive
+  whitening (per-bin running-peak divide) should produce flux whose scale
+  survives a change of take. Falsifier: LOTO materially above 0.434, and the
+  gain must also show in the ledger and splits.
+* **Decision:** Measured without touching the engine
+  (`scripts/measure-whitening-separability.ts`, identical decision-table
+  population, m and floor derived on the five 120bpm takes). Whitened-only
+  witnesses: LOTO 0.608, and the collapse nearly vanishes (0.723 in-sample →
+  0.608) — the diagnosis is confirmed. But at the derivation zero-label-cost
+  operating point they admit 237 of 254 held-out false candidates, and wired
+  as a veto on acted decisions they clear 2 false splits for 1 true one
+  across all twelve held-out takes. Statistical half of the falsifier passed,
+  ledger half failed; not wired into the engine.
+* **Alternatives Considered:** Adding whitened witnesses to the twelve in one
+  fitted model — measured worse (LOTO 0.414): the unstable features poison a
+  joint fit, consistent with Holzapfel's decision-level-fusion result.
+* **Consequences:** Future candidate witnesses should be evaluated in
+  whitened form first — scale stability is now known to be cheap, and
+  un-whitened LOTO numbers understate every candidate. The script stays as
+  the harness for that.
+
+#### [DECISION-013]: Frequency-axis max filter shipped config-gated, off by default
+* **Date:** 2026-08-20
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** The onset kernel's three-hop time-axis maximum suppresses
+  unresolved-harmonic beating but makes the reference the loudest recent
+  frame, raising the bar for quiet re-attacks — the failing case. SuperFlux
+  (Böck & Widmer) runs the max across frequency of the previous frame
+  instead. Falsifier: if steady-low-E flux still swings like a pick attack
+  with the frequency max and no time memory, revert.
+* **Decision:** Built into `kernels/onset.ts` as `maxFilterSemitones`
+  (per-bin ±semitone neighbourhood, minimum ±1 bin — chosen over a triangular
+  log filterbank, which would re-scale every downstream constant and the
+  arrival-band structure in one change). Falsifier passed decisively: worst
+  steady hop an order of magnitude below the time max's, with time memory
+  fully redundant (identical at 1, 2 and 3 frames). End to end it trades
+  −29 extra Notes for +11 missed labels at its best (43/71/78 against the
+  32/99/107 baseline) — an operating-point move, not a both-axes win, so the
+  default stays off (`transient.fluxMaxFilterSemitones: 0`), with unit tests
+  holding both the ripple suppression and re-pick coverage under the filter.
+* **Alternatives Considered:** Lowering the kernel arrival floor to recover
+  recall (worse on both axes: 51 missed / 83 extras); rescaling the two
+  sharpness-reading bars by the measured 0.849 witness shrink (recovers 2 of
+  13 lost labels only — the loss is structural, in split-pairing and
+  too-young churn).
+* **Consequences:** The capability and its falsifier tests ship without
+  changing default behaviour. Noted for revisiting: on the held-out takes
+  (read, never fitted) the filter Pareto-beats the incumbent at the kernel
+  level (361/381 covered at 0.67% off-label against 358/381 at 0.85%) — the
+  derivation-set advantage of the incumbent partly reflects constants tuned
+  to that set.
+
+#### [DECISION-012]: Pursue three literature onset features with pre-stated falsifiers
+* **Date:** 2026-08-20
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** DECISION-009..011 established that the twelve existing
+  witnesses are energy-increase detectors in disguise and no logic over them
+  (fitted model, rig calibration, joint DP) beats 32 missed / 107 extras.
+  `docs/onset-features-prompt.md` selected three mechanisms from the
+  literature with different physical bases: the SuperFlux frequency-axis max,
+  Stowell–Plumbley adaptive whitening, and period-to-period dissimilarity.
+* **Decision:** Run all three in order, each with its falsifier stated before
+  measuring, derivation-set discipline throughout, negatives reported as
+  findings. Outcomes: DECISION-013 (accepted, gated), DECISION-014
+  (rejected), DECISION-015 (rejected).
+* **Alternatives Considered:** Spectral sparsity (NINOS²) and
+  harmonic/percussive separation — deferred by the brief itself as
+  vulnerable to the room-hiss trap without whitening first.
+* **Consequences:** Full numbers in `docs/DETECTION-FINDINGS.md` ("Three
+  candidate features from the onset literature"). The same-pitch ceiling now
+  has eight converging negatives; the annotation-noise fraction of it is the
+  next thing to measure.
+
 #### [DECISION-011]: Reject DP-based joint region segmentation
 * **Date:** 2026-08-20
 * **Status:** Rejected

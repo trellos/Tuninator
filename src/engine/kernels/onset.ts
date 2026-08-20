@@ -52,6 +52,22 @@ export type OnsetOptions = {
    * `threshold`; see `MIN_ARRIVAL_BANDS`.
    */
   minArrivalBands?: number;
+  /**
+   * Half-width of a maximum filter applied across FREQUENCY to the reference
+   * spectrum, in semitones. Zero or absent disables it.
+   *
+   * The SuperFlux trick (Böck & Widmer, DAFx-13): measure the arriving frame
+   * against a frequency-neighbourhood maximum of the reference rather than
+   * against the same bin alone, so a partial that wanders between bins —
+   * vibrato, or the beating of unresolved low harmonics — generates no flux,
+   * while genuinely new energy still does. Expressed in semitones rather than
+   * bins because a fixed bin count on a linear FFT is a fixed Hz tolerance:
+   * far looser than musical at the bottom of the spectrum and far tighter at
+   * the top. Each bin's neighbourhood is at least +/-1 bin regardless, which
+   * is what catches energy sloshing between the unresolved harmonics of a low
+   * string, where +/-N semitones can round to zero bins.
+   */
+  maxFilterSemitones?: number;
 };
 
 export type OnsetResult = {
@@ -309,6 +325,14 @@ export class OnsetDetector {
   /** Arrival band edges as bin indices; `bandEdges.length - 1` bands. */
   private readonly bandEdges: Int32Array;
   private readonly minArrivalBands: number;
+  /**
+   * Frequency-neighbourhood bounds per bin for the reference max filter, or
+   * null when `maxFilterSemitones` is off. `nbrLo[k]..nbrHi[k]` inclusive.
+   */
+  private readonly nbrLo: Int32Array | null;
+  private readonly nbrHi: Int32Array | null;
+  /** Scratch for the frequency-max-filtered spectrum. */
+  private readonly freqFiltered: Float32Array | null;
 
   /** Ring buffer of the last `medianWindow` flux values. */
   private readonly fluxHistory: Float64Array;
@@ -383,6 +407,27 @@ export class OnsetDetector {
     // A range too narrow to hold that many bands cannot vote; it falls back to
     // the single broadband comparison rather than never firing.
     this.minArrivalBands = this.bandEdges.length - 1 >= requested ? requested : 0;
+
+    const semitones = options.maxFilterSemitones ?? 0;
+    if (semitones > 0) {
+      const ratio = Math.pow(2, semitones / 12);
+      const lo = new Int32Array(this.fft.bins);
+      const hi = new Int32Array(this.fft.bins);
+      for (let k = 0; k < this.fft.bins; k++) {
+        // At least +/-1 bin: near DC a musical interval rounds to zero bins,
+        // and the unresolved-harmonic sloshing this filter must absorb there
+        // is between ADJACENT bins.
+        lo[k] = Math.max(0, Math.min(k - 1, Math.floor(k / ratio)));
+        hi[k] = Math.min(this.fft.bins - 1, Math.max(k + 1, Math.ceil(k * ratio)));
+      }
+      this.nbrLo = lo;
+      this.nbrHi = hi;
+      this.freqFiltered = new Float32Array(this.fft.bins);
+    } else {
+      this.nbrLo = null;
+      this.nbrHi = null;
+      this.freqFiltered = null;
+    }
 
     this.bandHistory = new Float64Array(referenceFrames * this.bandFlux.length);
 
@@ -531,7 +576,27 @@ export class OnsetDetector {
     // adaptive threshold keeps tracking the signal during the dead time.
     this.pushFlux(heldFlux);
     const slot = this.historyIndexFrames * bins;
-    for (let k = 0; k < bins; k++) history[slot + k] = magnitude[k]!;
+    if (this.freqFiltered !== null) {
+      // The reference is the frequency-neighbourhood maximum of the stored
+      // frame (SuperFlux), so a partial wandering within the neighbourhood
+      // between frames generates no flux. Max commutes, so filtering at store
+      // time and taking the plain per-bin time maximum at compare time is the
+      // same as filtering the reference.
+      const filtered = this.freqFiltered;
+      const nbrLo = this.nbrLo as Int32Array;
+      const nbrHi = this.nbrHi as Int32Array;
+      for (let k = 0; k < bins; k++) {
+        let peak = 0;
+        for (let j = nbrLo[k]!; j <= nbrHi[k]!; j++) {
+          const v = magnitude[j]!;
+          if (v > peak) peak = v;
+        }
+        filtered[k] = peak;
+      }
+      for (let k = 0; k < bins; k++) history[slot + k] = filtered[k]!;
+    } else {
+      for (let k = 0; k < bins; k++) history[slot + k] = magnitude[k]!;
+    }
     for (let k = this.binFrom; k < this.binTo; k++) {
       const decayed = this.reportedReference[k]! * REPORTED_REFERENCE_DECAY;
       const current = magnitude[k]!;

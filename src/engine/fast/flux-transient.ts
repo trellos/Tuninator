@@ -62,6 +62,7 @@ export class FluxTransientDetector implements ITransientDetector {
       1,
       Math.round(config.transient.fluxReferenceMs / Math.max(hopMs, 1e-6))
     );
+    const maxFilterSemitones = config.transient.fluxMaxFilterSemitones || undefined;
     this.flux = new OnsetDetector({
       sampleRate,
       fftSize: config.transient.fluxFftSize,
@@ -69,6 +70,7 @@ export class FluxTransientDetector implements ITransientDetector {
       medianWindow: config.transient.fluxMedianWindow,
       sensitivity: config.transient.fluxSensitivity,
       referenceFrames,
+      maxFilterSemitones,
     });
     this.band = new OnsetDetector({
       sampleRate,
@@ -80,6 +82,7 @@ export class FluxTransientDetector implements ITransientDetector {
       bandHiHz: config.transient.attackBandHiHz,
       floorFactor: config.transient.attackBandFloorFactor,
       referenceFrames,
+      maxFilterSemitones,
     });
     this.baselineFrames = Math.max(
       1,

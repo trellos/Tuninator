@@ -120,6 +120,24 @@ export type EngineConfig = {
      */
     fluxReferenceMs: number;
     /**
+     * Half-width, in semitones, of a maximum filter applied across FREQUENCY
+     * to the flux reference spectrum. Zero disables it.
+     *
+     * The SuperFlux reference trick (Böck & Widmer, DAFx-13): measured against
+     * a frequency-neighbourhood maximum, a partial that wanders between bins —
+     * vibrato, or unresolved low harmonics beating — generates no flux while
+     * genuinely new energy still does. On a steady synthetic low E, ±0.5 st
+     * with ONE frame of memory (`fluxReferenceMs` at one hop) holds the worst
+     * steady hop an order of magnitude below what the three-frame time
+     * maximum holds it at, making the time memory redundant.
+     *
+     * Off by default: end to end on the corpus it trades roughly 29 fewer
+     * duplicate Notes for 11 more missed labels — an operating-point move,
+     * not a win on both axes. See `maxFilterSemitones` in `kernels/onset.ts`
+     * and "Three candidate features" in `docs/DETECTION-FINDINGS.md`.
+     */
+    fluxMaxFilterSemitones: number;
+    /**
      * Lower edge of a SECOND, band-limited flux the detector runs alongside the
      * broadband one, Hz.
      *
@@ -742,6 +760,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     fluxSensitivity: 1.35,
     fluxMedianWindow: 17,
     fluxReferenceMs: 32,
+    fluxMaxFilterSemitones: 0,
     attackBandLoHz: 1000,
     attackBandHiHz: 6000,
     attackBandFloorFactor: 0.08,
