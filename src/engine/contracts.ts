@@ -210,7 +210,9 @@ export interface ITransientDetector {
     spectralWindow: Float32Array,
     shortRms: number,
     at: SourceTimeMs,
-    atSample: number
+    atSample: number,
+    /** The amplitude gate in force this hop; see `NoiseFloorTracker`. */
+    gate: number
   ): AttackEvidence | null;
 
   /**

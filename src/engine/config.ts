@@ -22,7 +22,37 @@ export type EngineConfig = {
     maxFrequencyHz: number;
     /** Requested fast hop; the engine snaps it to whole 128-sample quanta. */
     hopMs: number;
+    /**
+     * Loudest the gate may ever be, and what it was before it could move.
+     *
+     * The gate now comes from a measurement of the rig's own noise floor and
+     * this is the ceiling on it, which makes the change one-directional: on a
+     * quiet rig the detector gets more sensitive, and on a noisy one it is
+     * exactly as sensitive as it always was. A gate that could rise with the
+     * measurement would gate out a room mic's real playing, whose signal sits
+     * far closer to its floor than a direct input's does.
+     */
     rmsGate: number;
+    /**
+     * How far above the measured noise floor the gate sits.
+     *
+     * Derived on the five 120bpm fixtures by sweeping downward until one of
+     * them moves; see `NoiseFloorTracker` for what is being measured and why an
+     * absolute level cannot do this job.
+     */
+    rmsGateNoiseMultiple: number;
+    /** Quantile of frame RMS the noise floor tracks. */
+    noiseFloorQuantile: number;
+    /** Step size per hop of the noise-floor tracker, in log units. */
+    noiseFloorRate: number;
+    /**
+     * Level the noise-floor estimate never goes below.
+     *
+     * Digital silence is not a rig. Without this, a take that opens on a
+     * stretch of true zeros would derive a gate of zero and then hear the first
+     * speck of dither as playing.
+     */
+    noiseFloorMinimum: number;
     confidenceGate: number;
   };
 
@@ -308,6 +338,14 @@ export type EngineConfig = {
      * under a sixteenth at 120bpm (125ms) so a genuinely fast run still
      * segments. The fixtures put the cliff between 75 and 110ms: below it the
      * stubs survive, above it real notes in the triplet run are swallowed.
+     *
+     * Re-swept once the region lane began carving events out of what the fast
+     * lane had merged: the five 120bpm fixtures are bit-identical at 80 and
+     * `chords-a-bm` sheds a false positive at 75, so 80 is the shortest window
+     * that material supports. It matters because absorbing a stub is one of
+     * the two named ways a played note disappears — on the room-mic sixteenths
+     * three labelled strokes were being swallowed as stubs and on the amp sim
+     * five were.
      */
     articulationMs: number;
   };
@@ -579,6 +617,10 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     maxFrequencyHz: 1400,
     hopMs: 12,
     rmsGate: 0.008,
+    rmsGateNoiseMultiple: 200,
+    noiseFloorQuantile: 0.05,
+    noiseFloorRate: 0.02,
+    noiseFloorMinimum: 1e-5,
     // Tuned against the recorded fixtures, not chosen a priori. At 0.5 the
     // detector dropped frames mid-note on decaying low strings, which read as
     // note-offs and split notes in two; 0.35 keeps them voiced.
@@ -619,7 +661,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     glideMinCents: 25,
     glideWindowHops: 5,
     glideRiseOverride: 1.6,
-    articulationMs: 90,
+    articulationMs: 80,
   },
   tracking: {
     minStableMs: 55,

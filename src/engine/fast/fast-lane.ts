@@ -25,6 +25,7 @@ import { SampleClock } from "../clock.js";
 import { AudioRing } from "../ring-buffer.js";
 import { peak as windowPeak, rms as windowRms } from "../kernels/yin.js";
 import { FluxTransientDetector } from "./flux-transient.js";
+import { NoiseFloorTracker } from "./noise-floor.js";
 import { YinEstimator } from "./yin-estimator.js";
 
 export class FastLane {
@@ -42,6 +43,8 @@ export class FastLane {
   /** Short RMS window — the energy-injection witness. */
   private readonly rmsWindow: Float32Array;
 
+  private readonly noiseFloor: NoiseFloorTracker;
+
   private samplesSinceHop = 0;
   private hop = 0;
 
@@ -51,6 +54,11 @@ export class FastLane {
     this.hopSamples = snapHop(config.analysis.hopMs, clock.sampleRate);
 
     this.estimator = new YinEstimator(clock.sampleRate, config);
+    this.noiseFloor = new NoiseFloorTracker({
+      quantile: config.analysis.noiseFloorQuantile,
+      rate: config.analysis.noiseFloorRate,
+      minimum: config.analysis.noiseFloorMinimum,
+    });
     this.transient = new FluxTransientDetector(clock.sampleRate, config, this.hopSamples);
 
     this.longWindow = new Float32Array(config.pitch.longWindow);
@@ -71,6 +79,7 @@ export class FastLane {
     this.hop = 0;
     this.estimator.reset();
     this.transient.reset();
+    this.noiseFloor.reset();
   }
 
   /**
@@ -102,12 +111,21 @@ export class FastLane {
     const rms = windowRms(this.longWindow);
     const peak = windowPeak(this.longWindow);
     const shortRms = windowRms(this.rmsWindow);
-    const gated = rms < config.analysis.rmsGate;
+    // The gate is a measurement of this rig, capped at what it used to be. See
+    // `NoiseFloorTracker`: an absolute level means a different thing on a
+    // direct input and on a room mic, and the fixed 0.008 was a hundred times
+    // a DI's noise floor and four times a mic's.
+    const floor = this.noiseFloor.observe(rms);
+    const gate = Math.min(
+      config.analysis.rmsGate,
+      floor * config.analysis.rmsGateNoiseMultiple
+    );
+    const gated = rms < gate;
     const at = this.clock.toMs(endSample);
 
     readEndingAt(ring, this.fluxWindow, endSample);
     const attack = warmedUp
-      ? this.transient.observe(this.fluxWindow, shortRms, at, endSample)
+      ? this.transient.observe(this.fluxWindow, shortRms, at, endSample, gate)
       : null;
     if (attack !== null) this.estimator.clearHistory();
 

@@ -99,7 +99,8 @@ export class FluxTransientDetector implements ITransientDetector {
     spectralWindow: Float32Array,
     shortRms: number,
     at: SourceTimeMs,
-    atSample: number
+    atSample: number,
+    gate: number
   ): AttackEvidence | null {
     const t = this.config.transient;
 
@@ -125,7 +126,7 @@ export class FluxTransientDetector implements ITransientDetector {
     // witness the region lane corroborates against, never a reason to act.
     const bandResult = this.band.process(spectralWindow, at);
     this.lastBandOnset =
-      bandResult.isOnset && shortRms >= this.config.analysis.rmsGate * BAND_GATE_FRACTION;
+      bandResult.isOnset && shortRms >= gate * BAND_GATE_FRACTION;
     // Normalised by the frame's own level, so the same figure means the same
     // thing in a loud passage and a quiet one.
     let energy = 0;
@@ -140,7 +141,7 @@ export class FluxTransientDetector implements ITransientDetector {
     // than "sharp" in units that a microphone or an amp sim can move.
     const fluxRatio = fluxResult.flux / Math.max(fluxResult.threshold, 1e-12);
 
-    const audible = shortRms >= this.config.analysis.rmsGate;
+    const audible = shortRms >= gate;
     const envelope = audible && riseRatio >= t.envelopeRiseRatio;
     const fired = audible && (fluxResult.isOnset || envelope);
     if (!fired) return null;
