@@ -9,11 +9,19 @@
  * the number that has to come down.
  *
  * Assignment is deliberately crude and independent of the matcher: a detection
- * belongs to the most recent label that had already started when it did (with a
- * small tolerance, because a Note backdated onto its attack can begin slightly
- * before the hand-annotated onset). Detections before the first label, or more
- * than `ORPHAN_GAP_MS` after the label they would attach to has ended, are
- * counted separately as strays rather than blamed on a label.
+ * belongs to the label whose annotated onset it began NEAREST to. Detections
+ * before the first label, or more than `ORPHAN_GAP_MS` after the label they
+ * would attach to has ended, are counted separately as strays rather than
+ * blamed on a label.
+ *
+ * Nearest, rather than "the most recent label that had already started, within
+ * a tolerance". That rule was written for the 120bpm fixtures, where a fixed
+ * 120ms tolerance is comfortably narrower than the gap between events, and it
+ * silently inverted on the 140bpm takes, where a triplet is 140ms: a Note
+ * beginning 118ms BEFORE a label was handed to that label rather than to the
+ * one 22ms before it, and the event it really belonged to was then charged with
+ * a split it had not committed. Nearest cannot invert, because it never reaches
+ * past the midpoint between two labels.
  *
  * Usage:
  *   npx tsx scripts/measure-splits.ts
@@ -26,7 +34,12 @@ import { labelOf, projectEmissions } from "../src/offline/eval-adapter.js";
 import { downmixToMono, readWav } from "../src/offline/wav.js";
 import { decodeFixtures } from "./decode-fixtures.js";
 
-/** How far before a label's annotated onset a Note may begin and still be its. */
+/**
+ * How far from a label's annotated onset a Note may begin and still be its.
+ *
+ * A bound on the nearest-label rule, not the rule itself: a Note that begins
+ * half a second from every label belongs to none of them.
+ */
 const ONSET_TOLERANCE_MS = 120;
 /** How long after a label ends a Note may begin and still be counted against it. */
 const ORPHAN_GAP_MS = 400;
@@ -75,11 +88,26 @@ function measure(): FixtureRow[] {
     let strays = 0;
     for (const detection of detections) {
       let owner: LabelRow | null = null;
+      let nearest = Infinity;
       for (const candidate of labels) {
-        if (detection.startedAt < candidate.startMs - ONSET_TOLERANCE_MS) break;
+        const distance = Math.abs(detection.startedAt - candidate.startMs);
+        if (distance >= nearest) continue;
+        nearest = distance;
         owner = candidate;
       }
-      if (owner === null || detection.startedAt > owner.endMs + ORPHAN_GAP_MS) {
+      // Within the tolerance of an onset, or somewhere inside the event's span.
+      // The second clause is what keeps a chord's fragmentation visible: a
+      // chord is seconds long, so a second Note shed half a second into one is
+      // nowhere near an onset and would otherwise be filed as unplaceable.
+      const placed =
+        owner !== null &&
+        (nearest <= ONSET_TOLERANCE_MS ||
+          (detection.startedAt >= owner.startMs && detection.startedAt <= owner.endMs));
+      if (owner === null || !placed) {
+        strays++;
+        continue;
+      }
+      if (detection.startedAt > owner.endMs + ORPHAN_GAP_MS) {
         strays++;
         continue;
       }
