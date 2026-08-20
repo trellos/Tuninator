@@ -35,12 +35,22 @@ import { downmixToMono, readWav } from "../src/offline/wav.js";
 import { decodeFixtures } from "./decode-fixtures.js";
 
 /**
- * How far from a label's annotated onset a Note may begin and still be its.
+ * How far BEFORE a label's annotated onset a Note may begin and still be its.
  *
- * A bound on the nearest-label rule, not the rule itself: a Note that begins
- * half a second from every label belongs to none of them.
+ * Not a search radius — a reach forward. A Note belongs to the last event that
+ * had started when it did, and this only covers the case where it begins
+ * slightly early: it is backdated onto its own attack, and the hand annotation
+ * is not sample-exact. Matched detections sit at a median of +12ms from their
+ * label over 266 pairs, with a tenth percentile near -35ms, so 40 covers every
+ * genuine early start.
+ *
+ * It must stay well under the tightest subdivision in the corpus — a sixteenth
+ * at 140bpm is 107ms — or it reaches past the next onset and charges a Note to
+ * an event that had not begun. At 120 it did exactly that, and the resulting
+ * "previous note's pitch, then the right one" pattern was read twice as a
+ * naming defect. It is a tail fragment of the event BEFORE, charged forward.
  */
-const ONSET_TOLERANCE_MS = 120;
+const ONSET_TOLERANCE_MS = 40;
 /** How long after a label ends a Note may begin and still be counted against it. */
 const ORPHAN_GAP_MS = 400;
 
@@ -87,23 +97,17 @@ function measure(): FixtureRow[] {
 
     let strays = 0;
     for (const detection of detections) {
+      // The last event that had started when this Note did. A Note may begin
+      // slightly BEFORE its label, because it is backdated onto its attack and
+      // the annotation is not sample-exact, so the tolerance lets it reach one
+      // event forward — but no further than the tightest subdivision in the
+      // corpus, or it reaches the wrong event entirely.
       let owner: LabelRow | null = null;
-      let nearest = Infinity;
       for (const candidate of labels) {
-        const distance = Math.abs(detection.startedAt - candidate.startMs);
-        if (distance >= nearest) continue;
-        nearest = distance;
+        if (detection.startedAt + ONSET_TOLERANCE_MS < candidate.startMs) break;
         owner = candidate;
       }
-      // Within the tolerance of an onset, or somewhere inside the event's span.
-      // The second clause is what keeps a chord's fragmentation visible: a
-      // chord is seconds long, so a second Note shed half a second into one is
-      // nowhere near an onset and would otherwise be filed as unplaceable.
-      const placed =
-        owner !== null &&
-        (nearest <= ONSET_TOLERANCE_MS ||
-          (detection.startedAt >= owner.startMs && detection.startedAt <= owner.endMs));
-      if (owner === null || !placed) {
+      if (owner === null) {
         strays++;
         continue;
       }

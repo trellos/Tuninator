@@ -1971,3 +1971,43 @@ fails `maxMedianOnsetErrorMs`. The one take it still helps is
 `power-chords-amped`: 15 detections to 17, 3 missed to 1, pitch class 78.6% to
 92.9%. Everything else is neutral or worse. Recorded, and closed: it is not
 waiting on the pitch path.
+
+### The fragmentation metric charged a tail fragment to the event that had not started
+
+The fourth instance of the window-wider-than-the-spacing error, and the one that
+manufactured a defect out of nothing.
+
+`measure-splits.ts` assigned each Note to the label whose onset it began
+NEAREST. That fixed the 120ms lookback, and introduced a subtler version of the
+same thing. The amped eighth-note run emits:
+
+```
+  n27 13320-13440 B4     n28 13440-13507 B4     <- tail fragment of e2
+  n29 13507-13627 C5     n30 13627-13693 C5     <- tail fragment of e3
+  labels: e2 B4@13312   e3 C5@13492   e4 D5@13679
+```
+
+`n28` begins 128ms after `e2` and 52ms before `e3`, so nearest-onset charged it
+to `e3` — an event that had not begun. `e3` then read as "B4 then C5", which is
+the "previous note's pitch, then the right one" pattern that was twice diagnosed
+as a naming lag in the pitch estimator. It was measured twice and refuted twice:
+84-91% of voiced hops on the lead takes use the SHORT 512-sample window, 10.7ms,
+shorter than the hop, so nothing straddles a boundary; and 96-100% of Notes on
+those takes name themselves correctly at their first emission. The Notes are
+named right. Each event simply emits a correctly-named ~130ms Note plus a ~70ms
+SAME-PITCH tail fragment, and the tail was being charged forward.
+
+The rule is now the last event that had started when the Note did, with a 40ms
+reach forward for a Note backdated slightly onto its own attack. 40 because
+matched detections sit at a median of +12ms with a tenth percentile near -35ms,
+and because it must stay well under a 107ms sixteenth.
+
+Corpus fragmentation reads **99 of 459 events split, 107 extra Notes, 10
+strays**, where the nearest-onset rule said 83/85/23. The number went UP, and
+that is the correction working: a fragment that begins inside an event is that
+event's, and thirteen Notes that the previous rule filed as unplaceable strays
+are fragments of an event that was sounding at the time.
+
+The defect that remains is one thing, stated correctly at last: **a same-pitch
+boundary inside a single event**, shedding a short tail after a correctly-named
+Note.
