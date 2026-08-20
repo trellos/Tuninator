@@ -322,6 +322,18 @@ export type EngineConfig = {
      * made, and reading those as re-strums is how a chord kept shedding Notes
      * seconds after it was played. Past this, re-articulating a chord takes
      * energy above its own decay curve, which is a witness ripple cannot fake.
+     *
+     * Any fixed value here is a bet about tempo, and the first one lost it. 800
+     * came off the 120bpm fixtures, where every genuine sharpness-only restrum
+     * lands within half a second. The held-out 140bpm power-chord takes answer
+     * each downstrum on the next note boundary, 857ms later, and the decisions
+     * arrive at 813-933ms: every single one of the sixteen even-numbered strikes
+     * across the three signal paths was refused for being 13ms to 133ms too
+     * late. 1000 is the smallest round bound that admits them, and it is a bound
+     * rather than a fit: raising it further changes no decision on any 140bpm
+     * take, while removing it entirely sheds extra Notes on three other
+     * fixtures (cowboy-amped 11->15, cowboy-120 10->12, power-chords-120 9->14).
+     * The ceiling is real and this sits below it.
      */
     mutedRestrumWindowMs: number;
     /**
@@ -687,7 +699,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     newPitchSharpness: 0.6,
     minRestrumMs: 380,
     restrumDecayExcess: 1.25,
-    mutedRestrumWindowMs: 800,
+    mutedRestrumWindowMs: 1000,
     glideMinCents: 25,
     glideWindowHops: 5,
     glideRiseOverride: 1.6,
