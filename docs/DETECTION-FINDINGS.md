@@ -375,6 +375,28 @@ false positives, 11 of 78 events split and 13 extra Notes. Every required
 fixture still meets every threshold. The cowboy 140bpm takes are unchanged on
 all three paths.
 
+**What it costs, stated plainly.** The lead take's over-segmentation moves the
+wrong way — mic 72 detections for 55 labels to 74, amp sim 59 to 64, direct
+input 64 unchanged — because two of the Notes this stops absorbing are in the
+triplet run, where the thing being absorbed was not a stroke but a decaying
+note shedding flux. Instrumented at `q13`: a transient fires at 10627ms with a
+rise ratio of 0.64, i.e. while the envelope is FALLING, and opens an 80ms Note
+that the old rule swallowed. Three attempts to keep that one and still keep the
+sixteenths were measured and none worked:
+
+| rule | sixteenths mic | lead mic |
+|---|---|---|
+| absorb when the stub never decayed (kept) | 32 | 74 |
+| ...or when its own transient brought no energy (`riseRatio < 1.25`) | 29 | 73 |
+| ...or when the envelope was outright falling (`riseRatio < 1.0`) | 30 | 74 |
+
+The reason is that "the envelope barely rose" is the DEFINING property of the
+stroke this pass exists to recover: the performer's upstrokes measure 0.85 to
+1.6 on the same ratio. A rule that reads a falling envelope as "no pick" cannot
+be tightened far enough to separate them without taking the upstrokes with it.
+Separating those two needs a witness that is not the broadband envelope, and
+the obvious candidate is the next section.
+
 ## The attack band: built, measured, rejected
 
 The remaining sixteenths are the quiet upstrokes. The performer's own
