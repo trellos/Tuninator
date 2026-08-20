@@ -76,6 +76,62 @@ export type EngineConfig = {
     /** Multiplier on the adaptive median. Higher = fewer flux onsets. */
     fluxSensitivity: number;
     fluxMedianWindow: number;
+    /**
+     * Lower edge of a SECOND, band-limited flux the detector runs alongside the
+     * broadband one, Hz.
+     *
+     * A pick is an impulse: it puts energy across the spectrum at once. A string
+     * already ringing is a handful of narrow partials, and on a guitar they are
+     * almost all below 1kHz. Summing the flux over a band that holds the pick's
+     * transient and not the ringing note's fundamentals is what lets a quiet
+     * pick be heard over a loud sustain, which is the whole of the
+     * alternate-picking problem: at 140bpm the upstrokes fall 107ms after the
+     * downstroke they answer and are far quieter than it.
+     *
+     * Both edges and the floor were derived on the five 120bpm fixtures alone,
+     * by sweeping them together and reading the raw onset coverage of the 78
+     * labels against the fraction of off-label hops that fire. The chosen point
+     * is the highest coverage available at an off-label rate no worse than the
+     * broadband detector's, and it is a local optimum in all four directions:
+     *
+     * ```
+     *   band \ floor      0.10           0.09           0.08           0.07
+     *   0-24k broadband 88.5%/6.27%    92.3%/7.10%    94.9%/8.40%    94.9%/9.93%
+     *   750-6000        91.0%/5.07%    92.3%/5.53%    93.6%/6.02%    93.6%/6.88%
+     *   1000-6000       89.7%/4.11%    91.0%/4.46%  * 93.6%/4.99% *  93.6%/5.43%
+     *   1250-6000       89.7%/3.82%    92.3%/4.16%    92.3%/4.45%    92.3%/4.94%
+     *   1000-24000      91.0%/4.58%    92.3%/4.89%    93.6%/5.51%    93.6%/6.09%
+     * ```
+     *
+     * Two things in that table matter more than the winning cell, and they are
+     * why this band can be chosen honestly where the highpass tried before it
+     * could not. Coverage has an interior maximum in the LOWER edge — it climbs
+     * to 1000Hz and falls again by 1500 — and raising the UPPER edge past 6kHz
+     * never buys a single label, it only costs off-label firing. A highpass has
+     * neither property: its edge could be raised indefinitely and the room-mic
+     * takes kept improving, because a mic take here is 28% of its magnitude
+     * above 12kHz where every direct input in the corpus is 0.2%. A band that
+     * stops at 6kHz cannot win by measuring hiss, and the sweep says it does
+     * not want to.
+     */
+    attackBandLoHz: number;
+    /** Upper edge of that band, Hz. See `attackBandLoHz`. */
+    attackBandHiHz: number;
+    /**
+     * Threshold floor for the band flux, as a multiple of the frame's own
+     * in-band magnitude.
+     *
+     * This is the term that actually decides an onset — not the adaptive
+     * median. Instrumented over every labelled attack in the five 120bpm
+     * fixtures, `fluxSensitivity * median` is the binding term at two of
+     * clean-lead's 43 labels and at none of the other four fixtures': the
+     * median runs an order of magnitude below the relative floor. So the onset
+     * test in practice reads "did more than this fraction of the frame's
+     * magnitude arrive as new energy", and a quiet upstroke landing on a loud
+     * ringing note is measured against a bar the ringing note sets. The band is
+     * what pays for lowering the bar.
+     */
+    attackBandFloorFactor: number;
     /** Minimum interval between accepted attacks, ms. */
     minIntervalMs: number;
     /** RMS window for the envelope-rise test, ms. */
@@ -495,6 +551,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     fluxFftSize: 1024,
     fluxSensitivity: 1.35,
     fluxMedianWindow: 17,
+    attackBandLoHz: 1000,
+    attackBandHiHz: 6000,
+    attackBandFloorFactor: 0.08,
     minIntervalMs: 70,
     envelopeWindowMs: 20,
     envelopeBaselineMs: 80,

@@ -116,6 +116,24 @@ export type FastFrame = {
   attack: AttackEvidence | null;
   /** Short-window RMS over the recent baseline; the decay/injection signal. */
   riseRatio: number;
+  /**
+   * A band-limited flux onset fired on this hop.
+   *
+   * A second witness the fast lane is deliberately NOT allowed to act on. It
+   * sums the flux over the region where a pick's transient lives and a ringing
+   * guitar string's fundamentals do not (`transient.attackBandLoHz`), which is
+   * what lets it hear a quiet upstroke over a loud note still sounding — the
+   * room-mic sixteenths take goes from 38 of its 48 attacks visible to 43.
+   *
+   * It is not a licence to open a Note, and that is a measurement rather than
+   * caution: routed into the fast lane's own decisions it costs `chords-a-bm` a
+   * labelled event and takes `clean-lead`'s false positives from 1 to 5-9 at
+   * every threshold tried, because every downstream constant is fitted to what
+   * the broadband flux does. What it is good for is corroboration — the region
+   * lane can see that the envelope rose over a trough and cannot localise it,
+   * and this says exactly when energy arrived.
+   */
+  bandOnset: boolean;
   /** Hop index since the engine started. */
   hop: number;
 };
@@ -194,6 +212,12 @@ export interface ITransientDetector {
     at: SourceTimeMs,
     atSample: number
   ): AttackEvidence | null;
+
+  /**
+   * Did the band-limited flux fire on the hop just observed? See
+   * `FastFrame.bandOnset`.
+   */
+  readonly bandOnset: boolean;
   /** Short-window RMS over its baseline for the most recent hop. */
   readonly riseRatio: number;
   reset(): void;

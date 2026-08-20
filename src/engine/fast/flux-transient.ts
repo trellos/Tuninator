@@ -24,11 +24,28 @@ import type { EngineConfig } from "../config.js";
 import type { AttackEvidence, ITransientDetector } from "../contracts.js";
 import { OnsetDetector } from "../kernels/onset.js";
 
+/**
+ * How far below the engine's amplitude gate the band witness still counts.
+ *
+ * The gate exists to stop the fast lane opening a Note on room tone, and it is
+ * right to be conservative there. A note picked into the tail of the one before
+ * it can sit under the gate for the hop where the pick lands, and that is
+ * precisely the event the region lane is trying to corroborate — so the band
+ * witness is allowed further down, but not into silence.
+ */
+const BAND_GATE_FRACTION = 0.5;
+
 export class FluxTransientDetector implements ITransientDetector {
   readonly windowSize: number;
 
   private readonly config: EngineConfig;
   private readonly flux: OnsetDetector;
+  /**
+   * The band-limited second witness. Runs every hop and decides nothing on its
+   * own; see `FastFrame.bandOnset`.
+   */
+  private readonly band: OnsetDetector;
+  private lastBandOnset = false;
   /** Rolling history of short-window RMS, for the envelope baseline. */
   private readonly rmsHistory: number[] = [];
   private readonly baselineFrames: number;
@@ -45,6 +62,16 @@ export class FluxTransientDetector implements ITransientDetector {
       medianWindow: config.transient.fluxMedianWindow,
       sensitivity: config.transient.fluxSensitivity,
     });
+    this.band = new OnsetDetector({
+      sampleRate,
+      fftSize: config.transient.fluxFftSize,
+      minIntervalMs: config.transient.minIntervalMs,
+      medianWindow: config.transient.fluxMedianWindow,
+      sensitivity: config.transient.fluxSensitivity,
+      bandLoHz: config.transient.attackBandLoHz,
+      bandHiHz: config.transient.attackBandHiHz,
+      floorFactor: config.transient.attackBandFloorFactor,
+    });
     this.baselineFrames = Math.max(
       1,
       Math.round((config.transient.envelopeBaselineMs / 1000) * sampleRate / hopSamples)
@@ -55,8 +82,14 @@ export class FluxTransientDetector implements ITransientDetector {
     return this.lastRiseRatio;
   }
 
+  get bandOnset(): boolean {
+    return this.lastBandOnset;
+  }
+
   reset(): void {
     this.flux.reset();
+    this.band.reset();
+    this.lastBandOnset = false;
     this.rmsHistory.length = 0;
     this.lastAttackAt = null;
     this.lastRiseRatio = 1;
@@ -88,6 +121,11 @@ export class FluxTransientDetector implements ITransientDetector {
     if (this.rmsHistory.length > this.baselineFrames * 2) this.rmsHistory.shift();
 
     const fluxResult = this.flux.process(spectralWindow, at);
+    // Runs unconditionally, and unconditionally decides nothing: the band is a
+    // witness the region lane corroborates against, never a reason to act.
+    const bandResult = this.band.process(spectralWindow, at);
+    this.lastBandOnset =
+      bandResult.isOnset && shortRms >= this.config.analysis.rmsGate * BAND_GATE_FRACTION;
     // Normalised by the frame's own level, so the same figure means the same
     // thing in a loud passage and a quiet one.
     let energy = 0;

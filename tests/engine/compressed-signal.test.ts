@@ -61,6 +61,7 @@ function frame(rms: number): FastFrame {
     gated: rms < DEFAULT_ENGINE_CONFIG.analysis.rmsGate,
     attack: null,
     riseRatio: 1,
+    bandOnset: false,
     hop: 100,
   };
 }

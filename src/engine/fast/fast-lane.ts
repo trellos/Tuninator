@@ -128,6 +128,7 @@ export class FastLane {
       gated,
       attack,
       riseRatio: this.transient.riseRatio,
+      bandOnset: warmedUp && this.transient.bandOnset,
       hop: this.hop,
     };
   }

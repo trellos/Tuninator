@@ -345,3 +345,95 @@ function makeDetectorWith(over: Partial<ConstructorParameters<typeof OnsetDetect
     ...over,
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* The band-limited witness                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A loud low drone with a quiet broadband click landing on top of it.
+ *
+ * This is alternate picking in miniature: the click carries a fraction of the
+ * drone's energy, so broadband it never clears a threshold set as a fraction of
+ * the frame's own magnitude. In the band where the pick lives and the drone's
+ * partials do not, the same click is the only thing there.
+ */
+function droneWithQuietClick(options: {
+  droneHz: number;
+  clickMs: number;
+  clickAmp: number;
+  durationMs: number;
+}): Float32Array {
+  const { droneHz, clickMs, clickAmp, durationMs } = options;
+  const signal = new Float32Array(Math.round((durationMs / 1000) * SR));
+  for (let i = 0; i < signal.length; i++) {
+    signal[i] = 0.5 * sawSample(droneHz, i / SR, 4);
+  }
+  const start = Math.round((clickMs / 1000) * SR);
+  // A short noise burst: flat across the spectrum, which is what a pick is.
+  let seed = 12345;
+  for (let i = start; i < Math.min(signal.length, start + Math.round(0.004 * SR)); i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const noise = (seed / 0x7fffffff) * 2 - 1;
+    const envelope = 1 - (i - start) / (0.004 * SR);
+    signal[i] = signal[i]! + clickAmp * envelope * noise;
+  }
+  return signal;
+}
+
+describe("OnsetDetector band limiting", () => {
+  const options = {
+    sampleRate: SR,
+    fftSize: FFT,
+    minIntervalMs: 70,
+    medianWindow: 17,
+    sensitivity: 1.35,
+  };
+
+  function firedNear(detector: OnsetDetector, signal: Float32Array, atMs: number): boolean {
+    const hop = 512;
+    let fired = false;
+    for (let end = FFT; end <= signal.length; end += hop) {
+      const timestampMs = (end / SR) * 1000;
+      const result = detector.process(signal.subarray(end - FFT, end), timestampMs);
+      if (result.isOnset && Math.abs(timestampMs - atMs) <= 40) fired = true;
+    }
+    return fired;
+  }
+
+  it("hears a quiet pick over a loud drone that the broadband flux misses", () => {
+    const signal = droneWithQuietClick({
+      droneHz: 110,
+      clickMs: 500,
+      clickAmp: 0.012,
+      durationMs: 900,
+    });
+
+    const broadband = new OnsetDetector(options);
+    const band = new OnsetDetector({
+      ...options,
+      bandLoHz: 1000,
+      bandHiHz: 6000,
+      floorFactor: 0.08,
+    });
+
+    expect(firedNear(broadband, signal, 500)).toBe(false);
+    expect(firedNear(band, signal, 500)).toBe(true);
+  });
+
+  it("rejects a band whose edges are inverted rather than silently reordering", () => {
+    expect(() => new OnsetDetector({ ...options, bandLoHz: 6000, bandHiHz: 1000 })).toThrow();
+  });
+
+  it("is unchanged by a band that spans the whole spectrum", () => {
+    const { signal } = repeatedAttacks({ hz: 196, count: 4, spacingMs: 250, decayMs: 220 });
+    const plain = new OnsetDetector(options);
+    const spanning = new OnsetDetector({ ...options, bandLoHz: 0, bandHiHz: SR / 2 });
+    const hop = 512;
+    for (let end = FFT; end <= signal.length; end += hop) {
+      const timestampMs = (end / SR) * 1000;
+      const frame = signal.subarray(end - FFT, end);
+      expect(spanning.process(frame, timestampMs)).toEqual(plain.process(frame, timestampMs));
+    }
+  });
+});

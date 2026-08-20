@@ -290,8 +290,15 @@ export class NoteTracker {
     // under the gate for the hop where the pick lands, which is exactly the
     // event the region lane is trying to corroborate. The gate still decides
     // what the fast lane may act on; this list only records what it saw.
-    if (frame.attack !== null) {
-      this.attackTimes.push(frame.attack.at);
+    // The band witness is recorded on the same list and for the same reason.
+    // The fast lane may not act on it — see `FastFrame.bandOnset` — but "energy
+    // arrived at exactly here" is the half of the answer the region lane cannot
+    // produce for itself, and a quiet upstroke 107ms after the downstroke it
+    // answers is visible to the band and to nothing else.
+    if (frame.attack !== null || frame.bandOnset) {
+      const at = frame.attack?.at ?? frame.at;
+      const last = this.attackTimes[this.attackTimes.length - 1];
+      if (last === undefined || at > last) this.attackTimes.push(at);
       if (this.attackTimes.length > ATTACK_HISTORY) this.attackTimes.shift();
     }
 

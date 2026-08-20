@@ -86,6 +86,7 @@ function frame(
           }
         : null,
     riseRatio: 1,
+    bandOnset: false,
     hop: index,
   };
 }
