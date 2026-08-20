@@ -130,6 +130,24 @@ official host before downloading. If the network policy blocks the datasets,
 enable them — and do not substitute synthetic training data; a model fitted
 to synthesis is how this project would quietly re-enter the take-scale trap.
 
+> **Measured 2026-08-20 — the check fired; this brief stopped at this
+> section.** The container's egress policy denies CONNECT to every non-GitHub
+> host (the gateway answers 403 before TLS; `https://example.com` is denied
+> too, so it is deny-by-default, not a per-site block). Denied, verbatim:
+> `https://zenodo.org/records/3371780` (GuitarSet record, all file URLs under
+> it, and `zenodo.org` generally); `https://ss12f32v.github.io/Guitar-Transcription/`
+> (EGDB page; all of `github.io`); `https://drive.google.com` and
+> `https://drive.usercontent.google.com` (EGDB's data host);
+> `https://huggingface.co`; `https://arxiv.org/abs/2202.09907`;
+> `https://mirdata.readthedocs.io`; `https://ieee-dataport.org`. Reachable:
+> GitHub content hosts (`raw.githubusercontent.com`, `codeload.github.com`,
+> `objects.githubusercontent.com`; `github.com` web/API is scoped to this
+> repository), `registry.npmjs.org`, `pypi.org` — none of which host either
+> dataset's audio. To run this brief, enable at minimum `zenodo.org`
+> (GuitarSet) plus EGDB's current host (its page is on `github.io`; the data
+> has lived on Google Drive). Step zero (the AGENTS.md §4 amendment,
+> DECISION-016) was completed before stopping and stands.
+
 Python with numpy (and torch if available; plain numpy SGD is acceptable at
 this parameter count) is for `training/` only. Nothing under `src/` may
 import from it, reference it, or need it at runtime.
