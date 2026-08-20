@@ -39,7 +39,18 @@ const RMS_GATE = 0.008;
 /** Envelope analysis hop. 10ms is finer than any label's stated precision. */
 const ENVELOPE_HOP_MS = 10;
 const ENVELOPE_WINDOW_MS = 20;
-/** How far from a label's `startMs` an energy rise still counts as its attack. */
+/**
+ * How far from a label's `startMs` an energy rise still counts as its attack.
+ *
+ * An outer bound only. The search is also stopped at the midpoint to the
+ * neighbouring labels, because 150ms is wider than a sixteenth note at 140bpm
+ * and an unbounded nearest-attack search then reports the PREVIOUS stroke's
+ * transient as this label's, one subdivision early. That reads exactly like a
+ * label annotated late, and it is not: on the amped sixteenths take 19 of the
+ * 19 labels whose nearest attack sat 30ms or more early had it within 25ms of
+ * the previous label's own onset, and the same holds 4 of 4, 3 of 3 and 1 of 1
+ * on the other fast held-out takes.
+ */
 const ONSET_SEARCH_MS = 150;
 /** Fractional rise over the preceding baseline that counts as an attack. */
 const ATTACK_RISE_RATIO = 1.35;
@@ -327,14 +338,29 @@ function verifyFixture(fixture: DecodeOutcome): FixtureReport {
   const pitchWindow = new Float32Array(PITCH_WINDOW);
   const chromaWindow = new Float32Array(CHROMA_FFT);
 
+  // Neighbour onsets, so the attack search cannot reach past the midpoint into
+  // the stroke before or after. See `ONSET_SEARCH_MS`.
+  const starts = events.map((event) => event.startMs).sort((a, b) => a - b);
+
   const labels: LabelReport[] = events.map((event) => {
     const concerns: string[] = [];
 
     /* Attack alignment. */
+    const index = starts.indexOf(event.startMs);
+    const previous = index > 0 ? (starts[index - 1] as number) : null;
+    const next = index >= 0 && index < starts.length - 1 ? (starts[index + 1] as number) : null;
+    const earliest = Math.max(
+      event.startMs - ONSET_SEARCH_MS,
+      previous === null ? -Infinity : (previous + event.startMs) / 2
+    );
+    const latest = Math.min(
+      event.startMs + ONSET_SEARCH_MS,
+      next === null ? Infinity : (event.startMs + next) / 2
+    );
     let nearest: number | null = null;
     for (const at of attacks) {
+      if (at < earliest || at > latest) continue;
       const delta = at - event.startMs;
-      if (Math.abs(delta) > ONSET_SEARCH_MS) continue;
       if (nearest === null || Math.abs(delta) < Math.abs(nearest)) nearest = delta;
     }
     const attackAligned = nearest !== null;
@@ -363,9 +389,18 @@ function verifyFixture(fixture: DecodeOutcome): FixtureReport {
 
     if (!audible) concerns.push("span never rises above the engine's rmsGate");
     if (!attackAligned) {
+      // Reported, never disqualifying. Two ordinary things produce a played
+      // event with no energy rise of its own: a legato or tied note, where the
+      // pick never re-attacks, and a MUTED restrum, which damps the strings and
+      // so puts total energy DOWN while plainly re-articulating the chord —
+      // eight of the sixteen strokes on each power-chord take are muted by
+      // construction, and `scripts/measure-mute-witness.ts` shows every one of
+      // them is real. Only inaudibility or an absent pitch class can put a label
+      // on the exception list.
+      const window = Math.round(Math.min(event.startMs - earliest, latest - event.startMs));
       concerns.push(
-        `no energy rise within ${ONSET_SEARCH_MS}ms of startMs ` +
-          "(may be a legato/tied event rather than a mislabel)"
+        `no energy rise within ${window}ms of startMs ` +
+          "(a legato, tied or muted event has none of its own)"
       );
     }
     if (expected.length > 0 && supported.length === 0) {

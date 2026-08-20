@@ -1791,3 +1791,49 @@ ended — whole notes, correctly refused. At the pitch-step site, which is the
 one that offers a stub of the note now arriving, `too-long` fires 22 times with
 a median duration of 293ms; those are not stubs either. Raising
 `articulationMs` reaches almost none of the shape it was supposed to reach.
+
+### The labels are not annotated late; the attack search was reading the wrong stroke
+
+Worth writing down because it has now been inferred twice from the same
+artefact, and because a conclusion that the ground truth is wrong would license
+changing it.
+
+`scripts/verify-fixtures.ts` reported each label's nearest energy rise within
+`ONSET_SEARCH_MS` (150). A sixteenth note at 140bpm is 107ms, so that window
+reaches a stroke and a half in each direction, and an unbounded nearest-attack
+search happily returns the PREVIOUS stroke's transient. Read naively that says
+the label is annotated 100ms late.
+
+It is not. Of the labels whose nearest attack sat 30ms or more early:
+
+```
+  take                       early    within 25ms of the PREVIOUS label's onset
+  amped sixteenths            19                19
+  room-mic sixteenths         16                11
+  DI sixteenths                4                 4
+  amped triplet                3                 3
+  DI triplet                   1                 1
+  clean-lead 120bpm           12                 0
+```
+
+Every one of them on the fast held-out takes is the neighbour, landing one
+subdivision back. Bounding the search at the midpoint between adjacent labels
+moves the amped sixteenths take from p10 −98ms / median −11ms to p10 −12ms /
+median −3ms, and the room mic from −97/−12 to −21/−8. The labels sit on the
+attacks.
+
+This is the third instance of the same class of error in this project — a
+window wider than the spacing of the events it discriminates. The other two
+were the fragmentation metric's 120ms ownership tolerance and the downstream
+ledger's absorb attribution, and all three inflated a number in the direction
+of blaming something innocent.
+
+A second thing the bound exposes, which is not a defect: with the search
+correctly narrowed, 105 labels have no energy rise of their own. That is
+expected and is reported rather than counted against them. A legato or tied
+note never re-attacks, and a MUTED restrum damps the strings — it puts total
+energy DOWN while plainly re-articulating the chord — so eight of the sixteen
+strokes on each power-chord take have no rise by construction. `SEPARATED` in
+`measure-mute-witness.ts` is the evidence that all of them are real. Only
+inaudibility or an absent pitch class can put a label on the exception list,
+and that list is unchanged at three.
