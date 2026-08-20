@@ -8,18 +8,23 @@ fixtures added since are held-out data: new label files and additive
 
 ## Against the frozen baseline (docs/BASELINE.md)
 
-| metric | baseline | before the region lane | now | gate |
-|---|---|---|---|---|
-| labels missed | 12 / 78 | 5 / 78 | **4 / 78** | 0 |
-| required fixtures failing | 2 | 0 | **0** | 0 |
-| clean-lead pitch class (gated) | 77.4% | 92.9% | **96.3%** | 90% |
-| clean-lead exact | — | 79.5% | **81.6%** | — |
-| triplets pitch class | — | 90.5% | **95.0%** | — |
-| clean-lead false positives | 8 | 1 | **1** | 3 |
-| power-chords onset median | 140ms FAIL | 113ms PASS | **113ms PASS** | 120ms |
-| chords-a-bm missed | 3 | 0 | **0** | — |
-| spurious Notes | 23 | 6 | **6** | — |
-| events yielding more than one Note | — | 11 / 78 | **11 / 78** | — |
+| metric | baseline | before the region lane | before the flux reference | now | gate |
+|---|---|---|---|---|---|
+| labels missed | 12 / 78 | 5 / 78 | 4 / 78 | **3 / 78** | 0 |
+| required fixtures failing | 2 | 0 | 0 | **0** | 0 |
+| clean-lead pitch class (gated) | 77.4% | 92.9% | **96.3%** | 92.6% | 90% |
+| clean-lead exact | — | 79.5% | **81.6%** | 76.9% | — |
+| clean-lead false positives | 8 | 1 | **1** | 2 | 3 |
+| power-chords onset median | 140ms FAIL | 113ms PASS | 113ms PASS | **PASS** | 120ms |
+| chords-a-bm missed | 3 | 0 | **0** | **0** | — |
+| cowboy 120 false positives | — | — | 4 | **2** | — |
+| sixteenths detected, mic / DI / amp | — | — | 35 / 39 / 38 | **38 / 41 / 36** | 48 |
+| events yielding more than one Note (whole corpus) | — | — | 98 / 459 | **97 / 459** | — |
+
+The two clean-lead rows that went the wrong way are the price of the change,
+and the section "What 48 detections would actually take" says exactly what was
+traded for what. Both still clear their gates; nothing else on the five
+originals moved except in the recogniser's favour.
 
 Every required fixture passes every gate it is held to, and `npm run eval`
 exits 0. The one remaining failure is `spicy-chords`' `maxFalseLabels`, on an
@@ -537,6 +542,18 @@ is in practice `10 x flux / magnitude`, a level-relative measure like the
 others. That last point is recorded rather than acted on; the constant works and
 the reason given for it is wrong.
 
+**Followed up and acted on since.** Everything above is still true of the
+threshold as a scalar, and the conclusion drawn from it — that the bar is set
+by the note the pick is landing on — turned out to be the whole problem rather
+than a curiosity. Forcing `fluxSensitivity` as high as 4 changes no decision on
+any fixture and none on a synthetic steady low E, which confirms the median
+term is inert; the fix was not to reweigh the terms but to stop measuring
+either of them against the whole frame. See "What 48 detections would actually
+take". The `restrumFluxRatio` note above is now also literally true and
+harmless: it divides the held flux by a threshold whose binding term is
+`0.1 x magnitude`, and it is used only over a ringing chord, where that is the
+right thing to be relative to.
+
 ## The attack band, second attempt: a bandpass, and what it is good for
 
 The previous attempt used a HIGHPASS and could not choose its edge honestly:
@@ -595,6 +612,13 @@ The upstrokes sit at 0.5-1.5 everywhere. There is no frequency region in which a
 quiet upstroke on that take is loud; the band buys its eight extra labels by
 lowering the floor it is measured against, not by finding a place where the pick
 is obvious.
+
+**And that reading of it was right, which is why the answer was elsewhere.**
+The floor is what had to change, not the region it is applied over — but it had
+to change per band and against a reference with no memory of the ringing note,
+not globally. Judged that way the BROADBAND detector reaches all 48 labels on
+all three takes on its own; the table above is the same evidence, seen through a
+bar the ringing note was still setting.
 
 ## The ledger: where the sixteenths actually go
 
@@ -975,7 +999,10 @@ The detection count on the amp sim climbs past 48 and keeps going, and the
 number of labels it lands on never moves. Shortening these floors does not
 recover played notes; past a point it manufactures fragments, and on the room
 mic it destroys the take outright. **No setting of any of these constants, at
-any tempo, gets the sixteenths materially closer to 48.**
+any tempo, gets the sixteenths materially closer to 48.** (Still true, and
+narrower than it reads: it is a statement about the tracker's duration floors,
+measured while the fast lane was only offering 37 usable transients on the room
+mic. It says nothing about the evidence, which turned out to be all there.)
 
 ### What the best version measured, end to end
 
@@ -1004,36 +1031,134 @@ exact accuracy 83.3% -> 76.9%, and whole-corpus fragmentation 98/459 events
 split with 109 extra Notes -> 107/459 with 121. Not kept. The mechanism is
 sound, the estimator does what it says, and it does not pay for itself.
 
-## What 48 detections would actually take
+## What 48 detections would actually take — the ceiling claim was wrong
 
-`scripts/measure-onset-ceiling.ts` counts the evidence before any tracker rule
-runs. `accepted` is broadband transients above the amplitude gate — the only
-witness the fast lane may act on — and `covered` is how many labelled events
-have one within 60ms:
+**This section previously concluded that the room-mic sixteenths take "cannot
+reach 48 — it cannot reach 39" without letting the band-limited witness open
+events. That conclusion was wrong, and it was refuted by direct measurement.
+What follows replaces it.** The reasoning that produced it was sound about the
+numbers it had and wrong about where they came from: it read the transient
+count off the fast lane's output and treated that as a property of the audio,
+when it was a property of one constant inside the flux kernel.
 
-| take | labels | detections | accepted transients | labels covered | +gated | +band |
-|---|---|---|---|---|---|---|
-| sixteenths mic | 48 | 35 | 37 | **38** | 38 | 46 |
-| sixteenths DI | 48 | 39 | 41 | **44** | 45 | 45 |
-| sixteenths amp | 48 | 38 | 44 | **43** | 43 | 45 |
-| lead line mic | 55 | 78 | 86 | 53 | 53 | 55 |
-| lead line DI | 55 | 71 | 82 | 55 | 55 | 55 |
-| lead line amp | 55 | 64 | 102 | 55 | 55 | 55 |
+### What the audio actually contains
 
-The room-mic take contains **thirty-seven** transients the fast lane is allowed
-to act on, and thirty-eight of its forty-eight labels have one. Thirty-five come
-out as Notes. Whatever is done downstream, that take cannot reach 48 — it cannot
-reach 39 — without changing what the fast lane is allowed to act on. The
-direct input tops out at 45 and the amp sim at 43 on the same reading.
+Raw broadband spectral flux against the PREVIOUS FRAME — N=1024, hop 256, local
+maxima, above the 0.008 amplitude gate, 60ms minimum separation — on the
+sixteenths takes:
 
-"Forty-eight notes played must read as forty-eight" is therefore not a
-segmentation target on this corpus. It is a request for the band-limited witness
-(or the gated transient) to be allowed to open events, and the two attempts at
-that are recorded above: routed into the fast lane's own decisions the band
-costs `chords-a-bm` a labelled event and takes `clean-lead` from 1 false
-positive to between 5 and 11, at every sharpness scale from 1.0x to 0.1x. The
-gap between 38 and 46 covered labels on the room mic is the whole of the
-remaining opportunity, and it lives in that one decision.
+| path | rule | candidates | labels covered | extras |
+|---|---|---|---|---|
+| mic | flux > 0.10 x frame magnitude | 71 | **48/48** | 23 |
+| DI | flux > 0.10 x frame magnitude | 50 | **48/48** | 2 |
+| amp | flux > 0.05 x frame magnitude | 76 | **48/48** | 28 |
+
+All forty-eight strokes are reachable on all three paths, from a candidate set
+of 50 to 76. The evidence was never missing. What was missing was a detector
+willing to look at it.
+
+### Why the old detector could not see them
+
+`kernels/onset.ts` measured flux against a per-bin peak hold decaying at 0.95 a
+hop — half a second of memory. That was a deliberate fix for a real problem
+(see below), but during a ringing note the reference stays high, so a quiet
+pick landing on top of a sounding note cannot raise any bin above it.
+Instrumented over the corpus, the old kernel's own onsets covered:
+
+| take | labels | old kernel covered | new kernel covered |
+|---|---|---|---|
+| sixteenths mic | 48 | 40 | **48** |
+| sixteenths DI | 48 | 45 | **48** |
+| sixteenths amp | 48 | 46 | **48** |
+| the five 120bpm fixtures | 78 | 50 | **70** |
+
+and, at the fast lane's output where the tracker can act on them:
+
+| take | labels | accepted before | accepted after | covered before | covered after |
+|---|---|---|---|---|---|
+| sixteenths mic | 48 | 37 | 47 | 38 | **44** |
+| sixteenths DI | 48 | 41 | 43 | 44 | **45** |
+| sixteenths amp | 48 | 44 | 52 | 43 | **45** |
+| clean-lead | 43 | 66 | 69 | 28 | **30** |
+
+A second, compounding defect was found in the same file and is worth naming
+separately, because it cost more than any threshold in the corpus: the kernel
+armed its own minimum-interval dead time from onsets BELOW the caller's
+amplitude gate — hops the fast lane was never going to act on. A note decaying
+across the gate fires, and swallows the pick that lands 70ms later. On the five
+120bpm fixtures that alone accounted for **fifteen of the seventy-eight
+labels**. The kernel now takes the caller's gate as an argument.
+
+### What replaced the decaying hold
+
+Three changes, each derived on the five 120bpm fixtures only, by the method the
+attack band was chosen by — highest label coverage available at an off-label
+firing rate no worse than the detector it replaces:
+
+1. **The reference is the per-bin maximum over the last three hops** (~32ms),
+   and nothing older. Long enough to cover the unresolved-harmonic beating,
+   far too short to remember a note.
+2. **The decision is made band by band**, each band judged against its own
+   magnitude and its own recent peak, with two bands required to agree. A
+   threshold set as a fraction of the whole frame's magnitude is a bar the
+   loudest thing sounding sets; per band, a ringing note is loud only where it
+   lives. A band narrower than eight bins is merged into its neighbour: at
+   fftSize 1024 the lowest band spans four and a half bins, and rectified flux
+   over four bins is a coin toss, which is what let a stationary noise floor
+   fire three or four times a second.
+3. **The flux is still REPORTED against the old decaying hold, alongside the
+   new one**, and the tracker uses each where it belongs. This is the part that
+   is not obvious: the short reading is what can SEE a quiet pick land on a
+   ringing note, and the long reading is what can tell that a compressed
+   chord's sustain, however busy it looks hop to hop, has added nothing since
+   the chord was struck. Measured on the amped cowboy take, the short reading
+   cannot separate that take's sustain (sharpness 1.5-3.7, ratio 0.6-1.2) from
+   its strums (1.9-8.6, 0.8-5.4) at all; the long reading separates them as it
+   always did. Routing the whole tracker onto the short reading chops ringing
+   chords; routing it onto the long one loses the sixteenths back down to 23 of
+   48 on the room mic. Both were measured.
+
+The steady-low-E ripple the peak hold was added for is real and has not come
+back: `tests/onset.test.ts` holds it directly, and shortening the reference to
+one hop fails that test.
+
+### What it bought, end to end
+
+| fixture | detections before | after | missed before/after |
+|---|---|---|---|
+| chords-a-bm 120 | 16/16 | 16/16 | 0 / 0 |
+| clean-lead 120 (gated) | 31/31 | 32/31 | 1 / 1 |
+| cowboy 120 | 12/8 | **10/8** | 0 / 0 |
+| power-chords 120 | 9/8 | 9/8 | 0 / 0 |
+| spicy | 3/3 | 3/3 | 0 / 0 |
+| sixteenths mic | 35/48 | **38/48** | 13 / **10** |
+| sixteenths DI | 39/48 | **41/48** | 9 / **7** |
+| sixteenths amp | 38/48 | 36/48 | 13 / 15 |
+| lead line mic | 78/55 | **64/55** | 0 / 3 |
+| lead line DI | 71/55 | 78/55 | 2 / **0** |
+| lead line amp | 64/55 | **61/55** | 9 / 13 |
+| cowboy mic/amp/DI 140 | 8, 11, 9 | 8, 11, 9 | unchanged |
+| power mic/DI/amp 140 | 23, 12, 11 | 20, 12, 10 | 1, 5, 7 / 2, 4, 7 |
+
+Whole-corpus fragmentation went from 98 of 459 events split with 109 extra
+Notes to **97 with 107**. Every required fixture meets every gate and
+`npm run eval` exits 0.
+
+### What is still true, and what the remaining gap is
+
+The room mic emits 38 of the 48 strokes it now HAS evidence for 44 of, so the
+remaining loss is downstream of the detector for the first time in this
+document's history. The exhaustive ledger below still describes where those go.
+
+And one thing measured in this pass deserves to be believed before the next
+attempt at `clean-lead`'s fast run: **the true and false splits inside it are
+not separable by any witness the engine has**. The transient at 12173ms that
+opens a stub inside a played note reads sharpness 2.59, flux ratio 1.38, rise
+0.98, and the labelled re-pick at 13720ms reads 2.16, 1.13, 0.83. Neither the
+held-scale readings, the band witness, nor the envelope flag distinguishes the
+two populations on that take. Whatever separates them is not in the transient,
+and a threshold sweep will only trade one for the other — which is exactly what
+every sweep of them did.
 
 ## The exhaustive ledger: every missed sixteenth, and the line that discarded it
 
