@@ -850,3 +850,242 @@ Note's end — rather than at a fixed offset from now. That is a different chang
 from "add latency", and it is the one worth making. It should be built and
 tuned against recordings these constants have never seen, not against these 78
 events.
+
+## The constants are absolute milliseconds: built, measured, rejected
+
+The section above ends by naming two of the fixed durations — `tracking.minStableMs`
+and `transient.articulationMs` — as what loses the sixteenths, and notes that
+both are pinned from the other side by the 120bpm fixtures. The obvious repair
+is that they should not be fixed durations at all. `minStableMs` of 55ms is a
+sliver of a whole note and half of a 107ms stroke; one number cannot be right
+for both, which would explain why every sweep of it trades one fixture against
+another. So the constants would stay and what they are measured in would change:
+durations at a *reference* pace, read proportionally shorter when the music is
+faster than that.
+
+It was built and measured against the whole corpus, in the shape the argument
+asks for, and it does not work. Recorded in full, because the reason it fails
+also rules out a class of repairs rather than one attempt at one.
+
+### What was built
+
+A `PaceEstimator` holding a ring of the recent inter-onset intervals, fed from
+every transient the fast lane accepted (in source time, allocation-free, no
+clock). Its `paceMs` is the median of the last eight, ignoring gaps shorter than
+`transient.minIntervalMs` — two transients closer than that are one articulation
+— and dropped entirely after 1.5s of silence, so a pause falls back to the
+reference. Deliberately one-directional: the estimate is clamped at the
+reference, so material at or below the reference rate behaves exactly as it did
+before, and only faster material is affected. Every duration named in the brief
+was routed through it: `tracking.minStableMs` at four separate sites,
+`transient.articulationMs` at both of its, `minRestrumMs`, `ringOutMs`,
+`mutedRestrumWindowMs`, `tracking.releaseGraceMs`, `harmony.changeStableMs`.
+
+### The reference pace, derived on the five originals
+
+Sweeping the reference UPWARD scales the constants down harder at any given
+pace, including inside the 120bpm sixteenth run itself, which is what makes the
+number falsifiable on the derivation set rather than only on the held-out data.
+Each site was swept alone, and the five originals were compared detection by
+detection and label by label:
+
+| the duration scaled | largest reference the five originals survive | what moves one step above it |
+|---|---|---|
+| `articulationMs`, attack-burst continuation | 167 | `cowboy` 12 -> 11 detections at 200 |
+| `minRestrumMs`, re-striking a named chord | 167 | `chords-a-bm` 16 -> 17 detections at 200 |
+| `minStableMs`, old enough to be ENDED | 143 | `clean-lead` 40 -> 39 detections and one label lost at 167 |
+| `ringOutMs` | 143 | `clean-lead` +1 false positive at 167 |
+| `minStableMs`, old enough to be ANNOUNCED | 125 | `clean-lead` +1 false positive at 143, +2 at 167 |
+| `articulationMs`, absorbing a stub | below 125 | `clean-lead` 40 -> 41 detections at 125 — one extra false positive, with the eval's missed count unchanged at 4 |
+| `changeStableMs` | below 125 | `cowboy` 12 -> 13 detections at 125 |
+| `minUnpitchedStableMs`, the `enriching` promotion, the stability term, `mutedRestrumWindowMs` | inert at every reference tried | nothing moves at 250 |
+
+Two of those are worth naming. `changeStableMs` is bounded by how long the
+chroma path needs to turn over — a 4096-point transform run once every four hops
+— and not by how fast the player is going, so scaling it is wrong in principle
+and the fixtures agree. And `tracking.releaseGraceMs` is falsified outright
+below.
+
+### With a PERFECT pace estimate, nothing changes
+
+The estimate can be wrong, and a fair test of the hypothesis has to separate "the
+idea is wrong" from "the measurement is". So the estimator was replaced with an
+oracle: the median gap between the LABELS within 700ms of now — the true local
+note rate, which no causal detector can have.
+
+| take, detections / labels | fixed constants | measured pace | ORACLE pace |
+|---|---|---|---|
+| sixteenths mic | 35 / 48 | 37 | 37 |
+| sixteenths DI | 39 / 48 | 39 | 39 |
+| sixteenths amp | 38 / 48 | 39 | 39 |
+| lead line mic | 78 / 55 | 81 | 79 |
+| lead line DI | 71 / 55 | 76 | 71 |
+| lead line amp | 64 / 55 | 65 | 65 |
+| `clean-lead` 120bpm | 40 / 43 | 41 | **36** |
+
+Perfect knowledge of the tempo buys **nothing at all** on the sixteenths, which
+is the thing this was built to fix. It does repair the damage to the lead takes,
+which says the estimate is genuinely poor — and the last row says the idea is
+wrong independently of that. Scaling by the TRUE note rate costs `clean-lead`
+four detections and three labels on the derivation set. Instrumented per site,
+one constant carries all of it: `tracking.releaseGraceMs`. How long silence must
+persist before a Note has ended is a property of the instrument's decay and of
+the amplitude gate, not of how fast the player is going, and the fixtures say so
+in the only way that counts.
+
+### Why the estimate is poor, and why a better one is not available
+
+The measured pace against the truth, per take:
+
+| take | median gap between LABELS | measured pace, p10 / median |
+|---|---|---|
+| sixteenths mic | 105 | 93 / 125 |
+| sixteenths DI | 105 | 107 / 113 |
+| sixteenths amp | 105 | 107 / 120 |
+| lead line mic | 196 | 93 / 125 |
+| lead line DI | 197 | 107 / 125 |
+| lead line amp | 197 | **80 / 107** |
+| the five 120bpm fixtures | 167 - 1920 | 113-125 / 125 |
+
+On the amp path the estimator reads the lead take — 197ms per note — as FASTER
+than the sixteenths take at 105ms. The inversion is not noise, it is the defect
+measuring itself: the sixteenths take is missing a third of its onsets, which
+stretches its intervals, and the lead take produces 86 accepted transients for
+55 played notes, which shortens its. The rate estimate needed to fix the
+segmentation is corrupted by the segmentation errors it is meant to fix, and
+the two takes it must separate sit at the same tempo and differ only in
+subdivision — which is precisely the quantity being mis-measured.
+
+### The ceiling of the whole idea
+
+Suppose the estimate were free to be anything. Forcing the scale factor to a
+constant, from 1 down to 0.01 — every one of these durations driven to nothing —
+bounds what shortening them can ever buy. Detections, and in brackets how many
+of the 48 labels a detection actually lands on:
+
+| factor | sixteenths mic | sixteenths DI | sixteenths amp | lead mic (55 labels) |
+|---|---|---|---|---|
+| 1.0 (today) | 35 (41) | 39 (46) | 38 (47) | 78 |
+| 0.75 | 38 (42) | 39 (46) | 40 (47) | 86 |
+| 0.5 | 43 (41) | 40 (46) | 44 (46) | 98 |
+| 0.25 | 24 (23) | 40 (46) | 50 (46) | 96 |
+| 0.1 | 28 (25) | 41 (46) | 51 (46) | 96 |
+
+The detection count on the amp sim climbs past 48 and keeps going, and the
+number of labels it lands on never moves. Shortening these floors does not
+recover played notes; past a point it manufactures fragments, and on the room
+mic it destroys the take outright. **No setting of any of these constants, at
+any tempo, gets the sixteenths materially closer to 48.**
+
+### What the best version measured, end to end
+
+The most defensible configuration — reference 143, every site scaled except the
+three the originals rule out — run over all seventeen fixtures:
+
+| fixture | detections before | after | missed before/after | fp before/after |
+|---|---|---|---|---|
+| chords-a-bm 120 | 16/16 | 16/16 | 0 / 0 | 0 / 0 |
+| clean-lead 120 | 40/43 | **41/43** | 4 / 4 | 1 / **2** |
+| cowboy 120 | 12/8 | 12/8 | 0 / 0 | 4 / 4 |
+| power-chords 120 | 9/8 | 9/8 | 0 / 0 | 1 / 1 |
+| spicy | 3/3 | 3/3 | 0 / 0 | 0 / 0 |
+| sixteenths mic | 35/48 | **37/48** | 13 / **11** | 0 / 0 |
+| sixteenths DI | 39/48 | 39/48 | 9 / 9 | 0 / 0 |
+| sixteenths amp | 38/48 | **39/48** | 13 / **12** | 3 / 3 |
+| lead line mic | 78/55 | **81/55** | 0 / 0 | 23 / **26** |
+| lead line DI | 71/55 | **76/55** | 2 / **1** | 18 / **22** |
+| lead line amp | 64/55 | **65/55** | 9 / **8** | 18 / 18 |
+| cowboy mic/amp/DI 140 | 8, 11, 9 | 8, 11, 9 | unchanged | unchanged |
+| power mic/DI/amp 140 | 23, 12, 11 | 23, 12, 11 | unchanged | unchanged |
+
+Three sixteenths recovered across three paths, against eight extra Notes on the
+lead takes, `clean-lead`'s gated pitch class 96.3% -> 92.6%, `chords-a-bm`'s
+exact accuracy 83.3% -> 76.9%, and whole-corpus fragmentation 98/459 events
+split with 109 extra Notes -> 107/459 with 121. Not kept. The mechanism is
+sound, the estimator does what it says, and it does not pay for itself.
+
+## What 48 detections would actually take
+
+`scripts/measure-onset-ceiling.ts` counts the evidence before any tracker rule
+runs. `accepted` is broadband transients above the amplitude gate — the only
+witness the fast lane may act on — and `covered` is how many labelled events
+have one within 60ms:
+
+| take | labels | detections | accepted transients | labels covered | +gated | +band |
+|---|---|---|---|---|---|---|
+| sixteenths mic | 48 | 35 | 37 | **38** | 38 | 46 |
+| sixteenths DI | 48 | 39 | 41 | **44** | 45 | 45 |
+| sixteenths amp | 48 | 38 | 44 | **43** | 43 | 45 |
+| lead line mic | 55 | 78 | 86 | 53 | 53 | 55 |
+| lead line DI | 55 | 71 | 82 | 55 | 55 | 55 |
+| lead line amp | 55 | 64 | 102 | 55 | 55 | 55 |
+
+The room-mic take contains **thirty-seven** transients the fast lane is allowed
+to act on, and thirty-eight of its forty-eight labels have one. Thirty-five come
+out as Notes. Whatever is done downstream, that take cannot reach 48 — it cannot
+reach 39 — without changing what the fast lane is allowed to act on. The
+direct input tops out at 45 and the amp sim at 43 on the same reading.
+
+"Forty-eight notes played must read as forty-eight" is therefore not a
+segmentation target on this corpus. It is a request for the band-limited witness
+(or the gated transient) to be allowed to open events, and the two attempts at
+that are recorded above: routed into the fast lane's own decisions the band
+costs `chords-a-bm` a labelled event and takes `clean-lead` from 1 false
+positive to between 5 and 11, at every sharpness scale from 1.0x to 0.1x. The
+gap between 38 and 46 covered labels on the room mic is the whole of the
+remaining opportunity, and it lives in that one decision.
+
+## The exhaustive ledger: every missed sixteenth, and the line that discarded it
+
+Requested as the decisive version of the partial ledgers above. Every labelled
+stroke on the three sixteenths takes with no detection paired to it under a
+greedy nearest-match at +-70ms, and for each one, the test that rejected it.
+Produced by instrumenting the tracker at the onset record, the re-articulation
+decision, the settled test, `absorbArticulationFragment` and the never-announced
+branch of `end()`, and reading the labels against the resulting trace.
+
+| cause | mic | DI | amp | total |
+|---|---|---|---|---|
+| band-only transient; the fast lane may not act on it | 7 | 1 | 2 | **10** |
+| a Note opened on this stroke, and the matcher paired it with a neighbouring label | 1 | 4 | 3 | **8** |
+| re-articulation accepted, but the sounding Note was too young to be ended | 3 | 0 | 2 | **5** |
+| rejected: gliding, and the envelope rise below `glideRiseOverride` | 1 | 3 | 1 | **5** |
+| a Note opened and was never announced | 2 | 0 | 1 | **3** |
+| absorbed as an articulation stub | 1 | 0 | 2 | **3** |
+| rejected: no energy arrived and the transient was not sharp | 1 | 0 | 2 | **3** |
+| no transient of any kind within 60ms | 0 | 1 | 1 | **2** |
+| **missed** | **16** | **9** | **14** | **39** |
+
+Per stroke, on the room mic:
+
+```
+s4  @4977  band-only transient                    s31 @7813  too young to be ended [sounded 40 < 55]
+s6  @5213  paired with a neighbouring label       s32 @7918  band-only transient
+s8  @5388  absorbed as an articulation stub       s34 @8135  too young to be ended [sounded 27 < 55]
+s15 @6124  no energy, not sharp [1.12 < 1.2, 0.62 < 0.65]   s36 @8365  band-only transient
+s16 @6250  gliding [rise 1.21 < 1.6]              s40 @8761  never announced [sounded 40 < 55]
+s18 @6451  band-only transient                    s42 @8984  never announced [sounded 27 < 55]
+s20 @6660  band-only transient                    s44 @9234  band-only transient
+s28 @7462  band-only transient                    s46 @9475  too young to be ended [sounded 53 < 55]
+```
+
+Three things follow, and they agree with everything measured above.
+
+**The fixed floors account for eleven of the thirty-nine**, and the eight
+"too young" and "never announced" cases sit at 13, 27, 27, 27, 27, 40, 40 and
+53ms. A floor scaled to a 107ms stroke is 41-47ms, depending on the reference:
+it reaches the 53 and nothing else. A
+floor scaled far enough to reach all of them is the 0.25 column of the limit
+table, where the room-mic take collapses to 24 detections. There is no setting
+in between that recovers them, which is why the estimator recovers three
+strokes and no more.
+
+**The largest single cause is not a threshold at all.** Ten of the thirty-nine
+strokes — seven of the room mic's sixteen — were seen only by the band-limited
+witness, which the tracker records and is not allowed to act on.
+
+**Eight more are boundary placement rather than detection.** A Note opened on
+the stroke and the matcher paired it with the label either side, which is the
+pitch-path lag this document has named twice: a Note whose boundary is right
+and whose first hops describe its predecessor. It is why the same takes
+simultaneously miss labels and over-segment, and it is not a duration.
