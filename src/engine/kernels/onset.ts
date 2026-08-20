@@ -158,24 +158,22 @@ const BAND_SHARE_FLOOR = 0.005;
  * times a second; merged into its neighbour, the same signal fires once, at
  * the moment the noise begins, which is the only true answer.
  */
+/**
+ * How much louder than its own recent peak a band has to be before it votes.
+ *
+ * The flux test says new energy appeared in this band; this says the band as a
+ * whole is louder than it has just been. The difference is between energy
+ * ARRIVING and energy MOVING: a vibrato sweeps every partial of a bright note
+ * across its neighbouring bins and shows rectified flux in every band at once
+ * while making no band louder, and at 1.00 exactly that produced eight Notes
+ * out of one vibratoed A3 in `tests/engine/articulation.test.ts`. Five percent
+ * is the smallest margin that holds that case; the five 120bpm fixtures lose
+ * two of their 78 labels to it, which is what a synthetic case is allowed to
+ * cost when it describes something the recogniser will meet constantly.
+ */
 const BAND_RISE = 1.05;
 
 const BAND_MIN_BINS = 8;
-
-/**
- * Highest frequency allowed to vote, Hz. Energy above it still counts toward
- * the reported flux; it just does not get a say in whether this hop is an
- * attack.
- *
- * The band-limited witness's own sweep found the same edge from the other
- * direction: raising it past 6kHz never bought a single label and only cost
- * off-label firing. What lives up there is signal-path character rather than
- * playing — a room-mic take in this corpus carries 28% of its magnitude above
- * 12kHz where every direct input carries 0.2% — and on a bright synthetic it
- * is where aliasing lives, so a vibrato sweeping its upper partials across a
- * few dozen bins reads as an arrival there and nowhere else.
- */
-const ARRIVAL_TOP_HZ = 24000;
 
 /**
  * Threshold floor as a fraction of a band's own magnitude: "did more than this
@@ -240,6 +238,28 @@ const ABSOLUTE_FLUX_FLOOR = 1e-3;
  * the measurement did not.
  */
 const REPORTED_REFERENCE_DECAY = 0.95;
+/**
+ * How much of the held threshold the held flux must reach before an arrival
+ * counts as an onset.
+ *
+ * The short reference cannot tell the difference between a pick landing on a
+ * decaying note and that note's own tail churning: both put new energy into
+ * bands that were quiet three hops ago. The held reading can say whether
+ * anything has arrived that is new since the note BEGAN, and requiring a
+ * fraction of its own threshold is the cheapest form of that question. Derived
+ * on the five 120bpm fixtures against `clean-lead`, which is where the churn
+ * lives. Swept, that fixture passes every gate between 0.35 and 0.45 and fails
+ * on both sides of it: at 0.25 its triplet run carries five false positives
+ * against a bar of three, and at 0.55 it loses two labelled re-picks and its
+ * gated pitch class drops to 88.5%. Inside that band the derivation fixtures
+ * are indifferent, so this takes the top of it, where whole-corpus
+ * fragmentation is lowest — 97 of 459 events split against 99 at the bottom,
+ * with the same detections on the three sixteenths takes either way.
+ *
+ * Deliberately a fraction rather than a multiple: the held reading is being
+ * asked to corroborate, not to decide, and asking it to decide is what kept the
+ * room-mic sixteenths at 23 of 48.
+ */
 const HELD_CORROBORATION = 0.45;
 
 /**
@@ -346,18 +366,17 @@ export class OnsetDetector {
 
     // Arrival bands are the fixed edges clipped into whatever range this
     // detector was given, so a band-limited instance subdivides its own band.
-    const votingTo = Math.min(this.binTo, Math.max(this.binFrom + 1, Math.round(ARRIVAL_TOP_HZ / binHz)));
     const edges: number[] = [this.binFrom];
     for (const hz of ARRIVAL_BAND_EDGES_HZ) {
       const bin = Math.round(hz / binHz);
-      if (bin - (edges[edges.length - 1] as number) >= BAND_MIN_BINS && bin < votingTo) {
+      if (bin - (edges[edges.length - 1] as number) >= BAND_MIN_BINS && bin < this.binTo) {
         edges.push(bin);
       }
     }
-    if (edges.length > 1 && votingTo - (edges[edges.length - 1] as number) < BAND_MIN_BINS) {
+    if (edges.length > 1 && this.binTo - (edges[edges.length - 1] as number) < BAND_MIN_BINS) {
       edges.pop();
     }
-    edges.push(votingTo);
+    edges.push(this.binTo);
     this.bandEdges = Int32Array.from(edges);
 
     const requested = options.minArrivalBands ?? MIN_ARRIVAL_BANDS;
