@@ -7,6 +7,48 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-018]: The derivation set cannot support the same-pitch decision; new derivation material is the precondition for further work on it
+* **Date:** 2026-08-21
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** Investigating why the learned head's per-take scores ran
+  opposite to expectation, a count of consecutive labelled events carrying
+  the same pitch or chord name found **seven in the entire derivation set,
+  all seven inside `chords-a-bm-g-d-2x-120bpm`**, against 138 in the
+  held-out set (108 of those in the three sixteenths takes). Carried into
+  the decision table every ceiling study fits on: **8 of 59 derivation
+  positives are same-pitch re-articulations; 51 are a new pitch arriving
+  over a ringing Note.** `clean-lead-120bpm`, 44% of that table, is a rising
+  scale with zero same-pitch repeats — a claim to the contrary in
+  `docs/DETECTION-FINDINGS.md` has been corrected in place.
+* **Decision:** Treat every derivation-set reading of "the same-pitch
+  re-articulation decision" as a reading of a mostly-different population,
+  and treat new derivation material containing the case as the precondition
+  for further work on it: minutes of deliberate same-pitch re-picking
+  (varied velocity, muted and open, sixteenth spacing and slower) through
+  the corpus's three signal paths, labelled by ear, added to the derivation
+  side. `scripts/measure-same-pitch-population.ts` reproduces the count and
+  should be run before trusting any future derivation reading of this
+  decision.
+* **Alternatives Considered:** Re-labelling existing takes more precisely —
+  rejected as the wrong instrument: 20% of decision rows sit within 20ms of
+  the 70ms attribution edge so timing precision is real but second-order,
+  and no labelling pass creates instances of a phenomenon the audio does not
+  contain. Promoting a held-out sixteenths take into derivation — rejected:
+  it would spend the corpus's only dense supply of the phenomenon on tuning
+  and leave nothing to be graded against. Continuing to infer same-pitch
+  performance from held-out scores — rejected as the practice that produced
+  eight experiments tuned on eight examples.
+* **Consequences:** Reframes the record rather than invalidating it: the
+  measured numbers stand, their titles do not. The 0.808 → 0.434
+  leave-one-take-out collapse of DECISION-009 now has a simpler available
+  explanation — the fold holding out `chords-a-bm-g-d-2x-120bpm` removes the
+  phenomenon from the training half entirely — which weakens it as evidence
+  for take-dependent witness scale and strengthens it as evidence that there
+  was nothing there to fit. The 0.73 ceiling should be renamed to what it
+  measures until new material exists. Cost: the fix needs the project owner
+  at a guitar, not an agent at a keyboard.
+
 #### [DECISION-017]: Reject wiring the learned onset head; the external-data bet failed its ranking falsifier
 * **Date:** 2026-08-20
 * **Status:** Rejected

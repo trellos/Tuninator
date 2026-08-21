@@ -3413,13 +3413,21 @@ Three things are true at once. The model does not collapse the way the
 fitted twelve-witness model did (0.808 → 0.434): fitted on zero rows of this
 corpus, it lands at 0.716 across an acoustic→electric domain change, which
 is transfer the fitted models never had. Its failure is *localised*: chords
-rank at 0.90–1.00 while `clean-lead-120bpm` — 44% of the table, the dense
-same-pitch re-picking the whole problem is about — reads 0.605. And its
-score LOCATIONS shift per take even where ranking is good: recalibrating a
-single threshold across takes (the LOTO logistic over the score alone)
-collapses the pooled figure to 0.513, and keeping every derivation positive
-admits 101 of 102 negatives. Even had the ranking bar been cleared, no
-usable operating point exists on this corpus today.
+rank at 0.90–1.00 while `clean-lead-120bpm` — 44% of the table — reads
+0.605. And its score LOCATIONS shift per take even where ranking is good:
+recalibrating a single threshold across takes (the LOTO logistic over the
+score alone) collapses the pooled figure to 0.513, and keeping every
+derivation positive admits 101 of 102 negatives. Even had the ranking bar
+been cleared, no usable operating point exists on this corpus today.
+
+**Correction, same day.** An earlier revision of this paragraph called
+`clean-lead-120bpm` "the dense same-pitch re-picking the whole problem is
+about". That is false, and the subsection below ("The derivation set holds
+eight instances…") measures what is actually there: the take is a rising
+scale, 43 notes, **zero** consecutive same-pitch events. The per-take
+ordering above therefore does not say what it looks like it says — the take
+the model scores 1.000 on is the one holding every same-pitch instance in
+the derivation set, and the take it scores 0.605 on holds none.
 
 ### Verdict, and the state of the ledger
 
@@ -3521,3 +3529,90 @@ positives actually live, and state the reachable ceiling BEFORE training,
 not after. Widening it is not free — every branch listed as out of reach is a
 guard some earlier experiment put there — but a fusion whose reachable upside
 is six labels should be recognised as such while it is still cheap to change.
+
+## The derivation set holds eight instances of the problem the derivation set is used to solve
+
+Counting consecutive labelled events that carry the SAME pitch or chord name
+— the literal definition of the decision eight experiments have been aimed
+at — across every fixture:
+
+```
+                                                    events   same-pitch repeats   median gap
+DERIVATION (all tuning happens here)
+  chords-a-bm-g-d-2x-120bpm                             16                    7        506ms
+  clean-lead-120bpm                                     43                    0        167ms
+  cowboy-chords-c-d-em-g-c-d-em-am-120bpm                8                    0       2027ms
+  power-chords-c-a-g-e-c-d-fsharp-e-120bpm               8                    0       2000ms
+  spicy-chords-cmaj9-g-am11                              3                    0       4610ms
+                                                                        TOTAL 7
+
+HELD OUT (scored, never fitted)
+  lead-line-sixteenths-e-fsharp-140bpm      x3          48                   36        105ms
+  power-chords-b-a-g-fsharp-b-a-g-e-140bpm  x3          16                    8        861ms
+  lead-line-quarter-eighth-triplet-140bpm   x3          55                    2        209ms
+  cowboy-chords-d-em-g-c-2x-140bpm          x3           8                    0       1727ms
+                                                                      TOTAL 138
+```
+
+**Seven same-pitch repeats in the derivation set, and all seven in one take.**
+Against 138 in the held-out set, 108 of them in the three sixteenths takes
+where the same E5 is picked four times at 82–144ms spacing.
+
+Carried through to the decision table the ceiling studies actually fit on —
+labelling each positive by whether its target label repeats the pitch of the
+label before it:
+
+```
+take                                       rows   pos   same-pitch re-artic.   new pitch arriving
+chords-a-bm-g-d-2x-120bpm                    25    10                      8                   2
+clean-lead-120bpm                            71    38                      0                  38
+cowboy-chords-c-d-em-g-c-d-em-am-120bpm      28     9                      0                   9
+power-chords-c-a-g-e-c-d-fsharp-e-120bpm     26     2                      0                   2
+spicy-chords-cmaj9-g-am11                    11     0                      0                   0
+TOTAL                                       161    59                      8                  51
+```
+
+**Eight of 59 derivation positives — 14% — are same-pitch re-articulations.**
+The other 51 are a new pitch arriving over a Note that has not finished
+ringing, which the engine routes through the same branch (an attack over a
+sounding Note) but which is a different question with different evidence
+available: the pitch has changed, and something downstream can eventually
+see that. On `clean-lead-120bpm` the `new-pitch` branch nonetheless fires
+only once in 71 rows, because at the decision hop YIN has not yet confirmed
+the arriving pitch — so the cascade answers a same-pitch question about an
+event that is not one.
+
+Three consequences, in increasing order of how much they should change what
+happens next.
+
+**The ceiling number is mis-titled.** "Best single witness 0.728 AUC on the
+same-pitch re-articulation decision" is, on inspection, 0.728 on a
+population that is 86% new-pitch arrivals. Every study since DECISION-009
+that reported a derivation AUC — including this one's falsifier 1 — measured
+that mixture. The numbers are not wrong; their name is.
+
+**The leave-one-take-out collapse has a simpler available explanation.**
+With all seven derivation same-pitch instances inside
+`chords-a-bm-g-d-2x-120bpm`, the fold that holds that take out removes the
+phenomenon from the training half entirely, and the folds that keep it in
+have no held-out instance to be scored on. A 0.808 → 0.434 collapse under
+those conditions is what a correct procedure looks like on a set that cannot
+support it — which does not make the fitted model good, but does mean the
+collapse is weak evidence for "the witnesses carry take-dependent scale" and
+strong evidence for "there is nothing here to fit".
+
+**The derivation set cannot support this problem, and no amount of cleverness
+will change that.** Eight instances will not distinguish between competing
+hypotheses about a decision this subtle, whatever the feature. This is the
+most likely single explanation for the shape of the whole record above:
+eight experiments tuned against eight examples and graded against 138.
+
+The cheapest fix is not a feature, a model, or a labelling pass over
+existing audio. It is **new derivation material containing the case**: a few
+minutes of deliberate same-pitch re-picking — varied velocity, muted and
+open, at sixteenth spacing and slower — recorded through the three signal
+paths this corpus already uses, labelled by ear, and added to the derivation
+side of the split. That would move the tuning set from 8 instances to some
+hundreds, and it is the precondition for taking any further reading of the
+0.73 ceiling seriously, including a re-run of the learned head on data whose
+target population is actually the target.
