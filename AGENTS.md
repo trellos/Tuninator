@@ -185,6 +185,17 @@ head-to-head that closed that lineage — the shipping engine matching 351 of th
 DECISION-023, and is the sharpest worked example in the repository of why the
 derivation/held-out split exists.
 
+The transferable part of that material is lifted into
+`docs/DETECTION-FINDINGS.md` ("Lessons carried over from the retired lineage")
+so it is read as guidance rather than as history. Four failures there are live
+risks in this tree: **a bench ranking is not a pipeline ranking** and has
+inverted the order end to end; **a trailing analysis window makes a bench answer
+for the previous note**; **visiting labelled spans in label order can run the
+clock backwards**, because measured spans overlap; and **over-segmentation
+flatters a one-to-one matcher** (139 events against 43 labels scored 88%, and 29
+against 31 through the real tracker). Read that section before trusting any
+number from a harness that isolates a kernel from the tracker.
+
 ---
 
 ## 4. Constraints that bind every change

@@ -3947,3 +3947,56 @@ the one that follows it, so a monophonic estimator reporting the loudest
 periodicity is correct and still scored wrong — is not refuted by any of this.
 It is the finding the current architecture was built to answer, and it is kept
 in `docs/archive/detection-rearchitecture-handoff.md`.
+
+## Lessons carried over from the retired lineage
+
+DECISION-023 closed the pre-rewrite `src/core/` lineage on its held-out numbers.
+Its *methodology* notes are a different matter: they were paid for in hours, and
+three of the four failures below are live risks in this tree, which has its own
+benches, its own offline decoder and its own one-to-one matcher. They are lifted
+out of `docs/archive/detection-rearchitecture-handoff.md` (§7–§9) because that
+directory is explicitly not read as guidance.
+
+**A bench ranking is not a pipeline ranking, and the gap can invert the order.**
+SWIPE-prime was the best single estimator on that lineage's bench — 36/43
+against YIN's 35, a miss set that was a strict subset of YIN's, and honestly
+calibrated confidence where YIN reported 0.84 for 68.9% correct. End to end
+through the real tracker it scored **29/43 against YIN's 34**. The bench sampled
+note interiors; the pipeline runs every frame including silence, attacks and
+decay, and YIN's path carried a short 384-sample window the bench never
+exercised. That project recorded being burned by this exact move twice. Any
+measurement here that isolates a kernel from the tracker — `measure-decision-
+separability.ts`, `measure-click-separability.ts`, the falsifier scorers under
+`training/` — carries the same hazard: an AUC on extracted rows is evidence
+about a witness, never about the recognizer.
+
+**A trailing analysis window makes a bench answer for the previous note.**
+Asking an estimator for the pitch at time T shows it audio *ending* at T, so
+sampling from a note's start answers mostly from its predecessor. That scored
+YIN at 1 of 12 sixteenths and very nearly produced a rewrite of a label file.
+This is the window-versus-spacing error class from §3 of `AGENTS.md` wearing a
+different hat, and it is the reason the standing rule is to check a window
+against the 107ms sixteenth *before* trusting anything built on it.
+
+**Visiting labelled spans in label order can run the clock backwards.** Measured
+note spans overlap, so walking them in label order moved time backwards by up to
+160ms at boundaries. Stateless estimators cannot detect this; the stateful one
+had its history drawn from the future on four of the eight notes it existed to
+fix. Anything that replays regions out of a ring by label order — the deep
+lane's re-segmentation work included — needs its ordering asserted, not assumed.
+
+**Over-segmentation flatters a one-to-one matcher.** An offline decoder emitting
+139 events against 43 labels scored 88%, because a one-to-one matcher finds
+correct-looking events in a haystack. Through the real tracker it was 29 against
+YIN's 31. This is the same asymmetry the standing two-axis bar exists to catch:
+`measure-splits.ts` alongside the ledger, never a recall number alone.
+
+Two further results from that lineage are worth not re-deriving: naive
+max-confidence fusion scored *below* its best single member, because an
+overconfident witness wins ties it should lose — the same failure mode the
+hypothesis trail in `tracker/hypotheses.ts` is built to avoid — and an ERB
+frequency warp in SWIPE lost to a linear axis at every step size, because an ERB
+axis spends four fifths of its points below 1kHz while the partials separating a
+guitar note from its octave are the high ones. The full list, including the
+Viterbi-over-NNLS variants and the NNLS octave arbiter, is in §8 of the archived
+handoff.
