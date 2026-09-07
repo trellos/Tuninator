@@ -110,6 +110,11 @@ const pseudo: Row[] = rows.map((r) => ({
   y: r.y,
   labelId: null,
   labelMatched: null,
+  // Label-attribution fields, unused here: these are synthetic rows carrying
+  // one feature (the frozen model's score) into the LOTO logistic machinery,
+  // not decisions collected at a point in a take.
+  nearLabelId: null,
+  nearLabelStartMs: null,
 }));
 const takeFold = pseudo.map((r) => takes.indexOf(r.stem));
 const lotoScores = outOfFold(pseudo, [0], takeFold, 0.01);
