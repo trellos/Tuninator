@@ -20,6 +20,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { analyzeSamples } from "../src/offline/analyzer.js";
 import { projectEmissions } from "../src/offline/eval-adapter.js";
 import { matchEvents, type LabeledEvent } from "../src/offline/matcher.js";
@@ -33,7 +34,7 @@ import { decodeFixtures } from "./decode-fixtures.js";
  * attributing a rejected transient to a stroke needs the tight one, and 70ms is
  * two thirds of a 107ms sixteenth at 140bpm.
  */
-const WINDOW_MS = 70;
+export const WINDOW_MS = 70;
 
 /** The takes this exists for. Everything else is available behind `--all`. */
 const FOCUS = ["sixteenths", "quarter-eighth-triplet"];
@@ -75,10 +76,10 @@ const SITES: Readonly<Record<string, string>> = {
   "no transient within the window": "kernels/onset.ts never fired here",
 };
 
-type Cause = { cause: string; detail: string };
+export type Cause = { cause: string; detail: string };
 
 /** What became of one Note, gathered from the trace. */
-type Fate = {
+export type Fate = {
   id: string;
   openedAt: number;
   trigger: string;
@@ -89,7 +90,7 @@ type Fate = {
   emitted: boolean;
 };
 
-function fatesOf(
+export function fatesOf(
   events: readonly TrackerTraceEvent[],
   emittedNoteIds: ReadonlySet<string>
 ): Map<string, Fate> {
@@ -173,14 +174,34 @@ function fateOf(fate: Fate, prefix: string, fates: ReadonlyMap<string, Fate>): C
 }
 
 /** Classify one missed label from the decisions taken around it. */
-function classify(
+export function classify(
   labelStart: number,
   events: readonly TrackerTraceEvent[],
   fates: ReadonlyMap<string, Fate>,
   /** Notes the matcher already gave to some OTHER label. */
-  spokenFor: ReadonlySet<string>
+  spokenFor: ReadonlySet<string>,
+  /**
+   * Every label onset in the fixture. A trace event within the window is only
+   * this label's when this label is the NEAREST one — six of the corpus's
+   * missed labels sit 55-77ms after their neighbour (rushed pairs, closer
+   * than the 70ms window), and without the nearest-label test the
+   * neighbour's own correct boundary was attributed to the missed stroke,
+   * reading a kernel dead-time loss as a split-pairing defect. The fifth
+   * instance of the window-wider-than-the-spacing error class in this
+   * project, this time inside the diagnostic itself.
+   */
+  allLabelStarts: readonly number[] = []
 ): Cause {
-  const near = events.filter((e) => Math.abs(e.at - labelStart) <= WINDOW_MS);
+  const nearestToThis = (at: number): boolean => {
+    for (const other of allLabelStarts) {
+      if (Math.abs(other - labelStart) < 1) continue;
+      if (Math.abs(at - other) < Math.abs(at - labelStart)) return false;
+    }
+    return true;
+  };
+  const near = events.filter(
+    (e) => Math.abs(e.at - labelStart) <= WINDOW_MS && nearestToThis(e.at)
+  );
 
   // 1. A Note opened on this stroke. Whatever else happened, the boundary was
   //    found; what is missing is a detection carrying it.
@@ -300,7 +321,13 @@ function run(stems: (stem: string) => boolean): FixtureLedger[] {
         id: label.id,
         startMs: label.startMs,
         label: label.label,
-        ...classify(label.startMs, events, fates, spokenFor),
+        ...classify(
+          label.startMs,
+          events,
+          fates,
+          spokenFor,
+          labels.map((l) => l.startMs)
+        ),
       })),
     });
   }
@@ -394,4 +421,6 @@ function main(): void {
   console.log("");
 }
 
-main();
+// Runs when invoked, stays quiet when imported: `build-relabel-kit.ts` reuses
+// `classify`/`fatesOf` to name each missed label's cause in its manifest.
+if (process.argv[1] === fileURLToPath(import.meta.url)) main();

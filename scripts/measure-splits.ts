@@ -29,6 +29,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { analyzeSamples } from "../src/offline/analyzer.js";
 import { labelOf, projectEmissions } from "../src/offline/eval-adapter.js";
 import { downmixToMono, readWav } from "../src/offline/wav.js";
@@ -50,9 +51,29 @@ import { decodeFixtures } from "./decode-fixtures.js";
  * "previous note's pitch, then the right one" pattern was read twice as a
  * naming defect. It is a tail fragment of the event BEFORE, charged forward.
  */
-const ONSET_TOLERANCE_MS = 40;
+export const ONSET_TOLERANCE_MS = 40;
 /** How long after a label ends a Note may begin and still be counted against it. */
-const ORPHAN_GAP_MS = 400;
+export const ORPHAN_GAP_MS = 400;
+
+/**
+ * The ownership rule, extracted so `build-relabel-kit.ts` charges extra Notes
+ * to exactly the labels this script charges them to. Returns the index of the
+ * owning label in `labels` (which must be sorted by startMs), or -1 for a
+ * stray.
+ */
+export function ownerIndexOf(
+  labels: ReadonlyArray<{ startMs: number; endMs: number }>,
+  startedAt: number
+): number {
+  let owner = -1;
+  for (let i = 0; i < labels.length; i++) {
+    if (startedAt + ONSET_TOLERANCE_MS < (labels[i] as { startMs: number }).startMs) break;
+    owner = i;
+  }
+  if (owner === -1) return -1;
+  if (startedAt > (labels[owner] as { endMs: number }).endMs + ORPHAN_GAP_MS) return -1;
+  return owner;
+}
 
 type LabelRow = {
   id: string;
@@ -101,21 +122,13 @@ function measure(): FixtureRow[] {
       // slightly BEFORE its label, because it is backdated onto its attack and
       // the annotation is not sample-exact, so the tolerance lets it reach one
       // event forward — but no further than the tightest subdivision in the
-      // corpus, or it reaches the wrong event entirely.
-      let owner: LabelRow | null = null;
-      for (const candidate of labels) {
-        if (detection.startedAt + ONSET_TOLERANCE_MS < candidate.startMs) break;
-        owner = candidate;
-      }
-      if (owner === null) {
+      // corpus, or it reaches the wrong event entirely. See `ownerIndexOf`.
+      const owner = ownerIndexOf(labels, detection.startedAt);
+      if (owner === -1) {
         strays++;
         continue;
       }
-      if (detection.startedAt > owner.endMs + ORPHAN_GAP_MS) {
-        strays++;
-        continue;
-      }
-      owner.notes.push(detection.label.name);
+      (labels[owner] as LabelRow).notes.push(detection.label.name);
     }
 
     let overlapSplit = 0;
@@ -200,4 +213,6 @@ function main(): void {
   );
 }
 
-main();
+// Runs when invoked, stays quiet when imported: `build-relabel-kit.ts` reuses
+// `ownerIndexOf` so its extra-Note boundaries are exactly this script's.
+if (process.argv[1] === fileURLToPath(import.meta.url)) main();

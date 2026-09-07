@@ -3304,3 +3304,263 @@ fraction of that ceiling (Dixon 2006; non-percussive onsets carry high
 annotator variance) is increasingly the live hypothesis: the next cheap
 experiment is not another feature but a second, independent labelling pass
 over a few takes to measure the human–human AUC on exactly these decisions.
+
+## The label ceiling, measured: a second annotation pass over every contested moment
+
+The previous section ended by naming the next experiment: not another feature,
+but a second, independent labelling pass to bound how much of the 0.73 AUC
+ceiling is annotation noise. That measurement now exists. The tooling is three
+scripts — `build-relabel-kit.ts`, `machine-annotate-relabel.ts`,
+`score-relabel.ts` — and the machine half of the measurement has been run to a
+verdict. The human half is a listening kit, built and waiting.
+
+### The kit
+
+Every contested moment in the corpus, rendered as an anonymised 1.5s WAV an
+annotator judges blind: the 32 missed labels (each carrying its ledger cause),
+106 extra-Note boundaries (the start of every Note past the first under
+`measure-splits.ts`' own ownership rule; one of the 107 deduplicated into a
+neighbouring miss), and 110 decision-table rows within 70ms of a label where
+the detector and the graded target disagree — 248 contested points, plus 54
+uncontested controls (matched labels, clear of anything contested, seeded-PRNG
+chosen) so an annotator cannot learn that everything is a trick question. The
+moment under test is jittered ±150ms off snippet centre so its position never
+encodes the claim; ids are opaque hashes; the manifest (id → fixture, time,
+cause) is kept separate from the answer sheet and nothing in the kit reveals
+what the detector or the shipped labels say. `fixtures/labels/` is untouched.
+
+The answer sheet asks one question per snippet — does a NEW note start in the
+middle third, and if so where (offsets in ms; several allowed) — and
+`score-relabel.ts` grades any completed sheet at 25/50/70ms tolerances, split
+by contested/control, point kind, derivation/held-out, signal path, and ledger
+cause, with the implied ceiling computed as the annotator-oracle's AUC against
+the shipped grading.
+
+### Annotator M, and what its calibration already measured
+
+The machine pass reads ONLY the anonymised audio. Its onset evidence is
+deliberately not the engine's: superflux-style spectral flux at a 5ms hop with
+±1-bin frequency tolerance, plus the 2-8kHz fine envelope at 1ms resolution
+(`kernels/click.ts`). The decision rule in `docs/ceiling-click-tracker-prompt.md`
+was stated in advance: an annotator must agree with the shipped labels on ≥95%
+of CONTROL points (headline 50ms) or the pass is broken and must be fixed
+before its contested answers are read.
+
+Getting an annotator through that bar was itself a measurement:
+
+- The first cut (adaptive flux bar at 1.5x the local median) passed controls —
+  **96.3%** at 50ms, 100% at 70ms — but on full takes it marked 4-20x as many
+  onsets as the take has played strokes (214 in the 24s of `clean-lead`'s 43).
+  Flux alone hears vibrato churn, strum constituents and fret noise as onsets.
+- Every precision gate tried against that — require a broadband envelope rise,
+  require a compact 2-8kHz click, require both — failed the control bar
+  (71-85%). Measured at the control strokes themselves: envelope-rise p5 is
+  **0.80** (a twentieth of CLEAR strokes get quieter across their own onset),
+  click-ratio p5 is **1.45**, flux-prominence p5 is **2.35** against a median
+  of 18. **No corroboration gate keeps 95% of clear strokes on this material.**
+  That is the engine's own recall/precision wall, measured from the other side
+  with different features at a different timescale, and it is the single most
+  clarifying number this pass produced.
+- The final annotator is therefore graded, not gated: the liberal reading (all
+  flux picks above the adaptive bar) is the primary answer and satisfies the
+  control bar; every offset carries a corroboration tag (`s`/`w`), and the
+  strict reading (corroborated only, ~87% of controls at 50ms — below the bar,
+  a secondary bound) is reported alongside.
+
+### The verdict, by the pre-stated rule
+
+Control bar: **PASS, 96.3%** (52/54 at 50ms; 54/54 at 70ms). Timing where both
+sides name a time: median +2ms, p90 +34ms. The contested numbers, liberal
+reading:
+
+| kind | n | agree@25 | agree@50 | agree@70 | annotator hears, labels lack | labels claim, annotator silent |
+|---|---|---|---|---|---|---|
+| miss | 32 | 69% | **91%** | **97%** | 0 | 1 |
+| decision-missed-accept | 84 | 67% | 85% | 98% | 0 | 2 |
+| decision-false-split | 26 | 62% | 81% | 100% | 0 | 0 |
+| extra-note | 106 | 42% | **27%** | **48%** | **55** | 0 |
+| control | 54 | 89% | 96% | 100% | 0 | 0 |
+
+Two different answers, one per axis:
+
+1. **The missed labels are real.** The independent pass confirms 29 of 32 at
+   50ms and 31 of 32 at 70ms — including all eight `too young to be ended`
+   losses at 25ms. Label noise is NOT what makes them missed; the pre-stated
+   under-10% branch of the decision rule applies to this subset, the headroom
+   on the miss side is real, and Task 1's consensus carve-out for the witness
+   studies turns out to be empty: every derivation decision row survives
+   (161 of 161), so the 0.73 bar stands ungraded-down.
+2. **The extra-Note axis carries real annotation ambiguity.** At 55 of the 106
+   extra-Note boundaries the machine pass hears an onset within 70ms where the
+   shipped labels have none — and the strict corroborated reading barely moves
+   that (64% vs 63% agreement at 50ms on contested points): these are not
+   marginal flux ripples but corroborated signal events. Not concentrated on
+   the room-mic path (DI 15, amp 15, mic 20, room 5), so the >30%-on-room-mic
+   branch of the rule does not fire as written; what fires instead is its
+   spirit on one axis: an "extra Note" at a moment where an independent
+   annotator hears an articulation is not unambiguously the detector's error.
+   Whether those 55 moments are unlabelled ghost/grace strokes and strum
+   components (the labels annotate musical strokes, not articulation events)
+   or the machine pass's residual liberality is exactly what the HUMAN pass
+   exists to arbitrate, and machine-only cannot settle it.
+
+The implied ceiling on the graded decision rows (annotator-oracle against the
+shipped grading): 0.59-0.65 at 25-50ms — but read that with its confound: a
+decision row's time is a hop-grid point up to 70ms from the label it graded,
+so tolerance-level disagreement there is partly quantisation, and at 70ms the
+decision-row population has no graded negatives at all. The clean statements
+stay the two numbered ones above.
+
+Human pass: rebuild with `npx tsx scripts/build-relabel-kit.ts`, listen per
+`.cache/relabel/README.md` (20-30 minutes covers the two or three takes that
+matter most — the extra-note points on the triplet and cowboy takes), score
+with `npx tsx scripts/score-relabel.ts .cache/relabel/answers-<name>.csv`.
+
+## The millisecond click, measured at its own timescale — and refuted at the decision
+
+The one physical cue in the corpus no experiment had touched: a pick's 1-5ms
+broadband click, measured by every existing witness only after dilution into a
+23ms window on a 12ms grid. The hypothesis was temporal COMPACTNESS as the
+churn-proof discriminator; the falsifier, stated before the run: the best
+single compactness witness clears 0.73 AUC on the derivation decision rows and
+does not collapse on the room-mic path, or the line closes with no rescue
+variants beyond the named set.
+
+`scripts/measure-click-separability.ts` follows the whitening study's pattern:
+engine unchanged, decision-row population identical to the baseline study's,
+witnesses computed from `kernels/click.ts` (causal 2-8kHz biquad cascade,
+rectified, 1ms boxcar, decimated to a 0.5ms grid) and joined by hop timestamp,
+with the click's true time searched over the hop's full ±12ms. The window rule
+is enforced by masking rather than assertion-failure: adjacent-label onsets
+are excluded from every surround ring (8-45ms each side of the peak, inside
+±53ms — half a 107ms sixteenth; 10 sixteenths rows needed masking).
+
+**The falsifier fired.** On the 161 derivation decision rows:
+
+| witness | oriented AUC | direction |
+|---|---|---|
+| sharpness (the incumbent, same rows) | **0.728** | high |
+| local kurtosis ±20ms | 0.586 | LOW — spikier at negatives |
+| compact duration above half peak | 0.560 | HIGH — re-picks LONGER than churn |
+| peak / surround-ring median | 0.538 | low |
+| peak / pre-ring median | 0.538 | high |
+| rise slope (peak / 3ms earlier) | 0.520 | low |
+
+Every witness is at or near chance, and both compactness readings point the
+WRONG way: at the accept/reject margin a re-pick's click band is no more
+compact than the churn it lands on. The distributions say it plainly —
+peak-to-surround medians 1.78 (re-picks) against 1.82 (churn).
+
+**The measurement is not broken, and that is established inside the same
+script.** A positive control runs the identical code paths on moments whose
+answer is known — every label onset against a point 180ms into every
+long-enough event — and there the click is plainly visible: peak-to-pre-ring
+**0.838**, peak-to-surround 0.746. The cue is real against clean sustain and
+dead at this decision, whose negatives are hops an energy witness already
+fired on: compression pumping, strum components and fret noise put 2-8kHz
+spikes at the negatives too, and — the same population lesson cycle
+dissimilarity taught (DECISION-015) — a re-pick over a still-ringing string
+is often gentler than what it interrupts. Two independent measurements in this
+pass corroborate the mechanism: annotator M's control-stroke click-ratio p5 of
+1.45 (clear strokes routinely have almost no click prominence, particularly
+through the amp sim, median 2.24), and the per-path table, where the witness
+family is weakest exactly where compression lives (amp sim 0.526-0.567) —
+the trap the brief named, confirmed rather than averaged away. Room mic did
+not collapse below the others (peakToPreRing 0.731 there), so hiss was not
+what killed it; the decision population was.
+
+Ninth converging negative on this decision. The one use the click band has
+demonstrably survived is not discrimination but instrumentation: the fine
+envelope localises a KNOWN onset well (the positive control, and annotator
+M's offset refinement), so sub-hop boundary PLACEMENT remains open — untested
+— even though click-as-witness is closed.
+
+## The tracker harvest: the ledger's own window bug, and a repair measured to a one-extra loss
+
+### Six of the eight "split-pairing" losses were never bookkeeping
+
+`measure-downstream-ledger.ts` attributed a trace event to a missed label
+whenever it fell within ±70ms. Six of the corpus's missed labels sit **55-77ms
+after their neighbour** — rushed pairs, annotated closer together than the
+window — so the neighbour's own correct boundary (+15-20ms late, correctly
+paired by the matcher) was read as "split made; successor paired with a
+neighbouring label" on the missed stroke. Traced concretely on the DI
+sixteenths take: labels s19@5610 and s20@5673 are 63ms apart; the onsets at
+5520 and 5627 are s18's and s19's own (+17ms each); s20 has no transient at
+all — the kernel's `minIntervalMs` is 60ms and its post-attack reference is
+still elevated where the second stroke of a rushed pair lands.
+
+The fifth instance of the window-wider-than-the-spacing error class in this
+project, and the first INSIDE the diagnostic that names causes. `classify`
+now attributes an event to a label only when that label is the event's
+nearest, and the corrected cause table redraws the map (MISSED unchanged at
+32; this is attribution only):
+
+| cause | was | is |
+|---|---|---|
+| no transient within the window | 4 | **10** |
+| band-only transient | 1 | **4** |
+| too young to be ended | 8 | 8 |
+| split made; successor paired with a neighbouring label | 8 | **2** |
+| absorbed, then paired with a neighbouring label | 3 | 1 |
+| never announced / absorbed-then-never-announced | 4 | 4 |
+| rejected (no-energy-not-sharp, gated) | 3 | 3 |
+| no boundary here; neighbour's | 1 | 0 |
+
+The brief's premise — "roughly 23 of 32 are attribution and timing, not
+evidence" — was partly this artifact. The honest split is ~14 of 32 upstream
+of the tracker (no transient + band-only, most of them rushed pairs inside
+the kernel's dead time), 8 in the thrice-measured `too young` interaction,
+and ~10 in assorted bookkeeping.
+
+### Built, measured, reverted by the stated bar: announce credit for a stub the same attack opened
+
+`NoteRecord.absorbedRenaming` discounts an absorbed step-split stub's span
+from the announcement clock, on the argument that a step-split stub is the
+PREVIOUS note still ringing while the estimator caught up. The trace at the
+room-mic sixteenths s45 shows the case where that argument misfires: the
+attack at 9387 opens n42 (trigger `attack`, burst 9387), the estimator reads
+the new pitch 40ms later, the step split absorbs n42 into n43 — same
+`burstAt`, this stroke's OWN attack still arriving, exactly the wording the
+attack-split branch uses — and n43 then dies unannounced at the next stroke
+with `announceSoundedMs` 53 against a real sounded span of 93.
+
+The change: set `absorbedRenaming` only when the absorbed stub was NOT
+attack-opened at the survivor's own burst. Measured end to end:
+
+| | missed | split | extras |
+|---|---|---|---|
+| baseline | 32 | 99 | 107 |
+| own-attack announce credit | **29** | 100 | **108** |
+
+The three recovered labels are real (room-mic sixteenths s45, room-mic
+triplet e14 and t8 — all confirmed by the annotation pass above). The +1
+extra is the change exposing a pre-existing defect rather than creating one:
+at e14/e15 a weak transient (sharpness 2.5) split n46 off at 17053, 53ms
+before e15's real attack at 17120 (sharpness 10.0, four times sharper) —
+which then hit the `settled` gate at 53ms < 55 by the same two milliseconds
+the too-young section documents, so the premature boundary stood and the real
+one was dropped. Announcing e14's true B4 put a second Note inside e14's
+ownership span, +1 extra.
+
+The pre-stated per-change bar — strictly improve one axis, no worse on the
+other — reads 108 > 107 and the change is reverted, recorded here with its
+mechanism intact. What it establishes for the next attempt: the announce
+accounting IS wrong for own-attack stubs (three real labels prove it), and
+the fix becomes shippable the moment the premature-weak-boundary shape it
+exposes is repaired — a boundary opened on a transient several times weaker
+than the attack that arrives inside the settle window is the natural
+candidate for re-dating to the stronger attack, though that needs a
+strength-ratio constant the derivation takes may not exercise, and the
+too-young ground is thrice-burned (see "The `settled` bar is two milliseconds
+off"). Not attempted blind here.
+
+### Not re-run, and why
+
+`minStableMs` variants (three documented failures, same shape each time), the
+causal rate estimator (documented: oracle ceiling is 8 emitted Notes, the
+causal estimate is biased into the costly band), and the retroactive
+same-pitch merge without a new discriminator (documented: every bar that
+removes extras eats sixteenths labels). The fragment-versus-its-two-
+neighbours comparison remains the open version of the rate idea; nothing in
+this pass touched it.
