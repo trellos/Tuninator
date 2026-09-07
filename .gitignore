@@ -38,6 +38,10 @@ temp/
 # Eval + decode cache
 .cache/
 
+# npm pack output. A release tarball is a build artifact, rebuilt by
+# `npm pack` from dist/; committing one ships a stale copy of the library.
+*.tgz
+
 # Training pipeline outputs: extracted row shards, checkpoints, scratch. The
 # weights that ship live in src/engine/ as a generated module; everything here
 # is reproducible from the committed pipeline plus the public datasets.
