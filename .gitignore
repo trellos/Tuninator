@@ -38,6 +38,11 @@ temp/
 # Eval + decode cache
 .cache/
 
+# Training pipeline outputs: extracted row shards, checkpoints, scratch. The
+# weights that ship live in src/engine/ as a generated module; everything here
+# is reproducible from the committed pipeline plus the public datasets.
+training/out/
+
 # Agent worktrees. Transient checkouts of this same repository, created for
 # isolated parallel work and removed afterwards; committing them would nest a
 # copy of the repo inside itself.

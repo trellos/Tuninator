@@ -7,7 +7,100 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-019]: Ledger cause attribution requires the nearest label, not any label within 70ms
+#### [DECISION-022]: The derivation set cannot support the same-pitch decision; new derivation material is the precondition for further work on it
+* **Date:** 2026-08-21
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** Investigating why the learned head's per-take scores ran
+  opposite to expectation, a count of consecutive labelled events carrying
+  the same pitch or chord name found **seven in the entire derivation set,
+  all seven inside `chords-a-bm-g-d-2x-120bpm`**, against 138 in the
+  held-out set (108 of those in the three sixteenths takes). Carried into
+  the decision table every ceiling study fits on: **8 of 59 derivation
+  positives are same-pitch re-articulations; 51 are a new pitch arriving
+  over a ringing Note.** `clean-lead-120bpm`, 44% of that table, is a rising
+  scale with zero same-pitch repeats — a claim to the contrary in
+  `docs/DETECTION-FINDINGS.md` has been corrected in place.
+* **Decision:** Treat every derivation-set reading of "the same-pitch
+  re-articulation decision" as a reading of a mostly-different population,
+  and treat new derivation material containing the case as the precondition
+  for further work on it: minutes of deliberate same-pitch re-picking
+  (varied velocity, muted and open, sixteenth spacing and slower) through
+  the corpus's three signal paths, labelled by ear, added to the derivation
+  side. `scripts/measure-same-pitch-population.ts` reproduces the count and
+  should be run before trusting any future derivation reading of this
+  decision.
+* **Alternatives Considered:** Re-labelling existing takes more precisely —
+  rejected as the wrong instrument: 20% of decision rows sit within 20ms of
+  the 70ms attribution edge so timing precision is real but second-order,
+  and no labelling pass creates instances of a phenomenon the audio does not
+  contain. Promoting a held-out sixteenths take into derivation — rejected:
+  it would spend the corpus's only dense supply of the phenomenon on tuning
+  and leave nothing to be graded against. Continuing to infer same-pitch
+  performance from held-out scores — rejected as the practice that produced
+  eight experiments tuned on eight examples.
+* **Consequences:** Reframes the record rather than invalidating it: the
+  measured numbers stand, their titles do not. The 0.808 → 0.434
+  leave-one-take-out collapse of DECISION-009 now has a simpler available
+  explanation — the fold holding out `chords-a-bm-g-d-2x-120bpm` removes the
+  phenomenon from the training half entirely — which weakens it as evidence
+  for take-dependent witness scale and strengthens it as evidence that there
+  was nothing there to fit. The 0.73 ceiling should be renamed to what it
+  measures until new material exists. Cost: the fix needs the project owner
+  at a guitar, not an agent at a keyboard.
+
+#### [DECISION-021]: Reject wiring the learned onset head; the external-data bet failed its ranking falsifier
+* **Date:** 2026-08-20
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** Under the DECISION-016 amendment, a 19,833-parameter
+  convolutional scorer was trained on 248,993 decision rows extracted by
+  running this engine over GuitarSet (six players, mic + pickup flavours,
+  three augmentation chains; EGDB unreachable under the environment's egress
+  policy), labelled by the exact target rule of the baseline separability
+  study, split grouped by player, early-stopped on external validation only.
+  Falsifier stated in advance: the frozen model must clear 0.73 AUC (best
+  existing single witness) on the derivation decision table, or stop.
+* **Decision:** The falsifier fired. Frozen reads on the derivation table:
+  0.7157 (full inputs; external val 0.8820), 0.6260 (patch + whitened flux),
+  0.6291 (patch only), against sharpness at 0.7281 on the same rows. All
+  derivation reads taken are reported in `docs/DETECTION-FINDINGS.md`;
+  variant selection read external validation only. Nothing is wired; the
+  runtime fusion machinery built for the win condition was removed again
+  (recoverable at bfce0ad); the engine is bit-identical to baseline and the
+  twelve 140bpm held-out takes were never read, so the once-only held-out
+  read remains unspent.
+* **Alternatives Considered:** Selecting the training epoch or variant by
+  derivation AUC (epoch 12 of the full run brushed 0.7288) — rejected as
+  tuning on the falsifier's own rows. Proceeding to the ledger anyway on the
+  grounds that falsifier 3 "is the only bar that matters" — rejected: the
+  ranking bar exists precisely to keep the held-out read from being spent on
+  a candidate no better than the incumbent witness. Iterating further
+  variants against the derivation table — rejected as the garden of forking
+  paths; the two ablations run were pre-planned and their prediction was
+  refuted (the witnesses carry transferable signal; removing them hurt both
+  domains).
+* **Consequences:** The pipeline (`training/`), the whitened band kernel,
+  and the hop-grid alignment finding stay committed and reproducible; the
+  external number (0.88 across six players and six signal paths) establishes
+  the decision is learnable while the derivation number says
+  GuitarSet-plus-augmentation is not yet this corpus. A post-hoc grouping of
+  the derivation rows by deciding branch (recorded in
+  `docs/DETECTION-FINDINGS.md`) adds a design finding independent of this
+  model: only six of the 59 derivation positives sat in the pool the fusion
+  scope allowed the witness to overturn, so the ledger's missed-label upside
+  was capped at six labels before any question of model quality. Any next
+  attempt should set the scope from where the positives live and state that
+  reachable ceiling before training. The same grouping shows two per-take
+  cells previously tabulated (power chords, spicy chords) rest on 48 pairs
+  and zero positives respectively and carry no signal. Named routes forward:
+  closer-domain training data (EGDB DI, or self-recorded labelled electric
+  takes), and the second independent labelling pass — the model ranks chord
+  re-articulations at 0.90–1.00 while `clean-lead-120bpm` reads 0.605,
+  consistent with the annotation-noise hypothesis living exactly where the
+  ceiling does.
+
+#### [DECISION-020]: Ledger cause attribution requires the nearest label, not any label within 70ms
 * **Date:** 2026-08-20
 * **Status:** Accepted
 * **Owner:** Evaluation methodology
@@ -33,7 +126,7 @@ are what keep later work from repeating them.
   question and carry the same risk profile as every documented
   more-willing-to-fire change.
 
-#### [DECISION-018]: Revert announce credit for stubs the same attack opened (per-change bar)
+#### [DECISION-019]: Revert announce credit for stubs the same attack opened (per-change bar)
 * **Date:** 2026-08-20
 * **Status:** Rejected
 * **Owner:** Tracker semantics
@@ -45,7 +138,7 @@ are what keep later work from repeating them.
   unannounced at 53ms counted against a real 93ms span.
 * **Decision:** Crediting the stub's span when it was attack-opened at the
   survivor's own burst recovers 3 real labels (32 → 29 missed, each
-  confirmed by the DECISION-016 annotation pass) but exposes one
+  confirmed by the DECISION-017 annotation pass) but exposes one
   pre-existing premature boundary as a new extra Note (107 → 108). The
   pre-stated Task-3 bar — strictly improve one axis, no worse on the other —
   fails on the extras axis. Reverted; mechanism and diff recorded in
@@ -60,7 +153,7 @@ are what keep later work from repeating them.
   the moment the premature-weak-boundary shape is repaired; that pairing is
   the highest-value small change left in the tracker.
 
-#### [DECISION-017]: Reject the millisecond click (compactness) witness for the same-pitch decision
+#### [DECISION-018]: Reject the millisecond click (compactness) witness for the same-pitch decision
 * **Date:** 2026-08-20
 * **Status:** Rejected
 * **Owner:** Detection architecture
@@ -85,11 +178,11 @@ are what keep later work from repeating them.
   terms. Sub-hop boundary LOCALISATION by the fine envelope — not refuted,
   untested, explicitly left open.
 * **Consequences:** The last untouched physical cue at this decision is
-  closed as a discriminator. Together with DECISION-016's finding that the
+  closed as a discriminator. Together with DECISION-017's finding that the
   missed labels are real, the remaining routes are tracker bookkeeping and
   the annotation ambiguity of the extras axis, not new witnesses.
 
-#### [DECISION-016]: The label ceiling is measured — the misses are real; the extras axis carries annotation ambiguity
+#### [DECISION-017]: The label ceiling is measured — the misses are real; the extras axis carries annotation ambiguity
 * **Date:** 2026-08-20
 * **Status:** Accepted
 * **Owner:** Evaluation methodology
@@ -125,6 +218,41 @@ are what keep later work from repeating them.
   mind: an extra Note where an independent annotator hears an articulation
   is not unambiguously a detector error, and 55 of 107 extras sit at such
   moments. The human pass is the open follow-up.
+#### [DECISION-016]: Amend the no-runtime-dependency constraint to admit fixed-weight learned components
+* **Date:** 2026-08-20
+* **Status:** Accepted
+* **Owner:** Project owner (amendment approved by project owner)
+* **Context:** The same-pitch re-articulation decision has a measured ceiling
+  under everything hand-built: best single witness 0.728 AUC, a fitted
+  twelve-witness logistic collapsing 0.808 in-sample → 0.434
+  leave-one-take-out, and eight closed directions (DECISION-009 through
+  DECISION-015). The collapse says 78 derivation events cannot support
+  fitting anything; the field's standing answer at this exact wall is a small
+  learned function trained on large external labelled corpora (Basic Pitch,
+  ~17K parameters, ICASSP 2022). AGENTS.md §4 read "No npm runtime
+  dependencies, no neural-network runtime", which as written also barred
+  shipping fixed weights executed by plain TypeScript.
+* **Decision:** §4 now reads: a learned component is shippable only as fixed
+  weights (≤ ~25,000 parameters) executed by plain TypeScript over
+  `Float32Array` inside `src/engine/**` — no runtime dependency, no dynamic
+  loading, no training at runtime. The training pipeline lives outside the
+  shipped library (`training/`), may use any tooling, and is never imported
+  by `src/**`. Approved by project owner.
+* **Alternatives Considered:** Keeping the constraint as written — rejected
+  because it conflates two different risks: a runtime dependency (still
+  banned; the zero-dependency invariant and engine isolation are untouched)
+  and learned constants (already shippable in spirit — every tuned threshold
+  is a fitted constant; the amendment only raises the admissible parameter
+  count and names its bound). An unbounded amendment — rejected: the ~25K cap
+  keeps the component in the class proven CPU-real-time-trivial and keeps the
+  library auditable as checked-in `Float32Array` literals.
+* **Consequences:** The learned-onset-head experiment can proceed with the
+  engine-isolation test still enforcing that `src/engine/**` imports nothing
+  outside itself. The twelve 140bpm held-out takes gain a stricter rule:
+  never trained or validated on, in addition to never fitted. Risk accepted:
+  checked-in weights are less inspectable than named thresholds; mitigated by
+  requiring the training pipeline, dataset manifest, and run provenance to be
+  committed alongside.
 
 #### [DECISION-015]: Reject cycle dissimilarity (and YIN aperiodicity) as re-articulation witnesses
 * **Date:** 2026-08-20
