@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck, tests, eval, package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The verification bar from AGENTS.md §4, in the order it states.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # Decodes every take in fixtures/audio and scores the real recognition
+      # chain against the hand-written labels. Exits nonzero when a fixture
+      # marked `required` misses a threshold in fixtures/eval.config.json.
+      - name: Eval
+        run: npm run eval
+
+      # fixtures/labels/** and eval.config.json are read-only ground truth.
+      # A run that modified them scored itself against a moved target.
+      - name: Fixtures unmodified
+        run: |
+          if ! git diff --quiet -- fixtures/; then
+            echo "::error::eval modified fixtures/ — labels and thresholds are read-only ground truth"
+            git diff --stat -- fixtures/
+            exit 1
+          fi
+
+      - name: Build
+        run: npm run build
+
+      # Proves the published tarball actually carries dist/. `files` is
+      # ["dist", ...] and dist/ is gitignored, so a packaging regression ships
+      # an empty package rather than failing loudly.
+      - name: Package contents
+        run: |
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e '
+            const p = JSON.parse(require("fs").readFileSync("/tmp/pack.json", "utf8"))[0];
+            const files = p.files.map((f) => f.path);
+            const required = [
+              "dist/index.js",
+              "dist/index.d.ts",
+              "dist/tuninator-worklet.js",
+              "dist/tuninator-engine-worker.js",
+            ];
+            const missing = required.filter((r) => !files.includes(r));
+            if (missing.length) {
+              console.error("missing from the package tarball:", missing.join(", "));
+              process.exit(1);
+            }
+            console.log(`package ok: ${files.length} files, ${(p.size / 1024).toFixed(1)} kB packed`);
+          '

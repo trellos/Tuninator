@@ -1,7 +1,7 @@
 {
   "name": "tuninator",
-  "version": "0.1.0",
-  "description": "UI-free browser library turning guitar microphone input into a continuous pitch stream and a high-level music-event stream.",
+  "version": "0.2.0",
+  "description": "UI-free browser library turning guitar microphone input into a streaming musical event recognizer: Notes that start early and are revised as the evidence improves.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "decode-fixtures": "tsx scripts/decode-fixtures.ts",
-    "eval": "npm run decode-fixtures && tsx scripts/eval.ts"
+    "eval": "npm run decode-fixtures && tsx scripts/eval.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
