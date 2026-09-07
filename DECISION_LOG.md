@@ -7,6 +7,52 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-024]: Remove the held 0.1 demo copy and the completed migration brief; keep every deliberately-unwired module
+* **Date:** 2026-09-07
+* **Status:** Accepted
+* **Owner:** Project structure
+* **Context:** A prune of deprecated paths across the whole project, not just
+  `src/`. `examples/browser-demo/` targeted the 0.1 API and did not compile —
+  its own `MIGRATION-REQUIRED.md` said every symbol it touched had changed. It
+  had been committed here only because the session that wrote it could not
+  create its repository (`403 Resource not accessible by integration`) and its
+  container was ephemeral; `examples/README.md` called the directory a holding
+  location and ended with "Then delete `examples/` from this repository."
+* **Decision:** Removed `examples/` and `docs/example-migration-prompt.md`.
+  Both are superseded rather than merely stale: `trellos/Tuninator-Example`
+  exists, was cloned and inspected, and is **already migrated** — it imports
+  `createRecognizer` and subscribes to `noteStarted`, and its head commit
+  (`507d102`, 2026-08-19) is "Delete the unreachable paths the 0.2 migration
+  left behind". The brief specified work that is finished. The demo's real home
+  is live, public, and ahead of the copy.
+* **Alternatives Considered:** Migrating the in-repo copy to 0.2 — rejected:
+  it would duplicate a published demo that is already migrated, and
+  `examples/README.md` warned that fixing this copy alone leaves the published
+  one broken while looking fixed; that risk now runs the other way. Keeping the
+  copy as a reference — rejected: it is a 0.1 reference, and pointing a
+  consumer at it (as this session did once) is worse than having no example in
+  the tree. Deleting `docs/MIGRATION.md` alongside it — rejected: `README.md`
+  links it as the 0.1→0.2 upgrade guide for consumers, so it is live
+  documentation. Deleting `docs/BASELINE.md` — rejected:
+  `docs/DETECTION-FINDINGS.md` measures its deltas against that frozen
+  baseline.
+* **Consequences:** The repository no longer carries code that does not
+  compile against its own public API, and `examples/` is gone from a library
+  whose example lives elsewhere; consumers are pointed at
+  `trellos/Tuninator-Example`. Nothing else was removed, and that is the
+  substantive half of this decision: a reachability sweep of `src/` found only
+  three modules unreachable from the entry points, and **all three are live** —
+  `kernels/click.ts` and `kernels/whitened-bands.ts` are unwired *by*
+  DECISION-018 and DECISION-021 and are used by their measurement scripts and
+  the training pipeline, and `offline/wav.ts` is imported by thirty scripts and
+  a test. Unwired is not dead here, and a prune that went by reachability alone
+  would have deleted the experimental record this project deliberately keeps.
+  Of 32 files in `scripts/`, one (`summary.mjs`) is referenced by no document;
+  it is a working A/B eval formatter and was kept. Noted, not acted on: this
+  repository has **no CI** — no `.github/` at all — and `package.json` still
+  reads `version: 0.1.0` while the library, its docs and this log all describe
+  the 0.2 recognizer.
+
 #### [DECISION-023]: Consolidate the branches on the shipping recognizer; retire the `src/core/` lineage
 * **Date:** 2026-09-07
 * **Status:** Accepted

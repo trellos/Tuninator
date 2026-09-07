@@ -558,3 +558,12 @@ line in `note-tracker.ts` or `fast/rearticulation.ts`.
 ## License
 
 MIT
+
+## Example app
+
+A working browser demo — mic start/stop, live frequency and cents, a scrolling
+canvas timeline driven by a metronome clock, and a mock stream (`?mock=1`) for
+developing without a microphone — lives in its own repository:
+**[trellos/Tuninator-Example](https://github.com/trellos/Tuninator-Example)**.
+
+It consumes this library through its public entry point only.
