@@ -336,9 +336,9 @@ free.
 
 ## Multi-channel interfaces
 
-A 2-in interface is a single **stereo** device to the browser — macOS and Windows both list the
-Audient iD4 as one input called "Analogue 1/2". A guitar in input 2 therefore exists only on
-channel 1, and nothing on channel 0.
+A 2-in interface is a single **stereo** device to the browser: macOS and Windows typically list
+its two inputs as one device with a name like "Analogue 1/2". A guitar plugged into input 2
+therefore exists only on channel 1, and nothing on channel 0.
 
 Three things follow, and all three are handled:
 
@@ -450,16 +450,6 @@ spectrum and the per-bin maximum over the last few hops — with an adaptive med
 both broadband and over a 1–6kHz band where a pick's transient lives and a ringing string's
 fundamentals do not. An RMS envelope alone cannot see a re-picked note at the same pitch, and a
 quiet upstroke 107ms after the downstroke it answers is exactly the case that needs the band.
-
-## Development
-
-```bash
-npm install
-npm run build      # library ESM+dts, the worklet bundle, and the engine-worker bundle
-npm test           # vitest
-npm run typecheck
-npm run eval       # decode fixtures, grade the recognizer, exit nonzero on required failures
-```
 
 ## Evaluation
 

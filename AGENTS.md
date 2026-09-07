@@ -256,6 +256,26 @@ disagrees with a fresh `npm run eval` run, **the eval output is authoritative**
 and the doc is stale. Fixing the doc is welcome; trusting the doc over a live
 run is not.
 
+For `README.md` this is now enforced rather than trusted:
+
+```bash
+npx tsx scripts/check-readme-eval.ts            # fails on drift, naming each figure
+npx tsx scripts/check-readme-eval.ts --write    # rewrite the README from the report
+```
+
+CI runs the check immediately after `npm run eval`. It covers the per-fixture
+table and four prose figures. It exists because that table drifted ten rows
+behind the recognizer — every one of them *understating* it — which is the
+failure mode to expect here: eval gates on thresholds and has no opinion about
+what the README claims, so an improvement lands silently and the prose quietly
+becomes a lie about your own work.
+
+Its header documents one thing not to "tidy": the table's columns are
+deliberately not uniform. Labels/Notes/Missed are the overall figures;
+Exact/Pitch class/Onset are the **gated** subset, which is why the three
+triplet takes read `—`. Sourcing the latter three from `overall` would fill
+those cells in while reporting a different metric than the eval gates on.
+
 ---
 
 ## 6. Decision Logging Protocol (Mandatory)
