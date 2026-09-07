@@ -138,8 +138,14 @@ scripts/verify-fixtures.ts                   is each label actually audible/atta
 ```
 
 Several more exist for specific investigations (`measure-decision-separability.ts`,
-`measure-rig-profile.ts`, `measure-dp-segmentation.ts`, …) — `ls scripts/` and
-read a header comment before assuming one doesn't exist.
+`measure-rig-profile.ts`, `measure-dp-segmentation.ts`,
+`measure-click-separability.ts`, `measure-same-pitch-population.ts`, the
+`*-relabel*.ts` listening kit, …) — `ls scripts/` and read a header comment
+before assuming one doesn't exist.
+
+`training/` is the out-of-library training pipeline admitted by DECISION-016.
+It may use any tooling and is **never imported by `src/**`**; nothing under it
+runs as part of `npm run eval` or the test suite.
 
 ### `docs/DETECTION-FINDINGS.md` — read before proposing a detection change
 
@@ -152,14 +158,32 @@ attack search against a 107ms sixteenth; two more). Check every new window
 against the corpus's tightest subdivision — a sixteenth note at 140bpm is
 **107ms** — before trusting a result built on it.
 
-Also recorded there: five converging negative results establishing that the
+Also recorded there: the converging negative results establishing that the
 current feature set has a hard ceiling on the same-pitch re-articulation
 decision (best single witness 0.73 AUC; a fitted twelve-witness model collapses
 from 0.808 in-sample to 0.434 leave-one-take-out; per-rig calibration, joint
 region segmentation by dynamic programming, and a local-rate gate all measured
-to their ceiling and rejected). `docs/onset-features-prompt.md` is the
-self-contained next-steps brief for that specific problem — read it before
-re-deriving the same conclusions from scratch.
+to their ceiling and rejected). Since then the millisecond click witness
+(DECISION-018) and a 19,833-parameter learned head trained on GuitarSet
+(DECISION-021, 0.7157 AUC against a stated bar of 0.73) have been measured and
+rejected on the same decision, and DECISION-022 records what the whole line
+ran into: **the derivation set contains seven same-pitch re-articulations, all
+of them in one take.** New derivation material is the precondition for taking
+any further reading of that ceiling seriously. Three briefs
+(`docs/onset-features-prompt.md`, `docs/ceiling-click-tracker-prompt.md`,
+`docs/learned-onset-head-prompt.md`) have all been run to their verdicts and
+carry status banners saying so — read them before re-deriving the same
+conclusions, not as work to pick up.
+
+### `docs/archive/` — closed lines of work
+
+Records from the retired pre-rewrite `src/core/` lineage, kept for the
+measurements in them. **Not guidance**, and the paths in them do not exist
+here; `docs/archive/README.md` says what each one is and why it survived. The
+head-to-head that closed that lineage — the shipping engine matching 351 of the
+381 held-out events against its 288 — is in `docs/DETECTION-FINDINGS.md` and
+DECISION-023, and is the sharpest worked example in the repository of why the
+derivation/held-out split exists.
 
 ---
 

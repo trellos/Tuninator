@@ -1,5 +1,20 @@
 # Task prompt: a tiny learned onset head, trained on external data, shipped as plain TypeScript
 
+> **STATUS: RUN AND CLOSED (2026-08-21).** This brief was executed on
+> `claude/learned-onset-head-prompt-4vomnn`, now merged. Step zero (the
+> AGENTS.md §4 amendment) is DECISION-016; the head was trained on GuitarSet
+> and **failed its pre-stated ranking falsifier** — 0.7157 AUC against a bar of
+> 0.73, with the best hand-built witness at 0.7281 on the same rows — which is
+> DECISION-021. Nothing is wired. DECISION-022 records the reason the brief
+> could not have succeeded as written: the derivation set holds seven
+> same-pitch re-articulations, all in one take, so new derivation material is
+> the precondition for any further work on this decision. The pipeline is in
+> `training/`. **Do not re-run it** without that new material.
+>
+> A separate attempt on `claude/learned-onset-head-prompt-20ldcz` stopped at
+> the dataset-access check in a more restrictive environment; that record is
+> preserved in place below.
+
 Self-contained brief for a fresh session on `trellos/Tuninator`. Everything
 needed is here — do not assume any prior conversation. Read `AGENTS.md` in
 full and the final section of `docs/DETECTION-FINDINGS.md` ("Three candidate

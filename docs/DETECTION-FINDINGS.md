@@ -3875,3 +3875,75 @@ side of the split. That would move the tuning set from 8 instances to some
 hundreds, and it is the precondition for taking any further reading of the
 0.73 ceiling seriously, including a re-run of the learned head on data whose
 target population is actually the target.
+
+## The retired `src/core/` lineage, scored on the held-out corpus
+
+The branch cleanup of 2026-09-07 had one open question worth measuring rather
+than asserting: `claude/tuninator-code-review-q5yzz2` carried a second, fully
+independent detector — the pre-rewrite `src/core/` tree, developed past the
+fork point with a four-estimator pitch front end (YIN, MPM, SWIPE-prime, an
+attack-aware estimator) fused by weighted vote. It is the only branch in the
+repository that ever contained a competing implementation of note detection.
+The question was whether it detects better than what shipped.
+
+It could not be answered from either branch's own numbers. **That branch never
+had the held-out corpus**: its `fixtures/` carried the five derivation takes
+only, and `fixtures/eval.config.json` had five entries. Every number ever
+reported for it — including the 80.8% in its handoff — was measured on the
+material it was tuned against.
+
+### Method
+
+The comparison was run on identical ground truth. The twelve held-out takes,
+their labels, and the seventeen-entry `eval.config.json` were copied from
+`main` into a detached worktree of `053526b`; the five label files the two
+trees share are byte-identical, so no ground truth was reconciled, edited or
+invented. Both detectors then ran their own `scripts/eval.ts` over all 459
+labelled events.
+
+### Result
+
+```
+                    labels  matched  missed   fp  |  exact   pitchClass
+main (shipping)
+  DERIVATION            78       76       2    8  |  78.9%        90.1%
+  HELD OUT             381      351      30   84  |  84.7%        88.7%
+retired src/core/
+  DERIVATION            78       74       4   11  |  85.1%        93.2%
+  HELD OUT             381      288      93   38  |  69.7%        71.1%
+```
+
+On the five takes it was tuned on, the retired detector is the better one: it
+wins exact accuracy on four of the five, and its derivation pitch-class figure
+(93.2%) is three points above the shipping engine's. On the 381 events it had
+never seen, it finds **63 fewer of them** (288 vs 351) and its exact accuracy
+falls 15 points. The gap is not uniform — it is a rig-generalisation failure.
+Both amp-sim takes collapse to **0.0% exact** (`cowboy-chords-amped` 3 of 8
+matched, `power-chords-amped` 8 of 16), and the hardest lead take in the corpus,
+`lead-line-sixteenths`, drops to 16 of 48 against the shipping engine's 39.
+Under the shared thresholds it fails ten fixtures including two marked
+`required`; the shipping engine passes every required one.
+
+Read on the standing two-axis bar, the shipping engine is not simply trading
+extras for recall: 30 missed + 84 extra against 93 missed + 38 extra is fewer
+total errors as well as far better labels. The retired detector's one genuine
+advantage is its extras axis — 38 held-out false positives against 84 — and
+that number is worth remembering, because it is the axis the shipping engine is
+weakest on and the one the ledger work keeps returning to.
+
+### Why this is the derivation-discipline warning, not a surprise
+
+This is the split doing exactly the job §3 of `AGENTS.md` claims for it. A
+detector tuned on 78 events, scored only on those 78 events, looked like the
+better one by every number its own branch could produce — and the same detector
+read 15 points worse the moment it met four performances through three signal
+paths it had never been fitted to. The twelve held-out takes are the only
+reason the question has an answer at all. Nothing about the retired lineage's
+design was refuted here; what was refuted is the evidence that made it look
+competitive, and that evidence was circular in exactly the documented way.
+
+The lineage's own most valuable finding — that a still-ringing note dominates
+the one that follows it, so a monophonic estimator reporting the loudest
+periodicity is correct and still scored wrong — is not refuted by any of this.
+It is the finding the current architecture was built to answer, and it is kept
+in `docs/archive/detection-rearchitecture-handoff.md`.

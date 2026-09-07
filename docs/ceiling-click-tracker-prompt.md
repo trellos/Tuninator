@@ -1,5 +1,15 @@
 # Task prompt: the label ceiling, the millisecond click witness, and the tracker harvest
 
+> **STATUS: RUN AND CLOSED (2026-08-20).** This brief was executed on
+> `claude/ceiling-click-tracker-prompt-h3qt23`, now merged. Task 1 (the label
+> ceiling) is DECISION-017, Task 2 (the millisecond click witness) is
+> DECISION-018 — rejected — and the tracker harvest is DECISION-019 and
+> DECISION-020. Findings are in `docs/DETECTION-FINDINGS.md`; the kit is
+> `scripts/build-relabel-kit.ts`, `scripts/machine-annotate-relabel.ts` and
+> `scripts/score-relabel.ts`; the witness is `src/engine/kernels/click.ts`,
+> measured and deliberately unwired. **Do not re-run it.** It is kept as the
+> record of what was asked and what the bars were.
+
 Self-contained brief for a fresh session on `trellos/Tuninator`. Everything needed
 is here — do not assume any prior conversation. Read `AGENTS.md` in full and the
 final section of `docs/DETECTION-FINDINGS.md` ("Three candidate features from the
@@ -297,7 +307,7 @@ npx tsx scripts/measure-splits.ts                    # baseline 99 split / 107 e
 Misses down at the cost of extras is **not** a win; both numbers count. A net
 loss is a finding, not a commit: write it into `docs/DETECTION-FINDINGS.md`
 and report it. Log every accepted or rejected direction in `DECISION_LOG.md`
-(continuing from DECISION-016). Commit and push everything, including
+(that numbering continued at DECISION-017). Commit and push everything, including
 negative results and the Task 1 listening kit scripts.
 
 ---

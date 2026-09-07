@@ -7,6 +7,59 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-023]: Consolidate the branches on the shipping recognizer; retire the `src/core/` lineage
+* **Date:** 2026-09-07
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** Seven published branches had accumulated with no statement of
+  which one detected best. Two were already fully contained in `main`
+  (`guitar-event-recognizer-refactor-t5g5yr`, merged at `f6c22a5`;
+  `exciting-edison-kyo0qw`, identical to it). Three carried measurement,
+  documentation and unwired kernels only. One,
+  `tuninator-code-review-q5yzz2`, carried a genuinely competing detector: the
+  pre-rewrite `src/core/` tree developed past the fork point with a
+  four-estimator fused pitch front end. Its own reported figure (80.8%) and
+  the shipping engine's were not comparable, because that branch never
+  carried the held-out corpus — its `fixtures/` held the five derivation
+  takes alone.
+* **Decision:** The shipping streaming recognizer on `main` is the most
+  accurate note detection in the repository, and the branches consolidate
+  onto it. Measured on identical ground truth (the twelve held-out takes and
+  the seventeen-entry `eval.config.json` copied into a worktree of `053526b`;
+  the five shared label files are byte-identical, so nothing was reconciled):
+  on the 381 held-out events the shipping engine matches 351 to the retired
+  lineage's 288 and scores 84.7% exact to its 69.7%, passing every `required`
+  fixture where the retired lineage fails ten fixtures including two
+  `required`. The retired lineage is **not** merged. Its architecture is
+  closed; its measurements, its handoff and its pre-rewrite contributor guide
+  are preserved under `docs/archive/`.
+* **Alternatives Considered:** Merging `q5yzz2`'s detector, or porting its
+  four-estimator fusion into the engine — rejected on the held-out numbers
+  above, and structurally: its single-active-event `EventTracker` cannot
+  represent overlapping Notes, which is the representation the current
+  tracker exists to provide. Judging the branches on their own reported
+  figures — rejected as exactly the circular comparison §3 of `AGENTS.md`
+  forbids; on the derivation takes alone the retired detector wins four of
+  five, which is the answer that would have been reached. Deleting the
+  retired lineage as superseded — rejected: its central measurement is the
+  one the current architecture was built to answer. Renumbering nothing and
+  living with duplicate decision IDs — rejected; three branches had
+  independently issued DECISION-016.
+* **Consequences:** `main` gains the click (compactness) witness kernel, the
+  whitened-bands kernel, the `training/` pipeline, the relabel listening kit
+  and scorer, the same-pitch population measurement, and the nearest-label
+  fix to the downstream ledger's own attribution window. Both merged kernels
+  are measured and **unwired**, and the eval report after the merges is
+  bit-identical to the pre-merge report — the consolidation moved no
+  detection numbers, by construction. Decision IDs were reconciled: the
+  shared dependency-constraint amendment keeps 016, the label-ceiling and
+  click work takes 017-020, the learned onset head takes 021-022. The
+  retired lineage's better held-out extras figure (38 against 84) is left on
+  the record as the one axis where it was ahead. Accepted debt: `main` now
+  carries two unwired kernels and a training tree that no shipped code
+  imports, and `docs/archive/` contains guidance-shaped documents that are
+  explicitly not guidance.
+
 #### [DECISION-022]: The derivation set cannot support the same-pitch decision; new derivation material is the precondition for further work on it
 * **Date:** 2026-08-21
 * **Status:** Accepted
