@@ -531,20 +531,6 @@ Where the recognizer confidently disagrees with a label, the evidence is written
 `.cache/proposed-label-corrections.json` rather than applied. **`fixtures/labels/` is read-only and
 was never modified**, and no label was ever decided by asking the recognizer.
 
-### Reproducing and debugging
-
-```bash
-npm run eval                                          # full run, writes .cache/eval-report.json
-npx tsx scripts/verify-fixtures.ts                    # is each label actually in the audio?
-npx tsx scripts/measure-downstream-ledger.ts --all    # every missed label, and the branch that lost it
-npx tsx scripts/measure-splits.ts --detail            # every event that came out as more than one Note
-npx tsx scripts/measure-onset-coverage.ts             # what the onset kernel saw, before the tracker
-```
-
-The ledger is built on the tracker's own trace rather than on a re-implementation of its rules, so
-it cannot describe a version of the recognizer that no longer exists. Every cause it names is a
-line in `note-tracker.ts` or `fast/rearticulation.ts`.
-
 ## License
 
 MIT
