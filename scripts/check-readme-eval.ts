@@ -1,15 +1,16 @@
 /**
- * Checks README.md's evaluation numbers against .cache/eval-report.json.
+ * Checks docs/EVALUATION.md's numbers against .cache/eval-report.json.
  *
- * The README's per-fixture table and four of its prose figures are derived
- * numbers. They drifted once already: ten of seventeen rows fell behind the
- * recognizer, all of them understating it, because `npm run eval` gates on
- * thresholds and has no opinion about what the README claims. This closes that
- * loop.
+ * That page's per-fixture table and four of its prose figures are derived
+ * numbers. They drifted once already, back when they lived in README.md: ten of
+ * seventeen rows fell behind the recognizer, all of them understating it,
+ * because `npm run eval` gates on thresholds and has no opinion about what the
+ * docs claim. This closes that loop. The script's name is kept for continuity
+ * with the CI step and the history that named it.
  *
  * Usage:
  *   npx tsx scripts/check-readme-eval.ts            # check; nonzero on drift
- *   npx tsx scripts/check-readme-eval.ts --write    # rewrite README from the report
+ *   npx tsx scripts/check-readme-eval.ts --write    # rewrite the page from the report
  *
  * Requires a report, so run `npm run eval` first. CI runs eval immediately
  * before this.
@@ -27,13 +28,17 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const REPO_ROOT = new URL("..", import.meta.url).pathname;
-const README = join(REPO_ROOT, "README.md");
+// fileURLToPath, not `.pathname`: on Windows the latter yields "/C:/dev/..."
+// and every read below fails with ENOENT.
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const PAGE = join(REPO_ROOT, "docs", "EVALUATION.md");
+const PAGE_NAME = "docs/EVALUATION.md";
 const REPORT = join(REPO_ROOT, ".cache", "eval-report.json");
 
 /**
- * Row order and display names, matching the README. Names are abbreviated
+ * Row order and display names, matching the page. Names are abbreviated
  * there for width; the stem is the join key, so renaming a column heading is
  * safe but reordering or renaming a fixture must be reflected here.
  */
@@ -67,7 +72,7 @@ const TRIPLET_STEMS = [
   "lead-line-quarter-eighth-triplet-140bpm",
   "lead-line-amped-quarter-eighth-triplet-140bpm",
 ];
-/** The one required fixture whose pitch class the README quotes. */
+/** The one required fixture whose pitch class the page quotes. */
 const REQUIRED_LEAD_STEM = "clean-lead-120bpm";
 
 type Stats = {
@@ -105,7 +110,7 @@ function buildTable(report: Map<string, Fixture>): string[] {
   for (const [stem, display, required] of ROWS) {
     const f = report.get(stem);
     if (!f) {
-      console.error(`fixture in README table but not in the eval report: ${stem}`);
+      console.error(`fixture in the ${PAGE_NAME} table but not in the eval report: ${stem}`);
       process.exit(2);
     }
     const o = f.overall;
@@ -177,7 +182,7 @@ function proseFigures(report: Map<string, Fixture>): Array<{ what: string; patte
 function main(): void {
   const write = process.argv.includes("--write");
   const report = loadReport();
-  const original = readFileSync(README, "utf8");
+  const original = readFileSync(PAGE, "utf8");
   let text = original;
 
   const problems: string[] = [];
@@ -186,7 +191,7 @@ function main(): void {
   const lines = text.split("\n");
   const start = lines.findIndex((l) => l.startsWith("| Fixture | Required |"));
   if (start === -1) {
-    console.error("could not find the eval table in README.md (no '| Fixture | Required |' header)");
+    console.error(`could not find the eval table in ${PAGE_NAME} (no '| Fixture | Required |' header)`);
     process.exit(2);
   }
   let end = start;
@@ -199,7 +204,7 @@ function main(): void {
     const width = Math.max(actual.length, expected.length);
     for (let i = 0; i < width; i += 1) {
       if (actual[i] !== expected[i]) {
-        problems.push(`  table row ${i + 1}:\n    README: ${actual[i] ?? "(missing)"}\n    report: ${expected[i] ?? "(missing)"}`);
+        problems.push(`  table row ${i + 1}:\n    page:   ${actual[i] ?? "(missing)"}\n    report: ${expected[i] ?? "(missing)"}`);
       }
     }
     lines.splice(start, end - start, ...expected);
@@ -210,28 +215,28 @@ function main(): void {
   for (const { what, pattern, correct } of proseFigures(report)) {
     const found = text.match(pattern);
     if (!found) {
-      problems.push(`  ${what}: the sentence this check anchors on is no longer in README.md — update scripts/check-readme-eval.ts`);
+      problems.push(`  ${what}: the sentence this check anchors on is no longer in ${PAGE_NAME} — update scripts/check-readme-eval.ts`);
       continue;
     }
     if (found[0] !== correct) {
-      problems.push(`  ${what}:\n    README: ${JSON.stringify(found[0])}\n    report: ${JSON.stringify(correct)}`);
+      problems.push(`  ${what}:\n    page:   ${JSON.stringify(found[0])}\n    report: ${JSON.stringify(correct)}`);
       text = text.replace(pattern, correct);
     }
   }
 
   if (problems.length === 0) {
-    console.log("README evaluation numbers match .cache/eval-report.json");
+    console.log(`${PAGE_NAME} evaluation numbers match .cache/eval-report.json`);
     return;
   }
 
   if (write) {
-    writeFileSync(README, text);
-    console.log(`README.md updated from the eval report (${problems.length} figure(s) refreshed):`);
+    writeFileSync(PAGE, text);
+    console.log(`${PAGE_NAME} updated from the eval report (${problems.length} figure(s) refreshed):`);
     console.log(problems.join("\n"));
     return;
   }
 
-  console.error("README.md disagrees with .cache/eval-report.json:\n");
+  console.error(`${PAGE_NAME} disagrees with .cache/eval-report.json:\n`);
   console.error(problems.join("\n"));
   console.error("\nThe eval output is authoritative (AGENTS.md §5).");
   console.error("Refresh with: npx tsx scripts/check-readme-eval.ts --write");

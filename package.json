@@ -10,6 +10,10 @@
   },
   "files": [
     "dist",
+    "docs/API.md",
+    "docs/NOTE-MODEL.md",
+    "docs/EVALUATION.md",
+    "docs/MIGRATION.md",
     "README.md",
     "LICENSE"
   ],

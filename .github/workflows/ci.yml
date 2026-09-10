@@ -50,11 +50,11 @@ jobs:
             exit 1
           fi
 
-      # The README's per-fixture table and four prose figures are derived from
-      # the report. eval gates on thresholds and has no opinion about what the
-      # README claims, so without this they drift silently — they already did
-      # once, ten rows behind and all understating the recognizer.
-      - name: README matches the eval report
+      # docs/EVALUATION.md's per-fixture table and four prose figures are
+      # derived from the report. eval gates on thresholds and has no opinion
+      # about what the docs claim, so without this they drift silently — they
+      # already did once, ten rows behind and all understating the recognizer.
+      - name: Evaluation docs match the eval report
         run: npx tsx scripts/check-readme-eval.ts
 
       - name: Build

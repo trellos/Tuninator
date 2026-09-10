@@ -3,10 +3,20 @@
 Orientation for coding agents working in this repository. Written to be read in
 full before the first edit.
 
-`README.md` is the *consumer-facing* document — install, usage, API reference.
-This file is the *contributor-facing* one: the invariants, the architecture, the
-reasoning behind the design, and the measured state of the recognizer. Where the
-two disagree on numbers, this file and `npm run eval` are authoritative.
+`README.md` is the *consumer-facing* front door — what the library is, how to
+install it, and one worked usage example. The reference material it used to
+carry lives in `docs/` (`API.md`, `NOTE-MODEL.md`, `EVALUATION.md`). This file
+is the *contributor-facing* one: the invariants, the architecture, the reasoning
+behind the design, and the measured state of the recognizer. Where they disagree
+on numbers, this file and `npm run eval` are authoritative.
+
+**`README.md` above `## Install` is human-written. Do not rewrite it.** Fix a
+factual error or a broken link there and say so; otherwise leave the wording,
+the voice and the structure alone.
+From `## Install` down is agent-maintained and should be kept accurate as the
+API changes — while staying short. That section is for someone deciding whether
+to use the library and getting their first Note out of it; depth belongs in
+`docs/`, linked from the README's Docs list.
 
 ---
 
@@ -26,8 +36,9 @@ reading. Zero runtime dependencies. Detection runs off the main thread by
 default (`AudioWorklet` for capture; the recognition engine inline or in a Web
 Worker).
 
-Read `README.md` first for the public API, the Note model, and the evaluation
-numbers as of the last README update. This file goes one layer deeper.
+Read `docs/API.md` and `docs/NOTE-MODEL.md` first for the public API and the
+Note model, and `docs/EVALUATION.md` for the numbers as of the last run. This
+file goes one layer deeper.
 
 ---
 
@@ -251,23 +262,25 @@ one note. A net loss on either axis is a finding, not a commit: write it up in
 
 ## 5. Doc drift
 
-If a number in `README.md`'s evaluation section, this file, or anywhere else
-disagrees with a fresh `npm run eval` run, **the eval output is authoritative**
-and the doc is stale. Fixing the doc is welcome; trusting the doc over a live
-run is not.
+If a number in `docs/EVALUATION.md`, this file, or anywhere else disagrees with
+a fresh `npm run eval` run, **the eval output is authoritative** and the doc is
+stale. Fixing the doc is welcome; trusting the doc over a live run is not.
 
-For `README.md` this is now enforced rather than trusted:
+For `docs/EVALUATION.md` this is now enforced rather than trusted (the script
+keeps its original name; the page moved out of `README.md`):
 
 ```bash
 npx tsx scripts/check-readme-eval.ts            # fails on drift, naming each figure
-npx tsx scripts/check-readme-eval.ts --write    # rewrite the README from the report
+npx tsx scripts/check-readme-eval.ts --write    # rewrite the page from the report
 ```
 
 CI runs the check immediately after `npm run eval`. It covers the per-fixture
-table and four prose figures. It exists because that table drifted ten rows
-behind the recognizer — every one of them *understating* it — which is the
+table and four prose figures — the four are matched by regexes that span line
+breaks, so **rewrapping those paragraphs breaks the check**; it says so by name
+when it can no longer find its anchor. It exists because that table drifted ten
+rows behind the recognizer — every one of them *understating* it — which is the
 failure mode to expect here: eval gates on thresholds and has no opinion about
-what the README claims, so an improvement lands silently and the prose quietly
+what the docs claim, so an improvement lands silently and the prose quietly
 becomes a lie about your own work.
 
 Its header documents one thing not to "tidy": the table's columns are

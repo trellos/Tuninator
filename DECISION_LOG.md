@@ -7,6 +7,49 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-025]: Split the README into a short front door plus `docs/`; the intro is human-owned
+* **Date:** 2026-09-10
+* **Status:** Accepted
+* **Owner:** Documentation
+* **Context:** The README had grown to ~530 lines and was carrying four
+  documents at once: an install guide, a full API reference, the design
+  rationale for the Note model and the engine, and the evaluation results. The
+  repository owner rewrote the opening section by hand and asked for two things:
+  that the human-written part stop being rewritten by agents, and that
+  everything from `## Install` down be made much shorter, because someone
+  deciding whether to use the library will not read a 530-line page.
+* **Decision:** `README.md` now ends at the events table: what it is, install,
+  one usage example, the event list, a Docs list, licence, example app. The
+  moved material lives in `docs/API.md` (methods, options, error codes,
+  `PitchFrame`, timestamps, worker host, multi-channel, worklet asset in full),
+  `docs/NOTE-MODEL.md` (Note semantics plus architecture, two lanes, pitch
+  reading) and `docs/EVALUATION.md` (the per-fixture table and analysis).
+  `AGENTS.md` gained an explicit ownership rule: above `## Install` is
+  human-written and not to be rewritten; below it is agent-maintained and is to
+  be kept both accurate and short. `scripts/check-readme-eval.ts` now checks
+  `docs/EVALUATION.md`, and the CI step was renamed to match; the script keeps
+  its name for continuity with the history that named it. Its Windows path bug
+  (`new URL(...).pathname` → `\C:\...`) was fixed in passing so the check is
+  runnable locally on the owner's machine, not only on CI.
+* **Alternatives Considered:** Deleting the moved prose outright — rejected: it
+  is the only consumer-facing statement of why a bend is one Note and why
+  summing a stereo rig combs the signal, and `AGENTS.md` covers neither at that
+  altitude. Deleting the evaluation section and its checker — considered
+  seriously, since eval results are arguably an implementation detail for a
+  consumer; rejected because the drift guard was added deliberately after the
+  table fell ten rows behind (DECISION-024 era), and moving the page keeps the
+  guard for a page nobody has to read. Keeping the table in the README to avoid
+  touching the checker — rejected: that is the tail wagging the dog, and the
+  checker is fifteen lines of string constants.
+* **Consequences:** The README is ~110 lines and reads as a front door. The
+  cost is a link hop for anyone wanting the options table, and a new failure
+  mode: `package.json`'s `files` ships only `dist`, `README.md` and `LICENSE`,
+  so the `docs/` links resolve on GitHub and through npm's repository rewriting
+  but are not inside the published tarball. Second cost worth naming: the four
+  prose figures in `docs/EVALUATION.md` are matched by regexes that span line
+  breaks, so rewrapping those paragraphs breaks CI — `AGENTS.md` §5 now says so
+  explicitly, since the material is in a less-travelled file than before.
+
 #### [DECISION-024]: Remove the held 0.1 demo copy and the completed migration brief; keep every deliberately-unwired module
 * **Date:** 2026-09-07
 * **Status:** Accepted
