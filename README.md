@@ -1,26 +1,12 @@
 # Tuninator
 
-A UI-free browser library that turns guitar microphone input into **musical events**.
+Tuninator is a browser library that turns guitar microphone input into **musical events**.
 
-The unit is a `Note`, and a Note is something the recognizer learns about over time. It starts the
-moment there is evidence something was played, and then improves: the pitch is refined, a bend is
-recognised as a bend rather than as three notes, a chord blooms out of what first looked like a
-single string. Every improvement arrives as a typed `NoteChange`, so a consumer can tell *"I know
-more now"* from *"I was wrong"*.
+It generates a `Note` object when a pitch is detected. As Tuninator listens to more audio it refines that note--possibly blooming into a chord, a bend to a different pitch, and tracking the end. Events are generated for each change.
 
-A second, optional stream — `pitchFrame` — is the raw continuous pitch reading, one frame every
-~13ms including during silence. That is what a tuner needs; it is off by default.
+Tuninator is written in TypeScript without runtime dependencies. Audio capture runs in an `AudioWorklet`. The recognition engine runs on the main thread by default and can be moved to a Web Worker.
 
-ESM, TypeScript, zero runtime dependencies. Audio capture runs in an `AudioWorklet`; the
-recognition engine runs on the main thread by default and can be moved to a Web Worker.
-
-The recognizer is graded against **recorded guitar**, not synthetic sine waves. `npm run eval`
-decodes seventeen labelled takes — three signal paths, two tempos, two guitars — runs the real
-recognition chain over them, and fails loudly on regression. See [Evaluation](#evaluation) for the
-actual numbers.
-
-> **Upgrading from 0.1?** The API changed completely. [`docs/MIGRATION.md`](docs/MIGRATION.md) maps
-> every old symbol to its replacement and explains what changed and why.
+This is just a little library I made to help write guitar stuff. If it helps you do something rad please reach out. If you know more about audio processing and see it doing boneheaded things, also please reach out.
 
 ## Install
 
