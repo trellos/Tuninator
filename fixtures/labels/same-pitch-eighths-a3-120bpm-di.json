@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md.",
   "events": [
     {
       "id": "e81",
@@ -1375,7 +1375,7 @@
     {
       "id": "s1626",
       "startMs": 23105,
-      "endMs": 23230,
+      "endMs": 23275,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1388,7 +1388,7 @@
     },
     {
       "id": "s1627",
-      "startMs": 23230,
+      "startMs": 23275,
       "endMs": 23355,
       "kind": "note",
       "label": "A3",
@@ -2285,20 +2285,6 @@
     {
       "id": "s1691",
       "startMs": 31230,
-      "endMs": 31355,
-      "kind": "note",
-      "label": "A3",
-      "pitches": [
-        "A3"
-      ],
-      "pitchClasses": [
-        "A"
-      ],
-      "required": true
-    },
-    {
-      "id": "s1692",
-      "startMs": 31355,
       "endMs": 31480,
       "kind": "note",
       "label": "A3",

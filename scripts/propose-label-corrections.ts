@@ -93,8 +93,14 @@ const HOP_MS = 2.5;
  */
 const MIN_PROMINENCE = 1.12;
 const MIN_INTERVAL_MS = 70;
-/** How far back the trough a peak climbed out of is looked for. */
-const TROUGH_LOOKBACK_MS = 90;
+/**
+ * How far a peak must fall back before it is confirmed as having turned over.
+ *
+ * Not a window: the detector walks forward and the trough it measures against
+ * is wherever the signal was quietest since the previous pick, however long ago
+ * that was. This only says when a rise has finished rising.
+ */
+const TURNOVER = 0.9;
 
 /**
  * How far from a grid label a measured onset may sit and still be ITS pick.
@@ -157,30 +163,40 @@ function envelope(x: Float32Array, sampleRate: number): number[] {
  * carrying the answer across is both more accurate and a consistency check.
  */
 function detectOnsets(env: readonly number[]): number[] {
-  const guard = Math.max(1, Math.round(MIN_INTERVAL_MS / 2 / HOP_MS));
-  const back = Math.max(1, Math.round(TROUGH_LOOKBACK_MS / HOP_MS));
-  const peaks: Array<{ at: number; prom: number }> = [];
-  for (let i = 1; i < env.length - 1; i++) {
+  // Forward, once, with no window anywhere. Track the quietest the signal has
+  // been SINCE THE LAST ACCEPTED PICK; when it climbs back out of that trough
+  // by `MIN_PROMINENCE` and turns over, that is the next pick, and the trough
+  // resets there. A fixed lookback was tried and is wrong for the same reason
+  // every fixed window in this project has been wrong: at 90ms against a 125ms
+  // sixteenth it reaches back past the previous pick, and the three picks it
+  // missed against the owner's ear were all found about 100ms early — it had
+  // locked onto the pick before.
+  const out: number[] = [];
+  let trough = Number.POSITIVE_INFINITY;
+  let peak = 0;
+  let peakAt = -1;
+  for (let i = 0; i < env.length; i++) {
     const v = env[i] as number;
-    let isPeak = true;
-    for (let j = Math.max(0, i - guard); j <= Math.min(env.length - 1, i + guard); j++) {
-      if ((env[j] as number) > v) { isPeak = false; break; }
+    if (v < trough) {
+      // Still falling: this is the gap between picks, wherever it happens to be.
+      trough = v;
+      peak = v;
+      peakAt = -1;
+      continue;
     }
-    if (!isPeak) continue;
-    let trough = v;
-    for (let j = Math.max(0, i - back); j < i; j++) trough = Math.min(trough, env[j] as number);
-    const prom = trough > 1e-9 ? v / trough : Infinity;
-    if (prom < MIN_PROMINENCE) continue;
-    peaks.push({ at: i * HOP_MS, prom });
+    if (v > peak) { peak = v; peakAt = i; }
+    // Risen out of the trough far enough, and now turning over: that was a pick.
+    const risen = trough > 1e-9 ? peak / trough : Infinity;
+    const turning = peakAt >= 0 && v < peak * TURNOVER;
+    if (risen >= MIN_PROMINENCE && turning) {
+      const at = peakAt * HOP_MS;
+      if (out.length === 0 || at - (out[out.length - 1] as number) >= MIN_INTERVAL_MS) out.push(at);
+      trough = v;
+      peak = v;
+      peakAt = -1;
+    }
   }
-  // Strongest first, then rate-limit, so a weak neighbour never displaces a pick.
-  peaks.sort((a, b) => b.prom - a.prom);
-  const kept: number[] = [];
-  for (const p of peaks) {
-    if (kept.some((k) => Math.abs(k - p.at) < MIN_INTERVAL_MS)) continue;
-    kept.push(p.at);
-  }
-  return kept.sort((a, b) => a - b);
+  return out;
 }
 
 /**

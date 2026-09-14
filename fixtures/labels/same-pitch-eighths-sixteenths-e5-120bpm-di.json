@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.955s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +30ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.955s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +30ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md.",
   "events": [
     {
       "id": "e81",
@@ -1095,7 +1095,7 @@
     {
       "id": "s1614",
       "startMs": 19575,
-      "endMs": 19700,
+      "endMs": 19613,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -1108,7 +1108,7 @@
     },
     {
       "id": "s1615",
-      "startMs": 19700,
+      "startMs": 19613,
       "endMs": 19825,
       "kind": "note",
       "label": "E5",
@@ -1277,20 +1277,6 @@
     {
       "id": "s1627",
       "startMs": 21200,
-      "endMs": 21325,
-      "kind": "note",
-      "label": "E5",
-      "pitches": [
-        "E5"
-      ],
-      "pitchClasses": [
-        "E"
-      ],
-      "required": true
-    },
-    {
-      "id": "s1628",
-      "startMs": 21325,
       "endMs": 21450,
       "kind": "note",
       "label": "E5",
@@ -2061,7 +2047,7 @@
     {
       "id": "s1683",
       "startMs": 28200,
-      "endMs": 28325,
+      "endMs": 28339,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -2074,7 +2060,7 @@
     },
     {
       "id": "s1684",
-      "startMs": 28325,
+      "startMs": 28339,
       "endMs": 28450,
       "kind": "note",
       "label": "E5",
@@ -2397,7 +2383,7 @@
     {
       "id": "s16107",
       "startMs": 31200,
-      "endMs": 31325,
+      "endMs": 31344,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -2410,7 +2396,7 @@
     },
     {
       "id": "s16108",
-      "startMs": 31325,
+      "startMs": 31344,
       "endMs": 31450,
       "kind": "note",
       "label": "E5",
