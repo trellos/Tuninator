@@ -4167,6 +4167,142 @@ separates a real re-pick from a spurious boundary survives a direct input and
 collapses under compression. A witness that survives compression is the open
 problem, and it is an onset-feature question, not a segmentation-bookkeeping one.
 
+## The envelope dip: the best witness yet, and still not enough
+
+The previous section closed forward absorption by measuring that the deep
+lane's retraction destroys real notes. This one asks the other half of the
+question — is there a witness that separates a real re-pick from an invented
+boundary at all — and answers it with a number that is both the best this
+project has measured and still insufficient, for a reason that is arithmetic
+rather than acoustic.
+
+The prompt for it was the owner's, looking at his own waveforms: the notes are
+plainly separate to the eye, even on the amp-sim renders and even at sixteenth
+spacing, so what is the recognizer failing to see?
+
+### What the recognizer can see at the moment it decides
+
+Every witness available to the re-articulation decision, scored over 1,103
+accepted articulations landing within 70ms of a label and 229 landing nowhere
+near one:
+
+```
+  witness                 AUC    median real   median spurious
+  sharpness               0.698          5.13             3.19
+  fluxRatio               0.695          2.05             1.39
+  heldSharpness           0.583          2.01             1.54
+  heldFluxRatio           0.569          1.68             1.41
+  troughRatio             0.525          1.33             1.22
+  riseRatio               0.506          1.11             1.11
+  fellFraction            0.398          0.86             0.94
+```
+
+**The best witness available is the one already in use**, `sharpness`, at 0.698
+— under this project's standing 0.73 bar. That single table explains every
+negative below: any gate built from these is reshuffling a 0.70 discriminator.
+
+The envelope family reads as noise, and that is the informative part rather
+than a disappointment. Every reading on that record is taken AT the transient,
+by which point the new energy has arrived. None of them can see whether
+anything fell beforehand, which is precisely the question the eye answers from
+a waveform.
+
+### The dip, measured on the audio rather than on the tracker
+
+A plain RMS envelope of the raw samples, with no engine state involved: at each
+boundary, `min(RMS)` over the span just before it against `max(RMS)` over the
+span before that.
+
+```
+  real re-picks    n=1570   median 0.350
+  spurious splits  n=106    median 0.763
+  AUC 0.763 corpus-wide, 0.743 on the 120bpm same-pitch material
+```
+
+Above the bar, and better than anything the engine computes. **The evidence the
+owner was pointing at is real and it is in the audio.**
+
+It is also robust in a way that matters, because three separate things were
+expected to break it and none did.
+
+**Window length does not matter.** Holding overlap fixed at 4x and varying only
+the RMS window, on the same material:
+
+```
+   5ms 0.768    10ms 0.771    20ms 0.797    40ms 0.801    85ms 0.773
+```
+
+Flat across a seventeenfold range. This refutes a plausible-sounding diagnosis
+that was made here before it was measured: that the deep lane is blind because
+it reads its envelope through the 85.3ms window the 4096-point FFT needs for
+pitch, and that a finer envelope would fix it. It would not. An 85ms envelope
+separates as well as a 5ms one.
+
+**Overlap does not rescue a long window, and does not need to.** The deep lane
+runs 4096-sample windows at a 1024-sample hop. Overlap yields more samples of a
+smeared curve rather than a less smeared one — the minimum across overlapping
+85ms windows spanning a 40ms gap is still dominated by the notes bracketing it.
+That reasoning is correct as far as it goes and turns out not to be the binding
+constraint, per the table above.
+
+**Anchoring beats windowing offline and loses in the pipeline.** Anchored on the
+preceding onset rather than a fixed window, separability rises to 0.797. Built
+into the engine it LOST eleven held-out notes, because offline the anchor was a
+LABEL and in the engine it can only be a detected attack — and on the amp-sim
+takes the kernel fires several transients per pick, so every phantom re-anchored
+the span. This is the archived lineage's "a bench ranking is not a pipeline
+ranking" in its purest form: the offline figure was reading ground truth.
+
+### Seven configurations, one exchange rate
+
+Baseline: 336 events split, 403 extra Notes, 161 missed labels.
+
+| gate | splits | extras | missed |
+|---|---|---|---|
+| baseline | 336 | 403 | **161** |
+| `regionMerge` on | 234 | 264 | **383** |
+| `regionMerge`, non-attack Notes only | 328 | 389 | **175** |
+| flux-ratio witness at 1.3 | 263 | 299 | **255** |
+| dip, windowed, bar 0.99 | 324 | 386 | **173** |
+| dip, windowed, age-gated | 335 | 402 | **164** |
+| dip, short windows | 314 | 364 | **195** |
+| dip, anchored on accepted articulations | 63 held-out splits | — | 39 held-out misses |
+
+Every one of them trades roughly one real note per phantom removed. The
+derivation sweep is flat — 10 split and 10 extras at every value of every
+constant tried — so none of these could be honestly derived there either; the
+old derivation set holds three instances of the phenomenon.
+
+One configuration came close enough to be worth recording precisely. The
+windowed dip at a bar of 0.99 leaves derivation misses at 2 and held-out misses
+at 30, both unchanged, while taking held-out splits from 73 to 65 — a clean win
+on hand-labelled data. All twelve of its added misses fall on the 120bpm
+same-pitch material, whose labels are generated. It was still not shipped,
+because five of those twelve are on a DIRECT take with the better labels, and
+the ledger attributes them to the new gate by name: `rejected: no-dip` 0 -> 5 on
+`same-pitch-eighths-sixteenths-e5-120bpm-di`. Sixteenths at 120bpm are 125ms
+apart against a 240ms reach — the window-versus-spacing error, committed inside
+the attempted repair. Age-gating the test so it only applies to notes older than
+its own span removes the harm and the benefit together: splits 336 -> 335.
+
+### Why 0.78 is not enough, which is arithmetic
+
+At this decision there are roughly five real re-picks for every invented
+boundary. A witness at 0.78 AUC still has heavily overlapping distributions —
+real p75 0.684 against spurious median 0.763 — so at that prior, a threshold
+catching one phantom catches about one real note. Reaching a favourable trade
+needs something near 0.95, not a better-placed bar on a 0.78 reading.
+
+**So the per-boundary threshold family is exhausted, and that is the finding.**
+Not "this witness is bad": the witness is the best one measured here and it is
+above the bar. The shape of the problem is wrong for it. What a listener uses on
+this material is not one number at one boundary — it is four evenly spaced
+events carrying the same envelope shape, which is a claim about a SEQUENCE. The
+two nearest things tried in this repository, joint region segmentation by
+dynamic programming and a local-rate gate, were both measured and rejected, and
+neither is a full sequence decoder over the envelope. That is where the next
+attempt belongs, and it should not begin by re-deriving the seven rows above.
+
 ## Lessons carried over from the retired lineage
 
 DECISION-023 closed the pre-rewrite `src/core/` lineage on its held-out numbers.

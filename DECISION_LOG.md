@@ -7,6 +7,75 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-028]: The per-boundary threshold family is exhausted; sequence modelling is the next step
+* **Date:** 2026-09-14
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** DECISION-027 closed forward absorption and left the open question
+  as a re-pick witness that survives compression. The owner pressed the obvious
+  objection: his waveforms show plainly separate notes, on the amp-sim renders
+  and at sixteenth spacing, so what is the recognizer failing to see? He also
+  settled the blocking question from DECISION-027 by assigning the 120bpm
+  same-pitch material as calibration material, which is what made any of the
+  sweeps below derivable at all — the old derivation set holds three instances
+  of the phenomenon and is flat across every constant tried.
+* **Decision:** **Reject every per-boundary gate on the current witnesses, and
+  name sequence modelling as the precondition for progress.** Two findings, each
+  measured. **(1)** The witnesses available at the decision top out at 0.698 AUC
+  over 1,103 real re-picks against 229 invented boundaries, and the best of them
+  is the `sharpness` the branch already used — so any gate built from them
+  reshuffles a 0.70 discriminator. **(2)** A new witness, the envelope dip before
+  a boundary, scores 0.763 corpus-wide and 0.743-0.801 on the same-pitch
+  material, above this project's 0.73 bar and better than anything the engine
+  computes. It is nonetheless insufficient: at roughly five real re-picks per
+  phantom, a 0.78 witness with overlapping distributions removes about one real
+  note per phantom, and all seven configurations tried landed on that same
+  exchange rate. `src/` is unchanged.
+* **Alternatives Considered:** (a) **`regionMerge` and a trigger-restricted
+  variant** — 383 and 175 missed labels against a baseline of 161. (b) **A second
+  flux witness on the monophonic fallback** — the file's own header says
+  `sharpness` is not path-independent and that neither reading suffices alone,
+  and applying the chord branch's bar to single notes cost 94 misses; the two
+  flux readings are 0.698 and 0.695 and strongly correlated, so the pair adds
+  nothing. (c) **An energy floor on the sharpness escape** — AUC 0.483, and a
+  floor killing 19 phantoms kills 173 real notes. (d) **A finer envelope for the
+  deep lane**, on the theory that it is blind because it reads RMS through the
+  85.3ms window the FFT needs for pitch — proposed here and then refuted by
+  measurement: separability is flat from 5ms to 85ms at fixed overlap
+  (0.768/0.771/0.797/0.801/0.773). (e) **Anchoring the dip on the preceding
+  articulation instead of a window**, which is the better idea and measures
+  better offline at 0.797 — rejected because it lost eleven held-out notes in the
+  pipeline, the offline anchor being a label and the engine's being a detected
+  attack on a signal that fires several transients per pick. (f) **Shipping the
+  windowed dip at 0.99**, which leaves derivation and held-out misses unchanged
+  at 2 and 30 while taking held-out splits 73 -> 65 — rejected because five of its
+  twelve added misses are on a DIRECT take and the ledger attributes them to the
+  new gate by name, sixteenths at 125ms against a 240ms reach being the
+  window-versus-spacing error committed inside the repair. Age-gating it removes
+  benefit and harm together (336 -> 335 splits).
+* **Consequences:** Positive — the defect's discriminability is now measured
+  rather than assumed, from two independent directions, and the best witness
+  available is known and quantified. The envelope dip is a genuine asset for
+  whatever comes next: it is above the bar, it is robust to window length over a
+  seventeenfold range, and it is the only reading that describes the span BEFORE
+  a transient rather than the instant of it. Negative — no accuracy change: the
+  corpus stands at 336 events split, 403 extra Notes, 161 missed labels, exactly
+  where the day began, and a consumer scoring one target per pick still pays for
+  it. **What this rules out** is the whole family of single-number thresholds at
+  a single boundary, which is where seven attempts and the eight earlier ceiling
+  studies have all gone. **What it points at** is a claim about a sequence —
+  evenly spaced events sharing an envelope shape — which is what a listener
+  actually uses on this material. Joint segmentation by dynamic programming
+  (DECISION-017) and a local-rate gate were both measured and rejected, and
+  neither is a sequence decoder over the envelope; that distinction is the
+  opening, and the seven rows in the findings entry are what the next attempt
+  should not re-derive. **Still outstanding and the owner's:** the
+  derivation/held-out assignment is now settled as calibration material, but the
+  provisional labels on that material have not been reviewed, and five of the
+  twelve misses in alternative (f) turn on whether those labels are right.
+
+---
+
 #### [DECISION-027]: Forward absorption is refused; the split-shape instruments are repaired
 * **Date:** 2026-09-14
 * **Status:** Rejected
