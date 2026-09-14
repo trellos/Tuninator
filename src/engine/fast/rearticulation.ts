@@ -253,6 +253,20 @@ export class RearticulationDetector implements IRearticulationDetector {
     if (frame.rms >= sustainedRms * t.rearticulationRiseRatio) {
       return { accepted: true, reason: "envelope-rise" };
     }
+    // Sharpness alone is not enough here, and the header above already says
+    // why: it divides flux by the frame's RMS, which an amp sim flatters
+    // without limit by holding the level flat while distortion keeps the
+    // spectrum churning. Every witness READ AT the transient has the same
+    // blind spot — by the time the attack fires the new energy has already
+    // arrived, so none of them can see whether anything fell beforehand.
+    //
+    // `dipRatio` asks that question instead, and it is the question the eye
+    // asks of a waveform: a note that ended and was picked again died away
+    // first, while a boundary invented inside one sounding note did not.
+    // See `transient.rearticulationDipRatio`.
+    if (attack.dipRatio > t.rearticulationDipRatio) {
+      return { accepted: false, reason: "no-dip" };
+    }
     return attack.sharpness >= t.rearticulationSharpness
       ? { accepted: true, reason: "sharpness" }
       : { accepted: false, reason: "no-energy-not-sharp" };

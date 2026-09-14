@@ -86,6 +86,29 @@ export type AttackEvidence = {
    */
   fluxRatio: number;
   /**
+   * How far the envelope FELL before this transient, as a fraction.
+   *
+   * `min(RMS)` over the window just before the attack, divided by `max(RMS)`
+   * over the stretch of signal before that. Small means the signal died away
+   * and then something new arrived — a note that finished and a pick that
+   * started the next one. Near 1 means nothing fell: the transient landed in
+   * the middle of a note that was still sounding at full strength.
+   *
+   * This is the question the eye asks of a waveform, and the only witness here
+   * that asks it. Every other reading on this record is taken AT the transient,
+   * by which time the new energy has already arrived, so none of them can see a
+   * gap that closed a moment earlier. Measured over 1,570 labelled onsets and
+   * 106 boundaries the recognizer invented, the readings taken at the transient
+   * top out at 0.698 AUC — under this project's standing 0.73 bar — while this
+   * one holds 0.743-0.759 across a threefold range of window sizes.
+   *
+   * Both windows are `transient.envelopeBaselineMs` and twice it, rather than
+   * constants of their own: the separation is insensitive to them over that
+   * whole range, so inventing two numbers to tune would be inventing precision
+   * the measurement does not have.
+   */
+  dipRatio: number;
+  /**
    * The same two readings taken against the flux kernel's LONG memory — a
    * decaying per-bin peak hold rather than the last few hops.
    *
