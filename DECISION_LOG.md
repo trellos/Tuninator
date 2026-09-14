@@ -69,7 +69,12 @@ are what keep later work from repeating them.
   19.89–33.96s against 111 labels; whether to carry DI times to the amped
   files; the three weak off-beats at 21.05/21.30/21.55s in `e5-di`). The
   material stays PROVISIONAL and unassigned to derivation or held-out.
-  `src/` is unchanged.
+  `src/` is unchanged. *Same day, later:* the owner listened to those DI
+  sections and gave 37 pick times; they are applied verbatim (findings entry,
+  "Resolved the same day, by ear"), closing the first, second and fourth open
+  items — the 19.614s pick is `s1614`, both A3 section-end picks are labelled,
+  `s1628` is restored at 21.297s — and leaving the amped files deferred on his
+  instruction.
 
 ---
 

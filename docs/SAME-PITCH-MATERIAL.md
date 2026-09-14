@@ -25,8 +25,8 @@ This material is deliberately nothing but that phenomenon.
 | fixture stem | pitch | content | events |
 |---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-{di,amped}` | A3 then E5 | 8 measures of quarter notes on A3, then **10** measures on E5 | 72 |
-| `same-pitch-eighths-a3-120bpm-{di,amped}` | A3 | eighth notes, then sixteenths from 20.0s | 183 |
-| `same-pitch-eighths-sixteenths-e5-120bpm-{di,amped}` | E5 | 8 measures of eighths, then 8 measures of sixteenths | 191 di / 190 amped |
+| `same-pitch-eighths-a3-120bpm-{di,amped}` | A3 | eighth notes, then sixteenths from 19.9s | 184 di / 183 amped |
+| `same-pitch-eighths-sixteenths-e5-120bpm-{di,amped}` | E5 | 8 measures of eighths, then 8 measures of sixteenths | 192 di / 190 amped |
 | `held-then-picked-six-strings-120bpm-{di,amped}` | F#2 C3 G3 C4 G4 D5 | per pitch: 4 cycles of [one measure held, one measure of quarter notes] | 120 |
 
 All at 120bpm, so a sixteenth is 125ms — just above the corpus's tightest
@@ -125,6 +125,18 @@ Two passes since, both on 2026-09-14, both recorded in each file's `timingNotes`
    fall outside 85–175ms. It is no worse per label than the grid was and is
    not verifiable from the amped render. Treat it as ±65ms data. The unmoved
    ids are listed in `docs/DETECTION-FINDINGS.md`.
+3. **The player's second listening pass**, same day, on the DI files only. He
+   gave every pick attack he heard in 19.0–20.3s and 21.0–21.8s of the E5 take
+   and 19.0–20.8s and 33.3–34.0s of the A3 take — 37 times, applied verbatim.
+   On E5 the 19.614s pick is `s1614` and 19.744s is `s1615` (the count was
+   right, the earlier lock's id was not), and `s1628` is restored at 21.297s.
+   On A3 the eighth at 19.230s (`e870`) had no pick under it and is removed,
+   both section-end picks are labelled (`s160` 19.875s, `s16113` 33.955s), and
+   two very weak picks at 19.131s and 19.599s are deliberately unlabelled: he
+   calls them bad playing and says missing them is fine, and a label is by
+   definition an event the recognizer must find. Where his times overlap the
+   re-timing, the re-timing was within 5ms on 21 of 31 labels and within 15ms
+   on 29. Counts: `e5-di` 192, `a3-di` 184.
 
 The amped renders of these two takes are untouched by either the re-timing or
 this validation: still on their own late-anchored grids, with the player's
@@ -140,9 +152,9 @@ As of the current labels (after both 2026-09-14 passes):
 |---|---|---|---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-di` | 72 | **0** | 72 | −35 | **0** | 25 |
 | `same-pitch-quarters-a3-e5-120bpm-amped` | 72 | 68 | 4 | −60 | −35 | 0 |
-| `same-pitch-eighths-a3-120bpm-di` | 183 | 59 | 124 | −30 | **−20** | −10 |
+| `same-pitch-eighths-a3-120bpm-di` | 184 | 58 | 126 | −30 | **−18** | −7 |
 | `same-pitch-eighths-a3-120bpm-amped` | 183 | 181 | 2 | — | 65 | — |
-| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 191 | 47 | 144 | −18 | **−13** | −5 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 192 | 48 | 144 | −18 | **−13** | −5 |
 | `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 190 | 114 | 76 | −5 | 25 | 55 |
 | `held-then-picked-six-strings-120bpm-di` | 120 | **2** | 118 | −50 | 50 | 130 |
 | `held-then-picked-six-strings-120bpm-amped` | 120 | 59 | 61 | −5 | 45 | 115 |
@@ -197,18 +209,18 @@ snapshot values are in parentheses:
 |---|---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-di` | 72 | 6 | 6 | 2 |
 | `same-pitch-quarters-a3-e5-120bpm-amped` | 72 | **51** | **81** | 4 |
-| `same-pitch-eighths-a3-120bpm-di` | 183 | 6 | 6 | 2 |
+| `same-pitch-eighths-a3-120bpm-di` | 184 | 5 (6) | 5 (6) | 2 |
 | `same-pitch-eighths-a3-120bpm-amped` | 183 | **56** | **61** (60) | 4 (3) |
-| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 191 | 25 (21) | 25 (21) | 2 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 192 | 23 (21) | 23 (21) | 2 |
 | `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 190 | 30 (29) | 38 (37) | 3 |
 | `held-then-picked-six-strings-120bpm-di` | 120 | 8 | 8 | 2 |
 | `held-then-picked-six-strings-120bpm-amped` | 120 | **61** (60) | **78** (77) | 5 |
 
 Corpus total moved from 99 of 459 events split to 336 of 1595, 403 extra Notes,
-when the material landed; on the current labels it reads **342 of 1590, 410
-extra Notes**. The `e5-di` rise from 21 to 25 is the labels getting closer to
-the picks and the assignment changing with them — a more accurate measurement,
-not a regression.
+when the material landed; on the current labels it reads **339 of 1592, 407
+extra Notes**. The `e5-di` movement (21 → 25 → 23) is the labels getting closer
+to the picks and the assignment changing with them — a more accurate
+measurement, not a regression.
 
 **The signal path dominates.** These are pairs: the same performance, differing
 only in whether the capture is direct or through an amp sim (the label timings
@@ -236,11 +248,11 @@ wide:
 | `same-pitch-quarters-a3-e5-120bpm-amped` | 63 | **63** | 0 | 0 |
 | `same-pitch-eighths-a3-120bpm-amped` | 53 | **53** | 0 | 0 |
 | `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 37 | **37** | 0 | 0 |
-| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 20 | **20** | 0 | 0 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 19 | **19** | 0 | 0 |
 | `same-pitch-eighths-a3-120bpm-di` | 3 | **3** | 0 | 0 |
 | `same-pitch-quarters-a3-e5-120bpm-di` | 1 | **1** | 0 | 0 |
 
-(Current labels; DECISION-027's snapshot read 36 and 19 on the two E5 rows.)
+(Current labels; DECISION-027's snapshot read 36 on the E5 amped row.)
 
 Every extra Note on all six, without exception, is at the label's own pitch
 class and butted against its neighbour. This material does exactly what it was
@@ -273,13 +285,12 @@ wrong. Recorded here because the correction is instructive.
 2. **`eighths A3` does contain a sixteenth section, starting at 20.0s** — the
    player listened and said so, and the labels now say so: 72 eighths, then
    sixteenths — 112 on the original grid from 19.960s, 111 since the player
-   removed `s1692` (31.355s, no pick under it), now re-timed to run 20.020s to
-   33.815s. **Its count is still open:** the DI audio carries pick-like events
-   with no label at both ends of the section, at 19.89s (130ms after the last
-   eighth and 130ms before `s161`) and at 33.96s (145ms after the last label),
-   so the section holds 111 labels against 112–113 events. Whether the
-   sixteenths begin a pickup early and whether the take ends at 33.96s is the
-   player's to say.
+   removed `s1692` (31.355s, no pick under it), 113 since his second pass: the
+   DI audio carried pick-like events with no label at both ends of the section,
+   and he confirmed both — the sixteenths begin at 19.875s (`s160`, one
+   sixteenth before the nominal 20.0s) and the take ends on a slight pick at
+   33.955s (`s16113`). The eighths are 71 on the DI render: `e870` (19.230s)
+   had no pick under it.
 
    **I had previously reported that this take had no sixteenth section at all,
    on three converging measurements. That was a false negative.** Worth the space,
@@ -324,21 +335,23 @@ player's ear rests on four values it is forbidden to move. What held:
   and the pick sequence in both renders says the method's *count* is right and
   the lock is enforcing an id the ear never gave. That one point is open.
 
-What is open, all of it the player's:
+Three of the four questions that left open were settled the same day by the
+player's second listening pass (pass 3 under "How the labels were made"): the
+19.614s pick is `s1614`; A3's sixteenths run 19.875s to 33.955s and both ends
+are labelled; the three off-beats at 21.04 / 21.30 / 21.55s are all picks and
+all labelled. What is still open, all of it the player's, DI first:
 
-1. Which sixteenth the 19.613s pick is (`s1614` by count). As it stands
-   `s1614` sits on a grid position 38ms before it and the pick at 19.750s has
-   no label — a pair inherited from the listening-pass commit, not created by
-   the re-timing.
-2. Whether `a3`'s sixteenths run 19.89s to 33.96s (111 labels, 112–113 events).
-3. Whether to carry the re-timed DI times to the amped files at +2.5ms.
-4. The three weak off-beats at 21.050 / 21.302 / 21.552s in `e5-di`, two now
-   labelled and one removed by ear.
+1. **The A3 sixteenth section's 33 grid-placeholder labels** between 21.1s and
+   33.4s. His pass over 20.0–20.8s heard every sixteenth, including the quiet
+   off-beats the envelope could not, so the same method settles the rest.
+2. Whether to carry the corrected DI times to the amped files at +2.5ms.
+   Deferred on his instruction.
 
 Until then: `same-pitch-eighths-sixteenths-e5-120bpm-di`,
 `same-pitch-quarters-a3-e5-120bpm-di` and `held-then-picked-six-strings-120bpm-di`
-carry measured onsets; `same-pitch-eighths-a3-120bpm-di`'s eighths do too; its
-sixteenth section and every amped fast-take label are ±65ms data.
+carry measured onsets; `same-pitch-eighths-a3-120bpm-di`'s eighths and its
+first 0.9s of sixteenths do too; the rest of that sixteenth section and every
+amped fast-take label are ±65ms data.
 
 ## Before relying on this material
 

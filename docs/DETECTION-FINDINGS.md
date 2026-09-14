@@ -4562,6 +4562,25 @@ same phantom at 21.3s is `s1628` in DI and `s1626` in amped. Consequences:
 4. The three weak off-beats at 21.050 / 21.302 / 21.552s in `e5-di`, two of
    which are labelled and one of which he removed.
 
+**Resolved the same day, by ear.** The owner listened to the four DI sections
+named above and gave every pick attack he heard (37 times in all). Applied
+verbatim: on `e5-di`, `s1610`–`s1620` and `s1626`–`s1632` take his times,
+which puts the 19.614s pick on `s1614` and 19.744s on `s1615` exactly as the
+count said, and `s1628` is restored at 21.297s, a pick he now hears 28ms before
+the grid position he had judged empty. On `a3-di`, `e869`, `e871`, `e872`,
+`s161`–`s167` and `s16108`–`s16112` take his times; both section-end events are
+real picks and are now labelled (`s160` at 19.875s, `s16113` at 33.955s, the
+latter "slight"); `e870` (grid 19.230s) had no pick under it and is removed;
+and two very weak picks at 19.131s and 19.599s are deliberately *not*
+labelled — he calls them bad playing and says missing them is fine, and a
+label here is by definition an event the recognizer must find. Of the 31 labels
+he timed that the re-timing had moved, the re-timing was within 5ms of his ear
+on 21, within 15ms on 29, and 25ms out on one (`s16110`). Counts are now 192
+(`e5-di`) and 184 (`a3-di`). Items 1, 2 and 4 above are closed; item 3 (the
+amped files) is deferred on his instruction, and the remaining DI work is the
+A3 sixteenth section's 33 unmoved labels, which the same listening method can
+settle in seven time windows.
+
 Every window used here was checked against the material's spacing before being
 trusted: the nearest-peak search is bounded at ±62ms and at the midpoints to
 the neighbouring labels, the onset function's peak-separation is 20ms, and its

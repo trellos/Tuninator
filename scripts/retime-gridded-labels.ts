@@ -35,9 +35,10 @@
  * with `--write` without reading the findings entry first.** Two limitations
  * were measured there. (1) The lock holds an (id, time) PAIR, but the owner's
  * ear supplies a TIME, not an id: at 19.613s the count-consistent assignment
- * puts that pick on `s1614`, the lock pins it to `s1615`, and the neighbour
- * yield rule then freezes `s1614` on a grid position 38ms before a real pick
- * while the pick at 19.750s carries no label. (2) Where a section's off-beat
+ * put that pick on `s1614` while the lock pinned it to `s1615`, freezing
+ * `s1614` on a grid position 38ms before a real pick. The owner's second
+ * listening pass settled it (s1614 = 19.614s, s1615 = 19.744s) and the tables
+ * below now carry every time he gave. (2) Where a section's off-beat
  * picks are too weak for the envelope (a third of `a3-di`'s sixteenths), the
  * skipped labels stay on the grid interleaved with re-timed neighbours, and
  * the alignment's skip choice can be an exact cost tie between two adjacent
@@ -72,14 +73,30 @@ const TAKES = [
  * onset with 19.745s — a worse value, from a weaker source, silently.
  */
 const LOCKED: Record<string, readonly string[]> = {
-  "same-pitch-eighths-sixteenths-e5-120bpm-di": ["s1615", "s1684", "s16108"],
-  "same-pitch-eighths-a3-120bpm-di": ["s1627"],
+  "same-pitch-eighths-sixteenths-e5-120bpm-di": [
+    "s1610", "s1611", "s1612", "s1613", "s1614", "s1615", "s1616", "s1617", "s1618", "s1619", "s1620",
+    "s1626", "s1627", "s1628", "s1629", "s1630", "s1631", "s1632", "s1684", "s16108",
+  ],
+  "same-pitch-eighths-a3-120bpm-di": [
+    "e869", "e871", "e872", "s160", "s161", "s162", "s163", "s164", "s165", "s166", "s167", "s1627",
+    "s16108", "s16109", "s16110", "s16111", "s16112", "s16113",
+  ],
 };
 
 /** The owner's listening pass on the DI renders, as the check. */
 const EAR: Record<string, { pick: number[] }> = {
-  "same-pitch-eighths-sixteenths-e5-120bpm-di": { pick: [19613, 25572, 28339, 30075, 31344] },
-  "same-pitch-eighths-a3-120bpm-di": { pick: [23275] },
+  "same-pitch-eighths-sixteenths-e5-120bpm-di": {
+    pick: [
+      19039, 19271, 19368, 19510, 19614, 19744, 19836, 19972, 20086, 20204, 20298,
+      21044, 21188, 21297, 21422, 21548, 21687, 21805, 25572, 28339, 30075, 31344,
+    ],
+  },
+  "same-pitch-eighths-a3-120bpm-di": {
+    pick: [
+      19019, 19494, 19747, 19875, 20011, 20117, 20254, 20375, 20518, 20613, 20744, 23275,
+      33296, 33416, 33563, 33689, 33809, 33955,
+    ],
+  },
 };
 
 function envelope(x: Float32Array, sampleRate: number): number[] {
