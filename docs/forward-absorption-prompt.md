@@ -1,10 +1,43 @@
 # Close the same-pitch tail fragment: make absorption able to reach forward
 
-> **STATUS: OPEN — not yet run to a verdict.**
-> Unlike `onset-features-prompt.md`, `ceiling-click-tracker-prompt.md` and
-> `learned-onset-head-prompt.md`, which carry banners saying they are finished,
-> this brief is live work. Update this banner when it reaches a verdict, whether
-> the fix lands or is reverted.
+> **STATUS: RUN TO A VERDICT — refused. Do not pick this up as work.**
+> See DECISION-027 and "Forward absorption: the instruments were wrong, then the
+> mechanism was refuted" in `docs/DETECTION-FINDINGS.md`. Nothing in `src/`
+> changed.
+>
+> Three things this brief got right and one it got wrong, worth reading before
+> acting on anything below.
+>
+> **Right:** absorption does reach backward only, confirmed by reading —
+> `absorbAttackFragments()` is additionally gated on `justNamed`, so it never
+> runs on monophonic lead material at all. The defect is a same-pitch boundary
+> inside one event. And the shape *is* the largest block, not a minority.
+>
+> **Wrong, and it was wrong in the direction the brief warned about:** the brief
+> says to establish what fraction of splits are actually `same pitch twice` and
+> to report it if the shape turns out to be a small minority. Measured as
+> shipped it looked like one — 18 of 294. That reading was an artefact of
+> `measure-split-shape.ts` testing the previous label's name before the label's
+> own, which makes `same pitch twice` unreachable whenever consecutive labels
+> share a pitch, i.e. on all of the material recorded to study it. Corrected, it
+> is 113 of 294; on an instrument that reads no label onset at all
+> (`measure-tail-fragments.ts`), 294 of 318 extra Notes are same-pitch and
+> contiguous and none are detached. Do not re-derive the "small minority"
+> reading — it was the instrument, not the corpus.
+>
+> **The verdict.** `deep.regionMerge` re-opened on the full 1,595-event corpus
+> costs 222 missed labels for 139 fewer extra Notes. Restricted to absorb only
+> Notes the fast lane opened without an attack — no new constant, the most
+> conservative retrospective rule available — it trades 14 extras for 14 misses,
+> one for one, in the same places. So the retrospective question the brief poses
+> below ("that fragment already happened — with its full duration, its decay,
+> and whether it carried its own attack witness, was it one?") is **answered,
+> and it does not sit on the better side of the 0.73 AUC ceiling.** The extra
+> evidence a fragment's own history carries is not the missing ingredient.
+>
+> The open problem this leaves is the one DECISION-026's headline points at: a
+> re-pick witness that survives compression and distortion. That is an
+> onset-feature question, not a segmentation one.
 
 
 Read `AGENTS.md` in full before your first edit. It is the contributor-facing source of

@@ -171,7 +171,12 @@ function proseFigures(report: Map<string, Fixture>): Array<{ what: string; patte
     },
     {
       what: "onset spread",
-      pattern: /of the [a-z]+ takes that score it, [a-z]+ have a median absolute error under\n25ms and the worst is \d+ms/,
+      // Either spelling, because `correct` below writes a NUMERAL once a count
+      // outruns `words` — as the take count did when the corpus reached 22. A
+      // pattern that only matched the word spelling could not find the sentence
+      // this script had itself just written, and reported its own anchor as
+      // lost on the very next run.
+      pattern: /of the (?:[a-z]+|\d+) takes that score it, (?:[a-z]+|\d+) have a median absolute error under\n25ms and the worst is \d+ms/,
       correct:
         `of the ${words[scoring] ?? scoring} takes that score it, ${words[under25] ?? under25} have a median absolute error under\n` +
         `25ms and the worst is ${worst}ms`,

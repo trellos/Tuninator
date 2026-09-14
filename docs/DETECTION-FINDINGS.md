@@ -3948,6 +3948,179 @@ periodicity is correct and still scored wrong — is not refuted by any of this.
 It is the finding the current architecture was built to answer, and it is kept
 in `docs/archive/detection-rearchitecture-handoff.md`.
 
+## Forward absorption: the instruments were wrong, then the mechanism was refuted
+
+The standing conclusion was that "the defect behind the largest block of splits
+is a same-pitch boundary inside one event, not a name arriving late", and that
+absorption reaches backward only. Both halves were tested against the 120bpm
+same-pitch material (DECISION-026, 1,136 events across eight fixtures). The
+first half is right and was being **under-reported by a factor of six**. The
+second is right, and the mechanism that would fix it is refuted.
+
+### The split-shape classifier could not see the shape it was built to find
+
+`measure-split-shape.ts` reported **18** `same pitch twice` splits corpus-wide,
+against 102 `named as before`. That reading is wrong, for two independent
+reasons, and both are the error class this file already records four times: a
+rule that was correct for the material it was written against.
+
+**The name tests were ordered previous-name first.**
+
+```
+offset < -45ms            -> predecessor's own
+name === previous.label   -> named as before      <- reached first
+name === label.label      -> same pitch twice     <- unreachable when they coincide
+```
+
+On same-pitch material `previous.label === label.label`, so every split whose
+leader began here and was correctly named fell into the naming bucket. On
+`same-pitch-eighths-a3-120bpm-amped` — a take where all 184 labels are A3 — 49
+of 50 splits sit on a same-pitch label pair, and the take reported **one**
+`same pitch twice`. The categories' own definitions settle the order: `named as
+before` is a claim that the NAME is wrong, `same pitch twice` that the BOUNDARY
+is. When the names coincide the name is not wrong. Reordered, with an
+`ambiguous` column counting where the two coincide:
+
+| shape | before | after |
+|---|---|---|
+| predecessor's own | 146 | 146 |
+| named as before | 102 | **7** |
+| same pitch twice | **18** | **113** |
+| named as neither | 28 | 28 |
+
+**`predecessor's own` uses a 45ms window against labels carrying up to 65ms of
+offset.** The amp-sim renders' labels were calibrated on the DI render and
+applied unchanged (`docs/SAME-PITCH-MATERIAL.md`), and `verify-fixtures.ts` puts
+their median offset at −35, +65, +25 and +45ms. Measured leader offsets on the
+four amped takes run median −42, −30, −38 and −25ms against that −45ms bar: the
+bucket boundary sits inside the label set's own placement error, so on these
+takes the column separates nothing. A leader that begins "before" a label which
+itself sits late is that label's own Note. The column is now documented as an
+upper bound rather than retuned, because the labels are read-only.
+
+### An instrument that uses no label onset at all
+
+`measure-tail-fragments.ts` (new) classifies each Note past the first by the
+**label's** pitch class — ground truth — and the gap to the Note before it.
+Neither test reads a label onset, so a systematically late label set cannot move
+the count.
+
+```
+  TOTAL                     split 294   extras 318
+    same pitch (contiguous)   294
+    detached                    0
+    other pitch                24
+    median shortest Note     93ms      median longest    227ms
+```
+
+**294 of 318 extra Notes are same-pitch and contiguous with their neighbour, and
+not one is detached.** On the six same-pitch fixtures it is 175 of 175 — every
+extra Note, without exception. The defect is exactly what the standing
+conclusion said it was; only the instrument disagreed.
+
+One number there rules out the cheap fixes. The median shortest Note in a split
+event is **93ms**, against `tracking.minStableMs` 55 and `deep.minSegmentMs` 90.
+These fragments are not sub-threshold blips that a bar could be raised past —
+they are above every suppression threshold the engine has, and the median
+longest is only 227ms, so the two Notes are of comparable size. The "~130ms Note
+then a ~70ms tail" shape quoted from the amped triplet take is one instance, not
+the population.
+
+### There is no forward path, confirmed by reading
+
+- `absorbArticulationFragment()` moves the survivor's **start** back onto a
+  predecessor stub. Backward.
+- `absorbAttackFragments()` walks `closing`/`ended` for candidates ending at or
+  before the survivor's start. Backward — and gated on `justNamed`, which
+  requires `harmonyLabel !== null`, so on monophonic lead material it is never
+  reached at all.
+- `carveAfter()`, `splitAtSegments()`, `insertFromSegment()` are additive: they
+  create Notes, never retract one.
+- `mergeWithinSegment()` is the only mechanism that extends a survivor's **end**
+  over a following Note, and it is gated behind `deep.regionMerge`, false.
+
+So an announced Note cannot today swallow a following same-pitch fragment. That
+absence is the defect's proximate cause.
+
+### Which path opens the fragment
+
+Over the 294 same-pitch extras, from the tracker's own trace:
+
+```
+  opened by    attack 154    pitchChange 133    (no trace) 7
+  accepted re-articulation at that start:
+    sharpness 195   envelope-rise 38   none 30   new-pitch 23
+    ring-out-sharpness 5   chord-decay-excess 3
+```
+
+`sharpness` — `rearticulationSharpness`, the prospective fast-lane decision with
+the measured 0.73 AUC ceiling — accounts for two thirds. The other half of the
+population is opened by a pitch step with no attack behind it at all.
+
+### `regionMerge`, re-opened on 20x the material, and refuted
+
+The existing negative on `deep.regionMerge` was taken on 78 derivation events:
+false positives 6 → 10, fragmentation 11/78 → 12/78. Re-run on the full 1,595-
+event corpus it is far worse than that comment suggests. **Falsifier stated in
+advance: missed labels must not rise above 161, and splits and extras must both
+fall.**
+
+| | baseline | `regionMerge` | + absorb only non-attack Notes |
+|---|---|---|---|
+| split events | 336 | 234 | 328 |
+| extra Notes | 403 | 264 | 389 |
+| same-pitch contiguous extras | 294 | 165 | 278 |
+| **missed labels** | **161** | **383** | **175** |
+| eval informational failures | 1 | 4 | 2 |
+
+Enabled, it buys 139 fewer extra Notes for **222 lost played notes**. The ledger
+names the mechanism exactly: `opened but never emitted` goes 0 → **184** —
+`mergeWithinSegment` sets `merged` on the absorbed Notes and `projectEmissions`
+drops them, so 184 notes somebody played are opened by the tracker and never
+reach the consumer. All three sixteenths takes lose their pitch-class gate,
+which is the 107ms subdivision against 85ms windows: "the region found one event
+here" is not a claim those windows can make at that spacing.
+
+The second column is the interesting one. Restricting the merge to absorb only
+Notes whose `trigger` is not `"attack"` — a discriminator already recorded, no
+new constant, and precisely the retrospective evidence the fragment's own
+history offers — cuts the losses from 222 to 14. It does not rescue the
+direction: it now trades **14 extra Notes for 14 missed labels, one for one**,
+and the per-fixture breakdown shows the two happening in the same places.
+
+```
+  fixture                                        split      extras     missed
+  same-pitch-eighths-sixteenths-e5-120bpm-di     21 -> 19   21 -> 19   21 -> 24
+  same-pitch-eighths-sixteenths-e5-120bpm-amped  29 -> 27   37 -> 34   16 -> 20
+  same-pitch-eighths-a3-120bpm-amped             56 -> 55   60 -> 59    9 -> 12
+  lead-line-amped-sixteenths-e-fsharp-140bpm      4 -> 3     6 -> 5    13 -> 15
+  lead-line-di-sixteenths-e-fsharp-140bpm         —          —          6 -> 8
+```
+
+It also introduces an informational gate failure on
+`lead-line-amped-sixteenths-e-fsharp-140bpm` (pitch class) that baseline does
+not have. Both variants reverted; `src/` is unchanged by this pass.
+
+### What this establishes
+
+The brief asked whether the **retrospective** question ("that fragment already
+happened — with its full duration, its decay, and whether it carried its own
+attack witness, was it one?") sits on the better side of the 0.73 AUC ceiling
+that eight experiments put on the **prospective** one. On this evidence it does
+not. The most conservative retrospective rule available — absorb only where the
+fast lane witnessed no fresh energy whatsoever, over a span the region lane
+positively called one event — still cannot tell which of two same-pitch Notes
+the player did not play. It gives back a real note for every phantom it removes.
+
+That is a stronger statement than "regionMerge does not pay for itself", and it
+is worth not re-deriving: the extra evidence a fragment's own history carries is
+not the missing ingredient. The signal-path result from DECISION-026 says where
+the missing ingredient is instead — split rates go 8% → 71%, 3% → 30% and 7% →
+50% between the DI and amped renders of the *same performance*, so whatever
+separates a real re-pick from a spurious boundary survives a direct input and
+collapses under compression. A witness that survives compression is the open
+problem, and it is an onset-feature question, not a segmentation-bookkeeping one.
+
 ## Lessons carried over from the retired lineage
 
 DECISION-023 closed the pre-rewrite `src/core/` lineage on its held-out numbers.

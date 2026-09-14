@@ -7,6 +7,79 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-027]: Forward absorption is refused; the split-shape instruments are repaired
+* **Date:** 2026-09-14
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** One played event is emitted as a correctly-named Note followed by
+  a same-pitch fragment. `docs/DETECTION-FINDINGS.md` concluded this is "a
+  same-pitch boundary inside one event, not a name arriving late", and that
+  absorption reaches backward only — `absorbArticulationFragment()` and
+  `absorbAttackFragments()` both move a survivor's START back, while the one
+  mechanism that could extend a survivor's END over a following Note,
+  `mergeWithinSegment()`, is gated behind `deep.regionMerge`, false on a measured
+  negative taken over 78 derivation events. DECISION-026 landed 1,136 events of
+  material that is nothing but this phenomenon, making the question answerable at
+  a scale the corpus could not previously reach.
+* **Decision:** **Reject forward absorption on the current feature set, and fix
+  the instruments that were hiding the defect's size.** Two measurements, each
+  with its falsifier named in advance (missed labels must not rise above 161;
+  splits and extras must both fall). Enabling `deep.regionMerge` takes splits
+  336 → 234 and extras 403 → 264, and missed labels **161 → 383** — 139 fewer
+  phantom Notes for 222 lost played ones, with `opened but never emitted` going
+  0 → 184 in the ledger. Restricting it to absorb only Notes whose `trigger` is
+  not `"attack"` — a discriminator already recorded, introducing no constant —
+  cuts the loss to 14, and then trades **14 extras for 14 misses, one for one**,
+  in the same fixtures and the same places, while adding an informational
+  pitch-class gate failure on `lead-line-amped-sixteenths`. Both reverted; `src/`
+  is unchanged. Separately, `measure-split-shape.ts` is repaired and
+  `measure-tail-fragments.ts` added, because the existing instrument could not
+  report the shape it was built to find: its two name tests were ordered
+  previous-name first, and on same-pitch material both tests pass, so
+  `same pitch twice` was unreachable — 18 reported corpus-wide where the correct
+  ordering gives **113**. Its `predecessor's own` bucket additionally uses a 45ms
+  window against amped labels carrying up to 65ms of placement offset, which is
+  documented rather than retuned since the labels are read-only.
+* **Alternatives Considered:** (a) **Suppress the fragment at announcement**
+  rather than retract it — rejected without measurement: it decides on strictly
+  less evidence than the retrospective test that has just been refuted, and it is
+  the prospective fast-lane decision that eight converging experiments already
+  put a 0.73 AUC ceiling on. (b) **Announce then retract via `structuralRevision`
+  with `relation: "absorbed"`** — the protocol exists and `mergeWithinSegment()`
+  already emits exactly this, so the API question is moot until a rule can decide
+  correctly; nothing was learned that requires `docs/API.md` or
+  `docs/NOTE-MODEL.md` to change. (c) **Delay the survivor's `noteEnded` past an
+  absorption window** — rejected for the same reason and at a real latency cost
+  in a real-time library. (d) **Tune a new constant** — refused: the derivation
+  set holds about seven same-pitch re-articulations, all in one take, and the only
+  material that exercises this phenomenon is DECISION-026's, which is deliberately
+  unassigned. Fitting anything on it would pre-empt that assignment and leak.
+  (e) **Retune `OWN_ONSET_MS` so `predecessor's own` stops absorbing late labels**
+  — rejected as fitting a diagnostic to the answer; documented instead.
+* **Consequences:** Positive — the defect's size is now measurable. It is six
+  times larger than reported (113 rather than 18 `same pitch twice`), and on an
+  instrument that reads no label onset at all, **294 of 318 extra Notes are
+  same-pitch and contiguous and none are detached**, rising to 175 of 175 on the
+  same-pitch fixtures. The backward-only claim is confirmed by reading and the
+  absence is the proximate cause. Most valuably, the retrospective question is
+  now answered rather than assumed: a fragment's full duration, its decay and its
+  own attack witness are **not** enough to tell which of two same-pitch Notes the
+  player did not play, so the retrospective framing does not sit on the better
+  side of the ceiling. Negative — the tail fragment still ships, and a consumer
+  scoring one target per pick still pays for it. Also negative: the median
+  shortest Note in a split event is 93ms, above both `tracking.minStableMs` (55)
+  and `deep.minSegmentMs` (90), so no threshold already in the engine can be
+  raised past these fragments. **What this leaves as the open question** is
+  DECISION-026's own headline — split rates go 8% → 71%, 3% → 30% and 7% → 50%
+  between the DI and amped renders of one performance — which locates the missing
+  evidence in the onset features, not in segmentation bookkeeping: a witness that
+  survives compression and distortion. **Two decisions this pass deliberately did
+  not take, both the owner's:** assigning the DECISION-026 material to derivation
+  or held-out, and reviewing its provisional labels. Everything above is reported
+  on the corpus as it stands, and no constant was fitted to any of it.
+
+---
+
 #### [DECISION-026]: Land the 120bpm same-pitch material with generated labels, unconfigured and unassigned
 * **Date:** 2026-09-14
 * **Status:** Proposed

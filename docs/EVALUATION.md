@@ -47,7 +47,7 @@ as not applicable rather than failed.
 ## What is good and what is not
 
 **Good.** Every chord fixture on every signal path finds all of its labels. Onset timing is well
-inside its gates — of the fourteen takes that score it, seven have a median absolute error under
+inside its gates — of the 22 takes that score it, eight have a median absolute error under
 25ms and the worst is 107ms against a 120ms limit. Pitch class on the required lead fixture is
 92.9%.
 

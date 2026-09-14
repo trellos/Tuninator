@@ -152,6 +152,34 @@ spurious boundary is surviving a direct input and collapsing under compression
 and distortion. It also fits the standing measurement that attack contrast varies
 2.0×–24.2× across the corpus and up to 106× within one take.
 
+### What SHAPE those splits are
+
+Measured in DECISION-027, on an instrument that reads no label onset —
+`measure-tail-fragments.ts`, added because this material's amped labels carry up
+to 65ms of placement offset and the existing shape classifier's buckets are 45ms
+wide:
+
+| fixture | extras | same pitch, contiguous | detached | other pitch |
+|---|---|---|---|---|
+| `same-pitch-quarters-a3-e5-120bpm-amped` | 63 | **63** | 0 | 0 |
+| `same-pitch-eighths-a3-120bpm-amped` | 53 | **53** | 0 | 0 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 36 | **36** | 0 | 0 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 19 | **19** | 0 | 0 |
+| `same-pitch-eighths-a3-120bpm-di` | 3 | **3** | 0 | 0 |
+| `same-pitch-quarters-a3-e5-120bpm-di` | 1 | **1** | 0 | 0 |
+
+Every extra Note on all six, without exception, is at the label's own pitch
+class and butted against its neighbour. This material does exactly what it was
+recorded to do. Note also that the median SHORTEST Note in a split event across
+the corpus is 93ms — above `tracking.minStableMs` (55) and `deep.minSegmentMs`
+(90) — so these are not sub-threshold blips.
+
+Beware `measure-split-shape.ts` on this material specifically: until
+DECISION-027 it tested the previous label's name before the label's own, which
+makes its `same pitch twice` bucket unreachable whenever consecutive labels
+share a pitch — which here is almost every label. It reported one such split on
+a 184-label take where all 184 labels are A3.
+
 Two cautions before building on these numbers. The labels are provisional, and
 the amped labels carry the most `verify-fixtures.ts` concerns — though note the
 timings are identical to the DI ones, so the 8-vs-60 gap on one performance
