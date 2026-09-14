@@ -121,6 +121,42 @@ timings, and the two renders are time-aligned: first-audible differs by 50ms on
 Three labels are flagged as unsupported by the audio, all in the A3 eighths take
 (`e882`, `e899`, `e8100`) — the same take whose structure is in question below.
 
+## What the recognizer does on it today
+
+`npx tsx scripts/measure-splits.ts`, with the material landed and nothing in
+`src/` changed:
+
+| fixture | labels | split | extras | worst |
+|---|---|---|---|---|
+| `same-pitch-quarters-a3-e5-120bpm-di` | 72 | 6 | 6 | 2 |
+| `same-pitch-quarters-a3-e5-120bpm-amped` | 72 | **51** | **81** | 4 |
+| `same-pitch-eighths-a3-120bpm-di` | 128 | 11 | 11 | 2 |
+| `same-pitch-eighths-a3-120bpm-amped` | 128 | **85** | **95** | 3 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 192 | 21 | 21 | 2 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 192 | 29 | 37 | 3 |
+| `held-then-picked-six-strings-120bpm-di` | 120 | 8 | 8 | 2 |
+| `held-then-picked-six-strings-120bpm-amped` | 120 | **60** | **77** | 5 |
+
+Corpus total moves from 99 of 459 events split to **370 of 1483, 443 extra
+Notes**.
+
+**The signal path dominates.** These are pairs: the same performance, the same
+label timings, differing only in whether the capture is direct or through an amp
+sim. Split rates go 8% → 71% on the quarters take, 9% → 66% on the A3 eighths,
+and 7% → 50% on held-then-picked. Up to five Notes on a single played event.
+
+That is a sharper statement of the problem than the corpus could previously
+make, and it points somewhere specific: whatever separates a real re-pick from a
+spurious boundary is surviving a direct input and collapsing under compression
+and distortion. It also fits the standing measurement that attack contrast varies
+2.0×–24.2× across the corpus and up to 106× within one take.
+
+Two cautions before building on these numbers. The labels are provisional, and
+the amped labels carry the most `verify-fixtures.ts` concerns — though note the
+timings are identical to the DI ones, so the 8-vs-60 gap on one performance
+cannot be a labelling difference. And `same-pitch-eighths-a3` has an open
+structural question below.
+
 ## What still needs confirming
 
 Two places where the audio does not match what was described. Both need the
