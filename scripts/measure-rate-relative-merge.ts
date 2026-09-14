@@ -706,6 +706,24 @@ function main(): void {
       spurious.map((c) => c.dipRatio)
     ).toFixed(3)}   (spurious score HIGH here, so the arguments are swapped)\n`
   );
+  // THE CEILING. With a PERFECT rate the gate is bounded by this; anything a
+  // better estimator could buy lies between the causal rows and these.
+  console.log("  CEILING: the same gate with an ORACLE rate, which no causal estimator can have\n");
+  for (const dip of [0.7, 0.85]) {
+    for (const bar of [0.35, 0.5, 0.7, 0.9]) {
+      report(
+        `ORACLE fragment/IOI <= ${bar.toFixed(2)} AND dip >= ${dip.toFixed(2)}`,
+        (c) => c.fragmentMs / c.oracleIoiMs <= bar && c.dipRatio >= dip
+      );
+    }
+    console.log("");
+  }
+  // And with no dip condition at all, to show what the dip is costing in reach.
+  for (const bar of [0.5, 0.7, 0.9]) {
+    report(`ORACLE fragment/IOI <= ${bar.toFixed(2)}, no dip condition`, (c) => c.fragmentMs / c.oracleIoiMs <= bar);
+  }
+  console.log("");
+
   console.log("  THE SIMPLER IMPLEMENTATION: fragment never announced, predecessor NOT stretched\n");
   const reportNoExtend = (name: string, gate: (c: Candidate) => boolean): void => {
     const d = endToEnd(takes, gate, (t) => t.derivation, false);

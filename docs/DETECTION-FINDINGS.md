@@ -4740,6 +4740,35 @@ decision rejected does not: `AttackEvidence.dipRatio` is now load-bearing, and
 the `rearticulationDipRatio` bar that scored one-real-note-per-phantom on its
 own is removed rather than left inert.
 
+### The ceiling of this lever, measured on top of the shipped change
+
+Asked afterwards, because the obvious next move is a better tempo estimator and
+it is worth knowing what one could buy. The rate was replaced with the oracle —
+the median gap between the LABELS around each candidate, which no causal
+detector can have — and the same gate re-run over the corpus as it now stands.
+Derivation false positives, against the post-change baseline of 232:
+
+| gate | derivation fp | derivation missed |
+|---|---|---|
+| shipped, estimated rate, span 0.35, dip 0.85 | **-35** | **+0** |
+| ORACLE rate, span 0.35, dip 0.85 | -49 | +3 |
+| ORACLE rate, span 0.50, dip 0.85 | -72 | +5 |
+| ORACLE rate, span 0.70, dip 0.85 | -84 | +37 |
+| ORACLE rate, span 0.50, no dip condition | -172 | +24 |
+| ORACLE rate, span 0.90, no dip condition | -193 | +365 |
+
+**A perfect clock is worth about twice the reach and it is no longer free.** The
+last row bounds the whole lever: even removing every fragment short for the pace
+caps out near -193 on derivation, and the cost curve is vertical long before it.
+Tempo estimation is therefore not where the remaining phantoms are, and a future
+attempt should not start by building a better one.
+
+What the same run says is where they are: on this population fragment span over
+the true rate scores **0.926** AUC and the dip that gates it scores **0.636**. A
+gate is as wide as its weaker half, and every boundary witness this project has
+measured sits at or below 0.70. **The second witness is the binding constraint,
+not the clock.**
+
 ### What this does not do
 
 The amp-sim takes still carry most of the defect — `held-then-picked-amped` is
