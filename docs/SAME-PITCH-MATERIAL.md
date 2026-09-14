@@ -200,34 +200,38 @@ re-timing could not locate.
 
 ## What the recognizer does on it today
 
-`npx tsx scripts/measure-splits.ts`, with nothing in `src/` changed since the
-material landed. Where a cell differs from the DECISION-026 snapshot it is
-because the labels moved (the 2026-09-14 passes), not the recognizer; the
-snapshot values are in parentheses:
+`npx tsx scripts/measure-splits.ts`, as of now. Two things have moved these
+cells since the DECISION-026 snapshot: the labels (the 2026-09-14 passes, which
+change which Note is assigned to which event) and DECISION-030's rate-relative
+fragment bar, which is the first engine change to touch this material:
 
 | fixture | labels | split | extras | worst |
 |---|---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-di` | 72 | 6 | 6 | 2 |
-| `same-pitch-quarters-a3-e5-120bpm-amped` | 72 | **51** | **81** | 4 |
-| `same-pitch-eighths-a3-120bpm-di` | 184 | 5 (6) | 5 (6) | 2 |
-| `same-pitch-eighths-a3-120bpm-amped` | 183 | **56** | **61** (60) | 4 (3) |
-| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 192 | 23 (21) | 23 (21) | 2 |
-| `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 190 | 30 (29) | 38 (37) | 3 |
+| `same-pitch-quarters-a3-e5-120bpm-amped` | 72 | **50** | **78** | 4 |
+| `same-pitch-eighths-a3-120bpm-di` | 184 | 5 | 5 | 2 |
+| `same-pitch-eighths-a3-120bpm-amped` | 183 | **55** | **60** | 4 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 192 | 23 | 23 | 2 |
+| `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 190 | **26** | **34** | 3 |
 | `held-then-picked-six-strings-120bpm-di` | 120 | 8 | 8 | 2 |
-| `held-then-picked-six-strings-120bpm-amped` | 120 | **61** (60) | **78** (77) | 5 |
+| `held-then-picked-six-strings-120bpm-amped` | 120 | **48** | **60** | 5 |
 
-Corpus total moved from 99 of 459 events split to 336 of 1595, 403 extra Notes,
-when the material landed; on the current labels it reads **339 of 1592, 407
-extra Notes**. The `e5-di` movement (21 → 25 → 23) is the labels getting closer
-to the picks and the assignment changing with them — a more accurate
-measurement, not a regression.
+Corpus total moved from 99 of 459 events split to 336 of 1595, 403 extra Notes
+when the material landed. On the current labels, and with DECISION-030's
+rate-relative fragment bar in the engine, it reads **318 of 1592, 379 extra
+Notes**. Two separate things moved it. The labels got closer to the picks, which
+changes which Note is assigned to which event (`e5-di` went 21 → 25 on re-timing
+and back to 23 after the listening pass) — a more accurate measurement, not a
+regression. Then DECISION-030 removed 28 extra Notes corpus-wide for no missed
+label, which is most of the `held-then-picked-amped` and `e5-amped` movement in
+the table above.
 
 **The signal path dominates.** These are pairs: the same performance, differing
 only in whether the capture is direct or through an amp sim (the label timings
 are identical on `quarters`, 15ms apart on `held-then-picked`, and on the two
 fast takes the amped file is a separately-anchored grid — see "How the labels
-were made"). Split rates go 8% → 71% on the quarters take, 3% → 30% on the A3
-eighths, and 7% → 50% on held-then-picked. Up to five Notes on a single played
+were made"). Split rates go 8% → 69% on the quarters take, 3% → 30% on the A3
+eighths, and 7% → 40% on held-then-picked. Up to five Notes on a single played
 event.
 
 That is a sharper statement of the problem than the corpus could previously

@@ -474,6 +474,50 @@ export type EngineConfig = {
      * buzz and the tail of the previous chord look like.
      */
     minUnpitchedStableMs: number;
+    /**
+     * How long a suspected same-pitch tail fragment must last to be announced,
+     * as a fraction of the LOCAL note rate.
+     *
+     * Applies only to a Note opened by a same-pitch re-articulation whose
+     * boundary showed no envelope dip (`rateFragmentDipRatio`). Such a Note is
+     * announced only once it has sounded for this fraction of the interval
+     * currently being played; one that dies first is dropped by `end()` as a
+     * Note that never cleared its bar, which is machinery that already exists.
+     *
+     * **Why the rate has to be in it.** The defect is one played note emitted
+     * as a correctly-named Note plus a same-pitch fragment butted against it.
+     * Every fixed-duration bar tried against that failed, because the fragment
+     * is 93ms at the corpus median and a real sixteenth at 140bpm is 107ms —
+     * the two populations are not separable in absolute time, and a bar of 80
+     * or 100ms costs 77 and 173 played notes. Relative to the local interval
+     * they separate well: measured over 1,237 same-pitch re-articulations,
+     * fragment span over the true local interval scores 0.905 AUC against 0.788
+     * for the span alone. A phantom is short BECAUSE it is a piece of one note;
+     * a real note is a note long at whatever pace is being played.
+     *
+     * 0.35 is the largest value that costs zero missed labels on the derivation
+     * material (0.40 costs two). Held out, it costs none either and removes
+     * four spurious Notes. See DECISION-029 and the findings entry.
+     */
+    rateFragmentSpanFraction: number;
+    /**
+     * How little the envelope may have fallen before a boundary for the Note it
+     * opens to be treated as a suspected fragment.
+     *
+     * `AttackEvidence.dipRatio` near 1 means nothing fell: the transient landed
+     * inside a note still sounding at full strength, which is what an invented
+     * boundary looks like and what a real re-pick does not. It is the second,
+     * INDEPENDENT witness here — one reads energy, the other reads time — and
+     * the pair is what makes the rule free. The rate test alone at any useful
+     * bar costs a played note on `lead-line-di-sixteenths`; with this condition
+     * added it costs none anywhere, because the fragments it then removes are
+     * only those that are both too short for the pace AND sit on a boundary
+     * with no gap under it.
+     *
+     * Deliberately high. At 0.85 the rule fires on a quarter of the candidates
+     * it would at 0.5, and takes no labels with it at any span bar tried.
+     */
+    rateFragmentDipRatio: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -791,6 +835,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   tracking: {
     minStableMs: 55,
     minUnpitchedStableMs: 90,
+    rateFragmentSpanFraction: 0.35,
+    rateFragmentDipRatio: 0.85,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

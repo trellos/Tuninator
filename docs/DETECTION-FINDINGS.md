@@ -4590,6 +4590,167 @@ on are `verify-fixtures.ts` (run with the `b5cf94b` labels substituted in
 memory, the tree untouched) and `retime-gridded-labels.ts` (run against the
 `b5cf94b` labels with output redirected away from `fixtures/`).
 
+## A tail fragment is short FOR THE PACE: the first gate that costs nothing
+
+DECISION-028 closed the per-boundary threshold family and named what it thought
+came next: "what a listener uses on this material is not one number at one
+boundary — it is four evenly spaced events carrying the same envelope shape,
+which is a claim about a SEQUENCE." This is that claim, built, measured and
+shipped. It is the first change in this line that removes phantom Notes at
+**zero cost in played ones**.
+
+### The measurement that reopened it
+
+`measure-restrike-oracle.ts` had already found the discriminator and then hidden
+it. Its candidates had to end "by a pitch step", and on the same-pitch material
+— where 294 of the corpus's 318 same-pitch contiguous extras live — the next
+event is the SAME pitch, so almost none qualified: 218 candidates against a
+corpus carrying 407 extra Notes. `measure-rate-relative-merge.ts` widens the set
+to every Note opened by an accepted, settled, same-pitch re-articulation, which
+is 1,237 decisions, 408 of them spurious.
+
+On that population the discriminator is much stronger than anything previously
+measured here:
+
+```
+  fragment span / true local interval   AUC 0.905
+  fragment span alone (control)         AUC 0.788
+  pair span / true local interval       AUC 0.867
+  boundary age / true local interval    AUC 0.666
+  dipRatio at the boundary              AUC 0.616
+```
+
+For scale, the whole of DECISION-028 ran on witnesses topping out at 0.698, and
+its best new one, the envelope dip, reached 0.763. The reason the rate matters
+is visible in the raw distributions: the spurious fragments sit at a median 1.01
+of a local interval when you measure the PAIR they form with their predecessor,
+and the real ones at 1.98. One played note split in two, against two played
+notes. The corresponding absolute numbers do not separate at all — the median
+spurious fragment is 93ms and a real sixteenth at 140bpm is 107ms, which is why
+a bar of 80ms costs 77 played notes and one of 100ms costs 173.
+
+### The estimator is the binding constraint, and the failure is one-directional
+
+Replacing the true rate with one the engine could actually hold — the median of
+the last eight gaps between Note openings — drops the same test from 0.905 to
+0.805, barely above the no-rate control. That gap is the circularity: a phantom
+INSERTS an onset, which splits one true interval into two short ones, so the
+estimate is corrupted by exactly the errors it exists to correct.
+
+Three repairs were measured and only the last matters.
+
+| repair | result |
+|---|---|
+| upper percentile of the recent gaps | AUC 0.805 -> 0.829; bias fixed (reads fast on 396 of 1171 rather than 753); end-to-end trade no better |
+| autocorrelation of the audio envelope | **failed**: envelope/true spreads 0.31 (p25) to 2.02 (p75), octave errors both ways, AUC 0.622 |
+| two-pass — strict merge, re-read the rate from survivors | +2 missed for -32 false positives; no better than one pass |
+
+The audio-side estimator is worth recording as a negative, because it is the
+obvious idea: read the pace from the signal, where no segmentation error can
+reach it. `docs/SAME-PITCH-MATERIAL.md` already says why it cannot be trusted —
+"in the E5 take the strongest envelope periodicity sits at the note period,
+while in the A3 take it sits at twice it, on the accent" — and taking the
+shortest qualifying lag rather than the strongest did not rescue it.
+
+What does make the estimator safe is an asymmetry rather than an accuracy. A
+missed onset merges two intervals and can only make a gap LONGER; a phantom
+splits one and can only make it SHORTER. The bar is a FRACTION of the interval,
+so a long reading raises it and suppresses real notes while a short reading
+merely does less. Only one of the two errors is dangerous.
+
+### The second witness is what makes it free
+
+The rate test alone, at every bar worth having, costs one played note on
+`lead-line-di-sixteenths` — hand-labelled held-out data at 107ms spacing, where
+a real note and a fragment are genuinely the same length. Adding the envelope
+dip as a second, INDEPENDENT condition — one reads time, the other energy —
+removes that cost entirely:
+
+```
+  DERIVATION (bar chosen here)                     HELD OUT (reported after)
+  fragment/rate <= 0.30 AND dip >= 0.85   +0 missed, -27 fp     +0 missed, -3 fp
+  fragment/rate <= 0.35 AND dip >= 0.85   +0 missed, -35 fp     +0 missed, -4 fp
+  fragment/rate <= 0.40 AND dip >= 0.85   +2 missed, -40 fp     +0 missed, -4 fp
+```
+
+0.35 is the last bar that costs nothing on derivation; 0.40 costs two. The dip
+bar of 0.85 is deliberately high — at 0.5 the rule fires four times as often and
+takes labels with it at every span bar tried.
+
+### Shipped as an announce bar, not a retraction
+
+The fragment's own span is only known once it has ended, so the obvious
+implementation is a deep-lane retraction: announce the Note, then withdraw it
+with `structuralRevision` / `relation: "absorbed"`. Measured against the far
+simpler alternative — never announce it at all, and let `end()` discard it as a
+Note that failed its bar, which is machinery that already exists — the two give
+**identical** numbers (DERIV +0 missed / -35 fp; HELD-OUT +0 / -4). So the
+simple one ships. A suspected fragment is announced only once it has outlasted
+`tracking.rateFragmentSpanFraction` of the local interval; latency is paid only
+on a boundary that is doubtful in both witnesses at once, and at sixteenth
+spacing the computed bar falls below `minStableMs` and the rule is inert.
+
+### The bench lied, twice, and the pipeline caught it
+
+Worth recording in full, because this repository has now hit "a bench ranking is
+not a pipeline ranking" five times and two of them are in this entry.
+
+The offline simulation predicted -43 emitted Notes and zero missed labels. The
+first engine build gave **-25 extras and a NEW informational failure**, on
+`lead-line-amped-sixteenths`'s pitch-class gate. Simulating a merge on a
+detection list assumes the rest of the pipeline is unchanged, and it is not:
+refusing to announce a Note changes what the tracker has open, what the deep
+lane re-segments, and what absorbs what.
+
+Diagnosis by instrument rather than by hypothesis, after two guesses had already
+failed. The suppressed Note was `n3` on that take: 147ms long, real, and killed
+by a bar of 175ms. 175 is `0.35 x 500`, and 500 was the estimator's FALLBACK —
+a whole note at 120bpm, applied at 3.7s into a take playing 107ms sixteenths,
+before any gap had been measured. Every percentile of the estimator failed
+identically because at the start of a take none of them has a gap to read. **The
+fix is to abstain**: the rule's claim is "shorter than a note at the pace
+currently being played", and with no pace measured there is no such claim, so
+`localIoiMs` returns null and the bar is left alone. Removing that one fallback
+took the corpus from 320 splits with a regression to 318 with none.
+
+### End to end
+
+Measured with the labels as of the same day's listening pass, `npm run eval`
+PASS with the single pre-existing informational failure
+(`power-chords-b-a-g-fsharp-b-a-g-e-140bpm`), 499 tests passing, and
+`fixtures/` untouched.
+
+| | before | after |
+|---|---|---|
+| missed labels | 159 | **159** |
+| false positives | 346 | **314** |
+| events split | 339 | **318** |
+| extra Notes | 407 | **379** |
+| detections | 1779 | 1747 |
+| `clean-lead` gated pitch class | 92.9% | 92.9% |
+
+Per fixture, where it moved: `held-then-picked-amped` 61 -> 48 split and 78 ->
+60 extras, `same-pitch-eighths-sixteenths-e5-amped` 30 -> 26 and 38 -> 34,
+`same-pitch-eighths-a3-amped` 56 -> 55, `same-pitch-quarters-amped` 51 -> 50,
+`lead-line-amped-quarter-eighth-triplet` 26 -> 25, `lead-line-mic-quarter-eighth-triplet`
+14 -> 13. Nothing regressed on any fixture.
+
+The envelope dip from DECISION-028 ships as a WITNESS here while the gate that
+decision rejected does not: `AttackEvidence.dipRatio` is now load-bearing, and
+the `rearticulationDipRatio` bar that scored one-real-note-per-phantom on its
+own is removed rather than left inert.
+
+### What this does not do
+
+The amp-sim takes still carry most of the defect — `held-then-picked-amped` is
+48 of 120 events split after this, against 8 of 120 on the direct render of the
+same performance. The rule removes the fragments that are short for the pace and
+sit on a boundary with no gap under it; it says nothing about a fragment that is
+a full note long, and DECISION-026's headline gap between signal paths is
+unchanged in kind. What has changed is that the sequence framing is no longer a
+hypothesis: it is measured at 0.905 against 0.698 for everything read at the
+boundary, and the first gate built on it costs nothing.
+
 ## Lessons carried over from the retired lineage
 
 DECISION-023 closed the pre-rewrite `src/core/` lineage on its held-out numbers.

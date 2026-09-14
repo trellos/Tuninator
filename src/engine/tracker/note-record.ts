@@ -352,12 +352,28 @@ export class NoteRecord {
     return Math.max(this.lastVoicedAt, this.lastAudibleAt) - from;
   }
 
+  /**
+   * A raised announce bar for a Note that may be a same-pitch tail fragment.
+   *
+   * Set by the tracker at `begin()`, and only for a Note opened by a same-pitch
+   * re-articulation whose boundary showed no envelope dip — that is, a boundary
+   * that landed inside something still sounding at full strength. The value is
+   * a fraction of the LOCAL note rate, so the claim it encodes is "this is
+   * shorter than a note at the pace currently being played", not "this is
+   * shorter than N milliseconds". Zero for every other Note, which is all of
+   * them on material that is not same-pitch.
+   *
+   * See `tracking.rateFragmentSpanFraction` for why the rate has to be in it.
+   */
+  rateFragmentBarMs = 0;
+
   /** The bar this Note has to clear to be announced. See the config comments. */
   get announceThresholdMs(): number {
     const pitched = this.lastVoicedAt > this.startTime || this.harmonyBloomed;
-    return pitched
+    const base = pitched
       ? this.config.tracking.minStableMs
       : this.config.tracking.minUnpitchedStableMs;
+    return Math.max(base, this.rateFragmentBarMs);
   }
 
   get durationMs(): number {

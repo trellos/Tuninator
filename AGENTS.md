@@ -129,6 +129,8 @@ DERIVATION (every tuned constant comes from here, and only here)     78 events
   chords-a-bm-g-d-2x-120bpm, clean-lead-120bpm,
   cowboy-chords-c-d-em-g-c-d-em-am-120bpm, power-chords-c-a-g-e-c-d-fsharp-e-120bpm,
   spicy-chords-cmaj9-g-am11
+  + the eight 120bpm same-pitch takes, assigned as calibration material by
+    DECISION-028. See the paragraph below: they are derivation, not held out.
 
 HELD OUT (scored every run, never fitted)                           381 events
   four Les Paul performances x three signal paths (DI / amp sim / room mic):
@@ -139,10 +141,17 @@ The held-out set is four performances heard three ways, not twelve independent
 samples — keep that in mind before treating a twelve-take result as more
 statistically solid than it is.
 
-**Eight further fixtures sit in neither column yet.** The 120bpm same-pitch
-material (DECISION-026) — four takes, DI and amped, 1,134 events — was recorded
-to answer DECISION-022, and is deliberately landed unassigned, with no
-`eval.config.json` entries and with generated labels that are still
+**Eight further fixtures are CALIBRATION material, and gate nothing.** The
+120bpm same-pitch material (DECISION-026) — four takes, DI and amped, 1,134
+events — was recorded to answer DECISION-022, and the owner has since assigned
+it as calibration material (DECISION-028), which is what makes any sweep on the
+same-pitch decision derivable at all: the five originals above hold about seven
+instances of the phenomenon, all in one take, and are flat across every constant
+ever tried on it. **So "derivation" now means the five originals PLUS these
+eight**, and the twelve 140bpm takes remain the held-out set — DECISION-030's
+two bars were chosen on that combined set and the held-out figures read only
+afterwards. They still carry no
+`eval.config.json` entries and generated labels that are still
 PROVISIONAL: the player has reviewed fifteen points by ear, and the two gridded
 DI sections were re-timed against the audio and validated (DECISION-029), but
 the amped renders of the two fast takes are still on their own grids and one DI
@@ -199,6 +208,17 @@ any further reading of that ceiling seriously. Three briefs
 `docs/learned-onset-head-prompt.md`) have all been run to their verdicts and
 carry status banners saying so — read them before re-deriving the same
 conclusions, not as work to pick up.
+
+**What did finally move it (DECISION-030)** is the one framing those studies all
+lacked: judging a fragment against the LOCAL NOTE RATE rather than against a
+fixed duration. Every witness read AT the boundary tops out at 0.698 AUC and the
+best absolute-duration bar costs 77 played notes; a fragment's span over the
+local inter-onset interval scores 0.905, and a gate built on it with the
+envelope dip as a second witness takes the corpus from 339 events split to 318
+and 407 extra Notes to 379 **with missed labels unchanged at 159**. Before
+proposing anything on this decision, read that entry: the ceiling results above
+are about single numbers at single boundaries, and they do not bound a claim
+about a sequence.
 
 ### `docs/archive/` — closed lines of work
 

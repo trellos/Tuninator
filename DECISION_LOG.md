@@ -7,6 +7,73 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-030]: A same-pitch fragment is judged against the local note rate, not against a fixed duration
+* **Date:** 2026-09-14
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** DECISION-028 closed the per-boundary threshold family — every
+  witness available at the decision tops out at 0.698 AUC, the new envelope dip
+  reaches 0.763, and at roughly five real re-picks per phantom a 0.78 witness
+  removes about one played note per phantom. It named the opening rather than a
+  fix: "what a listener uses on this material is not one number at one boundary
+  — it is four evenly spaced events carrying the same envelope shape, which is a
+  claim about a SEQUENCE." Separately, the owner pressed the point that the
+  session had produced analysis rather than accuracy. The defect is stereotyped:
+  294 of 318 extra Notes are at the label's own pitch class and butted against
+  their neighbour, and the median shortest Note in a split event is 93ms.
+* **Decision:** **Ship the sequence claim as an announce bar.** A Note opened by
+  a same-pitch re-articulation whose boundary showed no envelope dip
+  (`dipRatio >= tracking.rateFragmentDipRatio`, 0.85) must outlast
+  `tracking.rateFragmentSpanFraction` (0.35) of the LOCAL inter-onset interval
+  before it is announced; one that dies first is discarded by `end()` as a Note
+  that never cleared its bar. Measured over 1,237 same-pitch re-articulations,
+  fragment span over the true local interval scores **0.905 AUC** against 0.788
+  for the span alone and 0.698 for everything read at the boundary. End to end:
+  **missed labels 159 -> 159, false positives 346 -> 314, events split 339 ->
+  318, extra Notes 407 -> 379**, eval PASS with the one pre-existing
+  informational failure, `clean-lead` gated pitch class unchanged at 92.9%, 499
+  tests passing, `fixtures/` untouched. It is the first gate in this line that
+  removes phantom Notes at zero cost in played ones. 0.35 is the largest span
+  bar costing nothing on the derivation material (0.40 costs two); held-out was
+  reported only after the bar was fixed and costs nothing either.
+* **Alternatives Considered:** (a) **A fixed-duration bar** — refuted by the
+  populations: the median spurious fragment is 93ms and a real sixteenth at
+  140bpm is 107ms, so 80ms costs 77 played notes and 100ms costs 173. (b) **The
+  rate test alone** — costs one played note on `lead-line-di-sixteenths`,
+  hand-labelled held-out data at 107ms spacing where fragment and note are the
+  same length; the dip as a second, independent witness removes that cost
+  entirely, which is why both ship. (c) **A deep-lane retraction** (announce,
+  then withdraw via `structuralRevision` / `relation: "absorbed"`) — measured to
+  give identical numbers to simply never announcing, so the far simpler
+  mechanism ships. (d) **Estimating the rate from the audio envelope's own
+  periodicity**, to break the circularity at the source — measured and rejected:
+  envelope-over-truth spreads 0.31 to 2.02 across the quartiles with octave
+  errors both ways, dropping the test to 0.622 AUC. `docs/SAME-PITCH-MATERIAL.md`
+  already records why, the A3 take's strongest periodicity sitting at twice the
+  note period. (e) **An upper percentile, and a two-pass re-estimate**, both
+  aimed at the same contamination — each fixed the bias without improving the
+  end-to-end trade. (f) **Keeping DECISION-028's dip GATE** — removed rather than
+  left inert; the witness is load-bearing here, the rejected bar is not.
+* **Consequences:** Positive — 32 fewer false positives and 28 fewer extra Notes
+  for no missed label anywhere, and the sequence framing is now measured rather
+  than proposed: 0.905 against 0.698 for everything read at the boundary. The
+  estimator's error is understood and one-directional, which is what makes the
+  rule safe: a missed onset can only lengthen a gap and a phantom can only
+  shorten one, and only the long reading is dangerous. Negative — the amp-sim
+  takes still carry most of the defect (`held-then-picked-amped` 48 of 120 split
+  against 8 of 120 on the direct render of the same performance), and the rule
+  says nothing about a fragment that is a full note long. **The methodological
+  cost is worth naming:** the offline simulation predicted -43 extras and zero
+  missed labels, and the first engine build delivered -25 with a NEW
+  informational failure on `lead-line-amped-sixteenths`. That was a 500ms
+  FALLBACK rate applied 3.7s into a take playing 107ms sixteenths, before any
+  gap had been measured, which suppressed a real 147ms note under a 175ms bar.
+  Removing the fallback — abstaining when no pace is known — fixed it. Two
+  hypotheses were tried and failed before the instrument was read; that ordering
+  is the mistake, not the fallback.
+
+---
+
 #### [DECISION-029]: Keep the automated re-timing of the two gridded DI sections; the A3 sixteenth section is flagged, not reverted
 * **Date:** 2026-09-14
 * **Status:** Accepted
