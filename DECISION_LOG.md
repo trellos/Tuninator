@@ -50,13 +50,21 @@ are what keep later work from repeating them.
   could not read now exists in quantity, across two signal paths, with
   `held-then-picked` putting one-pick-one-Note and four-picks-four-Notes on
   identical material at six pitches from F#2 to D5. Negative, and the reason the
-  status is Proposed — **the labels are generated and two takes disagree with what
-  was described**: `quarters` runs 10 measures of E5 rather than 8 (pitch switch
-  measured at 17.970s, 32 then 40 evenly spaced notes), and `eighths A3` shows no
-  sixteenth section at all under three independent measures (onset spacing,
-  envelope modulation, envelope autocorrelation), so it is labelled as 16 measures
-  of eighths. Both need the player's confirmation; until then those two label sets
-  are guesses and anything derived from them inherits that. Also recorded: the
+  status is Proposed — **the labels are generated, not annotated by ear.** Both
+  structural questions have since been answered by the player. `quarters` does run
+  10 measures of E5 rather than 8, confirmed twice independently (pitch changes at
+  17.980s after exactly 32 onsets, 40 after, 0.500s spacing throughout).
+  `eighths A3` **does** contain a sixteenth section, from 20.0s, and it is now
+  labelled as 72 eighths plus 112 sixteenths. The earlier claim here that it had
+  no sixteenth section was a false negative from three measurements that shared a
+  premise: the envelope onset rule drops about half the picks in a fast same-pitch
+  run, and the modulation and autocorrelation readings were compared against the
+  E5 take rather than against this take over time — the two are voiced differently,
+  with the strongest periodicity at the note period in one and at twice it in the
+  other. Measured against itself the A3 take does step from a 0.5s peak lag to
+  0.25s at the boundary. The lesson is recorded in `docs/SAME-PITCH-MATERIAL.md`:
+  three statistics agreeing is not three pieces of evidence when they share a
+  premise, and subdivision in this material needs a human listen. Also recorded: the
   derivation/held-out predicate is implemented three different ways across
   `measure-decision-separability.ts`, `measure-same-pitch-population.ts` and
   `measure-dp-segmentation.ts`, and these stems fall on opposite sides of the first

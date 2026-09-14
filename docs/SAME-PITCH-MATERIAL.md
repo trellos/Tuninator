@@ -10,7 +10,7 @@ This material is deliberately nothing but that phenomenon.
 
 > **The labels in this set are PROVISIONAL.** They were generated, not
 > hand-annotated by ear. Read "How the labels were made" before trusting a
-> number computed against them, and see "What still needs confirming".
+> number computed against them, and see "Where the structure came from".
 
 ---
 
@@ -19,7 +19,7 @@ This material is deliberately nothing but that phenomenon.
 | fixture stem | pitch | content | events |
 |---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-{di,amped}` | A3 then E5 | 8 measures of quarter notes on A3, then **10** measures on E5 | 72 |
-| `same-pitch-eighths-a3-120bpm-{di,amped}` | A3 | **16 measures of eighth notes** | 128 |
+| `same-pitch-eighths-a3-120bpm-{di,amped}` | A3 | eighth notes, then sixteenths from 20.0s | 184 |
 | `same-pitch-eighths-sixteenths-e5-120bpm-{di,amped}` | E5 | 8 measures of eighths, then 8 measures of sixteenths | 192 |
 | `held-then-picked-six-strings-120bpm-{di,amped}` | F#2 C3 G3 C4 G4 D5 | per pitch: 4 cycles of [one measure held, one measure of quarter notes] | 120 |
 
@@ -85,7 +85,7 @@ Each take was then **calibrated once** against `verify-fixtures.ts`'s own attack
 search — which is deliberately cruder than, and independent of, the engine's
 spectral flux — by shifting the whole label set so its median offset lands near
 zero, where the rest of the corpus already sits. The shifts were +55ms
-(quarters), +45ms (eighths A3), +30ms (eighths+sixteenths E5) and +80ms
+(quarters), +20ms (eighths A3), +30ms (eighths+sixteenths E5) and +80ms
 (held-then-picked), each derived from the DI render and applied to both, since
 the pair is one performance.
 
@@ -95,8 +95,8 @@ the pair is one performance.
 |---|---|---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-di` | 72 | **0** | −35 | **0** | 25 |
 | `same-pitch-quarters-a3-e5-120bpm-amped` | 72 | 68 | −60 | −35 | 0 |
-| `same-pitch-eighths-a3-120bpm-di` | 128 | 6 | −40 | **10** | 50 |
-| `same-pitch-eighths-a3-120bpm-amped` | 128 | 126 | 40 | 80 | 80 |
+| `same-pitch-eighths-a3-120bpm-di` | 184 | 61 | — | **10** | — |
+| `same-pitch-eighths-a3-120bpm-amped` | 184 | 182 | — | 65 | — |
 | `same-pitch-eighths-sixteenths-e5-120bpm-di` | 192 | 48 | −25 | **0** | 30 |
 | `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 192 | 116 | −5 | 25 | 55 |
 | `held-then-picked-six-strings-120bpm-di` | 120 | **2** | −50 | 50 | 130 |
@@ -118,8 +118,9 @@ read the amped rows as a verdict on the labels. Their timings are the DI
 timings, and the two renders are time-aligned: first-audible differs by 50ms on
 `held-then-picked` and 10ms on `quarters`, with identical file lengths.
 
-Three labels are flagged as unsupported by the audio, all in the A3 eighths take
-(`e882`, `e899`, `e8100`) — the same take whose structure is in question below.
+The A3 eighths take's DI concern count rose from 6 to 61 when its sixteenth
+section was labelled, which is the verifier finding fast quiet picks over a
+ringing note hard to confirm — the same difficulty the take exists to capture.
 
 ## What the recognizer does on it today
 
@@ -130,19 +131,19 @@ Three labels are flagged as unsupported by the audio, all in the A3 eighths take
 |---|---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-di` | 72 | 6 | 6 | 2 |
 | `same-pitch-quarters-a3-e5-120bpm-amped` | 72 | **51** | **81** | 4 |
-| `same-pitch-eighths-a3-120bpm-di` | 128 | 11 | 11 | 2 |
-| `same-pitch-eighths-a3-120bpm-amped` | 128 | **85** | **95** | 3 |
+| `same-pitch-eighths-a3-120bpm-di` | 184 | 6 | 6 | 2 |
+| `same-pitch-eighths-a3-120bpm-amped` | 184 | **56** | **60** | 3 |
 | `same-pitch-eighths-sixteenths-e5-120bpm-di` | 192 | 21 | 21 | 2 |
 | `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 192 | 29 | 37 | 3 |
 | `held-then-picked-six-strings-120bpm-di` | 120 | 8 | 8 | 2 |
 | `held-then-picked-six-strings-120bpm-amped` | 120 | **60** | **77** | 5 |
 
-Corpus total moves from 99 of 459 events split to **370 of 1483, 443 extra
+Corpus total moves from 99 of 459 events split to **336 of 1595, 403 extra
 Notes**.
 
 **The signal path dominates.** These are pairs: the same performance, the same
 label timings, differing only in whether the capture is direct or through an amp
-sim. Split rates go 8% → 71% on the quarters take, 9% → 66% on the A3 eighths,
+sim. Split rates go 8% → 71% on the quarters take, 3% → 30% on the A3 eighths,
 and 7% → 50% on held-then-picked. Up to five Notes on a single played event.
 
 That is a sharper statement of the problem than the corpus could previously
@@ -157,25 +158,41 @@ timings are identical to the DI ones, so the 8-vs-60 gap on one performance
 cannot be a labelling difference. And `same-pitch-eighths-a3` has an open
 structural question below.
 
-## What still needs confirming
+## Where the structure came from
 
-Two places where the audio does not match what was described. Both need the
-player's answer, and until they have one the affected labels are guesses:
+Both open questions have been answered by the player, and one of my answers was
+wrong. Recorded here because the correction is instructive.
 
-1. **`quarters`: the E5 section is 10 measures, not 8.** The pitch changes at
-   17.970s; A3 runs 32 notes (8 measures) and E5 runs 40 (10 measures), 72 in
-   total, evenly spaced at 0.500s throughout. The labels follow the audio.
-2. **`eighths A3`: no sixteenth section could be found.** It was described as 8
-   measures of eighths then 8 of sixteenths. Three independent measurements
-   disagree, and all three say eighths throughout: onset spacing stays at a
-   median of 0.245s in the second half (the E5 take drops to 0.140s there);
-   envelope modulation never favours 8Hz over 4Hz (peak ratio 0.80, against 1.09
-   and 1.15 on the E5 take); and envelope autocorrelation in the second half
-   peaks at 0.5s with the 0.125s lag *negative*. The labels are written as 16
-   measures of eighths, 128 events. If a sixteenth section was intended and
-   played, these labels are wrong and the take should be relabelled or re-cut.
+1. **`quarters`: the E5 section really is 10 measures, not 8** — confirmed.
+   Verified twice, independently: pitch is A3 for exactly 32 onsets and changes
+   at 17.980s, leaving 40 onsets after it, evenly spaced at 0.500s throughout.
+   32/4 = 8.00 measures and 40/4 = 10.00 measures exactly. The labels follow the
+   audio.
+2. **`eighths A3` does contain a sixteenth section, starting at 20.0s** — the
+   player listened and said so, and the labels now say so: 72 eighths, then 112
+   sixteenths from 19.960s, ending at 33.835s against a last measured onset of
+   33.870s.
 
-`eighths-sixteenths E5` was confirmed as described by the same three measures.
+   **I had previously reported that this take had no sixteenth section at all,
+   on three converging measurements. That was a false negative.** Worth the space,
+   because the failure is the kind this repository already documents. Onset
+   spacing said eighths because the envelope rule drops roughly half the picks in
+   a fast same-pitch run — exactly the material it is worst at. Envelope
+   modulation and autocorrelation said eighths because I compared this take's
+   absolute figures against *the E5 take's*, when the two are voiced differently:
+   in the E5 take the strongest envelope periodicity sits at the note period,
+   while in the A3 take it sits at twice it, on the accent. Measured against
+   itself over time the A3 take does drop from a 0.5s peak lag to 0.25s after
+   20s, which is the boundary — but I read the cross-take comparison first and
+   stopped.
+
+   Three statistics agreeing is not three pieces of evidence when they share a
+   premise. The ear settled it in one listen.
+
+Neither take's subdivision can be resolved reliably by the crude envelope tools
+used here. Treat any future claim about subdivision in this material as needing
+a human listen, and note that this difficulty is itself the property the
+material was recorded for.
 
 ## Before relying on this material
 

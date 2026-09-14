@@ -12,12 +12,12 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +45ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
   "events": [
     {
       "id": "e81",
-      "startMs": 2000,
-      "endMs": 2250,
+      "startMs": 1980,
+      "endMs": 2230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -30,8 +30,8 @@
     },
     {
       "id": "e82",
-      "startMs": 2250,
-      "endMs": 2500,
+      "startMs": 2230,
+      "endMs": 2480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -44,8 +44,8 @@
     },
     {
       "id": "e83",
-      "startMs": 2500,
-      "endMs": 2750,
+      "startMs": 2480,
+      "endMs": 2730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -58,8 +58,8 @@
     },
     {
       "id": "e84",
-      "startMs": 2750,
-      "endMs": 3000,
+      "startMs": 2730,
+      "endMs": 2980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -72,8 +72,8 @@
     },
     {
       "id": "e85",
-      "startMs": 3000,
-      "endMs": 3250,
+      "startMs": 2980,
+      "endMs": 3230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -86,8 +86,8 @@
     },
     {
       "id": "e86",
-      "startMs": 3250,
-      "endMs": 3500,
+      "startMs": 3230,
+      "endMs": 3480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -100,8 +100,8 @@
     },
     {
       "id": "e87",
-      "startMs": 3500,
-      "endMs": 3750,
+      "startMs": 3480,
+      "endMs": 3730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -114,8 +114,8 @@
     },
     {
       "id": "e88",
-      "startMs": 3750,
-      "endMs": 4000,
+      "startMs": 3730,
+      "endMs": 3980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -128,8 +128,8 @@
     },
     {
       "id": "e89",
-      "startMs": 4000,
-      "endMs": 4250,
+      "startMs": 3980,
+      "endMs": 4230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -142,8 +142,8 @@
     },
     {
       "id": "e810",
-      "startMs": 4250,
-      "endMs": 4500,
+      "startMs": 4230,
+      "endMs": 4480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -156,8 +156,8 @@
     },
     {
       "id": "e811",
-      "startMs": 4500,
-      "endMs": 4750,
+      "startMs": 4480,
+      "endMs": 4730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -170,8 +170,8 @@
     },
     {
       "id": "e812",
-      "startMs": 4750,
-      "endMs": 5000,
+      "startMs": 4730,
+      "endMs": 4980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -184,8 +184,8 @@
     },
     {
       "id": "e813",
-      "startMs": 5000,
-      "endMs": 5250,
+      "startMs": 4980,
+      "endMs": 5230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -198,8 +198,8 @@
     },
     {
       "id": "e814",
-      "startMs": 5250,
-      "endMs": 5500,
+      "startMs": 5230,
+      "endMs": 5480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -212,8 +212,8 @@
     },
     {
       "id": "e815",
-      "startMs": 5500,
-      "endMs": 5750,
+      "startMs": 5480,
+      "endMs": 5730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -226,8 +226,8 @@
     },
     {
       "id": "e816",
-      "startMs": 5750,
-      "endMs": 6000,
+      "startMs": 5730,
+      "endMs": 5980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -240,8 +240,8 @@
     },
     {
       "id": "e817",
-      "startMs": 6000,
-      "endMs": 6250,
+      "startMs": 5980,
+      "endMs": 6230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -254,8 +254,8 @@
     },
     {
       "id": "e818",
-      "startMs": 6250,
-      "endMs": 6500,
+      "startMs": 6230,
+      "endMs": 6480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -268,8 +268,8 @@
     },
     {
       "id": "e819",
-      "startMs": 6500,
-      "endMs": 6750,
+      "startMs": 6480,
+      "endMs": 6730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -282,8 +282,8 @@
     },
     {
       "id": "e820",
-      "startMs": 6750,
-      "endMs": 7000,
+      "startMs": 6730,
+      "endMs": 6980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -296,8 +296,8 @@
     },
     {
       "id": "e821",
-      "startMs": 7000,
-      "endMs": 7250,
+      "startMs": 6980,
+      "endMs": 7230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -310,8 +310,8 @@
     },
     {
       "id": "e822",
-      "startMs": 7250,
-      "endMs": 7500,
+      "startMs": 7230,
+      "endMs": 7480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -324,8 +324,8 @@
     },
     {
       "id": "e823",
-      "startMs": 7500,
-      "endMs": 7750,
+      "startMs": 7480,
+      "endMs": 7730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -338,8 +338,8 @@
     },
     {
       "id": "e824",
-      "startMs": 7750,
-      "endMs": 8000,
+      "startMs": 7730,
+      "endMs": 7980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -352,8 +352,8 @@
     },
     {
       "id": "e825",
-      "startMs": 8000,
-      "endMs": 8250,
+      "startMs": 7980,
+      "endMs": 8230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -366,8 +366,8 @@
     },
     {
       "id": "e826",
-      "startMs": 8250,
-      "endMs": 8500,
+      "startMs": 8230,
+      "endMs": 8480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -380,8 +380,8 @@
     },
     {
       "id": "e827",
-      "startMs": 8500,
-      "endMs": 8750,
+      "startMs": 8480,
+      "endMs": 8730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -394,8 +394,8 @@
     },
     {
       "id": "e828",
-      "startMs": 8750,
-      "endMs": 9000,
+      "startMs": 8730,
+      "endMs": 8980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -408,8 +408,8 @@
     },
     {
       "id": "e829",
-      "startMs": 9000,
-      "endMs": 9250,
+      "startMs": 8980,
+      "endMs": 9230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -422,8 +422,8 @@
     },
     {
       "id": "e830",
-      "startMs": 9250,
-      "endMs": 9500,
+      "startMs": 9230,
+      "endMs": 9480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -436,8 +436,8 @@
     },
     {
       "id": "e831",
-      "startMs": 9500,
-      "endMs": 9750,
+      "startMs": 9480,
+      "endMs": 9730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -450,8 +450,8 @@
     },
     {
       "id": "e832",
-      "startMs": 9750,
-      "endMs": 10000,
+      "startMs": 9730,
+      "endMs": 9980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -464,8 +464,8 @@
     },
     {
       "id": "e833",
-      "startMs": 10000,
-      "endMs": 10250,
+      "startMs": 9980,
+      "endMs": 10230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -478,8 +478,8 @@
     },
     {
       "id": "e834",
-      "startMs": 10250,
-      "endMs": 10500,
+      "startMs": 10230,
+      "endMs": 10480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -492,8 +492,8 @@
     },
     {
       "id": "e835",
-      "startMs": 10500,
-      "endMs": 10750,
+      "startMs": 10480,
+      "endMs": 10730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -506,8 +506,8 @@
     },
     {
       "id": "e836",
-      "startMs": 10750,
-      "endMs": 11000,
+      "startMs": 10730,
+      "endMs": 10980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -520,8 +520,8 @@
     },
     {
       "id": "e837",
-      "startMs": 11000,
-      "endMs": 11250,
+      "startMs": 10980,
+      "endMs": 11230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -534,8 +534,8 @@
     },
     {
       "id": "e838",
-      "startMs": 11250,
-      "endMs": 11500,
+      "startMs": 11230,
+      "endMs": 11480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -548,8 +548,8 @@
     },
     {
       "id": "e839",
-      "startMs": 11500,
-      "endMs": 11750,
+      "startMs": 11480,
+      "endMs": 11730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -562,8 +562,8 @@
     },
     {
       "id": "e840",
-      "startMs": 11750,
-      "endMs": 12000,
+      "startMs": 11730,
+      "endMs": 11980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -576,8 +576,8 @@
     },
     {
       "id": "e841",
-      "startMs": 12000,
-      "endMs": 12250,
+      "startMs": 11980,
+      "endMs": 12230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -590,8 +590,8 @@
     },
     {
       "id": "e842",
-      "startMs": 12250,
-      "endMs": 12500,
+      "startMs": 12230,
+      "endMs": 12480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -604,8 +604,8 @@
     },
     {
       "id": "e843",
-      "startMs": 12500,
-      "endMs": 12750,
+      "startMs": 12480,
+      "endMs": 12730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -618,8 +618,8 @@
     },
     {
       "id": "e844",
-      "startMs": 12750,
-      "endMs": 13000,
+      "startMs": 12730,
+      "endMs": 12980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -632,8 +632,8 @@
     },
     {
       "id": "e845",
-      "startMs": 13000,
-      "endMs": 13250,
+      "startMs": 12980,
+      "endMs": 13230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -646,8 +646,8 @@
     },
     {
       "id": "e846",
-      "startMs": 13250,
-      "endMs": 13500,
+      "startMs": 13230,
+      "endMs": 13480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -660,8 +660,8 @@
     },
     {
       "id": "e847",
-      "startMs": 13500,
-      "endMs": 13750,
+      "startMs": 13480,
+      "endMs": 13730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -674,8 +674,8 @@
     },
     {
       "id": "e848",
-      "startMs": 13750,
-      "endMs": 14000,
+      "startMs": 13730,
+      "endMs": 13980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -688,8 +688,8 @@
     },
     {
       "id": "e849",
-      "startMs": 14000,
-      "endMs": 14250,
+      "startMs": 13980,
+      "endMs": 14230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -702,8 +702,8 @@
     },
     {
       "id": "e850",
-      "startMs": 14250,
-      "endMs": 14500,
+      "startMs": 14230,
+      "endMs": 14480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -716,8 +716,8 @@
     },
     {
       "id": "e851",
-      "startMs": 14500,
-      "endMs": 14750,
+      "startMs": 14480,
+      "endMs": 14730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -730,8 +730,8 @@
     },
     {
       "id": "e852",
-      "startMs": 14750,
-      "endMs": 15000,
+      "startMs": 14730,
+      "endMs": 14980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -744,8 +744,8 @@
     },
     {
       "id": "e853",
-      "startMs": 15000,
-      "endMs": 15250,
+      "startMs": 14980,
+      "endMs": 15230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -758,8 +758,8 @@
     },
     {
       "id": "e854",
-      "startMs": 15250,
-      "endMs": 15500,
+      "startMs": 15230,
+      "endMs": 15480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -772,8 +772,8 @@
     },
     {
       "id": "e855",
-      "startMs": 15500,
-      "endMs": 15750,
+      "startMs": 15480,
+      "endMs": 15730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -786,8 +786,8 @@
     },
     {
       "id": "e856",
-      "startMs": 15750,
-      "endMs": 16000,
+      "startMs": 15730,
+      "endMs": 15980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -800,8 +800,8 @@
     },
     {
       "id": "e857",
-      "startMs": 16000,
-      "endMs": 16250,
+      "startMs": 15980,
+      "endMs": 16230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -814,8 +814,8 @@
     },
     {
       "id": "e858",
-      "startMs": 16250,
-      "endMs": 16500,
+      "startMs": 16230,
+      "endMs": 16480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -828,8 +828,8 @@
     },
     {
       "id": "e859",
-      "startMs": 16500,
-      "endMs": 16750,
+      "startMs": 16480,
+      "endMs": 16730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -842,8 +842,8 @@
     },
     {
       "id": "e860",
-      "startMs": 16750,
-      "endMs": 17000,
+      "startMs": 16730,
+      "endMs": 16980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -856,8 +856,8 @@
     },
     {
       "id": "e861",
-      "startMs": 17000,
-      "endMs": 17250,
+      "startMs": 16980,
+      "endMs": 17230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -870,8 +870,8 @@
     },
     {
       "id": "e862",
-      "startMs": 17250,
-      "endMs": 17500,
+      "startMs": 17230,
+      "endMs": 17480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -884,8 +884,8 @@
     },
     {
       "id": "e863",
-      "startMs": 17500,
-      "endMs": 17750,
+      "startMs": 17480,
+      "endMs": 17730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -898,8 +898,8 @@
     },
     {
       "id": "e864",
-      "startMs": 17750,
-      "endMs": 18000,
+      "startMs": 17730,
+      "endMs": 17980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -912,8 +912,8 @@
     },
     {
       "id": "e865",
-      "startMs": 18000,
-      "endMs": 18250,
+      "startMs": 17980,
+      "endMs": 18230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -926,8 +926,8 @@
     },
     {
       "id": "e866",
-      "startMs": 18250,
-      "endMs": 18500,
+      "startMs": 18230,
+      "endMs": 18480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -940,8 +940,8 @@
     },
     {
       "id": "e867",
-      "startMs": 18500,
-      "endMs": 18750,
+      "startMs": 18480,
+      "endMs": 18730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -954,8 +954,8 @@
     },
     {
       "id": "e868",
-      "startMs": 18750,
-      "endMs": 19000,
+      "startMs": 18730,
+      "endMs": 18980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -968,8 +968,8 @@
     },
     {
       "id": "e869",
-      "startMs": 19000,
-      "endMs": 19250,
+      "startMs": 18980,
+      "endMs": 19230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -982,8 +982,8 @@
     },
     {
       "id": "e870",
-      "startMs": 19250,
-      "endMs": 19500,
+      "startMs": 19230,
+      "endMs": 19480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -996,8 +996,8 @@
     },
     {
       "id": "e871",
-      "startMs": 19500,
-      "endMs": 19750,
+      "startMs": 19480,
+      "endMs": 19730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1010,8 +1010,8 @@
     },
     {
       "id": "e872",
-      "startMs": 19750,
-      "endMs": 20000,
+      "startMs": 19730,
+      "endMs": 19980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1023,9 +1023,9 @@
       "required": true
     },
     {
-      "id": "e873",
-      "startMs": 20000,
-      "endMs": 20250,
+      "id": "s161",
+      "startMs": 19980,
+      "endMs": 20105,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1037,9 +1037,9 @@
       "required": true
     },
     {
-      "id": "e874",
-      "startMs": 20250,
-      "endMs": 20500,
+      "id": "s162",
+      "startMs": 20105,
+      "endMs": 20230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1051,9 +1051,9 @@
       "required": true
     },
     {
-      "id": "e875",
-      "startMs": 20500,
-      "endMs": 20750,
+      "id": "s163",
+      "startMs": 20230,
+      "endMs": 20355,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1065,9 +1065,9 @@
       "required": true
     },
     {
-      "id": "e876",
-      "startMs": 20750,
-      "endMs": 21000,
+      "id": "s164",
+      "startMs": 20355,
+      "endMs": 20480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1079,9 +1079,9 @@
       "required": true
     },
     {
-      "id": "e877",
-      "startMs": 21000,
-      "endMs": 21250,
+      "id": "s165",
+      "startMs": 20480,
+      "endMs": 20605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1093,9 +1093,9 @@
       "required": true
     },
     {
-      "id": "e878",
-      "startMs": 21250,
-      "endMs": 21500,
+      "id": "s166",
+      "startMs": 20605,
+      "endMs": 20730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1107,9 +1107,9 @@
       "required": true
     },
     {
-      "id": "e879",
-      "startMs": 21500,
-      "endMs": 21750,
+      "id": "s167",
+      "startMs": 20730,
+      "endMs": 20855,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1121,9 +1121,9 @@
       "required": true
     },
     {
-      "id": "e880",
-      "startMs": 21750,
-      "endMs": 22000,
+      "id": "s168",
+      "startMs": 20855,
+      "endMs": 20980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1135,9 +1135,9 @@
       "required": true
     },
     {
-      "id": "e881",
-      "startMs": 22000,
-      "endMs": 22250,
+      "id": "s169",
+      "startMs": 20980,
+      "endMs": 21105,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1149,9 +1149,9 @@
       "required": true
     },
     {
-      "id": "e882",
-      "startMs": 22250,
-      "endMs": 22500,
+      "id": "s1610",
+      "startMs": 21105,
+      "endMs": 21230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1163,9 +1163,9 @@
       "required": true
     },
     {
-      "id": "e883",
-      "startMs": 22500,
-      "endMs": 22750,
+      "id": "s1611",
+      "startMs": 21230,
+      "endMs": 21355,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1177,9 +1177,9 @@
       "required": true
     },
     {
-      "id": "e884",
-      "startMs": 22750,
-      "endMs": 23000,
+      "id": "s1612",
+      "startMs": 21355,
+      "endMs": 21480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1191,9 +1191,9 @@
       "required": true
     },
     {
-      "id": "e885",
-      "startMs": 23000,
-      "endMs": 23250,
+      "id": "s1613",
+      "startMs": 21480,
+      "endMs": 21605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1205,9 +1205,9 @@
       "required": true
     },
     {
-      "id": "e886",
-      "startMs": 23250,
-      "endMs": 23500,
+      "id": "s1614",
+      "startMs": 21605,
+      "endMs": 21730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1219,9 +1219,9 @@
       "required": true
     },
     {
-      "id": "e887",
-      "startMs": 23500,
-      "endMs": 23750,
+      "id": "s1615",
+      "startMs": 21730,
+      "endMs": 21855,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1233,9 +1233,9 @@
       "required": true
     },
     {
-      "id": "e888",
-      "startMs": 23750,
-      "endMs": 24000,
+      "id": "s1616",
+      "startMs": 21855,
+      "endMs": 21980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1247,9 +1247,9 @@
       "required": true
     },
     {
-      "id": "e889",
-      "startMs": 24000,
-      "endMs": 24250,
+      "id": "s1617",
+      "startMs": 21980,
+      "endMs": 22105,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1261,9 +1261,9 @@
       "required": true
     },
     {
-      "id": "e890",
-      "startMs": 24250,
-      "endMs": 24500,
+      "id": "s1618",
+      "startMs": 22105,
+      "endMs": 22230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1275,9 +1275,9 @@
       "required": true
     },
     {
-      "id": "e891",
-      "startMs": 24500,
-      "endMs": 24750,
+      "id": "s1619",
+      "startMs": 22230,
+      "endMs": 22355,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1289,9 +1289,9 @@
       "required": true
     },
     {
-      "id": "e892",
-      "startMs": 24750,
-      "endMs": 25000,
+      "id": "s1620",
+      "startMs": 22355,
+      "endMs": 22480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1303,9 +1303,9 @@
       "required": true
     },
     {
-      "id": "e893",
-      "startMs": 25000,
-      "endMs": 25250,
+      "id": "s1621",
+      "startMs": 22480,
+      "endMs": 22605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1317,9 +1317,9 @@
       "required": true
     },
     {
-      "id": "e894",
-      "startMs": 25250,
-      "endMs": 25500,
+      "id": "s1622",
+      "startMs": 22605,
+      "endMs": 22730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1331,9 +1331,9 @@
       "required": true
     },
     {
-      "id": "e895",
-      "startMs": 25500,
-      "endMs": 25750,
+      "id": "s1623",
+      "startMs": 22730,
+      "endMs": 22855,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1345,9 +1345,9 @@
       "required": true
     },
     {
-      "id": "e896",
-      "startMs": 25750,
-      "endMs": 26000,
+      "id": "s1624",
+      "startMs": 22855,
+      "endMs": 22980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1359,9 +1359,9 @@
       "required": true
     },
     {
-      "id": "e897",
-      "startMs": 26000,
-      "endMs": 26250,
+      "id": "s1625",
+      "startMs": 22980,
+      "endMs": 23105,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1373,9 +1373,9 @@
       "required": true
     },
     {
-      "id": "e898",
-      "startMs": 26250,
-      "endMs": 26500,
+      "id": "s1626",
+      "startMs": 23105,
+      "endMs": 23230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1387,9 +1387,9 @@
       "required": true
     },
     {
-      "id": "e899",
-      "startMs": 26500,
-      "endMs": 26750,
+      "id": "s1627",
+      "startMs": 23230,
+      "endMs": 23355,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1401,9 +1401,9 @@
       "required": true
     },
     {
-      "id": "e8100",
-      "startMs": 26750,
-      "endMs": 27000,
+      "id": "s1628",
+      "startMs": 23355,
+      "endMs": 23480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1415,9 +1415,9 @@
       "required": true
     },
     {
-      "id": "e8101",
-      "startMs": 27000,
-      "endMs": 27250,
+      "id": "s1629",
+      "startMs": 23480,
+      "endMs": 23605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1429,9 +1429,9 @@
       "required": true
     },
     {
-      "id": "e8102",
-      "startMs": 27250,
-      "endMs": 27500,
+      "id": "s1630",
+      "startMs": 23605,
+      "endMs": 23730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1443,9 +1443,9 @@
       "required": true
     },
     {
-      "id": "e8103",
-      "startMs": 27500,
-      "endMs": 27750,
+      "id": "s1631",
+      "startMs": 23730,
+      "endMs": 23855,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1457,9 +1457,9 @@
       "required": true
     },
     {
-      "id": "e8104",
-      "startMs": 27750,
-      "endMs": 28000,
+      "id": "s1632",
+      "startMs": 23855,
+      "endMs": 23980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1471,9 +1471,9 @@
       "required": true
     },
     {
-      "id": "e8105",
-      "startMs": 28000,
-      "endMs": 28250,
+      "id": "s1633",
+      "startMs": 23980,
+      "endMs": 24105,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1485,9 +1485,9 @@
       "required": true
     },
     {
-      "id": "e8106",
-      "startMs": 28250,
-      "endMs": 28500,
+      "id": "s1634",
+      "startMs": 24105,
+      "endMs": 24230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1499,9 +1499,9 @@
       "required": true
     },
     {
-      "id": "e8107",
-      "startMs": 28500,
-      "endMs": 28750,
+      "id": "s1635",
+      "startMs": 24230,
+      "endMs": 24355,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1513,9 +1513,9 @@
       "required": true
     },
     {
-      "id": "e8108",
-      "startMs": 28750,
-      "endMs": 29000,
+      "id": "s1636",
+      "startMs": 24355,
+      "endMs": 24480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1527,9 +1527,9 @@
       "required": true
     },
     {
-      "id": "e8109",
-      "startMs": 29000,
-      "endMs": 29250,
+      "id": "s1637",
+      "startMs": 24480,
+      "endMs": 24605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1541,9 +1541,9 @@
       "required": true
     },
     {
-      "id": "e8110",
-      "startMs": 29250,
-      "endMs": 29500,
+      "id": "s1638",
+      "startMs": 24605,
+      "endMs": 24730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1555,9 +1555,9 @@
       "required": true
     },
     {
-      "id": "e8111",
-      "startMs": 29500,
-      "endMs": 29750,
+      "id": "s1639",
+      "startMs": 24730,
+      "endMs": 24855,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1569,9 +1569,9 @@
       "required": true
     },
     {
-      "id": "e8112",
-      "startMs": 29750,
-      "endMs": 30000,
+      "id": "s1640",
+      "startMs": 24855,
+      "endMs": 24980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1583,9 +1583,9 @@
       "required": true
     },
     {
-      "id": "e8113",
-      "startMs": 30000,
-      "endMs": 30250,
+      "id": "s1641",
+      "startMs": 24980,
+      "endMs": 25105,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1597,9 +1597,9 @@
       "required": true
     },
     {
-      "id": "e8114",
-      "startMs": 30250,
-      "endMs": 30500,
+      "id": "s1642",
+      "startMs": 25105,
+      "endMs": 25230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1611,9 +1611,9 @@
       "required": true
     },
     {
-      "id": "e8115",
-      "startMs": 30500,
-      "endMs": 30750,
+      "id": "s1643",
+      "startMs": 25230,
+      "endMs": 25355,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1625,9 +1625,9 @@
       "required": true
     },
     {
-      "id": "e8116",
-      "startMs": 30750,
-      "endMs": 31000,
+      "id": "s1644",
+      "startMs": 25355,
+      "endMs": 25480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1639,9 +1639,9 @@
       "required": true
     },
     {
-      "id": "e8117",
-      "startMs": 31000,
-      "endMs": 31250,
+      "id": "s1645",
+      "startMs": 25480,
+      "endMs": 25605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1653,9 +1653,9 @@
       "required": true
     },
     {
-      "id": "e8118",
-      "startMs": 31250,
-      "endMs": 31500,
+      "id": "s1646",
+      "startMs": 25605,
+      "endMs": 25730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1667,9 +1667,9 @@
       "required": true
     },
     {
-      "id": "e8119",
-      "startMs": 31500,
-      "endMs": 31750,
+      "id": "s1647",
+      "startMs": 25730,
+      "endMs": 25855,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1681,9 +1681,9 @@
       "required": true
     },
     {
-      "id": "e8120",
-      "startMs": 31750,
-      "endMs": 32000,
+      "id": "s1648",
+      "startMs": 25855,
+      "endMs": 25980,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1695,9 +1695,9 @@
       "required": true
     },
     {
-      "id": "e8121",
-      "startMs": 32000,
-      "endMs": 32250,
+      "id": "s1649",
+      "startMs": 25980,
+      "endMs": 26105,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1709,9 +1709,9 @@
       "required": true
     },
     {
-      "id": "e8122",
-      "startMs": 32250,
-      "endMs": 32500,
+      "id": "s1650",
+      "startMs": 26105,
+      "endMs": 26230,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1723,9 +1723,9 @@
       "required": true
     },
     {
-      "id": "e8123",
-      "startMs": 32500,
-      "endMs": 32750,
+      "id": "s1651",
+      "startMs": 26230,
+      "endMs": 26355,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1737,9 +1737,9 @@
       "required": true
     },
     {
-      "id": "e8124",
-      "startMs": 32750,
-      "endMs": 33000,
+      "id": "s1652",
+      "startMs": 26355,
+      "endMs": 26480,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1751,9 +1751,9 @@
       "required": true
     },
     {
-      "id": "e8125",
-      "startMs": 33000,
-      "endMs": 33250,
+      "id": "s1653",
+      "startMs": 26480,
+      "endMs": 26605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1765,9 +1765,9 @@
       "required": true
     },
     {
-      "id": "e8126",
-      "startMs": 33250,
-      "endMs": 33500,
+      "id": "s1654",
+      "startMs": 26605,
+      "endMs": 26730,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1779,9 +1779,9 @@
       "required": true
     },
     {
-      "id": "e8127",
-      "startMs": 33500,
-      "endMs": 33750,
+      "id": "s1655",
+      "startMs": 26730,
+      "endMs": 26855,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1793,9 +1793,793 @@
       "required": true
     },
     {
-      "id": "e8128",
-      "startMs": 33750,
-      "endMs": 34000,
+      "id": "s1656",
+      "startMs": 26855,
+      "endMs": 26980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1657",
+      "startMs": 26980,
+      "endMs": 27105,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1658",
+      "startMs": 27105,
+      "endMs": 27230,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1659",
+      "startMs": 27230,
+      "endMs": 27355,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1660",
+      "startMs": 27355,
+      "endMs": 27480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1661",
+      "startMs": 27480,
+      "endMs": 27605,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1662",
+      "startMs": 27605,
+      "endMs": 27730,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1663",
+      "startMs": 27730,
+      "endMs": 27855,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1664",
+      "startMs": 27855,
+      "endMs": 27980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1665",
+      "startMs": 27980,
+      "endMs": 28105,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1666",
+      "startMs": 28105,
+      "endMs": 28230,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1667",
+      "startMs": 28230,
+      "endMs": 28355,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1668",
+      "startMs": 28355,
+      "endMs": 28480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1669",
+      "startMs": 28480,
+      "endMs": 28605,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1670",
+      "startMs": 28605,
+      "endMs": 28730,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1671",
+      "startMs": 28730,
+      "endMs": 28855,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1672",
+      "startMs": 28855,
+      "endMs": 28980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1673",
+      "startMs": 28980,
+      "endMs": 29105,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1674",
+      "startMs": 29105,
+      "endMs": 29230,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1675",
+      "startMs": 29230,
+      "endMs": 29355,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1676",
+      "startMs": 29355,
+      "endMs": 29480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1677",
+      "startMs": 29480,
+      "endMs": 29605,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1678",
+      "startMs": 29605,
+      "endMs": 29730,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1679",
+      "startMs": 29730,
+      "endMs": 29855,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1680",
+      "startMs": 29855,
+      "endMs": 29980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1681",
+      "startMs": 29980,
+      "endMs": 30105,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1682",
+      "startMs": 30105,
+      "endMs": 30230,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1683",
+      "startMs": 30230,
+      "endMs": 30355,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1684",
+      "startMs": 30355,
+      "endMs": 30480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1685",
+      "startMs": 30480,
+      "endMs": 30605,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1686",
+      "startMs": 30605,
+      "endMs": 30730,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1687",
+      "startMs": 30730,
+      "endMs": 30855,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1688",
+      "startMs": 30855,
+      "endMs": 30980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1689",
+      "startMs": 30980,
+      "endMs": 31105,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1690",
+      "startMs": 31105,
+      "endMs": 31230,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1691",
+      "startMs": 31230,
+      "endMs": 31355,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1692",
+      "startMs": 31355,
+      "endMs": 31480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1693",
+      "startMs": 31480,
+      "endMs": 31605,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1694",
+      "startMs": 31605,
+      "endMs": 31730,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1695",
+      "startMs": 31730,
+      "endMs": 31855,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1696",
+      "startMs": 31855,
+      "endMs": 31980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1697",
+      "startMs": 31980,
+      "endMs": 32105,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1698",
+      "startMs": 32105,
+      "endMs": 32230,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s1699",
+      "startMs": 32230,
+      "endMs": 32355,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16100",
+      "startMs": 32355,
+      "endMs": 32480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16101",
+      "startMs": 32480,
+      "endMs": 32605,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16102",
+      "startMs": 32605,
+      "endMs": 32730,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16103",
+      "startMs": 32730,
+      "endMs": 32855,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16104",
+      "startMs": 32855,
+      "endMs": 32980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16105",
+      "startMs": 32980,
+      "endMs": 33105,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16106",
+      "startMs": 33105,
+      "endMs": 33230,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16107",
+      "startMs": 33230,
+      "endMs": 33355,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16108",
+      "startMs": 33355,
+      "endMs": 33480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16109",
+      "startMs": 33480,
+      "endMs": 33605,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16110",
+      "startMs": 33605,
+      "endMs": 33730,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16111",
+      "startMs": 33730,
+      "endMs": 33855,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16112",
+      "startMs": 33855,
+      "endMs": 33980,
       "kind": "note",
       "label": "A3",
       "pitches": [
