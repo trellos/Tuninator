@@ -83,7 +83,6 @@ function calibrate(config: EngineConfig): Bars {
   return {
     ...config.transient,
     rearticulationSharpness: config.transient.rearticulationSharpness * c.sharpnessScale,
-    rearticulationFluxRatio: config.transient.rearticulationFluxRatio * c.fluxRatioScale,
     newPitchSharpness: config.transient.newPitchSharpness * c.sharpnessScale,
     restrumSharpness: config.transient.restrumSharpness * c.heldSharpnessScale,
     restrumFluxRatio: config.transient.restrumFluxRatio * c.fluxRatioScale,
@@ -254,22 +253,7 @@ export class RearticulationDetector implements IRearticulationDetector {
     if (frame.rms >= sustainedRms * t.rearticulationRiseRatio) {
       return { accepted: true, reason: "envelope-rise" };
     }
-    // Both readings of the flux, for the reason `sharpEnough` already gives and
-    // this branch used to ignore. `sharpness` is flux over the frame's RMS,
-    // which an amp sim's compression flatters without limit: the level is held
-    // flat while distortion keeps the spectrum churning, so ordinary sustain
-    // reads as sharp here as a real pick does on a direct input. `fluxRatio` is
-    // flux over what the kernel had adapted to across the preceding hops — the
-    // signal's own recent history — and that reads the same on every path.
-    //
-    // Asking only the first is why one performance split 8% of its events on a
-    // DI and 71% through an amp, and why `sharpness` was the accepting test at
-    // 195 of the 294 same-pitch fragments in the corpus. The bar is
-    // `rearticulationFluxRatio`, swept on the derivation fixtures, and the
-    // short reading is paired with the short one to keep both witnesses on the
-    // same timescale.
-    return attack.sharpness >= t.rearticulationSharpness &&
-      attack.fluxRatio >= t.rearticulationFluxRatio
+    return attack.sharpness >= t.rearticulationSharpness
       ? { accepted: true, reason: "sharpness" }
       : { accepted: false, reason: "no-energy-not-sharp" };
   }
