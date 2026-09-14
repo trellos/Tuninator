@@ -25,6 +25,32 @@
  * every run so a change that breaks it says so rather than silently proposing
  * nonsense.
  *
+ * **STATUS: NOT GOOD ENOUGH TO APPLY. Read this before running it.**
+ *
+ * This rediscovers, from the other side, the limitation that produced the grid
+ * in the first place. `docs/SAME-PITCH-MATERIAL.md` says the two fast takes were
+ * gridded because "the runs are too fast for the envelope rule to resolve every
+ * pick" — and an envelope rule is what this is. It finds 11 of the 14 picks the
+ * owner confirmed, and flags 145 of 752 labels as having no pick under them,
+ * which cannot be right on material the player says has nothing missing.
+ *
+ * Three matching strategies were tried against his ear and none rescues it,
+ * because the problem is upstream of matching. Nearest-onset at a 110ms window
+ * let a spurious label be adopted by its neighbour's pick (4 of 5
+ * confirmed-silent labels came back as `move`); narrowing to 55ms made real
+ * drifted picks read as missing (256 of 752); monotonic sequence alignment,
+ * which needs no window at all, lands between them at 145. The grid drifts up
+ * to 87ms while a sixteenth is 125ms, so drift is comparable to spacing and no
+ * matching rule can separate the two cases when the onsets themselves are
+ * incomplete.
+ *
+ * SO: the two gridded takes cannot be re-timed by this method, and detection
+ * work that needs accurate onsets should use `same-pitch-quarters-a3-e5` and
+ * `held-then-picked-six-strings`, whose 72 and 120 events were measured
+ * one-to-one and are trustworthy. Fixing the gridded takes wants a human ear or
+ * a genuinely better onset method, and this file is kept as the record of what
+ * an envelope method does, not as a tool to run against the labels.
+ *
  * READ THE CALIBRATION BEFORE ACTING ON THE OUTPUT. As it stands it finds 5 of
  * 5 grid labels he confirmed have no pick under them — that half is reliable,
  * and the removal candidates are worth a listen. It finds only 11 of 14 picks,
@@ -70,8 +96,17 @@ const MIN_INTERVAL_MS = 70;
 /** How far back the trough a peak climbed out of is looked for. */
 const TROUGH_LOOKBACK_MS = 90;
 
-/** How far from a grid label a measured onset may sit and still be its pick. */
-const MATCH_WINDOW_MS = 110;
+/**
+ * How far from a grid label a measured onset may sit and still be ITS pick.
+ *
+ * Must stay well under HALF the spacing of the events it is matching, or a
+ * label with no pick under it is simply adopted by its neighbour's. At 110ms
+ * against 125ms sixteenths it was: four of the five labels the owner confirmed
+ * silent came back as `move` rather than as removal candidates, because a pick
+ * one subdivision away was inside the window. A sixteenth at 120bpm is 125ms,
+ * so half is 62.5, and this sits below that.
+ */
+const MATCH_WINDOW_MS = 55;
 
 /** The takes whose labels came off a grid rather than off measured onsets. */
 const GRID_TAKES = ["same-pitch-eighths-a3-120bpm", "same-pitch-eighths-sixteenths-e5-120bpm"];
@@ -148,6 +183,64 @@ function detectOnsets(env: readonly number[]): number[] {
   return kept.sort((a, b) => a - b);
 }
 
+/**
+ * Align labels to onsets MONOTONICALLY, in order, one to one.
+ *
+ * Nearest-onset matching cannot work on this material and the reason is
+ * structural rather than a matter of picking a better window. The grid drifts
+ * from the playing by up to 87ms — the owner's own measurement — while a
+ * sixteenth at 120bpm is 125ms apart. Drift is comparable to spacing, so at any
+ * window a label that drifted is indistinguishable from a label whose neighbour
+ * has been adopted: wide, and a spurious label silently attaches to the next
+ * pick along (four of five confirmed-silent labels came back as `move`);
+ * narrow, and real picks that drifted read as missing (256 of 752).
+ *
+ * What resolves it is the constraint the owner stated: the picks and the labels
+ * are both in time order, and the playing has no notes missing, so the two
+ * sequences should correspond in order. This is a standard monotonic alignment:
+ * match in order, or pay to skip a label (a label with no pick under it) or to
+ * skip an onset (a pick with no label). No window decides anything; the costs
+ * do, and they are compared against each other rather than against a bar.
+ */
+const SKIP_LABEL_COST = 90;
+const SKIP_ONSET_COST = 90;
+
+function alignMonotonic(labels: readonly number[], onsets: readonly number[]): Array<number | null> {
+  const n = labels.length, m = onsets.length;
+  const INF = Number.POSITIVE_INFINITY;
+  const cost: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(INF));
+  const from: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  cost[0]![0] = 0;
+  for (let i = 0; i <= n; i++) {
+    for (let j = 0; j <= m; j++) {
+      const here = cost[i]![j] as number;
+      if (!Number.isFinite(here)) continue;
+      if (i < n && j < m) {
+        const c = here + Math.abs((labels[i] as number) - (onsets[j] as number));
+        if (c < (cost[i + 1]![j + 1] as number)) { cost[i + 1]![j + 1] = c; from[i + 1]![j + 1] = 1; }
+      }
+      if (i < n) {
+        const c = here + SKIP_LABEL_COST;
+        if (c < (cost[i + 1]![j] as number)) { cost[i + 1]![j] = c; from[i + 1]![j] = 2; }
+      }
+      if (j < m) {
+        const c = here + SKIP_ONSET_COST;
+        if (c < (cost[i]![j + 1] as number)) { cost[i]![j + 1] = c; from[i]![j + 1] = 3; }
+      }
+    }
+  }
+  const out = new Array<number | null>(n).fill(null);
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    const f = from[i]![j] as number;
+    if (f === 1) { out[i - 1] = onsets[j - 1] as number; i--; j--; }
+    else if (f === 2) { i--; }
+    else if (f === 3) { j--; }
+    else break;
+  }
+  return out;
+}
+
 type Row = {
   stem: string;
   id: string;
@@ -194,16 +287,15 @@ function main(): void {
       }
       for (const t of ear.silent) {
         silentTotal++;
-        if (!onsets.some((o) => Math.abs(o - t) <= 45)) silentOk++;
+        if (!onsets.some((o) => Math.abs(o - t) <= MATCH_WINDOW_MS)) silentOk++;
       }
     }
 
-    for (const label of fixture.label.events) {
-      let best: number | null = null;
-      for (const o of onsets) {
-        if (Math.abs(o - label.startMs) > MATCH_WINDOW_MS) continue;
-        if (best === null || Math.abs(o - label.startMs) < Math.abs(best - label.startMs)) best = o;
-      }
+    const evts = fixture.label.events;
+    const aligned = alignMonotonic(evts.map((l) => l.startMs), onsets);
+    for (let k = 0; k < evts.length; k++) {
+      const label = evts[k] as (typeof evts)[number];
+      const best = aligned[k] ?? null;
       const offset = best === null ? null : best - label.startMs;
       rows.push({
         stem: fixture.stem,
