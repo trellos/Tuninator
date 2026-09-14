@@ -298,6 +298,29 @@ export type EngineConfig = {
      */
     ringOutFluxRatio: number;
     /**
+     * How far above its own recent flux a *single* note's re-pick must stand
+     * when nothing else can vouch for it.
+     *
+     * The companion of `rearticulationSharpness`, and the reason that constant
+     * no longer decides the monophonic fallback on its own. Sharpness is flux
+     * over the frame's RMS: level-independent, but not PATH-independent. An amp
+     * sim holds the level flat while distortion keeps the spectrum churning, so
+     * ordinary sustain reads as sharp there as a real pick does on a direct
+     * input — and the fallback that branch ends in was accepting on sharpness
+     * alone. Measured: one performance split 8% of its events on a DI and 71%
+     * through an amp, and `sharpness` was the accepting test at 195 of the 294
+     * same-pitch fragments in the corpus.
+     *
+     * `fluxRatio` divides the same flux by what the kernel had adapted to over
+     * the preceding hops — the signal's own history — which reads alike on every
+     * path. `sharpEnough()` has always required both for a chord; this is the
+     * same requirement for a single note, at the short timescale the monophonic
+     * branch reads.
+     *
+     * Swept on the five 120bpm derivation fixtures. See DECISION-028.
+     */
+    rearticulationFluxRatio: number;
+    /**
      * Transient sharpness a *pitch-changing* attack needs before it starts a
      * new Note.
      *
@@ -770,6 +793,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     envelopeRiseRatio: 1.35,
     rearticulationRiseRatio: 1.2,
     rearticulationSharpness: 1.6,
+    rearticulationFluxRatio: 1.0,
     restrumSharpness: 0.9,
     restrumFluxRatio: 1.3,
     ringOutMs: 250,
