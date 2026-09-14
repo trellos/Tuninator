@@ -4101,6 +4101,26 @@ It also introduces an informational gate failure on
 `lead-line-amped-sixteenths-e-fsharp-140bpm` (pitch class) that baseline does
 not have. Both variants reverted; `src/` is unchanged by this pass.
 
+### The listening kit could not be re-scored, and nothing here rests on it
+
+The brief for this pass asks that the second-annotation figures be re-scored
+before being relied on — the 6/6 agreement on extra-note points, the 0.875/0.938
+implied ceiling, the control bar at n=2. **They could not be.** The kit writes
+everything under `.cache/relabel/` and `build-relabel-kit.ts` says in its header
+that those outputs are never committed, so the partially-filled answer sheet
+exists on the owner's machine and not in the repository;
+`npx tsx scripts/score-relabel.ts` has no input here.
+
+That is recorded rather than worked around because the honest consequence is
+worth stating: **none of the conclusions above use those figures.** Every number
+in this section comes from the corpus and the tracker's own trace. The kit's
+direction — that the annotator heard no new note where the detector split, so
+the detector is inventing boundaries rather than the labels undercounting — is
+consistent with the 294-of-318 same-pitch contiguous result measured here
+independently, but it is a separate witness that has not been checked, and its
+control bar was last reported at n=2. Do not cite it as corroboration without
+re-running it.
+
 ### What this establishes
 
 The brief asked whether the **retrospective** question ("that fragment already
