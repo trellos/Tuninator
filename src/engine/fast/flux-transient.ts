@@ -52,6 +52,9 @@ export class FluxTransientDetector implements ITransientDetector {
   private lastAttackAt: SourceTimeMs | null = null;
   private lastRiseRatio = 1;
   private lastDipRatio = 1;
+  /** Peak RMS since the last reported attack, and the lowest since that peak. */
+  private sincePeak = 0;
+  private sinceMin = Number.POSITIVE_INFINITY;
   private historyFrames = 1;
 
   constructor(sampleRate: number, config: EngineConfig, hopSamples: number) {
@@ -112,6 +115,8 @@ export class FluxTransientDetector implements ITransientDetector {
     this.lastAttackAt = null;
     this.lastRiseRatio = 1;
     this.lastDipRatio = 1;
+    this.sincePeak = 0;
+    this.sinceMin = Number.POSITIVE_INFINITY;
   }
 
   observe(
@@ -137,25 +142,26 @@ export class FluxTransientDetector implements ITransientDetector {
     const riseRatio = shortRms / Math.max(baseline, 1e-9);
     this.lastRiseRatio = riseRatio;
 
-    // Did the envelope FALL before this hop? `min` over the window just behind
-    // us against `max` over the window behind THAT. Computed on history only,
-    // before this hop is pushed, so an arriving attack cannot lift the body it
-    // is measured against. See `AttackEvidence.dipRatio`.
-    let dipRatio = 1;
-    {
-      const n = this.rmsHistory.length;
-      const dipFrom = Math.max(0, n - this.baselineFrames);
-      const bodyFrom = Math.max(0, n - this.baselineFrames * 3);
-      if (dipFrom > bodyFrom) {
-        let lo = Number.POSITIVE_INFINITY;
-        for (let i = dipFrom; i < n; i++) lo = Math.min(lo, this.rmsHistory[i] as number);
-        let hi = 0;
-        for (let i = bodyFrom; i < dipFrom; i++) hi = Math.max(hi, this.rmsHistory[i] as number);
-        // A body with no energy in it says nothing: leave the witness silent
-        // rather than manufacture a dip out of a divide by almost zero.
-        if (hi > 1e-9 && Number.isFinite(lo)) dipRatio = Math.min(1, lo / hi);
-      }
+    // Did the envelope FALL since the last attack?
+    //
+    // Anchored on the previous transient rather than on a fixed window, which
+    // is the whole point: a window is a bet about tempo, and the corpus runs
+    // from 500ms quarters to 107ms sixteenths, so any fixed span is several
+    // notes wide at one end and half a note at the other. The span that means
+    // the same thing at every tempo is "whatever is currently sounding" — from
+    // the attack that started it up to now.
+    //
+    // The minimum is taken after the PEAK, not from the attack itself, so a
+    // slow attack's own rise is not mistaken for the trough. See
+    // `AttackEvidence.dipRatio`.
+    if (shortRms > this.sincePeak) {
+      this.sincePeak = shortRms;
+      this.sinceMin = shortRms;
+    } else if (shortRms < this.sinceMin) {
+      this.sinceMin = shortRms;
     }
+    const dipRatio =
+      this.sincePeak > 1e-9 ? Math.min(1, this.sinceMin / this.sincePeak) : 1;
     this.lastDipRatio = dipRatio;
 
     this.rmsHistory.push(shortRms);
@@ -197,6 +203,14 @@ export class FluxTransientDetector implements ITransientDetector {
     // enforces its own interval, but the envelope witness has none of its own.
     if (this.lastAttackAt !== null && at - this.lastAttackAt < t.minIntervalMs) return null;
     this.lastAttackAt = at;
+
+    // This transient is reported, so the span the dip is measured over restarts
+    // here: whatever sounds from now on is a new thing sounding, and the note
+    // before it is no longer what "currently sounding" means. Re-anchored AFTER
+    // `dipRatio` was read above, so the value this attack carries still
+    // describes the span it interrupted rather than the empty one it begins.
+    this.sincePeak = shortRms;
+    this.sinceMin = shortRms;
 
     // Strength blends "how much energy arrived" with "how much the spectrum
     // changed", each saturating: a 10x rise is not ten times the evidence of a
