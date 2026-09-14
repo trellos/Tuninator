@@ -4303,6 +4303,274 @@ dynamic programming and a local-rate gate, were both measured and rejected, and
 neither is a full sequence decoder over the envelope. That is where the next
 attempt belongs, and it should not begin by re-deriving the seven rows above.
 
+## The re-timed labels, checked from the other render
+
+`fixtures/labels/**` was edited twice on 2026-09-14 on the owner's instruction:
+`b5cf94b` applied nine corrections from his own listening pass over fifteen
+disputed points, and `7a216fe` re-timed the two gridded DI sections
+(`same-pitch-eighths-a3-120bpm-di`, `same-pitch-eighths-sixteenths-e5-120bpm-di`)
+automatically with `scripts/retime-gridded-labels.ts` — roughly 330 labels moved
+on envelope evidence. `docs/validate-relabelled-material-prompt.md` asked for an
+adversarial check of the second pass, assuming it unsound until shown otherwise,
+with `src/` untouched and no detector output consulted. **Verdict: the
+re-timing holds on three of its four sections by evidence it never saw, is
+unverifiable but not worse on the fourth, and is kept.** The nine ear
+corrections stand throughout. Nothing under `fixtures/` changed in this pass.
+
+### Why the re-timing's own 6/6 could not count
+
+The script checks itself against six picks the owner confirmed by ear and
+reports 6/6 within 30ms. Four of those six are values it is forbidden to move
+(`LOCKED`), so it cannot fail them; only `s1662` (25.572s) and `s1698` (30.075s)
+test anything, and both were already within 3ms on the grid. Everything below
+is built to avoid that property.
+
+### What was reproduced first
+
+- Running the script on the `b5cf94b` labels (from git, never through the
+  working tree) reproduces `7a216fe` **byte for byte** on both files. The
+  commit is what the script produces; there is no hand edit hiding in it.
+- Structural: all eight same-pitch and held-then-picked files strictly ordered,
+  no `endMs > next.startMs`, no `endMs <= startMs`; contiguity preserved
+  (182/182 and 190/190 `endMs == next.startMs` on the two re-timed files).
+  Counts 183/183/191/190/72/72/120/120 as required. All eight locked values
+  intact, all five removed ids absent.
+- The lock does work: unlocked, the script proposes 19.745s for `s1615` over
+  the owner's 19.613s, exactly as the commit message says it once did.
+- `npm run eval` PASS, zero required failures, the one pre-existing
+  informational failure (`power-chords-b-a-g-fsharp-b-a-g-e-140bpm`);
+  `clean-lead-120bpm` gated pitch class 92.9%.
+- The neighbour-yield rule dropped exactly one proposal (`s1614` → 19.618s).
+
+### The two renders are 2.5ms apart, not 20–90ms
+
+The brief records two earlier offset measurements that disagreed (envelope
+correlation 9/12/25/56ms; onset matching 80/10/90/80ms). Cross-correlating a
+plain onset-strength function (half-wave-rectified log-RMS rise, 10ms window,
+2.5ms hop, no shared code with `src/engine/**`) between the DI and amped
+renders over the whole file, ±400ms:
+
+| take | lag | r at peak | runner-up (>30ms away) |
+|---|---|---|---|
+| `eighths-sixteenths-e5` | **2.5ms** | 0.545 (0.637 HF-weighted) | 0.257 at 240ms |
+| `eighths-a3` | **2.5ms** | 0.243 (0.223) | 0.065 at 258ms |
+| `quarters` (control) | 2.5ms (−17.5 HF) | 0.232 (0.294) | 0.118 at −30ms |
+
+Per-section lags agree (2.5/2.5, 2.5/7.5ms). The onset-function peaks of the
+two e5 renders coincide to ≤5ms pick by pick, and the owner's own ear gave the
+*same* time on both renders for three picks (25.572, 30.075, 31.344s). The
+renders are one performance, time-aligned to within one hop. Both earlier
+methods were wrong, and the 240–258ms runner-ups are the eighth-note period —
+the trap an onset-matching method with a window wider than the spacing falls
+into.
+
+### Cross-render: do the re-timed DI labels sit on picks in the amped audio?
+
+For each label set, each label (+2.5ms) is scored against the amped render two
+ways: the nearest amped onset-function peak within ±62ms (half a sixteenth,
+further bounded at the midpoints to the neighbouring labels), and the
+onset-function maximum within ±12.5ms of the label ("OSF@label"), against the
+same statistic at uniformly spaced points across the section ("chance"). Three
+label sets: the DI grid+ear (`b5cf94b`), the re-timed DI (`7a216fe`), and the
+amped file's own untouched labels. Broadband OSF; HF-weighted in parentheses.
+
+| e5 section | label set | within 25ms of an amped peak | \|Δ\| median / p90 | OSF@label | chance |
+|---|---|---|---|---|---|
+| eighths (64) | DI grid+ear | 57 | 13 / 30 | 0.84 (0.86) | 0.07 (0.11) |
+| eighths (64) | **DI re-timed** | 59 | 8 / 26 | 0.67 (0.81) | |
+| eighths (64) | amped's own | 61 | 10 / 20 | 0.79 (0.81) | |
+| sixteenths (127) | DI grid+ear | 118 | 10 / 25 | 0.18 (0.30) | 0.10 (0.17) |
+| sixteenths (127) | **DI re-timed** | **124** | 10 / **21** | **0.49 (0.66)** | |
+| sixteenths (126) | amped's own | 111 | 13 / 28 | 0.12 (0.25) | |
+
+With the peak floor raised from 0.05 to 0.2 of the section's 95th percentile
+(fewer, stronger peaks): sixteenths within-25ms goes grid 99, re-timed **115**,
+amped's own 87. The control — `quarters`' measured labels against its amped
+render — scores 67/72 within 25ms and OSF@label 0.20 against chance 0.04, so
+this is what "labels on picks" looks like on this instrument. In the e5
+sixteenth section the re-timed labels sit on 2.7× the amped onset energy the
+grid did (0.49 vs 0.18, chance 0.10); in the eighths section the grid was
+already on the picks and the re-timing changes little (both ≈0.8, chance 0.07).
+**This is evidence from audio the re-timing never read.**
+
+On `a3` the check has no power: OSF@label is at chance for every label set in
+both sections (0.05–0.13 against 0.07), the render correlation is 0.24, and
+`verify-fixtures.ts` finds an attack for 2 of the 183 amped labels. The A3
+amp-sim render is too compressed for a crude onset function to see picks. What
+the same instrument says on the DI audio (semi-circular for the re-timed set,
+which came from a different DI envelope statistic): a3 eighths within-25ms
+50 → 68 of 72, sixteenths 63 → 94 of 111.
+
+### `verify-fixtures.ts`: the concern count is blind here, the offsets are not
+
+Concern counts barely moved (a3-di 60 → 59, e5-di 47 → 47 on the `b5cf94b`
+baseline; the brief's 61/48 are the pre-ear figures) and the re-timing commit
+called the verifier "a crude instrument". The dismissal reaches the right
+conclusion for the wrong reason. A label earns an onset concern only when *no*
+energy rise exists inside a search bounded at the midpoints to its neighbours —
+±62.5ms at sixteenth spacing — and no move in this pass exceeds 90ms, so **the
+count cannot see a move smaller than the window by construction.** The
+verifier's per-label `nearestAttackDeltaMs` can, and it uses a different
+window (20ms/10ms hop), a different rule (1.35× rise over a 60ms baseline) and
+none of the re-timer's prominence logic. Verifier attack offset, p10..p90,
+`b5cf94b` → `7a216fe`:
+
+| section | labels with an attack found | p10..p90 before | p10..p90 after | \|Δ\|≥40ms before → after |
+|---|---|---|---|---|
+| a3 eighths | 69/72 | −40..+40 | −33..−10 | 22 → 0 |
+| a3 sixteenths | 54 → 55 of 111 | −50..+50 | −28..−5 | 32 → 0 |
+| e5 eighths | 64/64 | −20..+20 | −18..−8 | 1 → 1 |
+| e5 sixteenths | 80/127 | −30..+30 | −18..0 | 10 → 1 |
+
+The spread tightens three- to four-fold on every section and lands on a
+constant −13 to −20ms: the re-timed labels sit at the RMS *peak*, the verifier
+fires at the *rise*, and that lag is uniform where before it was scattered.
+Per-label "closer/farther" counts (e.g. e5 sixteenths 49 closer, 27 farther)
+are inflated by that constant and are not the right reading. On `a3-di` the
+verifier's unsupported list (span never above the engine's gate) went from
+eleven labels to six.
+
+### Inter-onset intervals against a human reference
+
+A grid has zero spread by construction. A human does not. `quarters-di` and
+`held-then-picked-di` carry measured one-to-one onsets and are the reference
+for how this player's intervals scatter.
+
+| series | n | nominal | SD | MAD | within ±20 / ±40ms |
+|---|---|---|---|---|---|
+| **human:** `quarters-di` | 71 | 500 | 16.5 | 10 | 85% / 99% |
+| **human:** `held-then-picked-di`, quarter-note IOIs | 95 | 500 | 20.1 | 10 | 83% / 94% |
+| e5 eighths, grid+ear | 63 | 250 | 0.0 | 0 | 100% |
+| e5 eighths, re-timed | 63 | 250 | 21.5 | 12 | 75% / 90% |
+| e5 sixteenths, re-timed, both ends moved | 104 | 125 | **22.0** | 13 | 82% / 98% |
+| e5 sixteenths, re-timed, ≥1 end still on grid | 22 | 125 | 38.6 | 20 | 55% / 82% |
+| a3 eighths, re-timed | 71 | 250 | 21.3 | 14 | 62% / 93% |
+| a3 sixteenths, re-timed, both ends moved | 46 | 125 | 35.8 | 16 | 70% / 87% |
+| a3 sixteenths, re-timed, ≥1 end still on grid | 64 | 125 | 45.2 | 40 | 23% / 47% |
+
+The re-timed e5 sections and the a3 eighths scatter like the human reference
+(SD 21–22ms against 16–20; MAD 12–14 against 10): not tighter than a player,
+which would have meant snapping to something periodic, and not wildly looser,
+which would have meant losing the beat. The a3 sixteenth section does not: 22
+of its 110 intervals are under 85ms and 17 are over 175ms, in 22 adjacent
+short/long pairs, and **every one of the 39 involves one of the 33 labels the
+re-timing left on the grid.** That is the interleaving the brief warned about,
+quantified.
+
+### The ear points, leave-one-out
+
+Unlocking one owner-confirmed label at a time and reading the script's
+proposal for it is a genuine accuracy measurement at six points; the 6/6 above
+is not.
+
+| label | owner's ear | proposal, unlocked | Δ |
+|---|---|---|---|
+| a3 `s1627` | 23275 | 23280 | +5 |
+| e5 `s1662` | 25572 | 25583 | +10.5 |
+| e5 `s1684` | 28339 | 28345 | +6 |
+| e5 `s1698` | 30075 | 30075 | 0 |
+| e5 `s16108` | 31344 | 31348 | +3.5 |
+| e5 `s1615` | 19613 | **19745** | **+132** |
+
+Five of six within 11ms. The sixth is a whole sixteenth off, and the
+neighbourhood explains it. Peaks in both renders between 19.0 and 20.1s sit at
+19042, 19275, 19370 (weak), 19513, 19617 (weak, prominence 1.2), 19750, 19837
+(weak), 19978, 20090 — nine picks, alternating strong and weak, for the nine
+labels `s1610`–`s1618`. Counted in order, the pick at 19617 is `s1614`'s and
+19750 is `s1615`'s, which is exactly what the unlocked script proposed. The
+owner reported a *time* (19.613s, correct — he heard the weak pick the envelope
+barely registers); the lock enforces an *id*, `s1615`, that the ear never
+asserted. With the lock, the yield rule then freezes `s1614` on its grid
+position, 38ms before the real pick at 19613, and the pick at 19750 carries no
+label at all. The same 38ms pair exists in `b5cf94b`, where the correction was
+applied to `s1615` without revisiting `s1614`; `7a216fe` preserved it rather
+than created it. It is the one place the lock made the labels worse than the
+unlocked method would have, and it needs the owner to say which sixteenth the
+19.613s pick is, not a re-run.
+
+### The A3 sixteenth section, specifically
+
+- The re-timer located 78 of 111 picks. A plain onset function on the DI finds
+  84–89 events in the section at a sane floor (74 at a strict one), against 111
+  labels: roughly a third of this player's off-beat sixteenths on A3 are too
+  quiet for any envelope method, and the labels for those stay on the grid,
+  up to ±65ms from where the pick would be by interpolation. The 33 are `s166
+  s1611 s1614 s1618 s1623 s1625 s1627 s1630 s1636 s1638 s1641 s1643 s1646
+  s1648 s1650 s1652 s1658 s1659 s1663 s1667 s1675 s1677 s1679 s1681 s1683
+  s1685 s1687 s1690 s1693 s1696 s1697 s1699 s16107` (the four unmoved eighths
+  are `e823 e834 e842 e870`; on e5, `e817 e824 e831 e833 e844 e856 e864` and
+  `s164 s169 s1614 s1615 s1669 s1670 s1678 s1684 s1694 s1696 s1698 s16108`).
+- Where a pick is missing the alignment's skip choice can be an exact tie. At
+  `s1652`–`s1654` (grid 26355/26480/26605; picks 26285, 26420, 26540, then a
+  240ms gap to 26780) the two assignments cost 265 each; the script skipped
+  `s1652`, the count-consistent reading skips `s1654`. Both label the same
+  real picks — only the phantom's position differs — so this is not a cascade,
+  but it is a coin toss the method cannot call.
+- The section has pick-like events with no label at both ends, in the grid and
+  the re-timed set alike: 19.89s (prominence 5.3, between `e872` at 19.760 and
+  `s161` at 20.020, 130ms from each) and 33.96s (prominence 6.5, 145ms after the
+  last label). With `s1692` removed by ear the section holds 111 labels; the
+  audio shows 112–113 pick-like events. Whether the take ends at 33.815s or
+  33.960s, and whether the sixteenths begin a pickup early, is the player's to
+  say.
+- Around the removed `s1692` (31.355s) the DI shows a weak rise at 31.357s
+  (0.29 against ≈3.3 for the strong picks) and nothing at all near 31.16s; the
+  ear's "no pick" is consistent with the audio. Around e5's removed `s1628`
+  (21.325s) the DI shows a weak event at 21.302s of the same strength (0.88) as
+  the events at 21.050s and 21.552s that the re-timing *did* label (`s1626`,
+  `s1630`). The ear outranks the envelope; the owner may still want to hear
+  those three off-beats as a set.
+
+Per label, nothing in this section got worse: 78 labels moved onto DI events
+(median |Δ| 43ms, p90 62, none beyond 68) and 33 stayed where they were. As a
+*sequence* it is now non-physical, and no instrument available here can verify
+it from the other render. It is flagged, not reverted: a wholesale revert would
+discard the three verified sections to protect a fourth that a revert would not
+improve.
+
+### The amped labels were never the DI timings
+
+`docs/SAME-PITCH-MATERIAL.md` said the amped renders carry the DI timings. For
+the two fast takes they do not, and never did: each render's grid was anchored
+on its *own* first envelope rise, which fires late on the compressed signal, so
+the amped grids sit **195ms (A3) and 225ms (E5) after the DI grids** while the
+audio is aligned to 2.5ms. The owner's corrections show it directly: the same
+physical pick at 31.344s is `s16108` in `e5-di` and `s16106` in `e5-amped`; the
+same phantom at 21.3s is `s1628` in DI and `s1626` in amped. Consequences:
+
+- The brief's fourth declared weakness — that the DI removal at 34.050 should
+  carry to `e5-di`, and so on — transfers by id, which is invalid here. There is
+  no `e5-di` label at 34.050 to remove (its last is 33.810, and the amped
+  `s16128` at 34.050 the owner removed sat *after* the last pick of the
+  performance precisely because that grid runs 225ms late).
+- In the sixteenth sections the amped files' own labels sit at chance on their
+  own audio (OSF@label 0.12 against 0.10; 87 of 126 within 25ms of a strong
+  peak against 115 for the re-timed DI labels +2.5ms). The amped eighth labels
+  are on picks. The natural repair is to carry the re-timed DI *times*, not
+  ids, across at +2.5ms — a label edit, so the owner's call.
+- `quarters` really is identical on both renders (0 of 72 differ);
+  `held-then-picked`'s amped labels differ from its DI labels by a median 15ms
+  (max 26).
+
+### What this leaves for the owner
+
+1. Which sixteenth the 19.613s pick is (`s1614` by count), and with it the
+   phantom at 19.575 and the unlabelled pick at 19.750.
+2. Whether `a3`'s sixteenths begin at 19.89s and end at 33.96s (111 labels
+   against 112–113 events).
+3. Whether to carry the re-timed DI times to the amped files at +2.5ms.
+4. The three weak off-beats at 21.050 / 21.302 / 21.552s in `e5-di`, two of
+   which are labelled and one of which he removed.
+
+Every window used here was checked against the material's spacing before being
+trusted: the nearest-peak search is bounded at ±62ms and at the midpoints to
+the neighbouring labels, the onset function's peak-separation is 20ms, and its
+window 10ms — all under the 125ms sixteenth. Numbers in this section come from
+scratch scripts kept outside the tree; the repository scripts they were built
+on are `verify-fixtures.ts` (run with the `b5cf94b` labels substituted in
+memory, the tree untouched) and `retime-gridded-labels.ts` (run against the
+`b5cf94b` labels with output redirected away from `fixtures/`).
+
 ## Lessons carried over from the retired lineage
 
 DECISION-023 closed the pre-rewrite `src/core/` lineage on its held-out numbers.

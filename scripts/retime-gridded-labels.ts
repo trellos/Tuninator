@@ -31,6 +31,18 @@
  * plain RMS envelope sharing no code with `src/engine/**`. Run without `--write`
  * first and read the agreement against the owner's ear that it prints.
  *
+ * **STATUS: applied once (7a216fe) and validated (DECISION-029). Do not re-run
+ * with `--write` without reading the findings entry first.** Two limitations
+ * were measured there. (1) The lock holds an (id, time) PAIR, but the owner's
+ * ear supplies a TIME, not an id: at 19.613s the count-consistent assignment
+ * puts that pick on `s1614`, the lock pins it to `s1615`, and the neighbour
+ * yield rule then freezes `s1614` on a grid position 38ms before a real pick
+ * while the pick at 19.750s carries no label. (2) Where a section's off-beat
+ * picks are too weak for the envelope (a third of `a3-di`'s sixteenths), the
+ * skipped labels stay on the grid interleaved with re-timed neighbours, and
+ * the alignment's skip choice can be an exact cost tie between two adjacent
+ * labels. Both need the owner's ear, not a re-run.
+ *
  * Usage:
  *   npx tsx scripts/retime-gridded-labels.ts
  *   npx tsx scripts/retime-gridded-labels.ts --write

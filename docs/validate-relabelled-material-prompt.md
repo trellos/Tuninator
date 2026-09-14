@@ -1,7 +1,18 @@
 # Validate the re-labelled 120bpm same-pitch material
 
-> **STATUS: OPEN.** This is a validation task, not a detection task. Nothing in
-> `src/` should change. Update this banner when it reaches a verdict.
+> **STATUS: CLOSED 2026-09-14 — verdict: the re-timing (`7a216fe`) holds and is
+> kept; `b5cf94b` stands.** Three of the four re-timed sections were confirmed by
+> instruments the re-timing never consulted (the amped render, the verifier's
+> attack search, inter-onset-interval spread against a human reference, and a
+> leave-one-out at the owner's ear points); the fourth, `a3-di`'s sixteenth
+> section, could not be verified either way and is flagged as unreliable. Two
+> of this brief's premises were wrong and are corrected in the record: the two
+> renders are aligned to within 5ms, not 20–90ms; and the amped label files of
+> the two fast takes were never the DI timings — their grids are anchored
+> 195ms and 225ms later — so a removal cannot be carried across renders by
+> label id. Full numbers in `docs/DETECTION-FINDINGS.md` ("The re-timed labels,
+> checked from the other render") and DECISION-029. `src/` is unchanged;
+> `fixtures/labels/**` is unchanged by the validation.
 
 Read `AGENTS.md` in full before anything else. Then read this whole brief before
 running anything.

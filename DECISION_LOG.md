@@ -7,6 +7,72 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-029]: Keep the automated re-timing of the two gridded DI sections; the A3 sixteenth section is flagged, not reverted
+* **Date:** 2026-09-14
+* **Status:** Accepted
+* **Owner:** Fixture ground truth (validation pass)
+* **Context:** `fixtures/labels/**` is read-only against the detector, and was
+  edited twice on the owner's instruction: `b5cf94b` applied nine corrections
+  from his own listening pass (human annotation, the highest authority in the
+  repository), and `7a216fe` re-timed roughly 330 labels in the two gridded DI
+  sections with `scripts/retime-gridded-labels.ts`, on envelope evidence that is
+  weaker than an ear, against material this project has mis-measured before.
+  The re-timing's own check — 6/6 of the owner's picks within 30ms — is nearly
+  circular, four of the six being values it is forbidden to move. The brief
+  (`docs/validate-relabelled-material-prompt.md`) asked whether the automated
+  pass is sound, with the instruction to revert `7a216fe` alone if not, never
+  to touch `src/`, and never to consult Tuninator's output.
+* **Decision:** **Keep `7a216fe`; `b5cf94b` stands; no further label edit.**
+  The re-timing reproduces byte for byte from the script; every structural,
+  count, lock and eval check passes. Three of its four sections are confirmed
+  by evidence it never read: on `e5-di` the re-timed sixteenth labels sit on
+  2.7× the onset energy in the *amped* render that the grid did (0.49 vs 0.18,
+  chance 0.10; 115 vs 99 of 127 within 25ms of a strong amped peak), the
+  verifier's attack-offset spread tightens three- to four-fold on all four
+  sections, inter-onset intervals scatter like this player's measured
+  quarter-note takes (SD 21–22ms against 16–20), and a leave-one-out at the
+  owner's six ear points lands five within 11ms. The fourth section, `a3-di`'s
+  sixteenths, located 78 of 111 picks and is not verifiable from the amped
+  render (that audio is too compressed for any crude onset function); per label
+  it is no worse than the grid, but as a sequence it is non-physical (39 of 110
+  intervals outside 85–175ms, every one involving an unmoved grid label). It is
+  flagged as unreliable in `docs/SAME-PITCH-MATERIAL.md` with its 33 unmoved
+  ids listed, rather than reverted, because a wholesale revert would discard the
+  three verified sections and improve nothing.
+* **Alternatives Considered:** (a) **Revert `7a216fe`** — rejected: the grid it
+  would restore is measurably further from the picks on three sections and no
+  closer on the fourth. (b) **Revert only the A3 sixteenth section** — rejected:
+  the brief permits a wholesale revert or nothing, and any partial edit of
+  `fixtures/labels/**` needs the owner's ear. (c) **Re-run the script with the
+  lock changed to hold times rather than (id, time) pairs**, which would fix the
+  one place the lock demonstrably hurt (`s1614`/`s1615`) — rejected here for the
+  same reason: a further automated edit of ground truth is not this pass's to
+  make; the limitation is recorded in the script header and the findings. (d)
+  **Carry the re-timed DI times to the amped files** at the measured +2.5ms
+  render offset — deferred to the owner; it would be the right repair for amped
+  sixteenth labels that currently sit at chance on their own audio. (e) **Trust
+  the re-timing's own 6/6** — rejected as the circular check the brief named.
+* **Consequences:** Positive — the two DI takes that were the corpus's worst
+  onset data now carry measured onsets on 318 of their 374 labels, checked from
+  a second recording of the same performance; the two renders are established
+  as aligned to 2.5ms (both earlier offset measurements, 9–56ms and 80–90ms,
+  were wrong); and three false premises in the record are corrected: the amped
+  label files of the two fast takes were never the DI timings (their grids are
+  anchored 195/225ms later, so label ids do not name the same pick across
+  renders), `verify-fixtures.ts`'s concern count cannot see a sub-window move by
+  construction (its per-label offsets can, and do), and a removal cannot be
+  carried across renders by id. Negative — the A3 sixteenth section remains
+  unusable for anything needing better than ±65ms, now with a non-physical
+  interval structure; the amped fast-take labels are unchanged and known to be
+  off their picks in the sixteenth sections; and four questions are left with
+  the owner (which sixteenth the 19.613s pick is; whether A3's sixteenths run
+  19.89–33.96s against 111 labels; whether to carry DI times to the amped
+  files; the three weak off-beats at 21.05/21.30/21.55s in `e5-di`). The
+  material stays PROVISIONAL and unassigned to derivation or held-out.
+  `src/` is unchanged.
+
+---
+
 #### [DECISION-028]: The per-boundary threshold family is exhausted; sequence modelling is the next step
 * **Date:** 2026-09-14
 * **Status:** Rejected
