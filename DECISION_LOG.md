@@ -73,10 +73,19 @@ are what keep later work from repeating them.
   DECISION-026's own headline — split rates go 8% → 71%, 3% → 30% and 7% → 50%
   between the DI and amped renders of one performance — which locates the missing
   evidence in the onset features, not in segmentation bookkeeping: a witness that
-  survives compression and distortion. **Two decisions this pass deliberately did
-  not take, both the owner's:** assigning the DECISION-026 material to derivation
-  or held-out, and reviewing its provisional labels. Everything above is reported
-  on the corpus as it stands, and no constant was fitted to any of it.
+  survives compression and distortion. **Three decisions this pass deliberately did
+  not take, all the owner's:** assigning the DECISION-026 material to derivation
+  or held-out, reviewing its provisional labels, and resolving the listening kit —
+  whose human-pass figures the brief cites but which exist nowhere in this tree,
+  since the kit writes to the never-committed `.cache/relabel/`. That last one is
+  not merely missing: the committed MACHINE pass points the opposite way on the
+  decisive row, hearing an onset at 55 of 106 extra-Note boundaries where the
+  labels have none, against the brief's n=6 human reading of zero. The
+  disagreement is unresolved, and its direction runs against forward absorption —
+  articulations the labels do not carry would make some of the 294 same-pitch
+  extras real notes that absorbing destroys without any miss count showing it.
+  Everything above is reported on the corpus as it stands, no constant was fitted
+  to any of it, and no conclusion here depends on either annotation pass.
 
 ---
 

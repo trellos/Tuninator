@@ -4113,13 +4113,39 @@ exists on the owner's machine and not in the repository;
 
 That is recorded rather than worked around because the honest consequence is
 worth stating: **none of the conclusions above use those figures.** Every number
-in this section comes from the corpus and the tracker's own trace. The kit's
-direction — that the annotator heard no new note where the detector split, so
-the detector is inventing boundaries rather than the labels undercounting — is
-consistent with the 294-of-318 same-pitch contiguous result measured here
-independently, but it is a separate witness that has not been checked, and its
-control bar was last reported at n=2. Do not cite it as corroboration without
-re-running it.
+in this section comes from the corpus and the tracker's own trace.
+
+**And the two halves of that kit disagree on precisely this axis, which the
+brief does not say.** What is committed to this repository is the MACHINE pass,
+and "The label ceiling, measured" above reports it hearing an onset at **55 of
+106** extra-Note boundaries where the shipped labels have none — closing that
+the strict corroborated reading barely moves the figure, that it is not
+concentrated on any one signal path, and that "an 'extra Note' at a moment where
+an independent annotator hears an articulation is not unambiguously the
+detector's error", which "machine-only cannot settle". The human figures the
+brief quotes point the other way — 6 of 6 agreeing with the shipped labels, zero
+`ann+ lab-` — and they are **n=6 on a control bar of n=2**, recorded in the
+brief's prose and nowhere else in this tree. The section above still describes
+the human half as "built and waiting"; whoever ran the partial pass did not
+commit its results, so there is no answer sheet and no updated table to check
+them against.
+
+| | extra-note points | annotator hears, labels lack |
+|---|---|---|
+| machine pass (committed, scored) | 106 | **55** |
+| human pilot (brief prose only) | 6 | **0** |
+
+The direction of that unresolved disagreement matters here, and it runs against
+forward absorption rather than for it. The negative above is measured against
+LABELS — a miss is a label with no Note — so labels undercounting cannot
+manufacture one, and the 161 → 383 and 161 → 175 results stand whichever
+annotator is right. But if the machine pass is even partly right, some fraction
+of the 294 same-pitch extras are articulations somebody played that the labels
+do not carry, and absorbing those costs real notes the miss count never sees.
+The uncertainty makes forward absorption look better than it is, not worse.
+
+Do not cite either half as corroboration without re-running it, and do not cite
+the human figures at all until they are committed.
 
 ### What this establishes
 

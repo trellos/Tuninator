@@ -38,6 +38,20 @@
 > The open problem this leaves is the one DECISION-026's headline points at: a
 > re-pick witness that survives compression and distortion. That is an
 > onset-feature question, not a segmentation one.
+>
+> **One correction to the section "What the blind listening pass already says"
+> below: those human figures are not in this repository.** The kit writes to
+> `.cache/relabel/`, which is never committed, so no answer sheet exists here and
+> `score-relabel.ts` cannot be run — the re-scoring this brief asks for is not
+> possible in the tree. What IS committed is the MACHINE pass, and it points the
+> **opposite** way on the one row that matters: it hears an onset at 55 of 106
+> extra-Note boundaries where the labels have none, and `DETECTION-FINDINGS.md`
+> concludes that machine-only cannot settle whether those are real. The human
+> reading quoted below is n=6 on a control bar of n=2, and the findings section
+> it belongs to still says the human half is "built and waiting". Treat the
+> figures below as an uncommitted claim, not a prior — and note the direction:
+> if the machine pass is even partly right, some of the "extra Notes" are notes
+> somebody played, which makes absorbing them worse, not better.
 
 
 Read `AGENTS.md` in full before your first edit. It is the contributor-facing source of
