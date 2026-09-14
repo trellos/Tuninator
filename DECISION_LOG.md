@@ -7,6 +7,64 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-026]: Land the 120bpm same-pitch material with generated labels, unconfigured and unassigned
+* **Date:** 2026-09-14
+* **Status:** Proposed
+* **Owner:** Detection architecture
+* **Context:** DECISION-022 established that the derivation set holds about seven
+  same-pitch re-articulations, all inside `chords-a-bm-g-d-2x-120bpm`, and named
+  new derivation material as the precondition for further work on that decision —
+  "minutes of deliberate same-pitch re-picking (varied velocity, muted and open,
+  sixteenth spacing and slower) through the corpus's three signal paths, labelled
+  by ear", closing with "the fix needs the project owner at a guitar, not an agent
+  at a keyboard". The owner recorded four takes at 120bpm, each as DI and through
+  an amp sim: quarter notes on A3 then E5; eighths on A3; eighths then sixteenths
+  on E5; and, per pitch across all six strings, four cycles of one held measure
+  followed by one measure of quarter notes. The separate, downstream motivation is
+  a consumer scoring one target per pick, where a spurious same-pitch tail fragment
+  costs a miss and a wrong note and cascades through the phrase.
+* **Decision:** Land all eight files with generated labels — 1,024 events — while
+  making three things explicitly unfinished. **(1)** The labels are PROVISIONAL and
+  say so in every `timingNotes`. Structure comes from the player's description and
+  onsets from a plain RMS envelope written for the job; Tuninator placed nothing,
+  so the labels are not derived from the detector they will grade. `quarters` and
+  `held-then-picked` carry measured onsets one-to-one (the envelope rule found
+  exactly 72 and 120, matching the structure); the two fast takes sit on a
+  subdivision grid anchored on the first measured onset with one fitted median
+  offset, because that rule cannot resolve every pick in a fast run. **(2)** No
+  `fixtures/eval.config.json` entries, so the eval reports them and gates nothing —
+  correct for labels nobody has reviewed. **(3)** No derivation/held-out assignment;
+  that is DECISION-022's substance and wants a deliberate choice, with both renders
+  of one take on the same side because they are one performance.
+* **Alternatives Considered:** (a) Audio with no labels at all — `decode-fixtures.ts`
+  discovers fixtures from label files, so unlabelled audio is invisible and the
+  material would contribute nothing. Rejected as landing the cost without the
+  benefit. (b) Hand-annotating by ear — correct, and not something this agent can
+  do; the generated set is scaffolding for that pass, not a substitute, and
+  `verify-fixtures.ts` plus the relabel kit exist to check it. (c) Writing labels
+  from Tuninator's own output — rejected outright as the circularity `AGENTS.md` §3
+  names. (d) Assigning derivation/held-out here — rejected: splitting the corpus's
+  new supply of the phenomenon is the decision DECISION-022 was about, not a side
+  effect of landing files.
+* **Consequences:** Positive — the phenomenon that eight converging ceiling studies
+  could not read now exists in quantity, across two signal paths, with
+  `held-then-picked` putting one-pick-one-Note and four-picks-four-Notes on
+  identical material at six pitches from F#2 to D5. Negative, and the reason the
+  status is Proposed — **the labels are generated and two takes disagree with what
+  was described**: `quarters` runs 10 measures of E5 rather than 8 (pitch switch
+  measured at 17.970s, 32 then 40 evenly spaced notes), and `eighths A3` shows no
+  sixteenth section at all under three independent measures (onset spacing,
+  envelope modulation, envelope autocorrelation), so it is labelled as 16 measures
+  of eighths. Both need the player's confirmation; until then those two label sets
+  are guesses and anything derived from them inherits that. Also recorded: the
+  derivation/held-out predicate is implemented three different ways across
+  `measure-decision-separability.ts`, `measure-same-pitch-population.ts` and
+  `measure-dp-segmentation.ts`, and these stems fall on opposite sides of the first
+  two and the third — whichever assignment is chosen, all three need updating
+  together or a future reading silently mixes the sides.
+
+---
+
 #### [DECISION-025]: Split the README into a short front door plus `docs/`; the intro is human-owned
 * **Date:** 2026-09-10
 * **Status:** Accepted

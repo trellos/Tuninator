@@ -139,6 +139,16 @@ The held-out set is four performances heard three ways, not twelve independent
 samples — keep that in mind before treating a twelve-take result as more
 statistically solid than it is.
 
+**Eight further fixtures sit in neither column yet.** The 120bpm same-pitch
+material (DECISION-026) — four takes, DI and amped, 1,024 events — was recorded
+to answer DECISION-022, and is deliberately landed unassigned, with no
+`eval.config.json` entries and with PROVISIONAL generated labels. It gates
+nothing and is fitted by nothing until someone assigns it and reviews the
+labels. Read `docs/SAME-PITCH-MATERIAL.md` before using it for either purpose;
+two of the four takes do not match what the player described and say so there.
+Note also that the derivation predicate is implemented three different ways
+across the measurement scripts, and these stems fall on opposite sides of them.
+
 ### Measurement scripts
 
 ```
