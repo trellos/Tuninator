@@ -298,25 +298,6 @@ export type EngineConfig = {
      */
     ringOutFluxRatio: number;
     /**
-     * How far the envelope must have FALLEN before a transient with no other
-     * witness may re-articulate a single note.
-     *
-     * `AttackEvidence.dipRatio`: the quietest hop just before the attack over
-     * the loudest hop before that. A note that finished and was picked again
-     * fell away first; a boundary invented inside one sounding note did not.
-     *
-     * This is the only witness available here that is not read AT the
-     * transient, and that is why it is the only one that works. Measured over
-     * 1,570 labelled onsets against 106 boundaries the recognizer invented,
-     * every reading taken at the transient tops out at 0.698 AUC — under the
-     * standing 0.73 bar, and the best of them, `sharpness`, is the one this
-     * branch was already using. `dipRatio` holds 0.743-0.759 across a
-     * threefold range of window sizes on the 120bpm same-pitch material.
-     *
-     * Swept on the derivation fixtures. See DECISION-028.
-     */
-    rearticulationDipRatio: number;
-    /**
      * Transient sharpness a *pitch-changing* attack needs before it starts a
      * new Note.
      *
@@ -789,7 +770,6 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     envelopeRiseRatio: 1.35,
     rearticulationRiseRatio: 1.2,
     rearticulationSharpness: 1.6,
-    rearticulationDipRatio: 1.0,
     restrumSharpness: 0.9,
     restrumFluxRatio: 1.3,
     ringOutMs: 250,

@@ -237,7 +237,6 @@ describe("rig calibration", () => {
       fluxRatio: 9,
       heldSharpness: t.restrumSharpness,
       heldFluxRatio: t.restrumFluxRatio,
-      dipRatio: 1,
       strength: 1,
     } satisfies AttackEvidence;
     const frame = { gated: false } as FastFrame;
@@ -268,7 +267,6 @@ describe("rig calibration", () => {
       fluxRatio: 9,
       heldSharpness: t.restrumSharpness,
       heldFluxRatio: t.restrumFluxRatio,
-      dipRatio: 1,
       strength: 1,
     } satisfies AttackEvidence;
     const frame = { gated: false } as FastFrame;
