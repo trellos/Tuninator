@@ -4782,3 +4782,57 @@ The dip requirement stays at −6dB. What would settle it is the DI derivation
 material DECISION-029 already names as its precondition, plus a reviewed
 label pass over the eight takes — not a threshold read off the takes
 themselves.
+
+### Why the merge does not move the split axis at all
+
+Worth stating as a number rather than an impression, because the question comes
+up every time the corpus is re-scored: `measure-tail-fragments.ts` reads
+**296 same-pitch contiguous fragments on `main` and 296 on the merge.** Not
+nearly the same — the same. `detached` stays 0 and `other pitch` stays 24, so
+the whole 320-fragment population is unchanged in shape as well as in count.
+Split *events* go 342 to 340 and the composition shifts between fixtures (the
+DI triplet 23 to 11, the eight takes 243 to 252), but the defect itself does
+not move.
+
+That is what the DI repair is: a PROPOSAL-side change. The fine-hop witness
+adds boundaries where the 13.3ms broadband kernel proposed none, and the prefix
+rule absorbs a pre-pick fragment BACKWARD into the note the pick plays.
+Neither can remove a boundary struck inside a note that is already sounding,
+and that is the whole of this defect.
+
+`measure-split-cause.ts` confirms it from the other end by naming the site that
+accepted each of the 296:
+
+```
+sharpness                199      envelope-rise             35
+(no rearticulation)       30      new-pitch                 21
+ring-out-sharpness         4      fine-onset                 4
+chord-decay-excess         3
+```
+
+**The fine witness accepts four of the 296.** Two thirds are accepted by
+`sharpness`, a test that predates this work and that neither branch touched.
+The thirty with no accepted rearticulation within 60ms did not come from the
+re-articulation path at all — the region lane or a Note ending and restarting —
+and are a separate defect sharing a symptom.
+
+And the readings at those wrong boundaries are not marginal: sharpness has a
+**median of 3.94 and a p90 of 9.78** where they were accepted. The engine is
+not failing to compute something at these instants. It is reading a real
+spectral rise and calling it a pick, which is exactly DECISION-028's 0.698 AUC
+ceiling seen from the phantom side instead of the missed side. The same
+decision that lets a quiet re-pick through is the one that lets a compressed
+note's own sustain through, which is why the two failure modes cannot be traded
+off by moving a threshold: at roughly five real re-picks per phantom, all seven
+configurations DECISION-028 measured removed about one real note per phantom.
+The `fineOnsetDipDb = 0` reading above is that same exchange rate in the other
+direction — 23 events recovered, splits 340 to 351.
+
+The physical root is unchanged and is where the asymmetry points: on the *same
+performance*, `same-pitch-quarters-a3-e5` splits 71% of its events on the amped
+render and 12% on the DI, and `held-then-picked-six-strings` 50% against 7%.
+Compression re-inflates the decay and the amp's harmonic re-excitation puts
+genuine flux inside one note. A listener does not judge these instants in
+isolation — the rhythm and a monotonically decaying envelope across the phrase
+are what make a single picked note obvious to an ear — and that is the sequence
+claim DECISION-028 named as the precondition, not another per-boundary gate.
