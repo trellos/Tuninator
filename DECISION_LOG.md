@@ -7,6 +7,111 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-032]: The two same-pitch benches measure different targets; name which question each answers
+* **Date:** 2026-09-15
+* **Status:** Accepted
+* **Owner:** Evaluation methodology
+* **Context:** DECISION-031's gate measured the DECISION-030 rate feature at
+  0.533 on the re-articulation decision table, against 0.826 in the study that
+  produced it. The discrepancy was assumed to be estimator error and was not:
+  scored on the rate study's own sub-population (accepted, settled, same-pitch,
+  1,038 derivation rows) the same feature on the same rows reads **0.805**
+  against the rate study's target and **0.526** against the decision table's,
+  reproducing each study's own number. The inputs agree; the ground truth does
+  not.
+* **Decision:** **Record that the two benches ask different questions, and which
+  question each answers, because both files describe themselves as being about
+  "the same-pitch re-articulation decision".**
+  `measure-decision-separability.ts` asks a BOUNDARY-shaped question: does an
+  uncovered label begin within 70ms of this decision, so should the split have
+  been made? `measure-rate-relative-merge.ts` asks an OUTCOME-shaped question:
+  did the matcher pair the Note this split created with a label, so is this
+  emitted Note surplus? **They disagree on 278 of 1,038 shared rows, 26.8%** —
+  162 where the boundary was right but the child went unpaired, 116 where the
+  boundary was wrong but the child got the label. Neither is wrong; they are
+  answers to different questions. Choose by what is being decided: a consumer
+  scoring one target per pick pays for surplus Notes, so the outcome-shaped
+  target governs anything about fragmentation, and the boundary-shaped target
+  governs anything about segmentation.
+* **Alternatives Considered:** (a) **Treating one as the correct target and
+  retiring the other** — rejected: both questions are real, and the 73.2%
+  agreement means neither is a noisy version of the other. (b) **Reconciling
+  them into a single target** — rejected for now; the 278 disagreements are
+  where a Note is right about the boundary and wrong about its own extent, or
+  vice versa, and collapsing that loses the distinction rather than resolving
+  it. (c) **Assuming the gap was estimator error**, which was the first
+  hypothesis — refuted by scoring both targets on identical rows.
+* **Consequences:** Positive — a class of future confusion is closed, and two
+  existing conclusions can now be read correctly. **DECISION-021's rejection of
+  the learned onset head was measured against the BOUNDARY-shaped target**, on
+  161 rows with 59 positives; that verdict stands for the question it asked and
+  is not evidence about a model trained and judged on surplus Notes, which has
+  never been run. DECISION-030's shipped gate operates on the outcome-shaped
+  target, which is why it improves the fragmentation numbers while moving
+  nothing on this table. Negative — every AUC in this repository predating this
+  entry now needs its target identified before it is compared with another, and
+  the two ceiling figures most often quoted (0.698 at the boundary, 0.926 for
+  the rate feature) are NOT on the same scale and must never be cited as though
+  they were. This is the fifth instance of "a bench ranking is not a pipeline
+  ranking" and the sharpest: not a bench disagreeing with the engine, but two
+  benches disagreeing with each other about the ground truth.
+
+---
+
+#### [DECISION-031]: Rhythm features do not transfer across takes at the boundary; the learned-model gate fails
+* **Date:** 2026-09-15
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** DECISION-030 shipped a rate-relative fragment bar whose leading
+  feature scores 0.926 against a true clock, far above the 0.698 every witness
+  read AT the boundary tops out at, and the owner asked whether a neural network
+  could separate a real pluck from an invented boundary. DECISION-021 already
+  spent a 19,833-parameter conv net on this decision and failed its falsifier at
+  0.7157. Rather than train a second one, the cheap gate: offer the same rhythm
+  features to a plain L2 logistic regression on the existing decision table and
+  measure cross-take generalisation. A regression is the floor — if the
+  information does not appear there, no network over the same inputs will find
+  it. Falsifier stated in advance: leave-one-take-out AUC must clear 0.702 by
+  more than the spread across folds, AND must remove materially more than 0 of
+  635 false positives at zero label cost.
+* **Decision:** **Both clauses fail; nothing is wired and `src/` is unchanged.**
+  Leave-one-take-out goes 0.593 (twelve witnesses) to **0.603** with the
+  prospective rhythm group added, against a bar of 0.828, and false positives
+  removable at zero label cost go 0 to **2 of 635**. The retrospective group,
+  which the brief named in advance as the interesting outcome because it would
+  have argued for a retraction-based design, is the WEAKER of the two: it moves
+  leave-one-take-out by −0.001 and scores 0.431 alone, worse than chance
+  out-of-take, and the fitted model assigns it a weight of −0.01. A lambda sweep
+  changes nothing. In-sample rose 0.717 to 0.742 and pooled 5-fold 0.711 to
+  0.733, but both pool across takes, which is the within-take memorisation this
+  table exists to expose.
+* **Alternatives Considered:** (a) **Training a model anyway** — rejected as the
+  expensive version of an experiment that just came back negative on its floor.
+  (b) **Selecting lambda or the feature subset on the leave-one-take-out
+  column** — rejected as tuning on the falsifier's own rows, the same trap
+  DECISION-021 named. (c) **Reading the pooled held-out gain (0.723 -> 0.749) as
+  generalisation** — rejected: it pools twelve takes and is the same kind of
+  number as the 5-fold one. (d) **Concluding the rate feature does not work** —
+  refuted; see DECISION-032. It works, on a different target.
+* **Consequences:** Positive — a training run is not attempted on a feature set
+  that does not clear its floor, and one genuinely useful feature is identified:
+  pace-normalising `soundedMs` takes it 0.646 to **0.708**, a real +0.062 and
+  the only new feature to beat any existing witness, which is the DECISION-030
+  framing working as advertised even though it correlates 0.794 with the raw
+  quantity and only ties `fluxRatio`. The best of all 171 witness pairs is now
+  `fluxRatio` + `localIoiMs` at 0.687 leave-one-take-out, up from 0.679.
+  Negative, and the sharpest limit found — **the rate abstains where it is most
+  needed.** `localIoiMs` is missing on 71% of rows on one cowboy take and 59-64%
+  on the three 140bpm cowboy takes, against 0.4-1.3% on the same-pitch material,
+  because sparse chord playing keeps tripping the 1,500ms reset. Adding the
+  group also hurts `held-then-picked-amped`, 0.479 -> 0.463, the largest
+  negative-heavy take. **What this does NOT close** is a model judged on surplus
+  Notes rather than on boundaries: this table asks the boundary-shaped question
+  and DECISION-032 records that the two differ on 26.8% of shared rows, so the
+  learned direction is closed only for the question this table asks.
+
+---
+
 #### [DECISION-030]: A same-pitch fragment is judged against the local note rate, not against a fixed duration
 * **Date:** 2026-09-14
 * **Status:** Accepted

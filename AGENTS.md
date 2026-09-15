@@ -209,6 +209,17 @@ any further reading of that ceiling seriously. Three briefs
 carry status banners saying so — read them before re-deriving the same
 conclusions, not as work to pick up.
 
+**Before comparing any two AUCs in this repository, check they share a target
+(DECISION-032).** `measure-decision-separability.ts` scores a BOUNDARY-shaped
+question — should this split have been made — and `measure-rate-relative-merge.ts`
+an OUTCOME-shaped one — is this emitted Note surplus. Both describe themselves as
+being about the same-pitch re-articulation decision, and **they disagree on 26.8%
+of their shared rows.** The same feature reads 0.805 against one and 0.526
+against the other on identical rows. Fragmentation questions take the
+outcome-shaped target; segmentation questions take the boundary-shaped one. The
+often-quoted 0.698 boundary ceiling and the 0.926 rate figure are NOT on the same
+scale.
+
 **What did finally move it (DECISION-030)** is the one framing those studies all
 lacked: judging a fragment against the LOCAL NOTE RATE rather than against a
 fixed duration. Every witness read AT the boundary tops out at 0.698 AUC and the

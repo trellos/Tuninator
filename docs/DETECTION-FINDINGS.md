@@ -4826,6 +4826,154 @@ unchanged in kind. What has changed is that the sequence framing is no longer a
 hypothesis: it is measured at 0.905 against 0.698 for everything read at the
 boundary, and the first gate built on it costs nothing.
 
+## Rhythm features at the boundary: the learned-model gate, and it fails
+
+DECISION-030 shipped a rate-relative fragment bar and measured its leading
+feature at 0.926 AUC against a true clock — far above the 0.698 every witness
+read AT the boundary tops out at. The obvious follow-up is a learned model, and
+DECISION-021 already spent a conv net on this decision and lost. So before
+training anything a second time, the cheap gate: **offer the same rhythm
+features to a plain logistic regression on the existing decision table and see
+whether they move cross-take generalisation.** A regression is the floor. If the
+information does not show up there, no network over the same inputs will find
+it.
+
+The falsifier was stated before running: leave-one-take-out AUC must clear
+0.702 (the best single witness in-sample) by more than the spread across folds,
+AND at a threshold costing zero labels it must remove materially more than the
+0 of 635 false positives that everything currently removes.
+
+**Both clauses fail.** The result is negative and nothing is wired.
+
+### The runs
+
+Derivation, 1,627 rows / 992 positives / 13 takes, L2 logistic regression at
+lambda 0.01. Group **P** is PROSPECTIVE — available at the instant the decision
+is made: the local note rate, `soundedMs` over that rate, the last gap over that
+rate, and the coefficient of variation of the last eight gaps. Group **R** is
+RETROSPECTIVE — time from the decision to the next Note boundary, raw and over
+the rate, defined for accepted and rejected rows alike.
+
+| configuration | cols | in-sample | 5-fold | **LOTO** | FP at zero label cost |
+|---|---|---|---|---|---|
+| twelve witnesses (control) | 12 | 0.717 | 0.711 | **0.593** | 635 / 635 |
+| twelve + P | 17 | 0.741 | 0.733 | **0.603** | 633 / 635 |
+| twelve + R | 15 | 0.721 | 0.712 | **0.592** | 635 / 635 |
+| twelve + P + R | 19 | 0.742 | 0.733 | **0.603** | 633 / 635 |
+| P alone | 5 | 0.626 | 0.622 | **0.539** | 634 / 635 |
+| R alone | 3 | 0.583 | 0.584 | **0.431** | 634 / 635 |
+
+Clearing the bar would need 0.828. The best configuration reaches 0.603, which
+misses by 0.099 before any margin is asked of it. Two false positives of 635
+become removable, 0.3%. A lambda sweep changes nothing (LOTO 0.603 / 0.602 /
+0.574 / 0.399 at 0.01 / 0.1 / 1 / 10).
+
+What DID move is in-sample 0.717 -> 0.742 and pooled 5-fold 0.711 -> 0.733, and
+pooled held-out 0.723 -> 0.749. All three pool across takes, which is precisely
+the within-take scale memorisation this table exists to expose. None of it
+reaches LOTO. Every configuration still accepts all 254 held-out negatives at
+the zero-label operating point.
+
+### The retrospective group is the WEAKER one, which was not the expectation
+
+The brief said in advance that "P fails but R passes" would be a positive
+result, because it would mean the evidence does not exist when the fast lane
+must decide and a retraction-based design is required. That did not happen. R
+moves LOTO by −0.001 and scores 0.431 alone, worse than chance out-of-take. The
+fitted model gives `nextBoundaryOverIoi` a weight of −0.01, i.e. it discards it.
+**There is no case here for announcing and retracting.**
+
+The one way R could have been fake was checked and ruled out: a split's own
+`opened` lands at the burst, at or before the deciding hop, so a naive
+definition would read ~0 on every accept and merely re-encode `accepted`.
+Excluded by trace order and timestamp, accepted rows read a median 147ms and
+rejected 267ms, so the feature is defined and non-degenerate on both halves.
+
+### Per feature, and what carries the little there is
+
+| feature | group | oriented AUC | rows present |
+|---|---|---|---|
+| `soundedOverIoi` | P | **0.708** | 1496 |
+| `gapCv8` | P | 0.601 | 1399 |
+| `localIoiMs` | P | 0.578 | 1496 |
+| `nextBoundaryMs` | R | 0.573 | 1627 |
+| `nextBoundaryOverIoi` | R | 0.533 | 1496 |
+| `gapBeforeOverIoi` | P | 0.525 | 1496 |
+
+`soundedOverIoi` is the only new feature to beat any existing witness.
+Pace-normalising `soundedMs` takes it 0.646 -> 0.708, a real +0.062 — the
+DECISION-030 framing working exactly as advertised — but it correlates 0.794
+with raw `soundedMs` and still only ties `fluxRatio` at 0.702. In the exhaustive
+sweep over all 171 pairs the best is now `fluxRatio` + `localIoiMs` at 0.687
+LOTO, ahead of the previous best pair at 0.679, and still under `fluxRatio`
+alone in sample.
+
+### Where the rate abstains is where it was most needed
+
+`localIoiMs` is missing on 131 of 1,627 derivation rows (8.0%) and 79 of 564
+held out (14.0%), and the missingness is wildly take-dependent:
+
+```
+  cowboy-chords-c-d-em-g-c-d-em-am-120bpm   20 of 28 rows (71%)
+  the three 140bpm cowboy takes             59-64%
+  power-chords-c-a-g-e-c-d-fsharp-e-120bpm  62%
+  the eight same-pitch takes                0.4-1.3%
+```
+
+On sparse chord material the openings are far enough apart that the 1,500ms
+reset keeps firing and no rate exists. That is the correct behaviour — no pace
+measured, no claim made, which is the fix DECISION-030 had to make — but it
+means **Group P abstains on exactly the material where the existing witnesses
+are weakest.** Adding P also *hurts* `held-then-picked-amped`, 0.479 -> 0.463,
+the largest negative-heavy take in the set. Four of twelve folds sit below 0.52
+in every configuration.
+
+### The real finding: two benches in this repository measure different things
+
+This is the part worth carrying forward, and it was not what the experiment was
+looking for.
+
+`measure-rate-relative-merge.ts` scores the rate feature at 0.826. On this
+table the same idea reads 0.533. The estimate is not the reason. Scored on the
+rate study's OWN sub-population — accepted, settled, same-pitch, 1,038
+derivation rows, where `nextBoundaryMs` IS the child Note's span — the same
+feature on the same rows gives:
+
+```
+  against the rate study's target    0.805   (span alone 0.796)
+  against this table's target        0.526
+```
+
+The first reproduces the rate study's 0.81 / 0.79 almost exactly, so the feature
+and the estimator are fine. **The two targets are different questions, and they
+disagree on 278 of 1,038 rows — 26.8%.**
+
+- This table asks a BOUNDARY-shaped question: does an uncovered label begin
+  within 70ms of this decision, so should the split have been made?
+- The rate study asks an OUTCOME-shaped question: did the matcher pair the Note
+  this split created with a label, so is this emitted Note surplus?
+
+162 rows have a boundary that was right while the child went unpaired; 116 have
+a boundary that was wrong while the child got the label. Both files describe
+themselves as being about the same-pitch re-articulation decision.
+
+**Which one is correct depends on what is being decided, and the shipped gate
+operates on the outcome-shaped one.** A consumer scoring one target per pick
+pays for surplus Notes, not for boundaries. So:
+
+- For a question about surplus Notes, the outcome-shaped target is the right
+  one and this decision table is the wrong instrument.
+- For a question about segmentation, the boundary-shaped target is right.
+- **DECISION-021's rejection of the learned onset head was measured against the
+  boundary-shaped target**, on 161 rows with 59 positives. That verdict stands
+  for the question it asked. It is not evidence about a model trained and judged
+  on surplus Notes, which is a different experiment that has never been run.
+
+That is the fifth instance of "a bench ranking is not a pipeline ranking" in
+this document, and the sharpest: not a bench disagreeing with the engine, but
+two benches disagreeing with each other about the ground truth for a quarter of
+their shared rows.
+
 ## Lessons carried over from the retired lineage
 
 DECISION-023 closed the pre-rewrite `src/core/` lineage on its held-out numbers.
