@@ -232,3 +232,50 @@ npx tsx scripts/measure-same-pitch-population.ts   # re-run DECISION-022's count
 `verify-fixtures.ts` is the one that matters: it checks each label against the
 audio independently, and it is the cheapest way to catch a systematic error in
 a generated label set before anything is derived from it.
+
+## The amped re-timing pass: two takes proposed, two refused
+
+`scripts/propose-amped-onsets.ts` derives onsets for the four amped renders from
+the amped audio itself — a plain signal measurement, sharing no constant and no
+line of code with Tuninator, which is never consulted. It writes a proposal to a
+`--out` directory, has no `--write` mode, and refuses any path under `fixtures/`.
+Proposals are scored by importing `verifyFixture` from `verify-fixtures.ts`, so
+the before/after numbers come from that script's own code, constants and concern
+wording rather than a lookalike.
+
+| take | events in → out | median shift | placement |
+|---|---|---|---|
+| `quarters-a3-e5-amped` | 72 → 72 | 0ms | no change proposed; still matches DI |
+| `eighths-a3-amped` | 183 → 183 | **−187ms** | proposed (p10 −240, p90 −137) |
+| `eighths-sixteenths-e5-amped` | 190 → 190 | **−215ms** | proposed (p10 −241, p90 −187) |
+| `held-then-picked-amped` | 120 → 120 | — | **refused, see below** |
+
+Event counts are identical in and out everywhere; no pitch, name, id or ordering
+was touched.
+
+**Where the evidence is real.** On `e5-amped` — the only amped render with
+enough findable attacks to measure placement at all — the proposal takes the
+error against the independent attack search from **|Δ| median 25ms to 8ms**, p90
+55ms to 20ms. That is better than the DI render's own 13ms. It was computed
+after the method was fixed, with nothing tuned on it.
+
+**`held-then-picked-amped` is a clean no.** The prominence method fails its own
+DI control at a 105ms interquartile spread on clean audio — 2s held notes defeat
+an envelope peak-picker, which is the same class of error as a window wider than
+the spacing it discriminates. The only move on offer was −15ms, inside the
+40.7ms spread of the measurement that would justify it, and applying it made the
+concern count worse (59 → 61). Refusing is the result.
+
+**The concern count is not the target, and this is the measurement behind that.**
+Every concern on all eight renders is "no energy rise near `startMs`". The
+verifier's rule fires legitimately only 10, 7, 80 and 75 times against 72, 183,
+190 and 120 labels; the rest is a head noise floor above the engine's `rmsGate`,
+at 14.3% and 31.3% of envelope peak on two amped renders. The floors below which
+no label placement can take these counts are 62, 176, 110 and 45. This is what
+"that is mostly the verifier, not the labels" above was asserting, now measured.
+
+**Structural disagreement, untouched and the owner's.** `e5` carries 191 DI
+events against 190 amped for one performance, and the two sets disagree about
+which picks exist — DI-only `s1626` and `s16128`, amped-only `s1628`; on
+`eighths-a3`, DI-only `e838` and amped-only `s1692`. Both cannot be true. No
+proposal changes a count, so this is unresolved.
