@@ -223,17 +223,6 @@ export class NoteRecord {
    * back across a boundary the tracker had already committed to.
    */
   restruck = false;
-  /**
-   * The Note this one split away from, when a settled SAME-pitch
-   * re-articulation opened it.
-   *
-   * Set only for that case, because it exists for one consumer: the pace
-   * absorb of `pace.absorbRatio`, which asks whether a fragment this short is
-   * plausible at the rate the player is going and hands it back if it is not.
-   * A different-pitch split is a different event by the only evidence that
-   * matters and is never a candidate.
-   */
-  rearticulationParentId: string | null = null;
 
   /**
    * The most recent re-articulation over this Note that was rejected for

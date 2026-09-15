@@ -756,45 +756,6 @@ export type EngineConfig = {
      */
     regionCorrectPitch: boolean;
   };
-  /**
-   * The live pace, and the one decision it is allowed to touch.
-   *
-   * Third attempt at a live pace here; see `tracker/pace.ts` for the two
-   * corrections it carries and `docs/DETECTION-FINDINGS.md`, "The two pace
-   * attempts, side by side", for what they cost. Deliberately NOT a scale
-   * applied to every duration, which is the first attempt and is refuted: an
-   * ORACLE pace bought nothing on the material it was built for and cost the
-   * derivation set four detections, all of it carried by `releaseGraceMs`
-   * alone. How long silence must persist before a Note has ended is a property
-   * of the string's decay and the amplitude gate, not of how fast the player
-   * is going, and `harmony.changeStableMs` is bounded by how long the chroma
-   * path takes to turn over. Neither is scaled here and neither should be.
-   */
-  pace: {
-    /** Gaps held in the ring. */
-    ringSize: number;
-    /** Quantile read, 0..1. Low, because reading slow merges played notes. */
-    quantile: number;
-    /** Gaps needed before the estimator has an opinion. */
-    minGaps: number;
-    /** Silence after which the pace is forgotten. */
-    silenceResetMs: number;
-    /**
-     * A same-pitch fragment that sounded for less than this FRACTION of the
-     * local stroke length is absorbed back into the Note it split from.
-     *
-     * Zero switches the mechanism off, which is the shipped default until the
-     * falsifier in `docs/DETECTION-FINDINGS.md` is met. The oracle ceiling for
-     * this gate is 71 emitted Notes at no cost in missed labels over 1,590
-     * labelled events, measured by `scripts/measure-restrike-oracle.ts`; the
-     * same gate on the 459-label corpus it was first tried against reads 8,
-     * which is why it was closed and why the reading is worth taking again.
-     *
-     * A ratio rather than a duration on purpose: the reverted absolute form
-     * (`soundedMs < 80`) costs nine missed labels at the same corpus position.
-     */
-    absorbRatio: number;
-  };
 
   diagnostics: {
     pitchFrames: boolean;
@@ -926,13 +887,6 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     regionMerge: false,
     regionCorrectPitch: false,
   },
-  pace: {
-    ringSize: 8,
-    quantile: 0.25,
-    minGaps: 3,
-    silenceResetMs: 1500,
-    absorbRatio: 0,
-  },
   diagnostics: {
     pitchFrames: false,
     contour: false,
@@ -949,7 +903,6 @@ function clone(config: EngineConfig): EngineConfig {
     tracking: { ...config.tracking },
     harmony: { ...config.harmony },
     deep: { ...config.deep },
-    pace: { ...config.pace },
     diagnostics: { ...config.diagnostics },
     calibration: { ...config.calibration },
   };
