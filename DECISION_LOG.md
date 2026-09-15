@@ -7,6 +7,48 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-032]: Revision is the contract, not a cost; latency to be correct is accepted
+* **Date:** 2026-09-15
+* **Status:** Accepted
+* **Owner:** Project owner
+* **Context:** The phrase-level segmentation work (DECISION-028's opening, and
+  the rate line re-measured in `docs/DETECTION-FINDINGS.md`) cannot decide a
+  boundary at the instant it happens. A rhythm or envelope-shape claim needs
+  the strokes that follow, so a Note is delivered and then amended. That was
+  raised here as a consumer-facing cost: a Note appears and is withdrawn, which
+  on a live display is a flicker.
+* **Decision:** The owner rules that this is not a cost to be minimised but the
+  point of having a deep lane at all: better to end up correct than to stay
+  wrong, and a human listener also revises what they just heard. Retroactive
+  amendment is therefore in bounds for any phrase-level mechanism, and
+  "it would retract a Note" is not on its own an argument against one. The
+  existing machinery is already the right shape for it: `revision.ts` and the
+  `structuralRevision` change of DECISION-008 exist precisely so a segmentation
+  can be corrected after delivery, and `NoteChange` lets a consumer tell "I
+  know more now" from "I was wrong".
+* **Alternatives Considered:** Holding a Note back until the deep lane has
+  ruled — rejected: it makes the fast lane pointless, and the fast lane is what
+  makes a Note appear while the note is still sounding, which is the library's
+  reason for existing. Emitting phantom Notes and never correcting them —
+  rejected: that is the current behaviour on the split axis and is what the
+  owner is asking to fix. Marking a Note provisional and letting the consumer
+  decide when to draw it — not rejected, but it is a consumer concern and
+  `NoteChange` already carries what such a consumer would need.
+* **Consequences:** Positive — the design space for the split defect widens
+  from "witnesses available at the boundary", which eight ceiling studies have
+  now exhausted, to anything the deep lane can establish within its
+  `deep.ringSeconds` of 4. It also puts the burden where the evidence is: a
+  same-pitch boundary is not separable at the instant it happens, and this says
+  the engine may stop trying to. Negative — a consumer that renders every Note
+  immediately and never reads `NoteChange` will show more churn, so
+  `docs/NOTE-MODEL.md` and `docs/API.md` carry more weight for integrators than
+  they did; and a retraction is only correct if the mechanism driving it is,
+  so this accepts flicker in exchange for accuracy and NOT in exchange for
+  noise. The both-axes bar is unchanged: a mechanism that amends its way to
+  fewer extras by losing real notes still fails.
+
+---
+
 #### [DECISION-031]: The fine onset's dip requirement stays; measured off, it is a direct-input trade that leaves the amped renders untouched
 * **Date:** 2026-09-15
 * **Status:** Rejected

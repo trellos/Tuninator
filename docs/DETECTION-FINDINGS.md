@@ -4935,3 +4935,64 @@ played while slowing down. The quantile-0.25 reading is the existing mitigation
 — reading a passage as faster than it is only declines merges — but it was
 derived on metronomic material and its safety on expressive playing is
 untested and currently untestable here.
+
+### The two pace attempts, side by side, and the one combination neither ran
+
+"A tempo estimate that runs live and biases the engine toward whole notes and
+away from fragments" has been built **twice** in this repository, and both are
+recorded above in different places. Reading them together is the useful thing,
+because each found a different defect and each repair is in the other's entry.
+
+| | attempt 1: constants at a reference pace | attempt 2: the ratio gate |
+|---|---|---|
+| where | "The reference pace, derived on the five originals" | "The causal rate estimator: built, measured, reverted" |
+| the estimate | median of the last 8 inter-onset gaps, fed from **every accepted transient** | quantile 0.25 of the last 8, fed **once per attack burst** |
+| what it drove | every duration constant: `minStableMs` x4, `articulationMs` x2, `minRestrumMs`, `ringOutMs`, `mutedRestrumWindowMs`, `releaseGraceMs`, `changeStableMs` | one merge gate: absorb when `soundedMs < 0.40 x rate` |
+| verdict | reverted | reverted |
+| why | an ORACLE pace buys nothing on the sixteenths, and scaling by the TRUE rate **costs the derivation set** 4 detections and 3 labels | causal rate reached 2 emitted Notes against the oracle's 8 |
+
+Three findings fall out of the pair that neither entry states alone.
+
+**The feed, not the ring, was attempt 1's real defect.** Attempt 1's estimator
+read the amp-path lead take (197ms per note) as FASTER than the sixteenths take
+(105ms) — a straight inversion. Attempt 2 diagnosed it: one pick crossing six
+strings is one stroke with several transients, so feeding every transient reads
+a passage as several times faster than it is played, and feeding per attack
+burst instead moved whole-corpus extras 107 to 102. **Attempt 1 was never
+re-run with attempt 2's feed.** Its oracle row is therefore the only sound part
+of its verdict, and its measured-pace rows describe an estimator that has since
+been fixed.
+
+**Two of the constants attempt 1 scaled are physics, not tempo, and the
+derivation set said so.** `releaseGraceMs` carried all of the derivation damage
+by itself: how long silence must persist before a Note has ended is a property
+of the string's decay and the amplitude gate. `changeStableMs` is bounded by
+how long the chroma path needs to turn over. Both are wrong to scale in
+principle, and a third attempt should scale neither. That is a narrowing of the
+hypothesis, not a refutation of it: attempt 1 tested "scale every duration" and
+found one constant that must not be scaled.
+
+**Both attempts were measured without the same-pitch material.** Attempt 1's
+oracle table lists the sixteenths takes, the lead lines and `clean-lead`;
+attempt 2's end-to-end table reads `99 / 459`. The ceiling entry above puts the
+oracle gate at **71 emitted Notes on 1,590 labels against the 8 that closed
+it**, for a reason that is arithmetic rather than hopeful: the gate is visible
+only when `0.40 x rate` clears the 55-90ms announce bar, and this material's
+candidates sit at a 222ms median rate against the old 154ms.
+
+**So the untested combination is specific:** attempt 1's target (bias the
+segmentation decision toward whole notes) with attempt 2's feed (per attack
+burst, quantile 0.25), scaling only the announce and absorb constants and
+explicitly NOT `releaseGraceMs` or `changeStableMs`, measured on the merged
+corpus. Nobody has run that. It is not a new idea — it is the intersection of
+two reverted ones, and both refutations' stated causes have a repair in the
+other's entry.
+
+**One further shape neither attempt used.** Both were hard thresholds at a
+boundary. `tracker/hypotheses.ts` already holds a stateful trail
+(`candidate -> contender -> leading -> confirmed`), which is where a *prior*
+would live rather than a gate — weighting a segmentation hypothesis by how well
+its note lengths fit the passage, instead of merging or not merging at one
+instant. DECISION-032 makes that admissible by accepting retroactive amendment
+as the contract. It is untested and unmeasured, and stated here so it is not
+mistaken for a result.
