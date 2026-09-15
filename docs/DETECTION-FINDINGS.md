@@ -4836,3 +4836,35 @@ genuine flux inside one note. A listener does not judge these instants in
 isolation — the rhythm and a monotonically decaying envelope across the phrase
 are what make a single picked note obvious to an ear — and that is the sequence
 claim DECISION-028 named as the precondition, not another per-boundary gate.
+
+#### Why the deep lane does not already do this
+
+The obvious objection is that re-segmenting over more of the phrase is the deep
+lane's whole job. It is, and the reason it does not reach this defect is three
+specific things rather than a missing lane.
+
+**One, its merge is switched off.** `deep.regionMerge` is `false`.
+`mergeWithinSegment` is the only path that removes a boundary over a region,
+and DECISION-028 (a) measured it on: 383 missed labels against a 161 baseline.
+
+**Two, the local absorber is forbidden from these Notes by name.**
+`absorbAttackFragments` would accept them on size — `mergeMaxFragmentMs` is
+250 and these fragments run 93 to 227ms — but it declines any candidate that
+is `restruck && announced`. That is exactly this population: 199 of the 296
+carry an accepted re-articulation, and every one clears the 55ms
+`minStableMs` announce bar. The guard is deliberate and its reason is in the
+comment above it: retracting an announced re-articulation drags the survivor's
+start back over a stroke it did not begin, which is how a run of picked notes
+comes out as one long chord. DECISION-019 is the same rule from the other side.
+
+**Three, and the load-bearing one: the region segmenter sequences windows, not
+events.** `deep/resegment.ts` turns a span into a sequence of events with two
+witnesses — the dominant fundamental changed and stayed changed, and the
+envelope rose above the quietest point since the last boundary. Both are
+decided at one boundary from the windows around it. Neither compares a
+candidate boundary to the OTHER boundaries in the phrase, which is the
+regularity a listener uses. The lane has the audio to do it: `ringSeconds` is
+4, about two bars at 120bpm, while a region caps at `maxRegionMs` 1200. So the
+context is in the ring and unread, and "the deep lane looks at more of the
+phrase" is true of its window sequence and not yet true of its event sequence.
+That is the same gap DECISION-028 named, located in a file.
