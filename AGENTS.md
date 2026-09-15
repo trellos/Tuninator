@@ -149,11 +149,20 @@ Two structural questions were open when this material landed — whether
 `quarters`' E5 section is 8 measures or 10, and whether `eighths A3` contains a
 sixteenth section — and **both have since been answered by the player and the
 labels corrected to follow**, so the earlier warning here that two takes did not
-match his description is out of date. What remains is placement: the amped
-labels are the DI labels applied unchanged, since each pair is one performance,
-and they carry up to 65ms of offset and most of the `verify-fixtures.ts`
-concerns (68, 182, 116 and 59 against the DI renders' 0, 61, 48 and 2). So the
-DI renders are in good shape and the amped ones are what a review is for.
+match his description is out of date. What remains is placement, and it is
+worse than the doc records. The amped labels started as the DI labels applied
+unchanged, since each pair is one performance — but the re-timing commit
+`7a216fe` moved the two GRIDDED takes' DI labels (146 of 183 events, up to
+90ms; 172 of 191, up to 75ms) and **left their amped twins untouched**. So
+`same-pitch-eighths-a3` and `same-pitch-eighths-sixteenths-e5` no longer share
+timings between renders at all, and `docs/SAME-PITCH-MATERIAL.md`'s reasoning
+that "the timings are identical to the DI ones, so the 8-vs-60 gap on one
+performance cannot be a labelling difference" does not hold for those two.
+`same-pitch-eighths-sixteenths-e5` additionally has 191 DI events against 190
+amped, for one performance. The amped renders carry most of the
+`verify-fixtures.ts` concerns (68, 182, 116 and 59 against the DI renders' 0,
+61, 48 and 2). The DI renders are in good shape; the amped ones are what a
+review is for, and the two gridded amped sets are the worst of them.
 Note also that the derivation predicate is implemented three different ways
 across the measurement scripts, and these stems fall on opposite sides of them.
 

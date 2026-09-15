@@ -37,16 +37,17 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { downmixToMono, readWav } from "../src/offline/wav.js";
 import { decodeFixtures, REPO_ROOT } from "./decode-fixtures.js";
 
-const WIN_MS = 20;
-const HOP_MS = 2.5;
+export const WIN_MS = 20;
+export const HOP_MS = 2.5;
 /** Two peaks closer than this are one pick. Below a 120bpm sixteenth (125ms). */
-const MIN_INTERVAL_MS = 80;
+export const MIN_INTERVAL_MS = 80;
 /** How far outside a section's labelled extent a pick may still belong to it. */
-const MARGIN_MS = 150;
+export const MARGIN_MS = 150;
 
 /** Takes whose labels came off a grid, and the DI render to measure. */
 const TAKES = [
@@ -70,7 +71,7 @@ const EAR: Record<string, { pick: number[] }> = {
   "same-pitch-eighths-a3-120bpm-di": { pick: [23275] },
 };
 
-function envelope(x: Float32Array, sampleRate: number): number[] {
+export function envelope(x: Float32Array, sampleRate: number): number[] {
   const win = Math.max(1, Math.round((WIN_MS / 1000) * sampleRate));
   const hop = Math.max(1, Math.round((HOP_MS / 1000) * sampleRate));
   const out: number[] = [];
@@ -90,7 +91,7 @@ function envelope(x: Float32Array, sampleRate: number): number[] {
  * previous pick at sixteenth spacing. No threshold is applied here: the caller
  * decides how many to keep, which is the whole point.
  */
-function peaks(env: readonly number[]): Array<{ at: number; prom: number }> {
+export function peaks(env: readonly number[]): Array<{ at: number; prom: number }> {
   const out: Array<{ at: number; prom: number }> = [];
   let trough = Number.POSITIVE_INFINITY;
   let peak = 0;
@@ -116,7 +117,7 @@ function peaks(env: readonly number[]): Array<{ at: number; prom: number }> {
  * offsets on the sixteenth sections. Over-select, then let the alignment below
  * decide which candidates are real.
  */
-function candidates(all: readonly { at: number; prom: number }[], from: number, to: number, n: number) {
+export function candidates(all: readonly { at: number; prom: number }[], from: number, to: number, n: number) {
   const inSpan = all
     .filter((p) => p.at >= from - MARGIN_MS && p.at <= to + MARGIN_MS)
     .sort((a, b) => b.prom - a.prom);
@@ -134,8 +135,8 @@ function candidates(all: readonly { at: number; prom: number }[], from: number, 
  * skipped. Monotonic, so a missing pick costs one label rather than shifting
  * every label after it.
  */
-const SKIP_COST = 140;
-function align(labels: readonly number[], picks: readonly number[]): Array<number | null> {
+export const SKIP_COST = 140;
+export function align(labels: readonly number[], picks: readonly number[]): Array<number | null> {
   const n = labels.length, m = picks.length;
   const cost = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(Infinity));
   const from = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
@@ -274,4 +275,12 @@ function main(): void {
   console.log(write ? "  fixtures/labels/** UPDATED.\n" : "  (dry run - pass --write to apply)\n");
 }
 
-main();
+/* Run only when invoked directly, so another script can import the envelope,
+   peak-picking and alignment helpers above without this pass running and
+   without duplicating a single one of its constants. Same guard
+   `decode-fixtures.ts` uses. */
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (invokedDirectly) main();
