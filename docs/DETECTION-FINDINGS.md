@@ -4769,6 +4769,52 @@ gate is as wide as its weaker half, and every boundary witness this project has
 measured sits at or below 0.70. **The second witness is the binding constraint,
 not the clock.**
 
+### Three ways to read the rhythm instead, all measured, none kept
+
+Prompted by the owner, who asked whether the recent-note-duration estimate could
+be biased better, and observed that fast notes come in groups so a lone very
+short note before a long one is musically implausible. All three were measured
+on the same 1,237 candidates, on top of the shipped change.
+
+**The gap shape.** For each candidate, the gap to the Note before it against the
+gap to the Note after it. This needs no rate estimate at all, which is why it
+was worth trying: the estimator is the binding constraint on everything else
+here. The distributions confirm the picture and correct its direction — the
+phantom is the TAIL of a played note, not its head, so it sits LATE in the note
+it was cut from:
+
+```
+  gapAfter / gapBefore    spurious  median 0.36   matched  median 1.00
+  AUC 0.779, with no clock anywhere in it
+```
+
+Better than the dip (0.636) and close to the causal rate test (0.826). It is
+nonetheless **the same quantity already in the table above** under another name:
+a tail fragment ends where the next Note begins, so its `gapAfter` IS its span,
+and `gapAfter / gapBefore` is `fragment / predecessor span`, measured at exactly
+0.779. End to end it is dominated — `<= 0.40` with the dip removes 28 derivation
+false positives for **+7 missed labels**, against 35 for zero. OR-ing it onto the
+shipped gate is strictly worse than the shipped gate alone.
+
+**The run length.** How many consecutive gaps around this one are the same
+length, within 40%. The owner's "more than three of them" stated as a feature.
+AUC 0.686, and unusable: spurious runs have a median length of 1 and so do the
+first quartile of REAL notes. Chords and slow passages make a real note isolated
+by construction, so `runLength < 2` takes 145 played notes off the derivation
+set.
+
+**A different percentile of the recent gaps.** p75 and p90 rank better than the
+median (0.837 and 0.851 against 0.826), and the bench said p90 with the span bar
+re-chosen to 0.20 was worth seven more derivation false positives for free. **In
+the pipeline it is worse**: false positives 323 against 314 and extra Notes 386
+against 379, because p90 reads about 1.13x the median and 0.20 x 1.13 is
+stricter than the shipped 0.35, not looser. Every p90 bar loose enough to beat
+the shipped one costs played notes. The median at 0.35 stands.
+
+That is the third time in this one entry that the offline simulation disagreed
+with the engine. The rule is now explicit: **on this decision, a bench number is
+a hypothesis and only `npm run eval` plus `measure-splits.ts` settle it.**
+
 ### What this does not do
 
 The amp-sim takes still carry most of the defect — `held-then-picked-amped` is

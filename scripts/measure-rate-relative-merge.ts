@@ -131,6 +131,24 @@ type Candidate = {
    * worth measuring rather than either alone. See `AttackEvidence.dipRatio`.
    */
   dipRatio: number;
+  /**
+   * The gap to the Note before this one, and to the Note after it.
+   *
+   * The owner's observation, and it needs no rate estimate at all: fast notes
+   * come in GROUPS. A phantom fragment sits close behind its predecessor and is
+   * then followed by a full interval of silence before the next real pick, so
+   * `gapAfter / gapBefore` is large. A real fast note has neighbours the same
+   * distance away on both sides, so the ratio is near 1. A very quick note
+   * immediately before a long one is musically implausible.
+   */
+  gapBeforeMs: number;
+  gapAfterMs: number;
+  /**
+   * How many consecutive gaps around this one are the same length as its own,
+   * within 40%. The owner's "fast notes only count if there are more than three
+   * of them", measured rather than assumed.
+   */
+  runLength: number;
   /** The fragment ended on a pitch step — the narrow script's whole filter. */
   steppedAway: boolean;
   /** The matcher paired this Note with a label, so removing it costs one. */
@@ -280,6 +298,37 @@ function envelopeIoi(env: Float64Array, at: number): number {
   return NaN;
 }
 
+/**
+ * The local gap pattern around an opening: what came just before it, what came
+ * just after, and how long a run of same-length gaps it sits in.
+ *
+ * Deliberately free of any rate estimate. The estimator is the binding
+ * constraint on everything else measured in this file, so a discriminator that
+ * does not need one is worth knowing about even if it is weaker.
+ */
+function gapShape(
+  openings: readonly number[],
+  at: number
+): { gapBeforeMs: number; gapAfterMs: number; runLength: number } {
+  const i = openings.findIndex((t) => Math.abs(t - at) < 1);
+  if (i < 1) return { gapBeforeMs: NaN, gapAfterMs: NaN, runLength: 0 };
+  const gapBeforeMs = (openings[i] as number) - (openings[i - 1] as number);
+  const gapAfterMs =
+    i + 1 < openings.length ? (openings[i + 1] as number) - (openings[i] as number) : NaN;
+  // Consecutive gaps within 40% of this one, walked both ways.
+  const like = (g: number): boolean => Math.abs(g - gapBeforeMs) <= 0.4 * gapBeforeMs;
+  let runLength = 1;
+  for (let j = i - 1; j >= 1; j--) {
+    if (!like((openings[j] as number) - (openings[j - 1] as number))) break;
+    runLength++;
+  }
+  for (let j = i + 1; j < openings.length; j++) {
+    if (!like((openings[j] as number) - (openings[j - 1] as number))) break;
+    runLength++;
+  }
+  return { gapBeforeMs, gapAfterMs, runLength };
+}
+
 function collect(): Take[] {
   const takes: Take[] = [];
   for (const fixture of decodeFixtures({ quiet: true })) {
@@ -357,6 +406,7 @@ function collect(): Take[] {
         causalIoiMs: causalIoi(openings, child.at, 0.5),
         envIoiMs: envelopeIoi(env, child.at),
         dipRatio: split.dipRatio,
+        ...gapShape(openings, child.at),
         steppedAway,
         paired: paired.has(child.noteId),
       });
@@ -708,6 +758,72 @@ function main(): void {
   );
   // THE CEILING. With a PERFECT rate the gate is bounded by this; anything a
   // better estimator could buy lies between the causal rows and these.
+  console.log("\n  GAP SHAPE — the owner's idea, and it uses NO rate estimate\n");
+  const shapeRows: Array<[string, (c: Candidate) => number]> = [
+    ["gapAfter / gapBefore (low = fake)", (c) => c.gapAfterMs / c.gapBeforeMs],
+    ["gapBefore alone (control)", (c) => c.gapBeforeMs],
+    ["run length of same-size gaps", (c) => c.runLength],
+    ["run length (short = fake)", (c) => c.runLength],
+  ];
+  for (const [name, key] of shapeRows) {
+    console.log(`    ${name.padEnd(34)} AUC ${auc(spurious.map(key), matched.map(key)).toFixed(3)}`);
+  }
+  console.log("\n    gapAfter/gapBefore  spurious  " + span(spurious.map((c) => c.gapAfterMs / c.gapBeforeMs)));
+  console.log("    gapAfter/gapBefore  matched   " + span(matched.map((c) => c.gapAfterMs / c.gapBeforeMs)));
+  console.log("    run length          spurious  " + span(spurious.map((c) => c.runLength)));
+  console.log("    run length          matched   " + span(matched.map((c) => c.runLength)));
+  console.log("");
+  for (const r of [2, 3, 4]) {
+    report(`run length < ${r} (a lone fast note is fake)`, (c) => c.runLength < r);
+  }
+  console.log("");
+  // The phantom is the TAIL of a played note, not its head: it sits LATE in the
+  // note it was cut out of, so the gap AFTER it is short and the gap BEFORE it
+  // is nearly a whole interval. Spurious median 0.36 against 1.00 for real
+  // notes. The test is therefore "followed too soon", not "preceded too soon".
+  for (const bar of [0.3, 0.4, 0.5, 0.6]) {
+    report(`gapAfter/gapBefore <= ${bar}`, (c) => c.gapAfterMs / c.gapBeforeMs <= bar);
+  }
+  console.log("");
+  for (const bar of [0.3, 0.4, 0.5, 0.6]) {
+    report(`gapAfter/gapBefore <= ${bar} AND dip >= 0.85`, (c) => c.gapAfterMs / c.gapBeforeMs <= bar && c.dipRatio >= 0.85);
+  }
+  console.log("");
+  for (const bar of [0.4, 0.5, 0.6]) {
+    report(
+      `SHIPPED OR gapAfter/gapBefore <= ${bar} AND dip >= 0.85`,
+      (c) =>
+        (c.fragmentMs / (c.causal["0.50"] as number) <= 0.35 && c.dipRatio >= 0.85) ||
+        (c.gapAfterMs / c.gapBeforeMs <= bar && c.dipRatio >= 0.85)
+    );
+  }
+  console.log("");
+  // And with NO rate estimate anywhere in it, which is the interesting version.
+  for (const bar of [0.4, 0.5]) {
+    for (const dip of [0.7, 0.85]) {
+      report(
+        `RATE-FREE gapAfter/gapBefore <= ${bar} AND dip >= ${dip}`,
+        (c) => c.gapAfterMs / c.gapBeforeMs <= bar && c.dipRatio >= dip
+      );
+    }
+  }
+  console.log("");
+
+  // Does a DIFFERENT way of reading the recent gaps beat the median? The median
+  // is what ships. p75 and p90 score higher as rankings (0.837 and 0.851
+  // against 0.826), so the question is whether that survives the zero-cost
+  // constraint once the span bar is re-chosen for the larger denominator.
+  console.log("  A DIFFERENT READING OF THE RECENT GAPS, each with the dip condition\n");
+  for (const p of ["0.50", "0.75", "0.90"]) {
+    for (const bar of [0.15, 0.2, 0.25, 0.3, 0.35]) {
+      report(
+        `p${(Number(p) * 100).toFixed(0)} gaps, span <= ${bar.toFixed(2)}, dip >= 0.85`,
+        (c) => c.fragmentMs / (c.causal[p] as number) <= bar && c.dipRatio >= 0.85
+      );
+    }
+    console.log("");
+  }
+
   console.log("  CEILING: the same gate with an ORACLE rate, which no causal estimator can have\n");
   for (const dip of [0.7, 0.85]) {
     for (const bar of [0.35, 0.5, 0.7, 0.9]) {
