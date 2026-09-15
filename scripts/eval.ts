@@ -49,6 +49,7 @@ import {
 } from "../src/offline/analyzer.js";
 import { projectEmissions, type EvalProjections } from "../src/offline/eval-adapter.js";
 import { downmixToMono, readWav } from "../src/offline/wav.js";
+import type { EngineConfig } from "../src/engine/config.js";
 import {
   CACHE_DIR,
   REPO_ROOT,
@@ -275,9 +276,19 @@ function evaluateFixture(
     const mono = downmixToMono(wav.samples, wav.channels);
     // Only the traced fixture pays for the per-hop trace array.
     const wantTrace = traceStem === fixture.stem;
+    // A sweep hook for the fine-hop onset witness, offline only: the eval is
+    // the falsifier every threshold has to face, so it has to be runnable at a
+    // threshold the shipped default is not.
+    const fineOnset = process.env.TUNINATOR_FINE_ONSET;
+    const overrideConfig =
+      fineOnset === undefined
+        ? undefined
+        : (config: EngineConfig): void => {
+            config.transient.fineOnsetThreshold = Number(fineOnset);
+          };
     const analysis = wantTrace
-      ? analyzeSamplesDetailed(mono, wav.sampleRate)
-      : analyzeSamples(mono, wav.sampleRate);
+      ? analyzeSamplesDetailed(mono, wav.sampleRate, { overrideConfig })
+      : analyzeSamples(mono, wav.sampleRate, { overrideConfig });
     projections = projectEmissions(analysis.emissions);
     detections = projections.final;
     if (wantTrace) trace = (analysis as DetailedAnalyzeResult).trace;

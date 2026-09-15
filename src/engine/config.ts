@@ -195,6 +195,57 @@ export type EngineConfig = {
     attackBandFloorFactor: number;
     /** Minimum interval between accepted attacks, ms. */
     minIntervalMs: number;
+    /**
+     * Threshold of the fine-hop onset witness, on its median-subtracted
+     * log-flux scale. Zero switches the witness off.
+     *
+     * The broadband kernel decides at the 13.3ms hop with a 60ms dead time,
+     * and on a direct input that is what loses the quiet strokes of an
+     * alternate-picked run: it reaches 42 of the 48 DI sixteenths where the
+     * same physics read every 128 samples with log compression reaches 47,
+     * and every stroke it loses is lost at the kernel. See
+     * `kernels/fine-onset.ts` for the witness and
+     * `docs/DI-ACCURACY-ROADMAP.md` for the measurements.
+     *
+     * A fine onset only ACTS where the broadband kernel did not — it is
+     * deduplicated against accepted attacks within `fineOnsetDedupeMs` — and
+     * only over a single sounding note or silence, never over a chord, so a
+     * strummed take's hand noise stays with the witnesses that already judge
+     * it. Its constants are held-out readings until derivation material with
+     * quiet alternate-picked upstrokes exists (`DECISION-029`).
+     */
+    fineOnsetThreshold: number;
+    /** Least separation between two fine onsets, ms. Under the 63ms rushed pair on the DI sixteenths. */
+    fineOnsetMinIntervalMs: number;
+    /**
+     * How long a stronger fine candidate may follow before the earlier one is
+     * the pick landing on the string rather than a stroke. Measured on the DI
+     * takes: the contact precedes the stroke by 32–65ms.
+     */
+    fineOnsetPreparationMs: number;
+    /** How much stronger the follower must be to veto the earlier candidate: 13–30× measured. */
+    fineOnsetPreparationRatio: number;
+    /**
+     * A fine onset within this of an attack the fast lane acted on is that
+     * attack. Wider than the preparation window's lower end because the
+     * pick's contact can precede the broadband kernel's own firing by 40ms
+     * and read nearly as strong in flux; no two strokes in the corpus are
+     * this close (a sixteenth at 200bpm is 75ms).
+     */
+    fineOnsetDedupeMs: number;
+    /**
+     * How far the 5ms envelope must have DIPPED around a fine onset before it
+     * may re-articulate a note that is still sounding, dB (negative), and how
+     * far it must have come back up afterwards, dB (positive).
+     *
+     * The pick lands on the string before it plays it. On the DI sixteenths
+     * every quiet re-pick the broadband kernel loses is a 13–28dB dip followed
+     * by a rebound 20–35ms later; sustain ripple never dips that far that
+     * fast, and a contact or a hand mute that no stroke follows dips without
+     * rebounding. Over silence neither is asked for. See `FastLane.dipAround`.
+     */
+    fineOnsetDipDb: number;
+    fineOnsetReboundDb: number;
     /** RMS window for the envelope-rise test, ms. */
     envelopeWindowMs: number;
     /** Baseline the envelope-rise test measures against, ms. */
@@ -765,6 +816,13 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     attackBandHiHz: 6000,
     attackBandFloorFactor: 0.08,
     minIntervalMs: 60,
+    fineOnsetThreshold: 2.5,
+    fineOnsetMinIntervalMs: 40,
+    fineOnsetPreparationMs: 65,
+    fineOnsetPreparationRatio: 4,
+    fineOnsetDedupeMs: 55,
+    fineOnsetDipDb: -6,
+    fineOnsetReboundDb: 6,
     envelopeWindowMs: 20,
     envelopeBaselineMs: 80,
     envelopeRiseRatio: 1.35,

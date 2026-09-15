@@ -24,7 +24,7 @@ That separation is the only reason any number below means anything.
 |---|---|---|---|---|---|---|---|
 | `chords-a-bm-g-d-2x-120bpm` | **yes** | 16 | 16 | 0 | 91.7% | 100.0% | 0ms |
 | `clean-lead-120bpm` | **yes** | 43 | 42 | 2 | 82.1% | 92.9% | 46ms |
-| `power-chords-c-a-g-e-...-120bpm` | **yes** | 8 | 9 | 0 | 87.5% | 100.0% | 107ms |
+| `power-chords-c-a-g-e-...-120bpm` | **yes** | 8 | 9 | 0 | 100.0% | 100.0% | 107ms |
 | `cowboy-chords-...-120bpm` | no | 8 | 12 | 0 | 75.0% | 87.5% | 40ms |
 | `cowboy-chords-di-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 52ms |
 | `cowboy-chords-mic-...-140bpm` | no | 8 | 13 | 0 | 75.0% | 100.0% | 88ms |
@@ -33,10 +33,10 @@ That separation is the only reason any number below means anything.
 | `power-chords-...-140bpm` (mic) | no | 16 | 23 | 0 | 72.7% | 100.0% | 23ms |
 | `power-chords-amped-...-140bpm` | no | 16 | 18 | 0 | 92.3% | 100.0% | 13ms |
 | `spicy-chords-cmaj9-g-am11` | no | 3 | 5 | 0 | 33.3% | 100.0% | 37ms |
-| `lead-line-di-sixteenths-...-140bpm` | no | 48 | 42 | 6 | 87.5% | 87.5% | 15ms |
-| `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 39 | 9 | 68.1% | 72.3% | 16ms |
-| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 38 | 13 | 70.8% | 70.8% | 15ms |
-| `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 76 | 0 | — | — | — |
+| `lead-line-di-sixteenths-...-140bpm` | no | 48 | 46 | 2 | 95.8% | 95.8% | 15ms |
+| `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 40 | 8 | 68.1% | 72.3% | 16ms |
+| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 39 | 12 | 72.9% | 72.9% | 16ms |
+| `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 64 | 0 | — | — | — |
 | `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 65 | 2 | — | — | — |
 | `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 82 | 0 | — | — | — |
 
@@ -53,11 +53,11 @@ inside its gates — of the 22 takes that score it, eight have a median absolute
 
 **Not good, and both are the same defect seen from two sides.**
 
-- **Fast single-note lines lose strokes.** The sixteenth-note takes find 35–42 of 48 strokes. The
+- **Fast single-note lines lose strokes.** The sixteenth-note takes find 36–46 of 48 strokes. The
   losses are downstream of the evidence, not in it: the onset kernel covers 44, 44 and 47 of the
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.
-- **Fast single-note lines also produce extra Notes.** The triplet takes emit 65–82 Notes for 55
+- **Fast single-note lines also produce extra Notes.** The triplet takes emit 64–82 Notes for 55
   labels. `npx tsx scripts/measure-splits.ts` puts the corpus at 99 of 459 events split with 107
   extra Notes, and 63 of those 99 are the three triplet takes. The shape is one thing: a
   correctly-named Note followed by a short SAME-PITCH tail fragment, so a single played event
