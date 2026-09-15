@@ -4868,3 +4868,70 @@ regularity a listener uses. The lane has the audio to do it: `ringSeconds` is
 context is in the ring and unread, and "the deep lane looks at more of the
 phrase" is true of its window sequence and not yet true of its event sequence.
 That is the same gap DECISION-028 named, located in a file.
+
+### The rate gate's ceiling, re-measured with the same-pitch material in the corpus
+
+"The causal rate estimator: built, measured, reverted" above closed the local
+rate on a stated ceiling: **8 emitted Notes** at an oracle rate, which is not
+worth a mechanism. That reading was taken on a 459-label corpus — its own
+end-to-end table says `99 / 459` — and 459 is the corpus WITHOUT the eight
+120bpm same-pitch takes. It therefore measured the rate gate on material that
+barely contains the phenomenon, which is precisely DECISION-022's complaint
+about every ceiling this project had taken to that point.
+
+Re-run unchanged on the merged tree (1,590 labels, `measure-restrike-oracle.ts`,
+no source change), the same oracle gate reads:
+
+```
+  candidates 280    spurious (drop) 219    matched to a label (KEEP) 61
+
+  sounded/IOI <= 0.40 (oracle)   missed 138 (+1)   merged 214   emitted  77
+  sounded/IOI <= 0.35 (oracle)   missed 137 (+0)   merged 206   emitted  71
+  sounded/IOI <= 0.30 (oracle)   missed 137 (+0)   merged 178   emitted  51
+  sounded/IOI <= 0.20 (oracle)   missed 137 (+0)   merged 109   emitted  26
+
+  rate x 0.50 .. x 0.90          missed 137 (+0)   emitted 26 .. 73
+  rate x 1.50                    missed 144 (+7)
+```
+
+**71 emitted Notes at zero missed-label cost, against the 8 that closed the
+line.** Nine times the payoff, on the axis the correction above established as
+the only one that counts.
+
+The mechanism for the difference is the same threshold arithmetic that entry
+identified, and it is worth stating because it makes the result predictable
+rather than lucky. The gate removes something a consumer can see only when
+`0.40 x rate` clears the announcement bar of 55-90ms. The recorded median
+oracle IOI at these candidates was **154ms**, giving a 62ms gate — marginal.
+On the merged corpus the spurious candidates' median oracle IOI is **222ms**,
+giving 89ms — clear of the bar with room. The same-pitch takes are slower
+material than the 140bpm lead lines the old ceiling was dominated by, so the
+gate's whole benefit region is where this material actually sits.
+
+**This does not reopen the causal estimator; it makes it testable again, and
+that distinction is the finding.** The circularity is untouched: the rate
+estimate is corrupted by the over-segmentation it exists to correct, and no
+amount of new material fixes that. What changes is whether the known shortfall
+still lands below the usable band. `PaceEstimator` read a median of **0.82** of
+the oracle rate, and on the old corpus 0.82 x 154ms gave a 50ms gate, under the
+bar — which is exactly why it achieved 2 emitted Notes against the oracle's 8.
+On this corpus 0.82 x 222ms gives a 73ms gate, over it.
+
+So the falsifier for rebuilding `PaceEstimator` (reverted, not in the tree)
+is stated in advance and is narrow: **it must reach at least 35 emitted Notes —
+half the oracle's 71 — at no cost in missed labels on the derivation set and no
+net loss on the twelve held-out takes.** Below that it is the same shuffle the
+entry above reverted, and the ratio form is closed for good rather than
+pending. Note what it cannot be fitted on: the eight takes' labels are
+PROVISIONAL, so the 71 is a ceiling measured against unreviewed ground truth,
+and the label review is a precondition for believing the number rather than the
+direction.
+
+**A gap in the corpus that this line would depend on, and that no fixture
+covers:** every one of the 25 takes is metronomic, at 120 or 140bpm. Nothing
+here plays rubato, accelerates, or holds a note past the beat. A rate gate
+assumes regularity, and its failure mode is merging notes a player actually
+played while slowing down. The quantile-0.25 reading is the existing mitigation
+— reading a passage as faster than it is only declines merges — but it was
+derived on metronomic material and its safety on expressive playing is
+untested and currently untestable here.
