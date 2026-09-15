@@ -195,9 +195,13 @@ information behind every remaining DI defect is in the signal, and the
 roadmap names a staged repair with a falsifier per stage. Read it before
 touching the onset kernel's hop, the tracker's handling of a pitch step that
 a pick then re-articulates, or the chroma kernel's cancellation loop. Its
-numbers are ceilings read on held-out material; its Stage 0 (new DI
-derivation recordings) is what turns them into results, per DECISION-022's
-rule that new derivation material precedes any further reading of a ceiling.
+Stages 1 and 2 are built (`kernels/fine-onset.ts`; `claimPrefix` and its
+contact and stroke tests in `note-tracker.ts`) with every constant a
+held-out reading, under the rule that the derivation set must not move —
+`docs/DETECTION-FINDINGS.md`, "The direct input, repaired to its measured
+shapes", records what each draft of those rules cost on the mic takes and
+why it was changed. Its Stage 0 (new DI derivation recordings) is still
+what turns those readings into derived constants, per DECISION-022's rule.
 
 ### `docs/archive/` — closed lines of work
 

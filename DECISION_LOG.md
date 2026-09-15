@@ -9,7 +9,12 @@ are what keep later work from repeating them.
 
 #### [DECISION-026]: Adopt the direct-input roadmap: fine-hop flux proposals, transitions belong to the pick, octave-consistent cancellation; DI derivation material is the precondition
 * **Date:** 2026-09-15
-* **Status:** Proposed
+* **Status:** Accepted, amended 2026-09-15 — Stages 1 and 2 shipped with
+  every constant a held-out reading (no DI derivation material exists yet;
+  the derivation set was held to bit-identical numbers instead); Stage 3's
+  virtual-pitch exception shipped and its octave-consistent cancellation
+  was built twice and refuted; the strum-spread half of Stage 2 was
+  refuted. See the amendment below the Consequences.
 * **Owner:** Detection architecture
 * **Context:** Asked for a realistic path to perfect accuracy on the direct
   input. The four DI takes (127 held-out events) stand at 6 missed, 25 extra
@@ -60,6 +65,32 @@ are what keep later work from repeating them.
   material, and one semantic rule (the pre-pick prefix) that a consumer
   wanting every legato pitch change as a Note would want off. Nothing in
   `src/` moved; the eval report is bit-identical.
+* **Amendment (same day):** Built without the derivation material, under
+  the rule that the five derivation takes must not move at all — they did
+  not (84 Notes, 2 missed, 8 extra, before and after). What shipped:
+  (1) `kernels/fine-onset.ts` and its corroboration by the damping dip the
+  roadmap had refuted as a detector — the witness alone is not neutral on
+  the derivation set at any threshold (`clean-lead` 1 → 2–4 extras from
+  θ=4 down to 1); gated on a 6dB dip and a 6dB rebound, with a 55ms dedupe
+  against the broadband kernel's own attacks, it is. (2) The pre-pick
+  prefix and contact-led transition-stub rules, run from both ends because
+  six of the eight DI prefixes are Notes the region lane carves out after
+  the pick's Note was announced; a *contact* is a fine onset with a dip of
+  at least 10dB and no rebound — the 6dB-rebound test alone absorbed five
+  of the mic sixteenths' quiet upstrokes; the stroke look-back is 80ms,
+  bounded by `clean-lead` `s8` (48ms), the mic sixteenths' `s8` (62ms) and
+  the DI triplet's closest prefix (93ms). (3) Blooming on a virtual pitch
+  (`power-chords-120` 8/8). What was refuted and reverted: the strum-spread
+  exemption (absorbed the `spicy-chords` Cmaj9 into an E5); a stub rule
+  keyed on pitch alone (took the correct half of the mic triplet's `t20`);
+  a region `rose` flag as the prefix discriminator (hammer-ons rise); the
+  chroma sub-octave rule in both forms. Reading: the four DI takes go from
+  6 missed / 25 extra / 117 named to 2 missed / 13 extra / 121 named of
+  127; the twelve held-out takes from 30 missed / 84 extra to 24 / 72;
+  everything else bit-identical. The DI derivation material remains the
+  precondition for deriving rather than reading any of these constants,
+  and every one of them is documented as a held-out reading at its
+  declaration.
 
 #### [DECISION-025]: Split the README into a short front door plus `docs/`; the intro is human-owned
 * **Date:** 2026-09-10

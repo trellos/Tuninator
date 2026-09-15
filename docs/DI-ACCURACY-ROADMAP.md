@@ -333,6 +333,15 @@ can be *derived*, and the held-out takes stay what they are for.
 
 ### Stage 1 — a fine-hop onset front end, as proposals
 
+> **Status: shipped**, as `src/engine/kernels/fine-onset.ts`, acting in the
+> fast lane only when the damping dip of §2.5 corroborates it (a 6dB dip
+> and a 6dB rebound to re-articulate; the rebound to open over silence) and
+> deduped 55ms against the broadband kernel's own attacks. Threshold 2.5.
+> Read: DI sixteenths 42 → 46 of 48 at 0 extras; DI triplet unchanged;
+> amped and mic sixteenths one stroke each; derivation set bit-identical.
+> The witness acting alone is not neutral on the derivation set at any
+> threshold — the measurements are in `docs/DETECTION-FINDINGS.md`.
+
 **Change.** A second `OnsetDetector` instance (or a mode of the existing
 one) at a 128-sample hop over a 1024-point window: log-compressed magnitude,
 reference = per-bin maximum over the frames 8–24ms back, max-filtered over
@@ -365,6 +374,17 @@ candidate the broadband kernel disagrees with.
 
 ### Stage 2 — the direct input's transitions belong to the pick
 
+> **Status: rules 1 and 2 shipped, rule 3 refuted.** `claimPrefix` /
+> `offerPrefix` in `note-tracker.ts`. Two things the census did not show:
+> six of the eight prefixes are Notes the region lane carves out *after*
+> the pick's Note is announced, so the rule runs from both ends; and the
+> stub rule needs the fine witness to have seen the hand land (a contact:
+> a dip of at least 10dB with no rebound), because a step alone at a third
+> pitch takes the correct half of a misread note on the mic triplet. Read:
+> DI triplet 21 → 9 extras at 55/55; nothing else moves. Rule 3 absorbed
+> the `spicy-chords` Cmaj9 into the E5 after it and was reverted; the three
+> cowboy-DI strum fragments stay.
+
 **Change.** Three structural rules in the tracker, all of the kind
 `DECISION-008` provides for (the Note is delivered, then absorbed by a
 `structuralRevision`):
@@ -393,6 +413,13 @@ every held hammer-on. Rule 1's window is derived on the Stage 0 legato take,
 not on the DI triplet take.
 
 ### Stage 3 — chord naming: octave consistency, and blooming on a virtual pitch
+
+> **Status: the virtual-pitch bloom shipped** (`power-chords-120` 8/8);
+> **the octave-consistent cancellation was built twice and refuted** — it
+> named both DI chords and cost `spicy-chords` an extra, read the mic
+> triplet's `e18` as Dsus2 and moved the cowboy-amped onset median from 92
+> to 145ms; the tightened form still lost `e18` and left `c2` at Em7. `c1`
+> and `c2` stand.
 
 **Change.** (a) In `kernels/chroma.ts`'s cancellation loop, before a
 candidate f is accepted, test f/2: if the partials at 1×, 3× and 5× of f/2
@@ -429,6 +456,14 @@ at 8/8, 16/16, 55/55 and 47/48 — which is the definition of perfect this
 document set out with, made permanent.
 
 ### What the path is expected to read at the end
+
+> **Read so far** (Stages 1–3 as shipped above): `cowboy-di` 8/8 at 4
+> extras, `power-di` 16/16 at 0, triplet 55/55 at 9, sixteenths 46/48 at 0
+> — 2 missed, 13 extra, 121/127 named, from 6 / 25 / 117. The nine triplet
+> extras each carry a transient the witnesses call a stroke, or none at
+> all; the four cowboy extras are the strum's spread; the two sixteenths
+> misses are `s14` and `s6`. What is written below is the expectation as
+> stated before any of it was built.
 
 | take | detections | missed | extra | named |
 |---|---|---|---|---|

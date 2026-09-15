@@ -16,6 +16,7 @@
  */
 
 import type { PitchClass, PitchNote, SourceTimeMs } from "../types.js";
+import type { FineOnset } from "./kernels/fine-onset.js";
 
 /* -------------------------------------------------------------------------- */
 /* Evidence                                                                    */
@@ -150,6 +151,16 @@ export type FastFrame = {
    * and this says exactly when energy arrived.
    */
   bandOnset: boolean;
+  /**
+   * Onsets the fine-hop witness confirmed since the previous frame.
+   *
+   * Read at the render quantum rather than at the hop, and confirmed only
+   * once nothing stronger has followed inside the preparation window, so
+   * each arrives tens of milliseconds after the audio it describes and
+   * carries its own sample index. See `kernels/fine-onset.ts`. Absent or
+   * empty when the witness is off.
+   */
+  fineOnsets?: readonly FineOnset[];
   /** Hop index since the engine started. */
   hop: number;
 };

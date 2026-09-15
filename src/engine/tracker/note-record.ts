@@ -61,6 +61,8 @@ export class NoteRecord {
   readonly ownStartTime: SourceTimeMs;
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
   absorbedRenaming = false;
+  /** The pre-pick prefix check has run for this Note. See `NoteTracker.claimPrefix`. */
+  prefixClaimed = false;
   startSample: number;
   endTime: SourceTimeMs | null = null;
   lifecycle: NoteLifecycle = "started";
