@@ -144,8 +144,16 @@ material (DECISION-026) — four takes, DI and amped, 1,131 events — was recor
 to answer DECISION-022, and is deliberately landed unassigned, with no
 `eval.config.json` entries and with PROVISIONAL generated labels. It gates
 nothing and is fitted by nothing until someone assigns it and reviews the
-labels. Read `docs/SAME-PITCH-MATERIAL.md` before using it for either purpose;
-two of the four takes do not match what the player described and say so there.
+labels. Read `docs/SAME-PITCH-MATERIAL.md` before using it for either purpose.
+Two structural questions were open when this material landed — whether
+`quarters`' E5 section is 8 measures or 10, and whether `eighths A3` contains a
+sixteenth section — and **both have since been answered by the player and the
+labels corrected to follow**, so the earlier warning here that two takes did not
+match his description is out of date. What remains is placement: the amped
+labels are the DI labels applied unchanged, since each pair is one performance,
+and they carry up to 65ms of offset and most of the `verify-fixtures.ts`
+concerns (68, 182, 116 and 59 against the DI renders' 0, 61, 48 and 2). So the
+DI renders are in good shape and the amped ones are what a review is for.
 Note also that the derivation predicate is implemented three different ways
 across the measurement scripts, and these stems fall on opposite sides of them.
 
