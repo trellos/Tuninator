@@ -279,3 +279,48 @@ events against 190 amped for one performance, and the two sets disagree about
 which picks exist — DI-only `s1626` and `s16128`, amped-only `s1628`; on
 `eighths-a3`, DI-only `e838` and amped-only `s1692`. Both cannot be true. No
 proposal changes a count, so this is unresolved.
+
+### What applying the proposal does to the reported numbers — and why that is not a validation
+
+Measured in a throwaway detached worktree with the two proposals overlaid;
+nothing under `fixtures/` in the repository was touched. The twenty-three
+untouched fixtures read bit-identically, as they must.
+
+| | labels | Notes | missed | false pos | pitch class | exact | onset median abs |
+|---|---|---|---|---|---|---|---|
+| `eighths-a3-amped` now | 183 | 218 | 9 | 44 | 95.1% | 87.4% | 31ms |
+| `eighths-a3-amped` proposed | 183 | 218 | **10** | **45** | **94.5%** | 87.4% | **37ms** |
+| `eighths-sixteenths-e5-amped` now | 190 | 209 | 13 | 32 | 92.6% | 92.6% | 27ms |
+| `eighths-sixteenths-e5-amped` proposed | 190 | 209 | 13 | 32 | 92.6% | 92.6% | **18ms** |
+
+Corpus-wide: 137 missed to 138, 345 false positives to 346, pitch class 89.9%
+unchanged, exact 84.9% unchanged. `measure-splits.ts` goes 340 split / 410
+extras to 354 / 421, because moving a label changes which Note it pairs with.
+
+**Read the direction of inference carefully, because it is the trap this
+material exists to avoid.** None of the above is evidence about whether the
+labels are right. Judging a label by whether the recognizer scores better
+against it is precisely the circularity `AGENTS.md` §3 forbids — a detector and
+a label set can agree because both are wrong in the same direction, which on a
+DI-derived label set applied to an amped render is the expected failure, not an
+unlikely one. The non-circular instrument is `verify-fixtures.ts`'s independent
+attack search, and it says `e5-amped` improves from 25ms to 8ms while
+`a3-amped` **has no measurable anchor at all** — the hiss swamps the rise, so
+its proposal rests on a whole-render cross-correlation rather than on located
+attacks.
+
+Two conclusions follow.
+
+**The corpus numbers were never being held back by this.** A 187–215ms label
+error on two amped takes moves the corpus by one missed label and one false
+positive. Anyone hoping a label review would unlock an accuracy gain should
+stop hoping: it will not, and that is worth knowing before the review rather
+than after.
+
+**Propose `e5-amped`; hold `a3-amped` for a listening pass.** `e5` improves on
+the independent measure and costs nothing on the dependent one. `a3` improves on
+neither: its independent anchor is unmeasurable and the recognizer's own onset
+error gets *worse* (31ms to 37ms) while it loses a label. That disagreement does
+not prove the proposal wrong — the detector is not a judge here — but a proposal
+with no independent support and a dependent measure pointing the other way is
+exactly the one a human should place by ear.
