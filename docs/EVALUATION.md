@@ -37,8 +37,8 @@ That separation is the only reason any number below means anything.
 | `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 40 | 8 | 68.1% | 72.3% | 16ms |
 | `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 39 | 12 | 72.9% | 72.9% | 16ms |
 | `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 64 | 0 | — | — | — |
-| `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 65 | 2 | — | — | — |
-| `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 82 | 0 | — | — | — |
+| `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 64 | 2 | — | — | — |
+| `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 81 | 0 | — | — | — |
 
 The three triplet takes score no accuracy because every section of them is marked informational in
 `fixtures/eval.config.json`; the gated subset is empty by configuration, so the check is reported
@@ -57,7 +57,7 @@ inside its gates — of the 22 takes that score it, nine have a median absolute 
   losses are downstream of the evidence, not in it: the onset kernel covers 44, 44 and 47 of the
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.
-- **Fast single-note lines also produce extra Notes.** The triplet takes emit 64–82 Notes for 55
+- **Fast single-note lines also produce extra Notes.** The triplet takes emit 64–81 Notes for 55
   labels. `npx tsx scripts/measure-splits.ts` puts the corpus at 99 of 459 events split with 107
   extra Notes, and 63 of those 99 are the three triplet takes. The shape is one thing: a
   correctly-named Note followed by a short SAME-PITCH tail fragment, so a single played event

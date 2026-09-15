@@ -7,13 +7,13 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-033]: The third pace attempt ships disabled; the ratio gate misses its stated bar at the oracle's operating point
+#### [DECISION-037]: The third pace attempt ships disabled; the ratio gate misses its stated bar at the oracle's operating point
 * **Date:** 2026-09-15
 * **Status:** Rejected
 * **Owner:** Detection architecture
 * **Context:** DECISION-028 named a sequence claim as the precondition for
   progress on the same-pitch split, and the owner asked for the live-tempo form
-  of it (DECISION-032 having removed the retraction objection). A live pace had
+  of it (DECISION-036 having removed the retraction objection). A live pace had
   been built twice and reverted twice. Read against each other the two entries
   yield a combination neither ran: attempt 1's target (bias the segmentation
   toward whole notes) with attempt 2's feed (once per attack BURST, quantile
@@ -85,7 +85,7 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-032]: Revision is the contract, not a cost; latency to be correct is accepted
+#### [DECISION-036]: Revision is the contract, not a cost; latency to be correct is accepted
 * **Date:** 2026-09-15
 * **Status:** Accepted
 * **Owner:** Project owner
@@ -127,17 +127,17 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-031]: The fine onset's dip requirement stays; measured off, it is a direct-input trade that leaves the amped renders untouched
+#### [DECISION-035]: The fine onset's dip requirement stays; measured off, it is a direct-input trade that leaves the amped renders untouched
 * **Date:** 2026-09-15
 * **Status:** Rejected
 * **Owner:** Detection architecture
 * **Context:** With the eight 120bpm same-pitch takes and the DI repair in one
-  tree (DECISION-030), `held-then-picked-six-strings-120bpm-di` reads 14 missed
+  tree (DECISION-034), `held-then-picked-six-strings-120bpm-di` reads 14 missed
   of 120. The tracker's trace names the refusals: seven `rejected: gated` at
   the amplitude gate on a string decayed below it, three `ring-out-not-sharp`,
   three `band-only transient`, one with no transient in the window at all —
   twelve of the fourteen C3 or C4 re-picks, the other two an F#2 and a G4. The
-  fine-hop witness of DECISION-029 sees the gated ones with a 19-26dB rebound
+  fine-hop witness of DECISION-033 sees the gated ones with a 19-26dB rebound
   and `fineOnsetDipDb` vetoes them, because a fine onset may not re-articulate
   a sounding note unless the 5ms envelope dipped first - the pick landing on
   the string before it plays it.
@@ -173,7 +173,7 @@ are what keep later work from repeating them.
 * **Consequences:** The direct input keeps fourteen known misses on one take,
   with the mechanism that would recover thirteen of them identified, built, and
   deliberately not enabled. What unblocks it is stated rather than guessed: the
-  DI derivation material DECISION-029 already names as its precondition, and a
+  DI derivation material DECISION-033 already names as its precondition, and a
   reviewed label pass over the eight takes (`docs/validate-relabelled-material-prompt.md`).
   Negative cost: anyone reading the take's ledger will find the misses and the
   witness that sees them, and has to read this entry to learn why the two are
@@ -183,7 +183,7 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-030]: Merge the direct-input repair with the 120bpm same-pitch material; the merge has one engine parent, not two
+#### [DECISION-034]: Merge the direct-input repair with the 120bpm same-pitch material; the merge has one engine parent, not two
 * **Date:** 2026-09-15
 * **Status:** Accepted
 * **Owner:** Detection architecture
@@ -199,8 +199,9 @@ are what keep later work from repeating them.
   contributions whole. The conflict was in `DECISION_LOG.md` alone and was
   structural: the same-pitch material keeps `DECISION-026`, the number its
   own material is referenced by throughout the docs, and the DI roadmap entry
-  is renumbered to the next free number, `DECISION-029`, with its three
-  cross-references moved with it (`docs/DETECTION-FINDINGS.md`,
+  is renumbered clear of it — first to `DECISION-029`, then to `DECISION-033`
+  when the sibling branch's own 029-032 arrived — with its cross-references
+  moved with it each time (`docs/DETECTION-FINDINGS.md`,
   `src/engine/config.ts`, `src/engine/tracker/note-tracker.ts`). The eight
   takes stay out of `fixtures/eval.config.json`: they remain informational and
   gate nothing until their labels are confirmed. One doc figure was refreshed
@@ -248,7 +249,7 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-029]: Adopt the direct-input roadmap: fine-hop flux proposals, transitions belong to the pick, octave-consistent cancellation; DI derivation material is the precondition
+#### [DECISION-033]: Adopt the direct-input roadmap: fine-hop flux proposals, transitions belong to the pick, octave-consistent cancellation; DI derivation material is the precondition
 * **Date:** 2026-09-15
 * **Status:** Accepted, amended 2026-09-15 — Stages 1 and 2 shipped with
   every constant a held-out reading (no DI derivation material exists yet;
@@ -332,6 +333,261 @@ are what keep later work from repeating them.
   precondition for deriving rather than reading any of these constants,
   and every one of them is documented as a held-out reading at its
   declaration.
+
+---
+
+#### [DECISION-032]: The two same-pitch benches measure different targets; name which question each answers
+* **Date:** 2026-09-15
+* **Status:** Accepted
+* **Owner:** Evaluation methodology
+* **Context:** DECISION-031's gate measured the DECISION-030 rate feature at
+  0.533 on the re-articulation decision table, against 0.826 in the study that
+  produced it. The discrepancy was assumed to be estimator error and was not:
+  scored on the rate study's own sub-population (accepted, settled, same-pitch,
+  1,038 derivation rows) the same feature on the same rows reads **0.805**
+  against the rate study's target and **0.526** against the decision table's,
+  reproducing each study's own number. The inputs agree; the ground truth does
+  not.
+* **Decision:** **Record that the two benches ask different questions, and which
+  question each answers, because both files describe themselves as being about
+  "the same-pitch re-articulation decision".**
+  `measure-decision-separability.ts` asks a BOUNDARY-shaped question: does an
+  uncovered label begin within 70ms of this decision, so should the split have
+  been made? `measure-rate-relative-merge.ts` asks an OUTCOME-shaped question:
+  did the matcher pair the Note this split created with a label, so is this
+  emitted Note surplus? **They disagree on 278 of 1,038 shared rows, 26.8%** —
+  162 where the boundary was right but the child went unpaired, 116 where the
+  boundary was wrong but the child got the label. Neither is wrong; they are
+  answers to different questions. Choose by what is being decided: a consumer
+  scoring one target per pick pays for surplus Notes, so the outcome-shaped
+  target governs anything about fragmentation, and the boundary-shaped target
+  governs anything about segmentation.
+* **Alternatives Considered:** (a) **Treating one as the correct target and
+  retiring the other** — rejected: both questions are real, and the 73.2%
+  agreement means neither is a noisy version of the other. (b) **Reconciling
+  them into a single target** — rejected for now; the 278 disagreements are
+  where a Note is right about the boundary and wrong about its own extent, or
+  vice versa, and collapsing that loses the distinction rather than resolving
+  it. (c) **Assuming the gap was estimator error**, which was the first
+  hypothesis — refuted by scoring both targets on identical rows.
+* **Consequences:** Positive — a class of future confusion is closed, and two
+  existing conclusions can now be read correctly. **DECISION-021's rejection of
+  the learned onset head was measured against the BOUNDARY-shaped target**, on
+  161 rows with 59 positives; that verdict stands for the question it asked and
+  is not evidence about a model trained and judged on surplus Notes, which has
+  never been run. DECISION-030's shipped gate operates on the outcome-shaped
+  target, which is why it improves the fragmentation numbers while moving
+  nothing on this table. Negative — every AUC in this repository predating this
+  entry now needs its target identified before it is compared with another, and
+  the two ceiling figures most often quoted (0.698 at the boundary, 0.926 for
+  the rate feature) are NOT on the same scale and must never be cited as though
+  they were. This is the fifth instance of "a bench ranking is not a pipeline
+  ranking" and the sharpest: not a bench disagreeing with the engine, but two
+  benches disagreeing with each other about the ground truth.
+
+---
+
+#### [DECISION-031]: Rhythm features do not transfer across takes at the boundary; the learned-model gate fails
+* **Date:** 2026-09-15
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** DECISION-030 shipped a rate-relative fragment bar whose leading
+  feature scores 0.926 against a true clock, far above the 0.698 every witness
+  read AT the boundary tops out at, and the owner asked whether a neural network
+  could separate a real pluck from an invented boundary. DECISION-021 already
+  spent a 19,833-parameter conv net on this decision and failed its falsifier at
+  0.7157. Rather than train a second one, the cheap gate: offer the same rhythm
+  features to a plain L2 logistic regression on the existing decision table and
+  measure cross-take generalisation. A regression is the floor — if the
+  information does not appear there, no network over the same inputs will find
+  it. Falsifier stated in advance: leave-one-take-out AUC must clear 0.702 by
+  more than the spread across folds, AND must remove materially more than 0 of
+  635 false positives at zero label cost.
+* **Decision:** **Both clauses fail; nothing is wired and `src/` is unchanged.**
+  Leave-one-take-out goes 0.593 (twelve witnesses) to **0.603** with the
+  prospective rhythm group added, against a bar of 0.828, and false positives
+  removable at zero label cost go 0 to **2 of 635**. The retrospective group,
+  which the brief named in advance as the interesting outcome because it would
+  have argued for a retraction-based design, is the WEAKER of the two: it moves
+  leave-one-take-out by −0.001 and scores 0.431 alone, worse than chance
+  out-of-take, and the fitted model assigns it a weight of −0.01. A lambda sweep
+  changes nothing. In-sample rose 0.717 to 0.742 and pooled 5-fold 0.711 to
+  0.733, but both pool across takes, which is the within-take memorisation this
+  table exists to expose.
+* **Alternatives Considered:** (a) **Training a model anyway** — rejected as the
+  expensive version of an experiment that just came back negative on its floor.
+  (b) **Selecting lambda or the feature subset on the leave-one-take-out
+  column** — rejected as tuning on the falsifier's own rows, the same trap
+  DECISION-021 named. (c) **Reading the pooled held-out gain (0.723 -> 0.749) as
+  generalisation** — rejected: it pools twelve takes and is the same kind of
+  number as the 5-fold one. (d) **Concluding the rate feature does not work** —
+  refuted; see DECISION-032. It works, on a different target.
+* **Consequences:** Positive — a training run is not attempted on a feature set
+  that does not clear its floor, and one genuinely useful feature is identified:
+  pace-normalising `soundedMs` takes it 0.646 to **0.708**, a real +0.062 and
+  the only new feature to beat any existing witness, which is the DECISION-030
+  framing working as advertised even though it correlates 0.794 with the raw
+  quantity and only ties `fluxRatio`. The best of all 171 witness pairs is now
+  `fluxRatio` + `localIoiMs` at 0.687 leave-one-take-out, up from 0.679.
+  Negative, and the sharpest limit found — **the rate abstains where it is most
+  needed.** `localIoiMs` is missing on 71% of rows on one cowboy take and 59-64%
+  on the three 140bpm cowboy takes, against 0.4-1.3% on the same-pitch material,
+  because sparse chord playing keeps tripping the 1,500ms reset. Adding the
+  group also hurts `held-then-picked-amped`, 0.479 -> 0.463, the largest
+  negative-heavy take. **What this does NOT close** is a model judged on surplus
+  Notes rather than on boundaries: this table asks the boundary-shaped question
+  and DECISION-032 records that the two differ on 26.8% of shared rows, so the
+  learned direction is closed only for the question this table asks.
+
+---
+
+#### [DECISION-030]: A same-pitch fragment is judged against the local note rate, not against a fixed duration
+* **Date:** 2026-09-14
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** DECISION-028 closed the per-boundary threshold family — every
+  witness available at the decision tops out at 0.698 AUC, the new envelope dip
+  reaches 0.763, and at roughly five real re-picks per phantom a 0.78 witness
+  removes about one played note per phantom. It named the opening rather than a
+  fix: "what a listener uses on this material is not one number at one boundary
+  — it is four evenly spaced events carrying the same envelope shape, which is a
+  claim about a SEQUENCE." Separately, the owner pressed the point that the
+  session had produced analysis rather than accuracy. The defect is stereotyped:
+  294 of 318 extra Notes are at the label's own pitch class and butted against
+  their neighbour, and the median shortest Note in a split event is 93ms.
+* **Decision:** **Ship the sequence claim as an announce bar.** A Note opened by
+  a same-pitch re-articulation whose boundary showed no envelope dip
+  (`dipRatio >= tracking.rateFragmentDipRatio`, 0.85) must outlast
+  `tracking.rateFragmentSpanFraction` (0.35) of the LOCAL inter-onset interval
+  before it is announced; one that dies first is discarded by `end()` as a Note
+  that never cleared its bar. Measured over 1,237 same-pitch re-articulations,
+  fragment span over the true local interval scores **0.905 AUC** against 0.788
+  for the span alone and 0.698 for everything read at the boundary. End to end:
+  **missed labels 159 -> 159, false positives 346 -> 314, events split 339 ->
+  318, extra Notes 407 -> 379**, eval PASS with the one pre-existing
+  informational failure, `clean-lead` gated pitch class unchanged at 92.9%, 499
+  tests passing, `fixtures/` untouched. It is the first gate in this line that
+  removes phantom Notes at zero cost in played ones. 0.35 is the largest span
+  bar costing nothing on the derivation material (0.40 costs two); held-out was
+  reported only after the bar was fixed and costs nothing either.
+* **Alternatives Considered:** (a) **A fixed-duration bar** — refuted by the
+  populations: the median spurious fragment is 93ms and a real sixteenth at
+  140bpm is 107ms, so 80ms costs 77 played notes and 100ms costs 173. (b) **The
+  rate test alone** — costs one played note on `lead-line-di-sixteenths`,
+  hand-labelled held-out data at 107ms spacing where fragment and note are the
+  same length; the dip as a second, independent witness removes that cost
+  entirely, which is why both ship. (c) **A deep-lane retraction** (announce,
+  then withdraw via `structuralRevision` / `relation: "absorbed"`) — measured to
+  give identical numbers to simply never announcing, so the far simpler
+  mechanism ships. (d) **Estimating the rate from the audio envelope's own
+  periodicity**, to break the circularity at the source — measured and rejected:
+  envelope-over-truth spreads 0.31 to 2.02 across the quartiles with octave
+  errors both ways, dropping the test to 0.622 AUC. `docs/SAME-PITCH-MATERIAL.md`
+  already records why, the A3 take's strongest periodicity sitting at twice the
+  note period. (e) **An upper percentile, and a two-pass re-estimate**, both
+  aimed at the same contamination — each fixed the bias without improving the
+  end-to-end trade. (f) **Keeping DECISION-028's dip GATE** — removed rather than
+  left inert; the witness is load-bearing here, the rejected bar is not.
+* **Consequences:** Positive — 32 fewer false positives and 28 fewer extra Notes
+  for no missed label anywhere, and the sequence framing is now measured rather
+  than proposed: 0.905 against 0.698 for everything read at the boundary. The
+  estimator's error is understood and one-directional, which is what makes the
+  rule safe: a missed onset can only lengthen a gap and a phantom can only
+  shorten one, and only the long reading is dangerous. Negative — the amp-sim
+  takes still carry most of the defect (`held-then-picked-amped` 48 of 120 split
+  against 8 of 120 on the direct render of the same performance), and the rule
+  says nothing about a fragment that is a full note long. **The methodological
+  cost is worth naming:** the offline simulation predicted -43 extras and zero
+  missed labels, and the first engine build delivered -25 with a NEW
+  informational failure on `lead-line-amped-sixteenths`. That was a 500ms
+  FALLBACK rate applied 3.7s into a take playing 107ms sixteenths, before any
+  gap had been measured, which suppressed a real 147ms note under a 175ms bar.
+  Removing the fallback — abstaining when no pace is known — fixed it. Two
+  hypotheses were tried and failed before the instrument was read; that ordering
+  is the mistake, not the fallback.
+
+  *Amended 2026-09-15:* restricting this gate to MONOPHONIC Notes was proposed,
+  measured and refused. It was expected to be a no-op and is a regression —
+  false positives 314 -> 319, extra Notes 379 -> 383, missed unchanged — and it
+  fails at its own purpose: discards on the chord takes stay at 9 while firings
+  fall 31 to 17, because a power chord is a dyad and a decayed strum is one
+  ringing string, so `polyphonic` is silent exactly where the restriction was
+  wanted. All five lost discards are on `held-then-picked-amped`, which is
+  monophonic by construction, so the flag also fires wrongly on distorted
+  single-note material. The finding is about the flag rather than the idea; a
+  per-Note test on the predecessor's `harmonyBloomed` is the untested
+  alternative. `src/` is unchanged.
+
+---
+
+#### [DECISION-029]: Keep the automated re-timing of the two gridded DI sections; the A3 sixteenth section is flagged, not reverted
+* **Date:** 2026-09-14
+* **Status:** Accepted
+* **Owner:** Fixture ground truth (validation pass)
+* **Context:** `fixtures/labels/**` is read-only against the detector, and was
+  edited twice on the owner's instruction: `b5cf94b` applied nine corrections
+  from his own listening pass (human annotation, the highest authority in the
+  repository), and `7a216fe` re-timed roughly 330 labels in the two gridded DI
+  sections with `scripts/retime-gridded-labels.ts`, on envelope evidence that is
+  weaker than an ear, against material this project has mis-measured before.
+  The re-timing's own check — 6/6 of the owner's picks within 30ms — is nearly
+  circular, four of the six being values it is forbidden to move. The brief
+  (`docs/validate-relabelled-material-prompt.md`) asked whether the automated
+  pass is sound, with the instruction to revert `7a216fe` alone if not, never
+  to touch `src/`, and never to consult Tuninator's output.
+* **Decision:** **Keep `7a216fe`; `b5cf94b` stands; no further label edit.**
+  The re-timing reproduces byte for byte from the script; every structural,
+  count, lock and eval check passes. Three of its four sections are confirmed
+  by evidence it never read: on `e5-di` the re-timed sixteenth labels sit on
+  2.7× the onset energy in the *amped* render that the grid did (0.49 vs 0.18,
+  chance 0.10; 115 vs 99 of 127 within 25ms of a strong amped peak), the
+  verifier's attack-offset spread tightens three- to four-fold on all four
+  sections, inter-onset intervals scatter like this player's measured
+  quarter-note takes (SD 21–22ms against 16–20), and a leave-one-out at the
+  owner's six ear points lands five within 11ms. The fourth section, `a3-di`'s
+  sixteenths, located 78 of 111 picks and is not verifiable from the amped
+  render (that audio is too compressed for any crude onset function); per label
+  it is no worse than the grid, but as a sequence it is non-physical (39 of 110
+  intervals outside 85–175ms, every one involving an unmoved grid label). It is
+  flagged as unreliable in `docs/SAME-PITCH-MATERIAL.md` with its 33 unmoved
+  ids listed, rather than reverted, because a wholesale revert would discard the
+  three verified sections and improve nothing.
+* **Alternatives Considered:** (a) **Revert `7a216fe`** — rejected: the grid it
+  would restore is measurably further from the picks on three sections and no
+  closer on the fourth. (b) **Revert only the A3 sixteenth section** — rejected:
+  the brief permits a wholesale revert or nothing, and any partial edit of
+  `fixtures/labels/**` needs the owner's ear. (c) **Re-run the script with the
+  lock changed to hold times rather than (id, time) pairs**, which would fix the
+  one place the lock demonstrably hurt (`s1614`/`s1615`) — rejected here for the
+  same reason: a further automated edit of ground truth is not this pass's to
+  make; the limitation is recorded in the script header and the findings. (d)
+  **Carry the re-timed DI times to the amped files** at the measured +2.5ms
+  render offset — deferred to the owner; it would be the right repair for amped
+  sixteenth labels that currently sit at chance on their own audio. (e) **Trust
+  the re-timing's own 6/6** — rejected as the circular check the brief named.
+* **Consequences:** Positive — the two DI takes that were the corpus's worst
+  onset data now carry measured onsets on 318 of their 374 labels, checked from
+  a second recording of the same performance; the two renders are established
+  as aligned to 2.5ms (both earlier offset measurements, 9–56ms and 80–90ms,
+  were wrong); and three false premises in the record are corrected: the amped
+  label files of the two fast takes were never the DI timings (their grids are
+  anchored 195/225ms later, so label ids do not name the same pick across
+  renders), `verify-fixtures.ts`'s concern count cannot see a sub-window move by
+  construction (its per-label offsets can, and do), and a removal cannot be
+  carried across renders by id. Negative — the A3 sixteenth section remains
+  unusable for anything needing better than ±65ms, now with a non-physical
+  interval structure; the amped fast-take labels are unchanged and known to be
+  off their picks in the sixteenth sections; and four questions are left with
+  the owner (which sixteenth the 19.613s pick is; whether A3's sixteenths run
+  19.89–33.96s against 111 labels; whether to carry DI times to the amped
+  files; the three weak off-beats at 21.05/21.30/21.55s in `e5-di`). The
+  material stays PROVISIONAL and unassigned to derivation or held-out.
+  `src/` is unchanged. *Same day, later:* the owner listened to those DI
+  sections and gave 37 pick times; they are applied verbatim (findings entry,
+  "Resolved the same day, by ear"), closing the first, second and fourth open
+  items — the 19.614s pick is `s1614`, both A3 section-end picks are labelled,
+  `s1628` is restored at 21.297s — and leaving the amped files deferred on his
+  instruction.
 
 ---
 

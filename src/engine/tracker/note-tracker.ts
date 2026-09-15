@@ -105,6 +105,8 @@ export type TrackerTraceEvent =
       fluxRatio: number;
       heldFluxRatio: number;
       riseRatio: number;
+      /** How far the envelope FELL before the transient. See `AttackEvidence.dipRatio`. */
+      dipRatio: number;
       /** `frame.rms / sustainedRms`: the envelope against the Note's own baseline. */
       envelopeOverBaseline: number;
       /** The onset kernel itself fired on this hop, as against the envelope witness. */
@@ -267,7 +269,7 @@ const BEND_EPSILON = 10;
  * pick, name from the picked Note's own frames. A held hammer-on stays a
  * Note, and so does one that moves on to another pitch. These are held-out
  * readings until derivation material with re-picked legato exists
- * (`DECISION-029`).
+ * (`DECISION-033`).
  */
 const PREFIX_MAX_MS = 250;
 /** Longest silence between the prefix ending and the pick. */
@@ -308,6 +310,62 @@ const CONTACT_DIP_DB = -10;
  * fundamental of one low string heard through a speaker) stays a note.
  */
 const VIRTUAL_PITCH_SEMITONES = 11;
+/**
+ * The local note rate, and the shape of the estimator that reads it.
+ *
+ * Taken unchanged from the `PaceEstimator` in `docs/DETECTION-FINDINGS.md`
+ * ("The constants are absolute milliseconds"): a ring of recent inter-onset
+ * intervals, the median of the last eight, ignoring gaps too short to be two
+ * notes, dropped after a silence. Nothing is fitted to these — the two bars
+ * that ARE derived live in `tracking.rateFragmentSpanFraction` and
+ * `tracking.rateFragmentDipRatio`.
+ *
+ * One property matters more than accuracy here, and it was measured rather
+ * than assumed: a phantom boundary INSERTS an onset, which splits one true
+ * interval into two short ones, so the estimate is dragged FAST by exactly the
+ * errors the bar it feeds exists to remove. A fast rate gives a SHORTER bar and
+ * therefore merges LESS, so the corruption is self-limiting rather than
+ * self-reinforcing. Scaling the rate to 0.5x was measured to cost no labels.
+ */
+const RATE_GAPS = 8;
+/**
+ * Which recent gap to take as the interval. 0 is the shortest, 1 the longest.
+ *
+ * NOT the median, and the reason is a measured asymmetry rather than taste. A
+ * MISSED onset merges two intervals into one and can only make a gap LONGER; a
+ * PHANTOM onset splits one interval in two and can only make a gap SHORTER.
+ * The bar this feeds is a fraction of the interval, so a long reading raises it
+ * and suppresses real notes, while a short reading lowers it and merely does
+ * less. Only one of those two errors is dangerous, and it is the one that
+ * missed onsets cause.
+ *
+ * A median was tried first and failed in the pipeline exactly there: on
+ * `lead-line-amped-sixteenths`, where the recognizer already misses a third of
+ * the onsets, the surviving gaps are two and three sixteenths long, the median
+ * read ~2.5x the true interval, and the raised bar cost a played note and took
+ * that fixture's pitch-class gate below its threshold. A low percentile is
+ * immune to that by construction, because dropping onsets never produces a
+ * SHORT gap.
+ */
+const RATE_PERCENTILE = 0.5;
+const RATE_MIN_INTERVAL_MS = 50;
+const RATE_RESET_MS = 1500;
+/**
+ * There is deliberately NO fallback rate.
+ *
+ * An earlier version fell back to a whole note at 120bpm when it had no gaps
+ * yet, and that single line was the whole of a measured regression: on
+ * `lead-line-amped-sixteenths` the first Note of the take is 147ms long and
+ * real, the fallback set its bar to 0.35 x 500 = 175ms, and it was suppressed —
+ * costing a played note and taking that fixture's pitch-class gate under its
+ * threshold. Every percentile of the estimator failed identically, because at
+ * the start of a take none of them has any gap to read.
+ *
+ * The rule's claim is "shorter than a note at the pace currently being played".
+ * With no pace measured there is no such claim to make, so `localIoiMs` returns
+ * null and the caller leaves the bar alone. Abstaining is free here: it costs
+ * only the first notes of a take, where nothing has yet gone wrong.
+ */
 
 export class NoteTracker {
   private readonly config: EngineConfig;
@@ -390,6 +448,14 @@ export class NoteTracker {
   private lastEndedAt: SourceTimeMs | null = null;
 
   /**
+   * When each Note opened, oldest first, for the local-rate estimate.
+   *
+   * Every opening goes in, phantoms included: that is what a causal estimator
+   * has. See the constants above for why that is safe here.
+   */
+  private readonly openTimes: number[] = [];
+
+  /**
    * Where segmentation decisions go when anybody is listening. Null in every
    * production path, and checked rather than called, so tracing costs one
    * comparison per decision and allocates nothing.
@@ -404,6 +470,7 @@ export class NoteTracker {
   }
 
   reset(): void {
+    this.openTimes.length = 0;
     this.notes.clear();
     this.closing.length = 0;
     this.ended.length = 0;
@@ -526,6 +593,13 @@ export class NoteTracker {
     let active = this.current();
     /** Set when a split ends a Note whose successor should inherit its decay. */
     let splitFrom: NoteRecord | null = null;
+    /**
+     * `dipRatio` at a SAME-PITCH split, for the Note that split is about to
+     * open. Null when nothing split, or when the split changed pitch — a
+     * boundary the pitch itself vouches for is not a tail-fragment candidate.
+     * See `tracking.rateFragmentSpanFraction`.
+     */
+    let splitSamePitchDip: number | null = null;
 
     /* (a) An attack over something already sounding: a restrum or a re-pick.
      *     Only a genuine energy injection counts, and never mid-glide — a bend
@@ -640,6 +714,7 @@ export class NoteTracker {
           fluxRatio: frame.attack.fluxRatio,
           heldFluxRatio: frame.attack.heldFluxRatio,
           riseRatio: frame.riseRatio,
+          dipRatio: frame.attack.dipRatio,
           envelopeOverBaseline: frame.rms / Math.max(active.sustainedRms, 1e-9),
           kernelOnset: frame.attack.flux,
           bloomed: active.harmonyBloomed,
@@ -675,6 +750,7 @@ export class NoteTracker {
         // It inherits the decay: a restrum re-excites the strings that were
         // already ringing, so the curve is continuous through the split.
         splitFrom = active;
+        if (!pitchDiffers) splitSamePitchDip = frame.attack.dipRatio;
         active = null;
       }
     }
@@ -796,6 +872,18 @@ export class NoteTracker {
           splitFrom,
           splitFrom !== null
         );
+        // A Note opened by a same-pitch boundary that had no envelope dip under
+        // it is a suspected tail fragment: it has to outlast a fraction of the
+        // interval currently being played before it is announced at all. One
+        // that dies first is dropped by `end()`, which already discards a Note
+        // that never cleared its bar — so this refuses the fragment rather than
+        // announcing and retracting it, and costs latency only on a boundary
+        // that is doubtful in both witnesses at once.
+        const bars = this.config.tracking;
+        if (splitSamePitchDip !== null && splitSamePitchDip >= bars.rateFragmentDipRatio) {
+          const ioi = this.localIoiMs(active.startTime);
+          if (ioi !== null) active.rateFragmentBarMs = bars.rateFragmentSpanFraction * ioi;
+        }
       }
     }
 
@@ -1390,6 +1478,11 @@ export class NoteTracker {
         fluxRatio: onset.value,
         heldFluxRatio: 0,
         riseRatio: frame.riseRatio,
+        // The fine witness measures this same fall, in dB rather than as a
+        // ratio — `dipAround` reads the 5ms envelope minimum against its prior
+        // maximum, which is what `AttackEvidence.dipRatio` is. Converted rather
+        // than left at 1, because 1 means "nothing fell" and something did.
+        dipRatio: 10 ** (onset.dipDb / 20),
         envelopeOverBaseline: frame.rms / Math.max(active.sustainedRms, 1e-9),
         kernelOnset: false,
         bloomed: active.harmonyBloomed,
@@ -2400,6 +2493,8 @@ export class NoteTracker {
       this.absorbArticulationFragment(record, predecessor);
     }
     this.notes.set(record.id, record);
+    this.openTimes.push(at);
+    if (this.openTimes.length > RATE_GAPS * 4) this.openTimes.shift();
     if (this.trace !== null) {
       this.trace({ kind: "opened", at, noteId: record.id, trigger });
     }
@@ -2619,6 +2714,29 @@ export class NoteTracker {
       };
       out.push({ type: "changed", note: record.snapshot(), change });
     }
+  }
+
+  /**
+   * The interval between notes the player is currently producing, in ms.
+   *
+   * Median of the recent gaps between Note openings. Strictly causal — only
+   * openings at or before `at` are read — and deliberately built from the
+   * tracker's own output, because that is the only thing available live.
+   */
+  private localIoiMs(at: SourceTimeMs): number | null {
+    const gaps: number[] = [];
+    for (let i = this.openTimes.length - 1; i > 0 && gaps.length < RATE_GAPS; i--) {
+      const later = this.openTimes[i] as number;
+      // Strictly before: the opening being judged must not enter its own estimate.
+      if (later >= at) continue;
+      const gap = later - (this.openTimes[i - 1] as number);
+      if (gap > RATE_RESET_MS) break;
+      if (gap < RATE_MIN_INTERVAL_MS) continue;
+      gaps.push(gap);
+    }
+    if (gaps.length === 0) return null;
+    gaps.sort((a, b) => a - b);
+    return gaps[Math.min(gaps.length - 1, Math.round((gaps.length - 1) * RATE_PERCENTILE))] as number;
   }
 
   private end(record: NoteRecord, at: SourceTimeMs, out: TrackerEmission[]): void {

@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. RE-TIMED by scripts/retime-gridded-labels.ts: each section's picks located in the DI audio by taking the N most prominent envelope peaks, N being the section's own label count, and assigning them in time order. No threshold and no detector output is involved. The grid is gone from these sections; the count is unchanged.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. RE-TIMED by scripts/retime-gridded-labels.ts: each section's picks located in the DI audio by taking the N most prominent envelope peaks, N being the section's own label count, and assigning them in time order. No threshold and no detector output is involved. The grid is gone from these sections; the count is unchanged. CORRECTED 2026-09-14 (second listening pass): the player listened to the sections named here and gave every pick attack time he heard; those times are applied verbatim to the nearest label and outrank the automated re-timing. Tuninator was not consulted. Sections 19.0-20.8s and 33.3-34.0s. e870 (grid 19.230s) is removed: no pick under it. Two very weak picks at 19.131s and 19.599s are deliberately NOT labelled - the player calls them bad playing and says missing them is fine. s160 (19.875s) is a sixteenth played before the section's nominal start; s16113 (33.955s) is a slight final pick.",
   "events": [
     {
       "id": "e81",
@@ -955,7 +955,7 @@
     {
       "id": "e868",
       "startMs": 18765,
-      "endMs": 19023,
+      "endMs": 19019,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -968,22 +968,8 @@
     },
     {
       "id": "e869",
-      "startMs": 19023,
-      "endMs": 19230,
-      "kind": "note",
-      "label": "A3",
-      "pitches": [
-        "A3"
-      ],
-      "pitchClasses": [
-        "A"
-      ],
-      "required": true
-    },
-    {
-      "id": "e870",
-      "startMs": 19230,
-      "endMs": 19515,
+      "startMs": 19019,
+      "endMs": 19494,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -996,8 +982,8 @@
     },
     {
       "id": "e871",
-      "startMs": 19515,
-      "endMs": 19760,
+      "startMs": 19494,
+      "endMs": 19747,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1010,8 +996,22 @@
     },
     {
       "id": "e872",
-      "startMs": 19760,
-      "endMs": 20020,
+      "startMs": 19747,
+      "endMs": 19875,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s160",
+      "startMs": 19875,
+      "endMs": 20011,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1024,8 +1024,8 @@
     },
     {
       "id": "s161",
-      "startMs": 20020,
-      "endMs": 20143,
+      "startMs": 20011,
+      "endMs": 20117,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1038,8 +1038,8 @@
     },
     {
       "id": "s162",
-      "startMs": 20143,
-      "endMs": 20265,
+      "startMs": 20117,
+      "endMs": 20254,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1052,8 +1052,8 @@
     },
     {
       "id": "s163",
-      "startMs": 20265,
-      "endMs": 20398,
+      "startMs": 20254,
+      "endMs": 20375,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1066,8 +1066,8 @@
     },
     {
       "id": "s164",
-      "startMs": 20398,
-      "endMs": 20528,
+      "startMs": 20375,
+      "endMs": 20518,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1080,8 +1080,8 @@
     },
     {
       "id": "s165",
-      "startMs": 20528,
-      "endMs": 20605,
+      "startMs": 20518,
+      "endMs": 20613,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1094,8 +1094,8 @@
     },
     {
       "id": "s166",
-      "startMs": 20605,
-      "endMs": 20760,
+      "startMs": 20613,
+      "endMs": 20744,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1108,7 +1108,7 @@
     },
     {
       "id": "s167",
-      "startMs": 20760,
+      "startMs": 20744,
       "endMs": 20878,
       "kind": "note",
       "label": "A3",
@@ -2495,7 +2495,7 @@
     {
       "id": "s16107",
       "startMs": 33230,
-      "endMs": 33310,
+      "endMs": 33296,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2508,8 +2508,8 @@
     },
     {
       "id": "s16108",
-      "startMs": 33310,
-      "endMs": 33430,
+      "startMs": 33296,
+      "endMs": 33416,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2522,8 +2522,8 @@
     },
     {
       "id": "s16109",
-      "startMs": 33430,
-      "endMs": 33588,
+      "startMs": 33416,
+      "endMs": 33563,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2536,8 +2536,8 @@
     },
     {
       "id": "s16110",
-      "startMs": 33588,
-      "endMs": 33698,
+      "startMs": 33563,
+      "endMs": 33689,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2550,8 +2550,8 @@
     },
     {
       "id": "s16111",
-      "startMs": 33698,
-      "endMs": 33815,
+      "startMs": 33689,
+      "endMs": 33809,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2564,8 +2564,22 @@
     },
     {
       "id": "s16112",
-      "startMs": 33815,
-      "endMs": 33980,
+      "startMs": 33809,
+      "endMs": 33955,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "s16113",
+      "startMs": 33955,
+      "endMs": 34080,
       "kind": "note",
       "label": "A3",
       "pitches": [

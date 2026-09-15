@@ -66,14 +66,54 @@
  *     features, a collapse between derivation and held-out is the expected
  *     outcome, and reporting it is the point rather than the failure.
  *
+ * READING THE ROW AGAINST THE PACE
+ *
+ * Every witness above is read AT the boundary, and every one of them tops out
+ * near 0.70 AUC — including a 19,833-parameter conv net over a spectrogram
+ * patch ending at the decision hop (DECISION-021, 0.7157). What finally moved
+ * the same-pitch decision (DECISION-030) was not a better reading of the
+ * boundary but a different question: a fragment's span over the LOCAL
+ * INTER-ONSET INTERVAL scores 0.926 with an oracle rate and 0.826 with a causal
+ * estimate, against 0.788 for the span alone. That framing had never been
+ * offered to a fitted model, so this script now carries it, in two groups that
+ * are reported SEPARATELY because they imply different products:
+ *
+ *   GROUP P, PROSPECTIVE — computable at the instant the decision is taken, so
+ *   a model over them could run in the fast lane: `localIoiMs` (the tracker's
+ *   own rate estimate, re-implemented exactly, no fallback), `soundedOverIoi`,
+ *   `gapBeforeOverIoi`, `gapCv8`, and the missingness indicator `rateMissing`.
+ *
+ *   GROUP R, RETROSPECTIVE — knowable only afterwards, so a model over them
+ *   could only run in the deep lane, announcing a Note and sometimes retracting
+ *   it: `nextBoundaryMs` and `nextBoundaryOverIoi`.
+ *
+ * P failing while R passes would be a real finding rather than a failure: it
+ * would say the evidence does not exist at decision time and that a
+ * retraction-based design is the only one that could use it.
+ *
+ * MISSING VALUES ARE MISSING, NOT ZERO. `localIoiMs` has no fallback — with no
+ * usable gap between recent openings there is no pace to judge against. A 500ms
+ * fallback is the measured regression in `docs/DETECTION-FINDINGS.md`, so the
+ * feature is NaN on those rows, the regression mean-imputes from the training
+ * half of each fold and carries `rateMissing` alongside, and a single-feature
+ * AUC is taken over the present rows only with its n printed next to it.
+ *
  * AUC is the headline because the classes are wildly imbalanced (see the base
  * rates it prints): accuracy would be beaten by "reject everything".
+ *
+ * AUC ALSO DOES NOT SHIP ANYTHING. It answers "does the information exist at
+ * all", which is what this gate is for. This project has had an offline bench
+ * number disagree with the real pipeline five times; no claim of a recognizer
+ * improvement may rest on a figure from this file.
  *
  * WHAT WOULD FALSIFY THE VERDICT
  *
  *  - A combination whose leave-one-take-out AUC clears the best single witness
  *    by a margin larger than the spread across folds, AND holds on the twelve
- *    held-out takes. Then the combination is real and worth building.
+ *    held-out takes. Then the combination is real and worth building. For the
+ *    rhythm groups that bar is stated as a number in advance: LOTO above 0.702,
+ *    by more than the spread across the thirteen LOTO folds, and materially
+ *    more than 0 of 635 false positives removed at zero label cost.
  *  - A zero-label operating point whose false accepts fall materially below the
  *    best single witness's, on held-out data. Separation that does not survive
  *    that constraint buys nothing.
@@ -124,6 +164,126 @@ export const FEATURES = [
 
 const D = FEATURES.length;
 
+/* -------------------------------------------------------------------------- */
+/* Rhythm features. See the header, "READING THE ROW AGAINST THE PACE".         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * GROUP P — PROSPECTIVE. Every one of these is computable at the instant the
+ * decision is taken, from openings the tracker has already emitted. A model
+ * over these could run in the fast lane.
+ *
+ * `rateMissing` is the missingness INDICATOR, not a rhythm reading: it is 1 on
+ * a row where no local rate could be measured at all. It is listed here because
+ * every other column in this group is undefined on exactly those rows, and
+ * mean-imputing them without an indicator would tell the regression those rows
+ * are average when what is true of them is that they are unknown.
+ */
+export const PROSPECTIVE_FEATURES = [
+  "localIoiMs",
+  "soundedOverIoi",
+  "gapBeforeOverIoi",
+  "gapCv8",
+  "rateMissing",
+] as const;
+
+/**
+ * GROUP R — RETROSPECTIVE. Not knowable when the decision is taken. A model
+ * over these can only run in the deep lane, which means announcing a Note and
+ * sometimes retracting it. Kept separate from group P for exactly that reason:
+ * the two groups imply different products, so a gain that lives only here is a
+ * different finding from a gain that lives in P.
+ */
+export const RETROSPECTIVE_FEATURES = ["nextBoundaryMs", "nextBoundaryOverIoi"] as const;
+
+export const RHYTHM_FEATURES = [...PROSPECTIVE_FEATURES, ...RETROSPECTIVE_FEATURES] as const;
+
+/**
+ * Every column of a WIDE row: the twelve witnesses then the seven rhythm
+ * columns. `FEATURES` itself deliberately stays twelve long and `Row.x` stays
+ * twelve wide, because four other scripts index `Row.x` by `FEATURES` position
+ * and one of them appends its own columns at `FEATURES.length`.
+ */
+export const WIDE_FEATURES = [...FEATURES, ...RHYTHM_FEATURES] as const;
+
+/** How many recent gaps the rate estimate reads. `NoteTracker.RATE_GAPS`. */
+const RATE_GAPS = 8;
+/** `NoteTracker.RATE_PERCENTILE` — 0.5, the median. */
+const RATE_PERCENTILE = 0.5;
+/** `NoteTracker.RATE_MIN_INTERVAL_MS`. */
+const RATE_MIN_INTERVAL_MS = 50;
+/** `NoteTracker.RATE_RESET_MS`. */
+const RATE_RESET_MS = 1500;
+/** `NoteTracker` keeps this many openings; the walk cannot see past them. */
+const OPEN_TIMES_KEPT = RATE_GAPS * 4;
+
+/**
+ * The gaps `NoteTracker.localIoiMs` would collect, and the median it would
+ * return — re-implemented here over the `opened` trace events rather than
+ * imported, because the tracker's copy is private and this script must not
+ * change `src/`.
+ *
+ * Deliberately faithful down to the details that look like accidents:
+ *
+ *  - the walk runs backwards from the newest opening and takes at most eight
+ *    gaps, over a ring that holds only the last thirty-two openings;
+ *  - an opening at or after `at` is SKIPPED, not stopped at, and its gap to the
+ *    one before it is never formed — the opening being judged must not enter
+ *    its own estimate;
+ *  - the 1500ms reset is tested BEFORE the 50ms floor, so a long gap ends the
+ *    walk even when the gap after it was too short to count;
+ *  - **there is no fallback.** With no usable gap this returns null and the
+ *    feature is MISSING. A 500ms fallback — a whole note at 120bpm, applied at
+ *    3.7s into a take playing 107ms sixteenths — is the measured regression
+ *    recorded in `docs/DETECTION-FINDINGS.md`, and substituting any constant
+ *    here would put that same lie into the design matrix.
+ */
+function localIoi(openTimes: readonly number[], at: number): { ioi: number | null; gaps: number[] } {
+  const gaps: number[] = [];
+  for (let i = openTimes.length - 1; i > 0 && gaps.length < RATE_GAPS; i--) {
+    const later = openTimes[i] as number;
+    if (later >= at) continue;
+    const gap = later - (openTimes[i - 1] as number);
+    if (gap > RATE_RESET_MS) break;
+    if (gap < RATE_MIN_INTERVAL_MS) continue;
+    gaps.push(gap);
+  }
+  if (gaps.length === 0) return { ioi: null, gaps };
+  const sorted = [...gaps].sort((a, b) => a - b);
+  const ioi = sorted[
+    Math.min(sorted.length - 1, Math.round((sorted.length - 1) * RATE_PERCENTILE))
+  ] as number;
+  return { ioi, gaps };
+}
+
+/**
+ * The most recent opening-to-opening gap strictly before `at`, unfiltered.
+ *
+ * Unfiltered on purpose. `localIoi` throws away gaps under 50ms because a
+ * median wants to describe the pace; this feature wants to describe the LAST
+ * thing that happened, and a 30ms gap is a real and highly informative event —
+ * it is what a burst of phantom boundaries looks like from the inside.
+ */
+function lastGapMs(openTimes: readonly number[], at: number): number | null {
+  for (let i = openTimes.length - 1; i > 0; i--) {
+    if ((openTimes[i] as number) >= at) continue;
+    return (openTimes[i] as number) - (openTimes[i - 1] as number);
+  }
+  return null;
+}
+
+/** Coefficient of variation of a gap list; undefined below two gaps. */
+function cv(values: readonly number[]): number {
+  if (values.length < 2) return NaN;
+  let m = 0;
+  for (const v of values) m += v;
+  m /= values.length;
+  if (Math.abs(m) < 1e-9) return NaN;
+  let s = 0;
+  for (const v of values) s += (v - m) ** 2;
+  return Math.sqrt(s / (values.length - 1)) / m;
+}
+
 export type Row = {
   stem: string;
   at: number;
@@ -132,6 +292,16 @@ export type Row = {
   reason: string;
   settled: boolean;
   x: number[];
+  /**
+   * The rhythm columns, in `RHYTHM_FEATURES` order. A SEPARATE field rather
+   * than more of `x`, so that every other script indexing `x` by `FEATURES`
+   * position keeps reading what it read before. `NaN` means MISSING — see
+   * `standardiser`/`design`, which mean-impute it.
+   *
+   * Optional because `training/score-falsifiers.ts` builds synthetic rows that
+   * carry one score and no witnesses at all; `collectFixture` always sets it.
+   */
+  rhythm?: number[];
   y: 0 | 1;
   /** The label this row is the decision for, when it is a positive. */
   labelId: string | null;
@@ -145,6 +315,15 @@ export type Row = {
    */
   nearLabelId: string | null;
   nearLabelStartMs: number | null;
+  /**
+   * The Note this decision opened, and whether the MATCHER paired that Note
+   * with a label — `measure-rate-relative-merge.ts`'s target, carried here so
+   * the two studies can be read against each other on identical rows. Null on a
+   * decision that opened nothing, and on every row when `collect` was not given
+   * the paired set.
+   */
+  childId?: string | null;
+  childPaired?: boolean | null;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -160,7 +339,9 @@ export function collectFixture(
   stem: string,
   labels: readonly LabeledEvent[],
   events: readonly TrackerTraceEvent[],
-  matched: ReadonlySet<string>
+  matched: ReadonlySet<string>,
+  /** Ids of the DETECTIONS the matcher paired. Optional; see `Row.childPaired`. */
+  paired?: ReadonlySet<string>
 ): Row[] {
   const rows: Row[] = [];
 
@@ -177,13 +358,80 @@ export function collectFixture(
    */
   const openedSoFar: number[] = [];
 
-  for (const event of events) {
+  /**
+   * The tracker's own `openTimes` ring, mirrored exactly: push order, capped at
+   * thirty-two. Separate from `openedSoFar` above, which is uncapped because
+   * the TARGET rule needs every opening of the take and the RATE estimate must
+   * see only what the tracker would have had.
+   */
+  const openTimes: number[] = [];
+
+  for (let k = 0; k < events.length; k++) {
+    const event = events[k] as TrackerTraceEvent;
     if (event.kind === "opened") {
       openedSoFar.push(event.at);
+      openTimes.push(event.at);
+      if (openTimes.length > OPEN_TIMES_KEPT) openTimes.shift();
       continue;
     }
     if (event.kind !== "rearticulation") continue;
     const t = event.at;
+
+    /* ---- Group P: what the pace looks like from here, looking back --------- */
+
+    const { ioi, gaps } = localIoi(openTimes, t);
+    const gapBefore = lastGapMs(openTimes, t);
+    const prospective = [
+      ioi ?? NaN,
+      ioi === null ? NaN : event.soundedMs / ioi,
+      ioi === null || gapBefore === null ? NaN : gapBefore / ioi,
+      cv(gaps),
+      ioi === null ? 1 : 0,
+    ];
+
+    /* ---- Group R: what the pace looks like from here, looking forward ------ */
+
+    /*
+     * The next Note boundary of any kind: the first `opened` or `ended` that
+     * comes after this decision in TRACE order AND carries a timestamp after
+     * it.
+     *
+     * Both halves of that are load-bearing, and both exist to keep the feature
+     * defined on the same terms for an accepted row and a rejected one. A split
+     * ends the old Note and opens the new one at the BURST, which is at or
+     * before the deciding hop — so an accepted decision's own two boundary
+     * events both fail `at > t` and are skipped, and what is found instead is
+     * the end of the Note that decision opened. That is the span of the new
+     * Note, which is what the feature is supposed to mean. Trace order alone
+     * would return the decision's own consequences and read ~0 on every accept;
+     * timestamp alone would let a backdated boundary from before the decision
+     * count as its future.
+     */
+    let nextBoundaryMs = NaN;
+    for (let j = k + 1; j < events.length; j++) {
+      const later = events[j] as TrackerTraceEvent;
+      if (later.kind !== "opened" && later.kind !== "ended") continue;
+      if (later.at <= t) continue;
+      nextBoundaryMs = later.at - t;
+      break;
+    }
+    const retrospective = [
+      nextBoundaryMs,
+      ioi === null ? NaN : nextBoundaryMs / ioi,
+    ];
+
+    // The Note this decision opened: the next `opened`, before any further
+    // decision. Same rule `measure-rate-relative-merge.ts` uses to find its
+    // candidate child.
+    let childId: string | null = null;
+    for (let j = k + 1; j < events.length; j++) {
+      const later = events[j] as TrackerTraceEvent;
+      if (later.kind === "opened") {
+        childId = later.noteId;
+        break;
+      }
+      if (later.kind === "rearticulation") break;
+    }
 
     // The nearest label to this decision, if any is near enough.
     let near: LabeledEvent | null = null;
@@ -227,11 +475,14 @@ export function collectFixture(
         event.kernelOnset ? 1 : 0,
         event.bloomed ? 1 : 0,
       ],
+      rhythm: [...prospective, ...retrospective],
       y: positive ? 1 : 0,
       labelId: positive && near !== null ? near.id : null,
       labelMatched: positive && near !== null ? matched.has(near.id) : null,
       nearLabelId: near !== null ? near.id : null,
       nearLabelStartMs: near !== null ? near.startMs : null,
+      childId,
+      childPaired: paired === undefined || childId === null ? null : paired.has(childId),
     });
   }
   return rows;
@@ -248,8 +499,10 @@ export function collect(): Row[] {
     });
     const detections = projectEmissions(analysis.emissions).final;
     const labels = fixture.label.events as LabeledEvent[];
-    const matched = new Set(matchEvents(labels, detections).matches.map((m) => m.label.id));
-    rows.push(...collectFixture(fixture.stem, labels, events, matched));
+    const m = matchEvents(labels, detections);
+    const matched = new Set(m.matches.map((x) => x.label.id));
+    const paired = new Set(m.matches.map((x) => x.detection.id));
+    rows.push(...collectFixture(fixture.stem, labels, events, matched, paired));
   }
   return rows;
 }
@@ -287,25 +540,56 @@ export function auc(scores: readonly number[], y: readonly number[]): number {
 
 export type Standardiser = { mean: number[]; sd: number[] };
 
+/**
+ * Column means and spreads, over the rows where the column is PRESENT.
+ *
+ * A rhythm column is `NaN` on a row where the tracker had no gaps to read, and
+ * a mean taken over NaN is NaN, which would silently take every downstream AUC
+ * with it. Skipping the missing rows here and imputing the mean in `design` is
+ * the standard mean-imputation pair; the missingness itself is carried as its
+ * own column (`rateMissing`) rather than being smuggled into the value.
+ *
+ * Every one of the twelve original witnesses is always present, so this is
+ * identical to the previous behaviour on them.
+ */
 export function standardiser(rows: readonly Row[], cols: readonly number[]): Standardiser {
   const mean: number[] = [];
   const sd: number[] = [];
   for (const c of cols) {
     let m = 0;
-    for (const r of rows) m += r.x[c] as number;
-    m /= Math.max(rows.length, 1);
+    let n = 0;
+    for (const r of rows) {
+      const v = r.x[c] as number;
+      if (Number.isFinite(v)) {
+        m += v;
+        n++;
+      }
+    }
+    m /= Math.max(n, 1);
     let v = 0;
-    for (const r of rows) v += ((r.x[c] as number) - m) ** 2;
-    v /= Math.max(rows.length - 1, 1);
+    for (const r of rows) {
+      const value = r.x[c] as number;
+      if (Number.isFinite(value)) v += (value - m) ** 2;
+    }
+    v /= Math.max(n - 1, 1);
     mean.push(m);
     sd.push(Math.sqrt(v) > 1e-9 ? Math.sqrt(v) : 1);
   }
   return { mean, sd };
 }
 
+/**
+ * The standardised design matrix. A missing cell becomes 0 — the TRAINING
+ * mean in standardised units, refitted inside each fold, so imputation never
+ * reads the held-out take's own statistics.
+ */
 export function design(rows: readonly Row[], cols: readonly number[], s: Standardiser): number[][] {
   return rows.map((r) =>
-    cols.map((c, k) => ((r.x[c] as number) - (s.mean[k] as number)) / (s.sd[k] as number))
+    cols.map((c, k) => {
+      const v = r.x[c] as number;
+      if (!Number.isFinite(v)) return 0;
+      return (v - (s.mean[k] as number)) / (s.sd[k] as number);
+    })
   );
 }
 
@@ -437,11 +721,17 @@ export function outOfFold(
   return out;
 }
 
+/** Pairwise-complete Pearson r: a pair is dropped when either side is missing. */
 function pearson(a: readonly number[], b: readonly number[]): number {
-  const n = a.length;
+  const idx: number[] = [];
+  for (let i = 0; i < a.length; i++) {
+    if (Number.isFinite(a[i] as number) && Number.isFinite(b[i] as number)) idx.push(i);
+  }
+  const n = idx.length;
+  if (n < 2) return 0;
   let ma = 0;
   let mb = 0;
-  for (let i = 0; i < n; i++) {
+  for (const i of idx) {
     ma += a[i] as number;
     mb += b[i] as number;
   }
@@ -450,7 +740,7 @@ function pearson(a: readonly number[], b: readonly number[]): number {
   let sab = 0;
   let saa = 0;
   let sbb = 0;
-  for (let i = 0; i < n; i++) {
+  for (const i of idx) {
     const da = (a[i] as number) - ma;
     const db = (b[i] as number) - mb;
     sab += da * db;
@@ -459,6 +749,48 @@ function pearson(a: readonly number[], b: readonly number[]): number {
   }
   if (saa < 1e-12 || sbb < 1e-12) return 0;
   return sab / Math.sqrt(saa * sbb);
+}
+
+/**
+ * Single-feature AUC over the rows where the feature is PRESENT, with the size
+ * of that subset.
+ *
+ * Reported this way rather than by imputing first, because imputing a missing
+ * value to the mean and then ranking it puts a third of the rows on one tied
+ * score, and the AUC that comes out is a statement about the tie rather than
+ * about the feature. The subset figure answers "does this feature separate
+ * where it exists", which is the question a single-witness table is for. Every
+ * comparison against it in the report below is made on the same subset.
+ */
+function presentAuc(
+  values: readonly number[],
+  y: readonly number[]
+): { auc: number; n: number; pos: number } {
+  const s: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (!Number.isFinite(values[i] as number)) continue;
+    s.push(values[i] as number);
+    ys.push(y[i] as number);
+  }
+  return { auc: auc(s, ys), n: s.length, pos: ys.filter((v) => v === 1).length };
+}
+
+/**
+ * A row with the rhythm columns appended, so `cols` can index all nineteen.
+ *
+ * Throws rather than padding a row that has none: a short design matrix would
+ * silently shift every column index past `FEATURES.length` and the AUCs that
+ * came out would be real numbers describing the wrong features.
+ */
+export function widen(rows: readonly Row[]): Row[] {
+  return rows.map((r) => {
+    const rhythm = r.rhythm;
+    if (rhythm === undefined || rhythm.length !== RHYTHM_FEATURES.length) {
+      throw new Error(`row ${r.stem}@${r.at} has no rhythm columns to widen`);
+    }
+    return { ...r, x: [...r.x, ...rhythm] };
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -487,10 +819,24 @@ export const isHeldOut = (stem: string): boolean => stem.includes("140bpm");
 
 function main(): void {
   const dumpRows = process.argv.includes("--rows");
-  const rows = collect();
+  const rows = widen(collect());
   const derive = rows.filter((r) => !isHeldOut(r.stem));
   const held = rows.filter((r) => isHeldOut(r.stem));
   const cols = FEATURES.map((_, i) => i);
+
+  // Column indices of the two rhythm groups inside a widened row.
+  const wideIndex = (name: string): number => WIDE_FEATURES.indexOf(name as never);
+  const P = PROSPECTIVE_FEATURES.map((n) => wideIndex(n));
+  const R = RETROSPECTIVE_FEATURES.map((n) => wideIndex(n));
+  /*
+   * `rateMissing` is the missingness indicator for EVERY rate-dependent column,
+   * and `nextBoundaryOverIoi` is one of those — so a group-R run that omitted
+   * it would be mean-imputing without an indicator on the same rows group P
+   * marks. It is listed under P because that is where the rest of its group
+   * lives, and it joins any run carrying a rate-dependent column.
+   */
+  const Rx = [...R, wideIndex("rateMissing")];
+  const RHYTHM = RHYTHM_FEATURES.map((n) => wideIndex(n));
 
   const stemsOf = (rs: readonly Row[]): string[] => [...new Set(rs.map((r) => r.stem))];
   const posOf = (rs: readonly Row[]): number => rs.filter((r) => r.y === 1).length;
@@ -566,31 +912,146 @@ function main(): void {
       "    never gave a detection; the rest are strokes some other Note recovered."
   );
 
+  /* ---- 0. Rhythm coverage ------------------------------------------------- */
+
+  // Reported BEFORE any AUC, because a feature that is absent on a third of the
+  // rows and a feature that is absent on none are not the same instrument, and
+  // the reader has to know which one every number below came from.
+  console.log("\n\n  0. RHYTHM FEATURE COVERAGE: WHERE THERE IS NO RATE TO READ\n");
+  console.log(
+    "  `localIoiMs` has NO fallback: with no usable gap between recent Note\n" +
+      "  openings there is no pace to judge against, so the feature is MISSING\n" +
+      "  rather than defaulted. The regression mean-imputes a missing cell from\n" +
+      "  the TRAINING half of each fold and carries `rateMissing` as its own\n" +
+      "  column; a single-witness AUC below is taken over the present rows only,\n" +
+      "  with its n given.\n"
+  );
+  const missingOf = (rs: readonly Row[], col: number): number =>
+    rs.filter((r) => !Number.isFinite(r.x[col] as number)).length;
+  table(
+    ["feature", "derivation missing", "held-out missing", "total missing"],
+    RHYTHM.map((c) => [
+      WIDE_FEATURES[c] as string,
+      `${missingOf(derive, c)} / ${derive.length}`,
+      `${missingOf(held, c)} / ${held.length}`,
+      `${missingOf(rows, c)} / ${rows.length}`,
+    ])
+  );
+  const ioiCol = wideIndex("localIoiMs");
+
+  /*
+   * `nextBoundaryMs` has to mean the same thing on an accepted row and a
+   * rejected one or the comparison is meaningless, and the way it could fail is
+   * specific: a split's own `ended`/`opened` land at the BURST, which is at or
+   * before the deciding hop, so if the exclusion rule were wrong every accepted
+   * row would read ~0 and the feature would be measuring "was this accepted".
+   * The distribution below is the check. A near-zero median on accepts, or a
+   * different order of magnitude between the two rows, means the definition is
+   * broken rather than the feature informative.
+   */
+  const nbCol = wideIndex("nextBoundaryMs");
+  const quantiles = (v: readonly number[]): string => {
+    const s = [...v].sort((a, b) => a - b);
+    const q = (p: number): string =>
+      s.length === 0 ? "-" : (s[Math.min(s.length - 1, Math.round((s.length - 1) * p))] as number).toFixed(0);
+    return `n ${String(s.length).padStart(4)}   min ${q(0)}   p25 ${q(0.25)}   median ${q(0.5)}   p75 ${q(0.75)}   max ${q(1)}`;
+  };
+  const nb = (rs: readonly Row[]): number[] =>
+    rs.map((r) => r.x[nbCol] as number).filter((v) => Number.isFinite(v));
+  console.log("\n  nextBoundaryMs must be defined on BOTH halves and mean the same thing\n");
+  console.log(`    accepted rows   ${quantiles(nb(rows.filter((r) => r.accepted)))}`);
+  console.log(`    rejected rows   ${quantiles(nb(rows.filter((r) => !r.accepted)))}`);
+  console.log(`    positives       ${quantiles(nb(rows.filter((r) => r.y === 1)))}`);
+  console.log(`    negatives       ${quantiles(nb(rows.filter((r) => r.y === 0)))}`);
+
+  console.log("\n  rows with no rate at all, per take (these are a take's opening bars)\n");
+  table(
+    ["take", "rows", "no rate", "share", "pos among no-rate"],
+    stemsOf(rows).map((stem) => {
+      const rs = rows.filter((r) => r.stem === stem);
+      const none = rs.filter((r) => !Number.isFinite(r.x[ioiCol] as number));
+      return [
+        stem,
+        String(rs.length),
+        String(none.length),
+        f3(none.length / Math.max(rs.length, 1)),
+        String(none.filter((r) => r.y === 1).length),
+      ];
+    })
+  );
+
   /* ---- 1. Single witnesses ------------------------------------------------ */
 
   console.log("\n\n  1. SINGLE-WITNESS SEPARATION (derivation)\n");
   const yAll = derive.map((r) => r.y);
-  const singles = cols.map((c) => {
-    const s = derive.map((r) => r.x[c] as number);
-    const a = auc(s, yAll);
+  const single = (
+    c: number
+  ): { c: number; a: number; oriented: number; n: number; zc: ReturnType<typeof zeroCost> } => {
+    const raw = derive.map((r) => r.x[c] as number);
+    const present = presentAuc(raw, yAll);
     // A witness that separates by being LOW is as useful as one that separates
     // by being high; report the oriented figure alongside the raw one.
-    const oriented = Math.max(a, 1 - a);
-    const zc = zeroCost(a >= 0.5 ? s : s.map((v) => -v), yAll);
-    return { c, a, oriented, zc };
-  });
-  singles.sort((p, q) => q.oriented - p.oriented);
+    const oriented = Math.max(present.auc, 1 - present.auc);
+    // Zero-cost is scored over the WHOLE derivation set, with a missing cell
+    // sent to -Infinity — i.e. "this rule cannot vouch for this row". Scoring it
+    // on the present rows only would quietly compare operating points taken on
+    // different populations.
+    const signed = raw.map((v) =>
+      Number.isFinite(v) ? (present.auc >= 0.5 ? v : -v) : Number.NEGATIVE_INFINITY
+    );
+    return { c, a: present.auc, oriented, n: present.n, zc: zeroCost(signed, yAll) };
+  };
+  const baseSingles = cols.map(single).sort((p, q) => q.oriented - p.oriented);
   table(
-    ["witness", "AUC", "oriented", "dir", "FP at zero label cost"],
-    singles.map((s) => [
-      FEATURES[s.c] as string,
+    ["witness", "AUC", "oriented", "dir", "n", "FP at zero label cost"],
+    baseSingles.map((s) => [
+      WIDE_FEATURES[s.c] as string,
       f3(s.a),
       f3(s.oriented),
       s.a >= 0.5 ? "high" : "low",
+      String(s.n),
       `${s.zc.falseAccepts} / ${s.zc.negatives}`,
     ])
   );
-  const bestSingle = singles[0] as (typeof singles)[number];
+  const bestSingle = baseSingles[0] as (typeof baseSingles)[number];
+
+  console.log("\n  the rhythm features, same test\n");
+  const rhythmSingles = RHYTHM.map(single).sort((p, q) => q.oriented - p.oriented);
+  table(
+    ["feature", "group", "AUC", "oriented", "dir", "n", "FP at zero label cost"],
+    rhythmSingles.map((s) => [
+      WIDE_FEATURES[s.c] as string,
+      (P.includes(s.c) ? "P" : "R") + (s.c === wideIndex("rateMissing") ? " (indicator)" : ""),
+      f3(s.a),
+      f3(s.oriented),
+      s.a >= 0.5 ? "high" : "low",
+      String(s.n),
+      `${s.zc.falseAccepts} / ${s.zc.negatives}`,
+    ])
+  );
+
+  // A rhythm feature scored on the rows where it exists is not comparable to a
+  // witness scored on all of them, so here is the incumbent on each subset.
+  console.log(
+    "\n  like for like: the best existing witness restricted to each feature's own\n" +
+      "  present-rows subset, so the two figures describe the same population\n"
+  );
+  table(
+    ["feature", "its AUC", "n", `${WIDE_FEATURES[bestSingle.c]} on the same rows`, "difference"],
+    RHYTHM.map((c) => {
+      const keep = derive.filter((r) => Number.isFinite(r.x[c] as number));
+      const ys = keep.map((r) => r.y);
+      const mine = auc(keep.map((r) => r.x[c] as number), ys);
+      const theirs = auc(keep.map((r) => r.x[bestSingle.c] as number), ys);
+      return [
+        WIDE_FEATURES[c] as string,
+        f3(Math.max(mine, 1 - mine)),
+        String(keep.length),
+        f3(Math.max(theirs, 1 - theirs)),
+        f3(Math.max(mine, 1 - mine) - Math.max(theirs, 1 - theirs)),
+      ];
+    })
+  );
 
   /* ---- 2. Correlations ---------------------------------------------------- */
 
@@ -612,6 +1073,28 @@ function main(): void {
   table(
     ["pair", "r"],
     pairsCorr.slice(0, 8).map((p) => [`${FEATURES[p.i]} / ${FEATURES[p.j]}`, f3(p.r)])
+  );
+
+  // Whether the rhythm columns are a new reading or a restatement of an old
+  // one. Pairwise-complete, so a rhythm column's r is taken over its own rows.
+  console.log("\n  each rhythm feature against its nearest of the twelve, and against each other\n");
+  table(
+    ["feature", "closest of the twelve", "r", "closest rhythm feature", "r"],
+    RHYTHM.map((c) => {
+      const mine = derive.map((r) => r.x[c] as number);
+      const rank = (candidates: readonly number[]): { name: string; r: number } => {
+        let best = { name: "-", r: 0 };
+        for (const o of candidates) {
+          if (o === c) continue;
+          const r = pearson(mine, derive.map((row) => row.x[o] as number));
+          if (Math.abs(r) > Math.abs(best.r)) best = { name: WIDE_FEATURES[o] as string, r };
+        }
+        return best;
+      };
+      const base = rank(cols);
+      const other = rank(RHYTHM);
+      return [WIDE_FEATURES[c] as string, base.name, f3(base.r), other.name, f3(other.r)];
+    })
   );
 
   /* ---- 3. The combination ------------------------------------------------- */
@@ -655,6 +1138,230 @@ function main(): void {
       .map((p) => [FEATURES[p.c] as string, f2(p.w)])
   );
 
+  /* ---- 3r. The rhythm groups --------------------------------------------- */
+
+  /*
+   * The question this section exists for: does the rate move the CROSS-TAKE
+   * number, which is the one that has collapsed on every previous attempt.
+   *
+   * Lambda is pinned at 0.01 for the headline of every configuration — the
+   * control's own best, fixed before any rhythm column was fitted — so that no
+   * configuration can be rescued by choosing a different one for it. The full
+   * sweep is printed underneath for each, read but not selected on.
+   */
+  const HEADLINE_LAMBDA = 0.01;
+  type Config = { name: string; cols: number[] };
+  const CONFIGS: Config[] = [
+    { name: "1  twelve witnesses (control)", cols },
+    { name: "2  twelve + P (prospective)", cols: [...cols, ...P] },
+    { name: "3  twelve + R (retrospective)", cols: [...cols, ...Rx] },
+    { name: "4  twelve + P + R", cols: [...cols, ...P, ...R] },
+    { name: "5a P alone", cols: P },
+    { name: "5b R alone", cols: Rx },
+  ];
+
+  const runConfig = (
+    c: Config,
+    lambda: number
+  ): {
+    inSample: number;
+    cv5: number;
+    loto: number;
+    zc: ReturnType<typeof zeroCost>;
+    perTake: Array<{ stem: string; auc: number | null }>;
+    w: number[];
+    s: Standardiser;
+  } => {
+    const s = standardiser(derive, c.cols);
+    const w = fitLogistic(design(derive, c.cols, s), y, lambda);
+    const inSample = auc(score(design(derive, c.cols, s), w), y);
+    const cv5 = auc(outOfFold(derive, c.cols, kFold, lambda), y);
+    const loo = outOfFold(derive, c.cols, takeFold, lambda);
+    const perTake = stems.map((stem) => {
+      const idx = derive.map((r, i) => [r, i] as const).filter(([r]) => r.stem === stem);
+      const ys = idx.map(([r]) => r.y);
+      const p = ys.filter((v) => v === 1).length;
+      if (p === 0 || p === ys.length) return { stem, auc: null };
+      return { stem, auc: auc(idx.map(([, i]) => loo[i] as number), ys) };
+    });
+    return { inSample, cv5, loto: auc(loo, y), zc: zeroCost(loo, y), perTake, w, s };
+  };
+
+  console.log("\n\n  3r. DO RHYTHM FEATURES MOVE THE CROSS-TAKE NUMBER? (derivation)\n");
+  console.log(
+    "  GROUP P is available AT the decision; group R is not, and a model over R\n" +
+      "  could only run in the deep lane as announce-then-retract. They are kept\n" +
+      "  apart because a gain that lives only in R is a different product.\n" +
+      `  Every row here is lambda ${HEADLINE_LAMBDA}.\n`
+  );
+  const headline = CONFIGS.map((c) => ({ c, r: runConfig(c, HEADLINE_LAMBDA) }));
+  const spreadOf = (per: Array<{ stem: string; auc: number | null }>): string => {
+    const v = per.filter((p) => p.auc !== null).map((p) => p.auc as number);
+    if (v.length < 2) return "-";
+    const m = v.reduce((a, b) => a + b, 0) / v.length;
+    const sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+    return `${f3(Math.min(...v))}-${f3(Math.max(...v))}  sd ${f3(sd)}`;
+  };
+  table(
+    [
+      "configuration",
+      "cols",
+      "in-sample",
+      "5-fold",
+      "leave-one-take-out",
+      "FP at zero label cost",
+      "per-take LOTO spread",
+    ],
+    headline.map(({ c, r }) => [
+      c.name,
+      String(c.cols.length),
+      f3(r.inSample),
+      f3(r.cv5),
+      f3(r.loto),
+      `${r.zc.falseAccepts} / ${r.zc.negatives}`,
+      spreadOf(r.perTake),
+    ])
+  );
+  console.log(
+    `\n    the bar stated in advance: leave-one-take-out must clear ${f3(bestSingle.oriented)}\n` +
+      `    (the best single witness, ${WIDE_FEATURES[bestSingle.c]}, in sample) by more than the\n` +
+      "    spread across the folds, and must remove materially more than 0 of the\n" +
+      `    ${fits[0]?.zc.negatives ?? 0} false positives at a threshold costing zero labels.`
+  );
+
+  console.log("\n  the same, at every lambda (read, not selected on)\n");
+  table(
+    ["configuration", ...LAMBDAS.map((l) => `LOTO @ ${l}`)],
+    CONFIGS.map((c) => [c.name, ...LAMBDAS.map((l) => f3(runConfig(c, l).loto))])
+  );
+
+  console.log("\n  per-take leave-one-take-out AUC, every configuration\n");
+  table(
+    ["take", "pos", "neg", ...CONFIGS.map((c) => c.name.slice(0, 2).trim())],
+    stems.map((stem, k) => {
+      const rs = derive.filter((r) => r.stem === stem);
+      const p = rs.filter((r) => r.y === 1).length;
+      return [
+        stem,
+        String(p),
+        String(rs.length - p),
+        ...headline.map(({ r }) => {
+          const a = (r.perTake[k] as { auc: number | null }).auc;
+          return a === null ? "-" : f3(a);
+        }),
+      ];
+    })
+  );
+
+  console.log(`\n  fitted weights of the full P+R model, standardised units (lambda ${HEADLINE_LAMBDA})\n`);
+  const full = headline[3] as (typeof headline)[number];
+  table(
+    ["feature", "group", "weight"],
+    full.c.cols
+      .map((c, k) => ({ c, w: full.r.w[k] as number }))
+      .sort((a, b) => Math.abs(b.w) - Math.abs(a.w))
+      .map((p) => [
+        WIDE_FEATURES[p.c] as string,
+        p.c < D ? "existing" : P.includes(p.c) ? "P" : "R",
+        f2(p.w),
+      ])
+  );
+
+  /* ---- 3s. Reconciling with the rate-relative study ------------------------ */
+
+  /*
+   * `measure-rate-relative-merge.ts` reports a rate-relative span at 0.83 AUC
+   * causal and 0.93 with an oracle rate. Nothing in this section is meant to
+   * rescue that figure; it is here so the two cannot be confused, because they
+   * are not the same measurement and reading them as one would be the fifth
+   * "bench ranking is not a pipeline ranking" in this repository.
+   *
+   * That script asks: given a Note that an accepted, settled, SAME-PITCH
+   * re-articulation opened, is that Note spurious? Its population is 1,237
+   * children and its feature is the child's own span.
+   *
+   * This table asks: given a re-articulation decision, should it have been
+   * taken? Its population is every such decision — accepted or rejected, same
+   * pitch or not — and on a REJECTED row no child exists, so the feature that
+   * carried the other study is undefined there in substance even where it is
+   * defined in arithmetic.
+   *
+   * Restricting to the other study's sub-population is therefore the honest
+   * comparison, and it separates two very different conclusions: "the rate
+   * carries nothing" from "the rate carries something, but not about the
+   * question this table asks".
+   */
+  const sub = derive.filter(
+    (r) => r.accepted && r.settled && (r.x[FEATURES.indexOf("pitchDiffers")] as number) === 0
+  );
+  const subY = sub.map((r) => r.y);
+  console.log("\n\n  3s. THE SAME FEATURES ON THE RATE-RELATIVE STUDY'S OWN POPULATION\n");
+  console.log(
+    "  Accepted AND settled AND same pitch, on derivation: the decisions that\n" +
+      "  actually opened a child Note, which is what `measure-rate-relative-merge.ts`\n" +
+      "  measures. On these rows `nextBoundaryMs` IS that child's span.\n"
+  );
+  console.log(
+    `    ${sub.length} rows, ${subY.filter((v) => v === 1).length} positives ` +
+      `(base rate ${f3(subY.filter((v) => v === 1).length / Math.max(sub.length, 1))})\n`
+  );
+  /*
+   * TWO TARGETS, NOT TWO POPULATIONS. Target A is this table's: a labelled
+   * stroke starts within 70ms of the decision and no open Note accounts for it,
+   * so the boundary SHOULD have been cut. Target B is the rate study's: the
+   * matcher paired the child Note with a label, so removing that Note would
+   * cost one. They are both defined on every row below, and they are not the
+   * same question — A is about the boundary, B is about whether the emitted
+   * Note is surplus to the labels.
+   */
+  const subB = sub.map((r) => (r.childPaired === true ? 1 : 0));
+  const definedB = sub.filter((r) => r.childPaired !== null).length;
+  const agree = sub.filter((r, i) => r.y === (subB[i] as number)).length;
+  console.log(
+    `    target A (this table)  positives ${subY.filter((v) => v === 1).length}` +
+      `   negatives ${subY.filter((v) => v === 0).length}`
+  );
+  console.log(
+    `    target B (rate study)  child paired ${subB.filter((v) => v === 1).length}` +
+      `   child UNPAIRED ${subB.filter((v) => v === 0).length}   (defined on ${definedB})`
+  );
+  console.log(
+    `\n    the two targets agree on ${agree} / ${sub.length} of these rows (${f3(agree / Math.max(sub.length, 1))})`
+  );
+  console.log(
+    `      A=1, child paired      ${sub.filter((r, i) => r.y === 1 && subB[i] === 1).length}\n` +
+      `      A=1, child UNPAIRED    ${sub.filter((r, i) => r.y === 1 && subB[i] === 0).length}\n` +
+      `      A=0, child paired      ${sub.filter((r, i) => r.y === 0 && subB[i] === 1).length}\n` +
+      `      A=0, child UNPAIRED    ${sub.filter((r, i) => r.y === 0 && subB[i] === 0).length}`
+  );
+  console.log("");
+  table(
+    ["feature", "group", "AUC vs target A", "AUC vs target B", "n", "A on the full table"],
+    [...RHYTHM, ...cols].map((c) => {
+      const keep = sub.map((r, i) => [r, i] as const).filter(([r]) => Number.isFinite(r.x[c] as number));
+      const v = keep.map(([r]) => r.x[c] as number);
+      const a = auc(v, keep.map(([r]) => r.y));
+      const b = auc(v, keep.map(([, i]) => subB[i] as number));
+      const all = presentAuc(derive.map((r) => r.x[c] as number), yAll);
+      return [
+        WIDE_FEATURES[c] as string,
+        c < D ? "existing" : P.includes(c) ? "P" : "R",
+        f3(Math.max(a, 1 - a)),
+        f3(Math.max(b, 1 - b)),
+        String(keep.length),
+        f3(Math.max(all.auc, 1 - all.auc)),
+      ];
+    })
+  );
+  console.log(
+    "\n    On these rows `nextBoundaryMs` IS the child Note's span, so its target-B\n" +
+      "    figure is directly comparable with the 0.79 the rate study reports for\n" +
+      "    the span alone, and `nextBoundaryOverIoi` with its 0.81 for the span over\n" +
+      "    a causal median rate. Reproducing those two numbers here is what says the\n" +
+      "    rate is implemented correctly; the target-A column beside them is what\n" +
+      "    says the decision table is asking a different question."
+  );
+
   /* ---- 3b. Pooled against within-take ------------------------------------- */
 
   // The difference between these two columns is the whole defect. A model
@@ -686,23 +1393,38 @@ function main(): void {
 
   /* ---- 4. Two at a time --------------------------------------------------- */
 
-  console.log("\n\n  4. EXHAUSTIVE TWO-WITNESS SWEEP (derivation, leave-one-take-out)\n");
+  const W = WIDE_FEATURES.length;
+  console.log("\n\n  4. EXHAUSTIVE TWO-FEATURE SWEEP (derivation, leave-one-take-out)\n");
+  console.log(
+    `  All ${(W * (W - 1)) / 2} pairs over the twelve witnesses AND the seven rhythm columns.\n` +
+      "  Two features doing the job is far more useful than nineteen.\n"
+  );
   const pairScores: Array<{ i: number; j: number; loto: number; fp: number; neg: number }> = [];
-  for (let i = 0; i < D; i++) {
-    for (let j = i + 1; j < D; j++) {
+  for (let i = 0; i < W; i++) {
+    for (let j = i + 1; j < W; j++) {
       const oof = outOfFold(derive, [i, j], takeFold, best.lambda);
       const zc = zeroCost(oof, y);
       pairScores.push({ i, j, loto: auc(oof, y), fp: zc.falseAccepts, neg: zc.negatives });
     }
   }
   pairScores.sort((p, q) => q.loto - p.loto);
+  const pairName = (p: { i: number; j: number }): string =>
+    `${WIDE_FEATURES[p.i]} + ${WIDE_FEATURES[p.j]}`;
   table(
     ["pair", "leave-one-take-out AUC", "FP at zero label cost"],
     pairScores
-      .slice(0, 10)
-      .map((p) => [`${FEATURES[p.i]} + ${FEATURES[p.j]}`, f3(p.loto), `${p.fp} / ${p.neg}`])
+      .slice(0, 12)
+      .map((p) => [pairName(p), f3(p.loto), `${p.fp} / ${p.neg}`])
   );
   const bestPair = pairScores[0] as (typeof pairScores)[number];
+  const bestOldPair = pairScores.find((p) => p.i < D && p.j < D) as (typeof pairScores)[number];
+  const bestNewPair = pairScores.find((p) => p.j >= D) as (typeof pairScores)[number] | undefined;
+  console.log(
+    `\n    best pair with no rhythm column: ${pairName(bestOldPair)} at ${f3(bestOldPair.loto)}\n` +
+      (bestNewPair === undefined
+        ? "    no pair involving a rhythm column was scored."
+        : `    best pair WITH one:              ${pairName(bestNewPair)} at ${f3(bestNewPair.loto)}`)
+  );
 
   /* ---- 5. Held out -------------------------------------------------------- */
 
@@ -740,12 +1462,9 @@ function main(): void {
     ]);
   };
   evaluate("all twelve witnesses", cols, best.lambda);
-  evaluate(
-    `best pair: ${FEATURES[bestPair.i]} + ${FEATURES[bestPair.j]}`,
-    [bestPair.i, bestPair.j],
-    best.lambda
-  );
-  evaluate(`best single: ${FEATURES[bestSingle.c]}`, [bestSingle.c], best.lambda);
+  for (const c of CONFIGS.slice(1)) evaluate(c.name, c.cols, HEADLINE_LAMBDA);
+  evaluate(`best pair: ${pairName(bestPair)}`, [bestPair.i, bestPair.j], best.lambda);
+  evaluate(`best single: ${WIDE_FEATURES[bestSingle.c]}`, [bestSingle.c], best.lambda);
   table(
     ["rule", "derivation AUC", "held-out AUC", "positives kept", "labels lost", "false accepts"],
     heldRuns
@@ -754,7 +1473,7 @@ function main(): void {
   if (dumpRows) {
     console.log("\n\n  EVERY ROW\n");
     table(
-      ["take", "at", "note", "y", "accepted", "reason", ...FEATURES],
+      ["take", "at", "note", "y", "accepted", "reason", ...WIDE_FEATURES],
       rows.map((r) => [
         r.stem,
         r.at.toFixed(0),
@@ -762,7 +1481,7 @@ function main(): void {
         String(r.y),
         r.accepted ? "yes" : "no",
         r.reason,
-        ...r.x.map((v) => f2(v)),
+        ...r.x.map((v) => (Number.isFinite(v) ? f2(v) : "-")),
       ])
     );
   }
