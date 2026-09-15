@@ -7,6 +7,120 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-031]: The fine onset's dip requirement stays; measured off, it is a direct-input trade that leaves the amped renders untouched
+* **Date:** 2026-09-15
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** With the eight 120bpm same-pitch takes and the DI repair in one
+  tree (DECISION-030), `held-then-picked-six-strings-120bpm-di` reads 14 missed
+  of 120. The tracker's trace names the refusals: seven `rejected: gated` at
+  the amplitude gate on a string decayed below it, three `ring-out-not-sharp`,
+  three `band-only transient`, one with no transient in the window at all —
+  twelve of the fourteen C3 or C4 re-picks, the other two an F#2 and a G4. The
+  fine-hop witness of DECISION-029 sees the gated ones with a 19-26dB rebound
+  and `fineOnsetDipDb` vetoes them, because a fine onset may not re-articulate
+  a sounding note unless the 5ms envelope dipped first - the pick landing on
+  the string before it plays it.
+* **Decision:** Leave `transient.fineOnsetDipDb` at -6dB. Measured off
+  (`= 0`, by config override against the merged tree, no source change) with
+  the falsifier stated first: the override had to hold the derivation set at
+  84 Notes / 2 missed / 8 extra AND not lose ground on the twelve held-out
+  takes. It cleared both — derivation bit-identical, held-out 24 missed /
+  72 extra to 23 / 72, and the take it was aimed at 14 missed / 5 extra to
+  1 / 9, its last miss a G4 with no transient in the window. Refused on three
+  counts anyway. (1) Both axes: corpus-wide 137 missed / 345 extra to
+  114 / 358, twenty-three events bought with thirteen extra Notes;
+  `measure-splits.ts` agrees, 340 split / 410 extra to 351 / 421. A net loss
+  on either axis is a finding and not a commit. (2) Every one of the
+  twenty-three is on held-out (1) or on the eight unassigned takes (22), whose
+  labels are PROVISIONAL and, on two of the four takes, recorded in
+  `docs/SAME-PITCH-MATERIAL.md` as not matching what the player described;
+  material that gates nothing because it is unconfirmed cannot calibrate a
+  shipped constant either. (3) All four amped renders are bit-identical with
+  the requirement off - 1/71, 9/44, 13/32 and 2/83 missed/extra, 60/77, 57/62,
+  33/41 and 51/82 split/extra - and the amped renders are where the open
+  problem is, every split on the eight takes being same-pitch and contiguous.
+* **Alternatives Considered:** Shipping it on the strength of the derivation
+  set not moving — refused: derivation invariance is the floor this project
+  measures against, not the bar; the reading still has to pay on both axes.
+  Lowering the amplitude gate instead, so the seven `gated` refusals reach the
+  re-articulation witnesses at all — not measured here, and out of scope for a
+  merge; it is the more honest place to look, because the dip test is the
+  witness the gate never lets those strokes reach. Widening the dip window
+  rather than removing the requirement — the same fit to the same unreviewed
+  labels, with one more constant read off them. Taking the reading as evidence
+  about the amped renders — refuted by the renders themselves: nothing moves.
+* **Consequences:** The direct input keeps fourteen known misses on one take,
+  with the mechanism that would recover thirteen of them identified, built, and
+  deliberately not enabled. What unblocks it is stated rather than guessed: the
+  DI derivation material DECISION-029 already names as its precondition, and a
+  reviewed label pass over the eight takes (`docs/validate-relabelled-material-prompt.md`).
+  Negative cost: anyone reading the take's ledger will find the misses and the
+  witness that sees them, and has to read this entry to learn why the two are
+  not connected in the shipped engine. The full measurement is in
+  `docs/DETECTION-FINDINGS.md`, "The DI repair, scored on the eight 120bpm
+  takes it was never measured against".
+
+---
+
+#### [DECISION-030]: Merge the direct-input repair with the 120bpm same-pitch material; the merge has one engine parent, not two
+* **Date:** 2026-09-15
+* **Status:** Accepted
+* **Owner:** Detection architecture
+* **Context:** Two branches carried independent work. `claude/same-pitch-material`
+  landed the eight 120bpm same-pitch takes (1,131 labelled events), their
+  PROVISIONAL labels, `docs/SAME-PITCH-MATERIAL.md` and DECISION-026..028;
+  `claude/guitar-note-detection-cjeu2h` landed the DI repair - the fine-hop
+  onset witness, the pre-pick prefix and contact-led stub absorption, the
+  virtual-pitch bloom - and a decision entry numbered 026, colliding with the
+  other branch's. Each branch's readings were taken without the other's
+  fixtures, so neither had scored its engine on the other's material.
+* **Decision:** Merge into `claude/merge-di-and-same-pitch`, keeping both
+  contributions whole. The conflict was in `DECISION_LOG.md` alone and was
+  structural: the same-pitch material keeps `DECISION-026`, the number its
+  own material is referenced by throughout the docs, and the DI roadmap entry
+  is renumbered to the next free number, `DECISION-029`, with its three
+  cross-references moved with it (`docs/DETECTION-FINDINGS.md`,
+  `src/engine/config.ts`, `src/engine/tracker/note-tracker.ts`). The eight
+  takes stay out of `fixtures/eval.config.json`: they remain informational and
+  gate nothing until their labels are confirmed. One doc figure was refreshed
+  from the live report per AGENTS.md §5 (`check-readme-eval.ts`: eight takes
+  under a 25ms median onset error, now nine).
+* **Alternatives Considered:** Renumbering the same-pitch entry instead —
+  rejected: it is referenced by name from `AGENTS.md`, `DETECTION-FINDINGS.md`
+  and two briefs, and the DI entry by three sites, so moving the DI entry is
+  the smaller and more mechanical change. Adding the eight takes to
+  `eval.config.json` while they were in hand — rejected, twice over: it is
+  what DECISION-026 deliberately did not do, and the readings below would then
+  gate on unreviewed generated labels. Rebasing the DI branch onto the
+  same-pitch branch rather than merging — no advantage here and it rewrites two
+  commits of measured work; the merge commit is the honest record that two
+  independent readings met.
+* **Consequences:** Measured four ways over one fixture set, with `main` and
+  both source branches in detached worktrees holding `fixtures/` checked out
+  from the merge, so every tree saw byte-identical audio and labels. Two
+  results are structural. `claude/same-pitch-material` is **byte-identical to
+  `main`** on `measure-downstream-ledger.ts --all` and `measure-splits.ts`,
+  every fixture, both axes: both engine gates it tried were reverted on that
+  branch, so its net `src/` diff is empty. The merge is **byte-identical to
+  the DI branch** on the same instruments. The merge therefore has one engine
+  parent, and no interaction between the two lines of work exists. Readings -
+  derivation 84 Notes / 2 missed / 8 extra, unmoved across all four trees;
+  held-out 30 missed / 84 extra to 24 / 72; the eight takes 126 missed /
+  255 extra to 111 / 265. `npm run eval` PASSES (the one informational failure,
+  `power-chords-b-a-g-fsharp` exact accuracy at 72.7% against an 80%
+  informational bar, is pre-existing on `main` and unchanged). Five of the
+  eight takes read below the per-fixture best of the two parent engines, all
+  five on the extras axis; that best is not a thing any single engine can be,
+  and the cause is the fine witness alone, confirmed by an override and by the
+  trace. Negative: the DI repair's cost is now visible on 1,131 events it was
+  never fitted to, and it is not the one-sided win it is on the mic and amp
+  takes - fifteen events found for ten extra Notes. Written up in
+  `docs/DETECTION-FINDINGS.md`, "The DI repair, scored on the eight 120bpm
+  takes it was never measured against".
+
+---
+
 #### [DECISION-029]: Adopt the direct-input roadmap: fine-hop flux proposals, transitions belong to the pick, octave-consistent cancellation; DI derivation material is the precondition
 * **Date:** 2026-09-15
 * **Status:** Accepted, amended 2026-09-15 — Stages 1 and 2 shipped with

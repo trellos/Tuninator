@@ -3953,7 +3953,7 @@ in `docs/archive/detection-rearchitecture-handoff.md`.
 The standing conclusion was that "the defect behind the largest block of splits
 is a same-pitch boundary inside one event, not a name arriving late", and that
 absorption reaches backward only. Both halves were tested against the 120bpm
-same-pitch material (DECISION-026, 1,136 events across eight fixtures). The
+same-pitch material (DECISION-026, 1,131 events across eight fixtures). The
 first half is right and was being **under-reported by a factor of six**. The
 second is right, and the mechanism that would fix it is refuted.
 
@@ -4662,3 +4662,117 @@ twice: the loose form named both DI chords and cost `spicy-chords` an
 extra, read the mic triplet's `e18` A4 as Dsus2 and moved the cowboy-amped
 onset median from 92 to 145ms; the tightened form still lost `e18` and
 left `c2` at Em7. Both reverted. `c1` and `c2` stand where §2.4 left them.
+
+## The DI repair, scored on the eight 120bpm takes it was never measured against
+
+The fine-hop witness, the pre-pick prefix and the virtual-pitch bloom were
+built and read against the twelve held-out takes and the five derivation
+takes, under the rule that the derivation set must not move. The eight
+120bpm same-pitch takes (1,131 labelled events) existed on another branch at
+the time and were not in that reading. Bringing the two together makes them
+scoreable, and the first thing worth recording is what the repair does to
+material it was not measured on.
+
+Four trees, one fixture set. `main`, each source branch and the merge were
+measured with the eight takes present in all four — the two branch trees as
+detached worktrees with `fixtures/` checked out from the merge, so every
+tree saw byte-identical audio and labels.
+
+Two results are structural rather than numeric. **The same-pitch branch and
+`main` are byte-identical** on `measure-downstream-ledger.ts --all` and
+`measure-splits.ts`, every fixture, both axes: that branch tried two engine
+gates (a second flux witness on the monophonic re-pick fallback, then a
+backward-looking envelope dip) and reverted both, so its net `src/` diff
+against `main` is empty. **The merge is byte-identical to the DI branch** on
+the same two instruments. So the merge has one engine parent, not two, and
+no interaction between the two lines of work exists to find.
+
+| | derivation (78) | held out (381) | the eight (1,131) |
+|---|---|---|---|
+| `main` / same-pitch | 2 missed, 8 extra | 30 missed, 84 extra | 126 missed, 255 extra |
+| merge / DI | 2 missed, 8 extra | 24 missed, 72 extra | 111 missed, 265 extra |
+
+The derivation set does not move, as it did not on the DI branch: 84 Notes,
+2 missed, 8 extra, bit-identical across all four trees.
+
+**On the eight takes the repair is not the one-sided win it is on the mic and
+amp takes.** It finds 15 more of the 1,131 events and pays 10 more extra
+Notes, and the per-fixture readings do not all point the same way: five of
+the eight sit below the per-fixture best of the two parent engines, all five
+on the extras axis.
+
+| fixture | `main` | merge |
+|---|---|---|
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 21 missed, 18 extra | **8 missed**, 19 extra |
+| `same-pitch-quarters-a3-e5-120bpm-di` | 2 missed, 1 extra | 1 missed, **5 extra** |
+| `same-pitch-eighths-a3-120bpm-di` | 63 missed, 3 extra | 63 missed, **6 extra** |
+| `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 14 missed, 30 extra | 13 missed, **32 extra** |
+| `same-pitch-quarters-a3-e5-120bpm-amped` | 2 missed, 82 extra | 2 missed, **83 extra** |
+
+A per-fixture best of two engines is not a thing any single engine can be,
+so this is not a defect of the merge — it is the DI repair's own cost,
+charged on material the DI branch did not hold. The cause is one mechanism.
+Running the merge with `transient.fineOnsetThreshold = 0` (the witness off,
+by config override, no source change) returns every one of the five to its
+`main` reading on the extras axis, and the tracker's own trace says the same
+thing from the other side: the causes that shrink between `main` and the
+merge are `no transient within the window` (42 → 39 on the A3 eighths DI,
+11 → 1 on the E5 DI), `transient below the amplitude gate` and
+`rejected: gated` — the fine witness supplying boundaries the 13.3ms
+broadband kernel never proposed. Where the fragment it opens does not reach
+`announceThresholdMs` it lands as `never announced` (4 → 7); where it does,
+it is an extra Note.
+
+The prefix and bloom rules on their own (the same override) are the opposite
+trade: on the eight takes, 130 missed and 247 extra against `main`'s 126 and
+255. They lose four events and remove eight extras. The two mechanisms are
+not separable by sign — the fine witness buys events with extras and the
+prefix rules buy extras with events — and on the DI triplet they are not
+even independent: with the witness off, `lead-line-di-quarter-eighth-triplet`
+goes from 0 missed to 1, a note the witness pays back.
+
+### The dip requirement, measured off: a DI-only trade that leaves the amped renders where they were
+
+`fineOnsetDipDb` is what stops a fine onset re-articulating a sounding note
+unless the 5ms envelope dipped first — the pick landing on the string before
+it plays it. On `held-then-picked-six-strings-120bpm-di` it is what refuses
+the take's misses: the witness sees each with a 19–26dB rebound and the dip
+test vetoes it.
+
+Falsifier, stated before the run: the override must hold the derivation set
+at 84 Notes / 2 missed / 8 extra **and** not lose ground on the twelve
+held-out takes; derivation movement refuses it on the spot.
+
+It clears both. With `transient.fineOnsetDipDb = 0` (override, no source
+change) the derivation set does not move at all, and the held-out takes go
+from 24 missed / 72 extra to **23 / 72** — one event better, no extras. The
+take it was aimed at goes from 14 missed / 5 extra to **1 missed / 9 extra**,
+its last miss a G4 (`p5c1h`) with no transient in the window at all. Across
+the eight takes: 111 missed / 265 extra → **89 / 278**.
+
+**It is refused anyway, on three counts.**
+
+*Both axes.* Corpus-wide the trade is 137 missed / 345 extra → 114 / 358:
+23 events bought with 13 extra Notes. `measure-splits.ts` reads it the same
+way, 340 split / 410 extra → 351 / 421. A net loss on the extras axis is a
+finding and not a commit, and this one is not marginal.
+
+*Where the events come from.* All 23 are on held-out (1) and on the eight
+unassigned takes (22). Setting a shipped constant from those readings fits it
+to held-out data and to PROVISIONAL generated labels that
+`docs/SAME-PITCH-MATERIAL.md` records as not matching the player's own
+description on two of the four takes. The eight takes gate nothing precisely
+because they are not confirmed; they cannot calibrate a constant either.
+
+*What it does not touch.* **All four amped renders are bit-identical with the
+dip requirement off** — 1/71, 9/44, 13/32 and 2/83 missed/extra, and 60/77,
+57/62, 33/41 and 51/82 split/extra, before and after. Every split on the
+eight takes is same-pitch and contiguous, and on the amped renders that is
+the open problem; the dip override moves none of it. It is a direct-input
+effect end to end, which is consistent with where it was derived and with
+DECISION-028's reading that compression is what removes the separation.
+
+The dip requirement stays at −6dB. What would settle it is the DI derivation
+material DECISION-029 already names as its precondition, plus a reviewed
+label pass over the eight takes — not a threshold read off the takes
+themselves.

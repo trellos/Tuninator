@@ -140,7 +140,7 @@ samples — keep that in mind before treating a twelve-take result as more
 statistically solid than it is.
 
 **Eight further fixtures sit in neither column yet.** The 120bpm same-pitch
-material (DECISION-026) — four takes, DI and amped, 1,024 events — was recorded
+material (DECISION-026) — four takes, DI and amped, 1,131 events — was recorded
 to answer DECISION-022, and is deliberately landed unassigned, with no
 `eval.config.json` entries and with PROVISIONAL generated labels. It gates
 nothing and is fitted by nothing until someone assigns it and reviews the
