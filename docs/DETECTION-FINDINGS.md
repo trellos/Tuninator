@@ -5056,6 +5056,36 @@ and which `docs/SAME-PITCH-MATERIAL.md` records as not matching the player's
 description on two of four — so the cost is measured against annotations that
 cannot yet carry it.
 
+**Where the removed Notes come from, which is the finding and was not how the
+verdict above was first framed.** Leading with "9 against a bar of 35" put the
+weight on a bar chosen as half the oracle's figure, which is an arbitrary
+fraction rather than a test of whether the change is worth having. Split by
+material, the reading says something sharper and less flattering to both sides:
+
+| `absorbRatio` 0.40, extra Notes | off | 0.40 | delta |
+|---|---|---|---|
+| derivation (5 takes, 78 events) | 13 | 13 | **0** |
+| held out (12 takes, 381 events) | 83 | 82 | **-1** |
+| the eight (1,131 events, PROVISIONAL labels) | 314 | 296 | **-18** |
+
+**Eighteen of the nineteen removed Notes are on the eight takes.** On the
+seventeen takes whose labels have been reviewed the mechanism does essentially
+nothing: derivation is exactly unmoved, and held-out moves by one Note on each
+axis (one extra removed, one missed label recovered) which is a shuffle — the
+amped triplet take gives up two extras while the mic triplet take gains one.
+The missed cost divides the same way: -1 on held-out, +2 on the eight.
+
+So the exchange rate is good — 19 extras for 1 missed corpus-wide at 0.40, and
+42 for 2 at 0.50, against the roughly one-for-one every energy witness produced
+— and it is almost entirely an exchange rate measured against annotations that
+`docs/SAME-PITCH-MATERIAL.md` records as not matching the player's description
+on two of the four takes. **The verdict is therefore "not yet decidable", not
+"not worth having".** If the eight takes' labels survive review, a 19-for-1
+trade at the oracle's own operating point is a change this project would take;
+if they do not, both the benefit and the cost move and the reading has to be
+taken again. The label review is the blocker in the strict sense that the entire
+measured effect sits on the unreviewed side of the corpus.
+
 **What is retained and what is closed.** `pace.absorbRatio` stays 0 and the
 ratio gate is closed at its stated operating point. `PaceEstimator` stays, with
 `tests/engine/pace.test.ts` asserting both of the defects that sank the earlier

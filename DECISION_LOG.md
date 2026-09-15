@@ -54,6 +54,23 @@ are what keep later work from repeating them.
   Reverting the estimator outright — rejected per DECISION-024's precedent of
   keeping deliberately-unwired modules, and because the next measurement needs
   it.
+* **Amendment (same day):** The verdict above leads with the wrong quantity and
+  is corrected here. "9 against a bar of 35" weighs a bar set at half the
+  oracle's figure — an arbitrary fraction, not a test of worth — and the
+  standing both-axes bar was over-applied: it warns that fewer misses bought
+  with extras is not automatically a win, which does not make one extra missed
+  label an automatic refusal. Split by material at 0.40, extra Notes go 13 to
+  13 on derivation, 83 to 82 on the twelve held-out takes, and 314 to 296 on
+  the eight — so **eighteen of the nineteen removed Notes are on the eight
+  takes**, and the held-out move is a shuffle of one Note each way. The missed
+  cost divides identically: -1 held-out, +2 the eight. The exchange rate is
+  19 extras for 1 missed corpus-wide, far better than the one-for-one every
+  energy witness produced, and it is measured almost entirely against
+  PROVISIONAL labels. The decision therefore stands as **"not yet decidable"
+  rather than "not worth having"**, the operating point to read it at is 0.40
+  (the oracle's own, stated before this was built, not fitted), and the label
+  review on the eight takes is the blocker in the strict sense that the whole
+  measured effect sits on the unreviewed side of the corpus.
 * **Consequences:** No behaviour change: the engine is bit-identical, `npm run
   eval` PASSES, and the corpus stands at 137 missed and 410 extra Notes exactly
   where it did. The negative is specific rather than general — the *ratio* form
