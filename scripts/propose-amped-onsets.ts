@@ -477,6 +477,12 @@ function main(): number {
     const anchors = { di: measureAnchor(di), amped: measureAnchor(amped) };
     const firstDi = (di.label.events[0] as LabelFile["events"][number]).startMs;
     const firstAmped = (amped.label.events[0] as LabelFile["events"][number]).startMs;
+    // An anchor whose steepest rise cannot even clear verify-fixtures.ts's own
+    // 1.35 attack bar is not a located pick, it is the loudest thing in a
+    // hiss-dominated head. Report it as unmeasurable rather than as a number.
+    const anchorOk = (a: { ratio: number }): boolean => a.ratio >= 1.35;
+    const vsAnchor = (label: number, a: { atMs: number; ratio: number }): string =>
+      anchorOk(a) ? `${label - a.atMs >= 0 ? "+" : ""}${label - a.atMs} vs anchor` : "anchor NOT MEASURABLE";
     process.stdout.write(
       `\n  [2] FIRST-PICK ANCHOR  steepest relative envelope rise inside ${ANCHOR_SEARCH_MS}ms, no threshold\n` +
       `      di    anchor ${anchors.di.atMs}ms (rise x${anchors.di.ratio.toFixed(1)})  ` +
@@ -484,8 +490,9 @@ function main(): number {
       `      amped anchor ${anchors.amped.atMs}ms (rise x${anchors.amped.ratio.toFixed(1)})  ` +
       `head floor ${anchors.amped.headFloor.toExponential(2)} = ${((anchors.amped.headFloor / anchors.amped.peak) * 100).toFixed(1)}% of peak` +
       `${anchors.amped.headFloor >= 0.008 ? "   ** ABOVE the engine's rmsGate **" : ""}\n` +
-      `      first label:  di ${firstDi}ms (${firstDi - anchors.di.atMs >= 0 ? "+" : ""}${firstDi - anchors.di.atMs} vs anchor)   ` +
-      `amped ${firstAmped}ms (${firstAmped - anchors.amped.atMs >= 0 ? "+" : ""}${firstAmped - anchors.amped.atMs} vs anchor)\n`
+      `      first label:  di ${firstDi}ms (${vsAnchor(firstDi, anchors.di)})   ` +
+      `amped ${firstAmped}ms (${vsAnchor(firstAmped, anchors.amped)})` +
+      `${anchorOk(anchors.amped) ? "" : "  <- the hiss swamps the rise; this take gets no amped-native anchor"}\n`
     );
 
     /* --- 3. amped-native re-timing, with the DI control ------------------- */
@@ -607,8 +614,16 @@ function main(): number {
     }
 
     if (proposal !== null) {
-      const note =
-        source === "di-transfer"
+      const unchanged = shifts.every((d) => d === 0);
+      const note = unchanged
+        ? ` REVIEWED ${new Date().toISOString().slice(0, 10)} by scripts/propose-amped-onsets.ts and left` +
+          ` UNCHANGED: these labels already carry the DI render's one-to-one measured onsets, and the` +
+          ` measured render offset between the two renders is ${off.lag.median.toFixed(0)}ms (raw-waveform` +
+          ` cross-correlation at ${off.lag.n} onsets, ${take.windowMs}ms window, lag bounded to` +
+          ` +-${take.maxLagMs}ms), so there is nothing to re-time. This file is byte-identical in timing to` +
+          ` the one in fixtures/; it is written only so all four amped takes can be reviewed together.` +
+          ` NOT ground truth.`
+        : source === "di-transfer"
           ? ` PROPOSED ${new Date().toISOString().slice(0, 10)} by scripts/propose-amped-onsets.ts:` +
             ` startMs/endMs taken id-for-id from the DI render of this same performance, whose gridded` +
             ` sections were re-timed onto measured picks. Justified by a measured render offset of` +
