@@ -7,6 +7,67 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-033]: The third pace attempt ships disabled; the ratio gate misses its stated bar at the oracle's operating point
+* **Date:** 2026-09-15
+* **Status:** Rejected
+* **Owner:** Detection architecture
+* **Context:** DECISION-028 named a sequence claim as the precondition for
+  progress on the same-pitch split, and the owner asked for the live-tempo form
+  of it (DECISION-032 having removed the retraction objection). A live pace had
+  been built twice and reverted twice. Read against each other the two entries
+  yield a combination neither ran: attempt 1's target (bias the segmentation
+  toward whole notes) with attempt 2's feed (once per attack BURST, quantile
+  0.25), scaling only the absorb decision and explicitly not `releaseGraceMs`
+  or `harmony.changeStableMs`, both of which attempt 1 proved are decay physics
+  rather than tempo. Re-measuring the oracle ceiling with the eight same-pitch
+  takes in the corpus moved it from 8 emitted Notes to 71, because the gate is
+  visible only when `ratio x rate` clears the 55-90ms announce bar and this
+  material's candidates sit at a 222ms median rate against the old 154ms.
+  Falsifier stated before building: at least 35 emitted Notes removed, no
+  derivation cost, no net held-out loss.
+* **Decision:** Built (`tracker/pace.ts`, `absorbAtPace()` in
+  `note-tracker.ts`, `pace.*` config, `tests/engine/pace.test.ts`) and
+  **rejected as a shipping candidate; `pace.absorbRatio` stays 0**, verified
+  byte-identical to the merge with the gate off. At the oracle's own operating
+  point it removes **9 Notes at 0.35 and 19 at 0.40 against a bar of 35**,
+  where the oracle removed 71 and 77. The derivation set is unmoved at every
+  ratio tried and the held-out takes gain a label rather than lose one from
+  0.30 to 0.40, so the mechanism is inert rather than harmful — which is the
+  same shuffle attempt 2 was reverted for, now reproduced with attempt 2's own
+  corrections in place. `PaceEstimator` is retained and tested because a
+  sequence model over the envelope needs a pace and this one's two known
+  defects (the per-transient feed, the pace carried across a rest) are fixed
+  and covered by tests.
+* **Alternatives Considered:** **Shipping at 0.50**, where the sweep clears
+  every clause of the falsifier as written — 42 Notes removed, derivation
+  unmoved, held-out at its baseline. Refused on two counts. There is a
+  principled case for 0.50 (attempt 2 measured its estimator at 0.82 of the
+  oracle rate, and 0.40/0.82 = 0.49) but that 0.82 belongs to a different
+  implementation measured on a 459-label corpus and has **not been re-measured
+  for this estimator**, so shipping on it means choosing a constant because a
+  sweep over held-out and provisional-label material shows it clearing the bar.
+  And it costs two labels on the eight takes, a net loss on the missed axis
+  against annotations that are PROVISIONAL and, on two of four takes, recorded
+  as not matching what the player described. Scaling the announce bar as well
+  as the absorb bar — not tried, because attempt 1's derivation damage came
+  from scaling durations wholesale and the narrow gate had to be read first.
+  Reverting the estimator outright — rejected per DECISION-024's precedent of
+  keeping deliberately-unwired modules, and because the next measurement needs
+  it.
+* **Consequences:** No behaviour change: the engine is bit-identical, `npm run
+  eval` PASSES, and the corpus stands at 137 missed and 410 extra Notes exactly
+  where it did. The negative is specific rather than general — the *ratio* form
+  of a per-boundary pace gate is closed at its stated operating point, and the
+  sequence claim DECISION-028 named is untouched, because this was never a
+  sequence decoder: it reads one fragment against one scalar. **The next
+  measurement is named and small:** this estimator's own ratio to the oracle
+  rate at the candidates, per take. If it is 0.82 then 0.50 is derived rather
+  than fitted and the gate deserves re-reading against reviewed labels; if it
+  is not, the ratio form is finished. The label review on the eight takes is a
+  precondition for either reading, since two of the cost labels sit there.
+
+---
+
 #### [DECISION-032]: Revision is the contract, not a cost; latency to be correct is accepted
 * **Date:** 2026-09-15
 * **Status:** Accepted

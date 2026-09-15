@@ -4996,3 +4996,74 @@ its note lengths fit the passage, instead of merging or not merging at one
 instant. DECISION-032 makes that admissible by accepting retroactive amendment
 as the contract. It is untested and unmeasured, and stated here so it is not
 mistaken for a result.
+
+### The third pace attempt: built with both corrections, and it misses its own bar at the oracle's operating point
+
+The falsifier stated in the entry above was **35 emitted Notes removed — half
+the oracle's 71 — at no cost in missed labels on the derivation set and no net
+loss on the twelve held-out takes.** The combination it was stated for was built:
+`tracker/pace.ts` (ring of 8 gaps, quantile 0.25, fed once per attack burst,
+null until three gaps, forgotten after 1.5s of silence — attempt 2's feed and
+quantile, attempt 1's target) driving `absorbAtPace()` in `note-tracker.ts`,
+which hands a same-pitch fragment back to the Note it split from when the
+fragment sounded for less than `pace.absorbRatio` of the local stroke length.
+
+The candidate is the oracle's candidate exactly — a Note opened by an accepted,
+settled, same-pitch re-articulation that has ended by stepping away to another
+pitch — so the shipped rule and the oracle that bounded it are the same rule.
+Shipped at `absorbRatio: 0`, verified byte-identical to the merge on
+`measure-downstream-ledger.ts --all` with the gate off.
+
+| `absorbRatio` | derivation missed | held-out missed | the eight | ALL missed | split events | extra Notes | Notes removed |
+|---|---|---|---|---|---|---|---|
+| off | 2 | 24 | 111 | 137 | 340 | 410 | — |
+| 0.30 | 2 | 23 | 112 | 137 | 341 | 408 | 2 |
+| **0.35** | 2 | 23 | 113 | 138 | 338 | 401 | **9** |
+| 0.40 | 2 | 23 | 113 | 138 | 329 | 391 | 19 |
+| 0.50 | 2 | 24 | 113 | 139 | 315 | 368 | 42 |
+| 0.60 | 2 | 24 | 115 | 141 | 304 | 353 | 57 |
+
+**At the oracle's own operating point it fails, and not narrowly: 9 Notes
+against a bar of 35 at 0.35, and 19 at 0.40 where the oracle removed 77.** The
+derivation set does not move at any ratio tried, and the held-out takes gain a
+label at 0.30 through 0.40 rather than losing one, so the mechanism is not
+dangerous — it is mostly inert. That is the same shuffle attempt 2 was reverted
+for, reproduced with attempt 2's own corrections in place, and the ratio form of
+this gate is therefore closed as a shipping candidate on the reading it was
+given.
+
+**The honest wrinkle, stated rather than buried.** At `0.50` the sweep clears
+every clause of the falsifier as written: 42 Notes removed, derivation unmoved,
+held-out back at its baseline 24 with no net loss. It is not being shipped on
+that, for two reasons and one of them is disqualifying on its own.
+
+*The borrowed constant.* There is a principled argument for 0.50 rather than a
+fitted one: attempt 2 measured its causal estimator at **0.82** of the oracle
+rate, and 0.40 / 0.82 = 0.49, so 0.50 is the causal ratio that reproduces the
+oracle's effective duration bar. But that 0.82 was measured on a *different
+implementation* of a different estimator against a 459-label corpus, and it has
+**not been re-measured for this one**. Until it is, 0.50 is a number chosen
+because this table shows it clearing the bar, which is fitting on held-out and
+provisional-label material, and the difference between "derived" and "fitted"
+here is exactly one measurement that has not been taken.
+
+*The two labels.* 0.50 costs two labels on the eight takes (111 to 113), so the
+corpus-wide reading is 42 extra Notes removed for 2 missed. That is a far better
+exchange than the roughly one-for-one every energy witness produced, and it is
+still a net loss on the missed axis, which the standing bar calls a finding
+rather than a commit. Both labels are on takes whose ground truth is PROVISIONAL
+and which `docs/SAME-PITCH-MATERIAL.md` records as not matching the player's
+description on two of four — so the cost is measured against annotations that
+cannot yet carry it.
+
+**What is retained and what is closed.** `pace.absorbRatio` stays 0 and the
+ratio gate is closed at its stated operating point. `PaceEstimator` stays, with
+`tests/engine/pace.test.ts` asserting both of the defects that sank the earlier
+attempts: a pace fed per transient cannot recover the stroke length, and a pace
+is forgotten across a rest rather than carried. It is retained because a
+sequence model over the envelope — DECISION-028's actual opening, and the thing
+this gate is not — needs a pace, and this one's two known defects are fixed and
+covered. **The next measurement is named and small:** this estimator's own
+ratio to the oracle rate at the candidates, per take. If it is 0.82, 0.50 is
+derived and the gate is worth re-reading against reviewed labels. If it is not,
+the ratio form is finished.

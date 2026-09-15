@@ -36,6 +36,7 @@ import type {
   PitchClass,
   SourceTimeMs,
 } from "../../types.js";
+import { PaceEstimator } from "./pace.js";
 import type { EngineConfig } from "../config.js";
 import type {
   AttackEvidence,
@@ -335,6 +336,11 @@ export class NoteTracker {
    */
   private attackBurstStart: AttackEvidence | null = null;
   /**
+   * The local stroke length, fed once per attack burst. See `pace.ts` for why
+   * the feed granularity is the load-bearing part.
+   */
+  private readonly pace: PaceEstimator;
+  /**
    * When energy last arrived, oldest first.
    *
    * The fast lane sees every transient and then declines to act on most of
@@ -401,6 +407,13 @@ export class NoteTracker {
     this.config = config;
     this.pitchChange = new PitchChangeDetector(config);
     this.rearticulation = new RearticulationDetector(config);
+    this.pace = new PaceEstimator({
+      ringSize: config.pace.ringSize,
+      quantile: config.pace.quantile,
+      minIntervalMs: config.transient.minIntervalMs,
+      silenceResetMs: config.pace.silenceResetMs,
+      minGaps: config.pace.minGaps,
+    });
   }
 
   reset(): void {
@@ -410,6 +423,7 @@ export class NoteTracker {
     this.nextId = 1;
     this.lastAttack = null;
     this.attackBurstStart = null;
+    this.pace.reset();
     this.attackTimes.length = 0;
     this.attackSamples.length = 0;
     this.actedAttackTimes.length = 0;
@@ -511,6 +525,8 @@ export class NoteTracker {
         frame.attack.at - previous.at <= config.transient.articulationMs &&
         frame.attack.at - burst.at <= config.tracking.backdateWindowMs;
       this.attackBurstStart = continues ? burst : frame.attack;
+      // Once per BURST, not per transient: a continuation is the same stroke.
+      if (!continues) this.pace.feed(frame.attack.at);
       this.lastAttack = frame.attack;
       this.actedAttackTimes.push(frame.attack.at);
       if (this.actedAttackTimes.length > ATTACK_HISTORY) this.actedAttackTimes.shift();
@@ -525,7 +541,12 @@ export class NoteTracker {
 
     let active = this.current();
     /** Set when a split ends a Note whose successor should inherit its decay. */
+    // A pace held across a rest describes the phrase before it, and no stroke
+    // arrives to say so — hence a time-driven reset as well as a gap-driven one.
+    this.pace.observe(frame.at);
     let splitFrom: NoteRecord | null = null;
+    /** The Note a same-pitch re-articulation split away from, if one did. */
+    let paceParent: NoteRecord | null = null;
 
     /* (a) An attack over something already sounding: a restrum or a re-pick.
      *     Only a genuine energy injection counts, and never mid-glide — a bend
@@ -675,6 +696,9 @@ export class NoteTracker {
         // It inherits the decay: a restrum re-excites the strings that were
         // already ringing, so the curve is continuous through the split.
         splitFrom = active;
+        // Only a SAME-pitch split is a pace-absorb candidate; a different
+        // pitch is a different event by the evidence that counts.
+        paceParent = frame.pitch.frequencyHz === null || !pitchDiffers ? active : null;
         active = null;
       }
     }
@@ -773,6 +797,9 @@ export class NoteTracker {
       }
       const previous = active;
       this.end(active, at, out);
+      // The fragment has just stepped away, so how long it sounded is finally
+      // known. That is the moment the pace can rule on it.
+      this.absorbAtPace(previous, out);
       active = this.begin(
         "pitchChange",
         frame,
@@ -796,6 +823,9 @@ export class NoteTracker {
           splitFrom,
           splitFrom !== null
         );
+        if (paceParent !== null && active !== null && !paceParent.merged) {
+          active.rearticulationParentId = paceParent.id;
+        }
       }
     }
 
@@ -1900,6 +1930,81 @@ export class NoteTracker {
    * and where the Notes agree with the segment and with each other about what
    * was sounding.
    */
+  /**
+   * Hand a same-pitch fragment back to the Note it split from, when it is too
+   * short to be a stroke at the rate the player is going.
+   *
+   * The candidate is narrow by construction and matches
+   * `scripts/measure-restrike-oracle.ts` exactly, so the shipped rule and the
+   * oracle that bounded it are the same rule: a Note opened by an accepted,
+   * SETTLED, same-pitch re-articulation, which has now ended by stepping away
+   * to another pitch, and which sounded for less than `pace.absorbRatio` of
+   * the local stroke length.
+   *
+   * This is forward absorption, which DECISION-027 refused — and the refusal
+   * is why the gate is this narrow. That measurement enabled `regionMerge` and
+   * a trigger-restricted variant and got 139 phantom Notes for 222 lost played
+   * ones, then 14 for 14; its stated conclusion was that the region lane can
+   * tell that a span held one event but not WHICH of two same-pitch Notes was
+   * not played, and that the open question was evidence that survives
+   * compression. The pace is a different discriminator, not a retuning of that
+   * one: it asks whether a fragment this short is plausible at this tempo at
+   * all. Its oracle ceiling is 71 emitted Notes for no missed labels, which is
+   * the number this has to be judged against.
+   *
+   * A null pace means no opinion and the boundary is left alone. Retracting an
+   * announced Note is in bounds per DECISION-032 and travels as the
+   * `structuralRevision` DECISION-008 provides for; `projectEmissions` drops
+   * an absorbed Note from the scored set, so the fragmentation figure moves by
+   * the ones that were really emitted.
+   */
+  private absorbAtPace(fragment: NoteRecord, out: TrackerEmission[]): void {
+    const ratio = this.config.pace.absorbRatio;
+    if (ratio <= 0) return;
+    const parentId = fragment.rearticulationParentId;
+    if (parentId === null) return;
+    if (fragment.merged) return;
+    const paceMs = this.pace.paceMs();
+    if (paceMs === null) return;
+    if (fragment.announceSoundedMs > paceMs * ratio) return;
+
+    const parent = [...this.closing, ...this.ended].find((record) => record.id === parentId);
+    if (parent === undefined || parent.merged) return;
+    if (parent.endTime === null) return;
+    // A fragment that is not contiguous with its parent is a second event with
+    // silence in front of it, whatever its length.
+    if (fragment.startTime - parent.endTime > this.config.harmony.mergeMaxGapMs) return;
+
+    const end = Math.max(parent.endTime, fragment.endTime ?? parent.endTime) as SourceTimeMs;
+    fragment.merged = true;
+    parent.endTime = end;
+    parent.deepStructural = true;
+    if (this.trace !== null) {
+      this.trace({
+        kind: "declined",
+        at: fragment.startTime,
+        noteId: fragment.id,
+        intoId: parent.id,
+        reason: `pace-absorbed:${paceMs.toFixed(0)}`,
+        durationMs: fragment.announceSoundedMs,
+        fellTo: fragment.maxRms === 0 ? 1 : fragment.rms / fragment.maxRms,
+      });
+    }
+    if (!parent.announced) return;
+    const revisionNumber = parent.bump("structuralRevision");
+    out.push({
+      type: "changed",
+      note: parent.snapshot(),
+      change: {
+        type: "structuralRevision",
+        at: end,
+        revisionNumber,
+        relation: "absorbed",
+        relatedNoteIds: [fragment.id],
+      },
+    });
+  }
+
   private mergeWithinSegment(
     segment: RegionSegment,
     open: readonly NoteRecord[],
