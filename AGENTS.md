@@ -186,6 +186,19 @@ any further reading of that ceiling seriously. Three briefs
 carry status banners saying so — read them before re-deriving the same
 conclusions, not as work to pick up.
 
+### `docs/DI-ACCURACY-ROADMAP.md` — the direct input, measured to its ceiling
+
+The four DI takes were measured function by function
+(`scripts/measure-di-onset-ceiling.ts`, `measure-di-pitch-ceiling.ts`,
+`measure-di-extras-census.ts`, `measure-di-chord-evidence.ts`): the
+information behind every remaining DI defect is in the signal, and the
+roadmap names a staged repair with a falsifier per stage. Read it before
+touching the onset kernel's hop, the tracker's handling of a pitch step that
+a pick then re-articulates, or the chroma kernel's cancellation loop. Its
+numbers are ceilings read on held-out material; its Stage 0 (new DI
+derivation recordings) is what turns them into results, per DECISION-022's
+rule that new derivation material precedes any further reading of a ceiling.
+
 ### `docs/archive/` — closed lines of work
 
 Records from the retired pre-rewrite `src/core/` lineage, kept for the

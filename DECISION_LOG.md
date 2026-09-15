@@ -7,6 +7,60 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-026]: Adopt the direct-input roadmap: fine-hop flux proposals, transitions belong to the pick, octave-consistent cancellation; DI derivation material is the precondition
+* **Date:** 2026-09-15
+* **Status:** Proposed
+* **Owner:** Detection architecture
+* **Context:** Asked for a realistic path to perfect accuracy on the direct
+  input. The four DI takes (127 held-out events) stand at 6 missed, 25 extra
+  Notes and 4 wrong names under the shipping engine. Four ceiling
+  measurements (`scripts/measure-di-*.ts`, written up in
+  `docs/DI-ACCURACY-ROADMAP.md` and `docs/DETECTION-FINDINGS.md`) establish
+  that the information is in the signal: a log-compressed, max-filtered flux
+  at a 2.67ms hop, with a 65ms "preparation" veto, covers 126 of 127 onsets
+  with six off-label firings — three pick contacts 52–65ms before a stroke,
+  one strum-internal transient, one candidate 43ms before the interpolated
+  `s14`, and the take's final hand mute; the engine's own pitch estimator names 96–100%
+  of notes correctly by 15ms after a correct boundary; 21 of the 25 extra
+  Notes are the fretting hand arriving before the pick or the strum's
+  spread; both wrong chord names are one octave error in harmonic
+  cancellation. The seventh defect, `s14`, is the labeller's own exception.
+* **Decision:** Pursue the roadmap's stages, each with its falsifier stated
+  before measurement: (1) a fine-hop SuperFlux-shaped onset front end as a
+  PROPOSAL stage with a 65ms "preparation" veto in the region lane; (2) three
+  structural rules in the tracker — a step-opened Note ended by the pick
+  within 250ms at the pitch the pick plays is absorbed into it, a transition
+  stub likewise, and a strum's first-string fragment is no longer protected
+  by `restruck && announced`; (3) octave consistency in the cancellation
+  loop of `kernels/chroma.ts` and blooming on a virtual pitch. Precondition
+  for deriving rather than fitting any of their constants: about three
+  minutes of new DI derivation material (quiet alternate-picked sixteenths,
+  same-pitch re-picks, held-then-re-picked legato, open-chord changes),
+  labelled by the recipe the DI label files already document. Two semantic
+  decisions are the owner's: a pre-pick fretting transition is not a Note;
+  a picked-and-damped stroke is.
+* **Alternatives Considered:** A single fixed onset threshold across the DI
+  takes — refuted: the per-take best points span 0.145 to 3.0, and at 0.25
+  the strummed takes fire 65 times off-label. A mute veto keyed on the
+  envelope falling after a candidate — refuted: it removes `s6` and `s40`,
+  real strokes damped inside 40ms. The labeller's high-passed envelope and
+  an LPC residual as detectors — 114/127 and 125/127 covered at 179 and 189
+  off-label. Learned onset heads (Schlüter–Böck ≈290k parameters, Basic
+  Pitch ≈17k but non-causal by ±100ms) — out of bounds or already run to a
+  falsifier (`DECISION-021`). pYIN's note HMM — leaves a stable state only
+  through silence, the opposite of what re-picked sixteenths need.
+  Per-rig calibration of the existing witnesses — closed by `DECISION-010`.
+* **Consequences:** The DI's remaining defects are reframed as upstream of
+  the same-pitch decision the record calls a 0.73 ceiling: on a direct input
+  the kernel was too coarse to see the pick, not the decision too weak to
+  judge it. The path is expected to read 8/8, 16/16, 55/55 and 47/48 with
+  zero extras; it says nothing about the mic and amp paths beyond one new
+  candidate witness (the damping dip before a re-pick) that is untested on
+  the decision table. Cost: the owner at a guitar for the derivation
+  material, and one semantic rule (the pre-pick prefix) that a consumer
+  wanting every legato pitch change as a Note would want off. Nothing in
+  `src/` moved; the eval report is bit-identical.
+
 #### [DECISION-025]: Split the README into a short front door plus `docs/`; the intro is human-owned
 * **Date:** 2026-09-10
 * **Status:** Accepted

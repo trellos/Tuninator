@@ -4000,3 +4000,137 @@ axis spends four fifths of its points below 1kHz while the partials separating a
 guitar note from its octave are the high ones. The full list, including the
 Viterbi-over-NNLS variants and the NNLS octave arbiter, is in §8 of the archived
 handoff.
+
+## The direct input, measured to its ceiling
+
+The four DI takes — 127 held-out events on one guitar, one performer and one
+interface — were asked the prior question every miss and every extra reduces
+to: is the information in the signal, and which function sees it. Four
+scripts, every number read on the held-out takes with the constants chosen on
+the take measured, which makes each one a CEILING and not a result; the plan
+built on them is `docs/DI-ACCURACY-ROADMAP.md`. Engine at `f3bf223`, bit
+identical before and after: nothing here changed a detection.
+
+Where the DI stands under the shipping engine: 6 missed (all six on the
+sixteenths, all six "no transient within the window"), 25 extra Notes (21 on
+the triplet take, 4 on the cowboy take), 117 of 127 named exactly, onsets
+inside every gate.
+
+### Onsets: at a 2.67ms hop, log-compressed flux sees 126 of 127
+
+`scripts/measure-di-onset-ceiling.ts`, seven causal functions at a
+128-sample hop, each swept over its whole range and scored under
+NEAREST-label attribution inside ±30ms (narrower than the 63ms rushed pair
+`s19`/`s20`; the ±60ms reading that once produced "48/48" on this material
+is the window-wider-than-the-spacing error and is not repeated):
+
+| function, best point per take, summed over the four DI takes | covered | off-label | at 0 off-label |
+|---|---|---|---|
+| linear flux over frame magnitude (the kernel's shape) | 126/127 | 88 | 50/127 |
+| band-limited flux 1.5–6kHz | 126/127 | 72 | 11/127 |
+| log-compressed flux | 126/127 | 23 | 90/127 |
+| SuperFlux (±1-bin max-filtered reference) | 126/127 | 17 | 90/127 |
+| SuperFlux minus its trailing 100ms median | 126/127 | 15 | 107/127 |
+| 1.5kHz-highpassed 1ms envelope rise | 114/127 | 179 | 23/127 |
+| order-16 LPC prediction residual | 125/127 | 189 | 69/127 |
+
+The sixteenths read 47/48 for every flux variant against the kernel's 42;
+the one uncovered is `s14`, the label the labeller placed by subdivision.
+Listed candidate by candidate, the eleven off-label firings on the
+sixteenths at that point are nine candidates 32–51ms before a downstroke,
+each followed within 65ms by a candidate 13–30× stronger, one candidate
+43ms before the interpolated `s14`, and the terminal mute; on the triplet
+take the three are 52–65ms before an eighth note with the envelope
+collapsing behind them. **They are the pick landing on the
+string before the stroke.** With the veto "a candidate followed within 65ms
+by one ≥4× stronger is a preparation" the triplet take reads 55/55 with zero
+off-label, the power chords 16/16 with zero, the sixteenths 47/48 with two
+(the terminal mute; a candidate 43ms before the interpolated `s14`), the
+cowboy chords 8/8 with one strum-internal transient 68ms after the strum.
+126/127, six off-label, all six accounted for.
+
+**Refuted in the same pass.** A single fixed threshold across the four takes:
+with the preparation veto the best points sit at 0.145 (sixteenths), 1.86
+(triplet), 0.49 (power chords) and 3.0 (cowboy chords) on the
+median-subtracted SuperFlux, and at a single 0.25 the sixteenths and power
+chords hold (47/48 with 2 off-label, 16/16 with 1) while the triplet take
+fires 27 times and the cowboy take 65 times off-label, 27 and 48 of those
+with the envelope falling behind them. So the fine function is a proposal
+stage and whether energy followed remains the tracker's question. A mute
+veto keyed on the 20ms envelope 35ms later falling under half its value 5ms
+before takes the triplet take to 55/55 with zero off-label at 0.25, leaves
+the cowboy take's 65 where they were, and removes `s6` and `s40`, two real
+strokes that are picked and damped inside 40ms; refined to require no rise
+at all in the 5ms envelope within 16ms it still removes them, because their
+rebound comes 25–35ms after the label. Not the right form.
+
+### Pitch: given the boundary, the engine names the note by +15ms
+
+`scripts/measure-di-pitch-ceiling.ts`, the engine's own dual-window
+estimator with a fresh median, on windows ending a fixed distance after the
+LABELLED onset. Pitch class correct on the triplet take (55): 64% at +10ms,
+96% at +15, 98% at +20, 100% at +30 and +45; on the sixteenths (48): 60%,
+100%, 96%, 96%, 100%. Exact reads the same. No label unnamed by +90ms on
+either take. The pitch 15ms before the pick reads nothing at all on 46 of
+the 55 triplet labels — the string is damped by the pick's contact — and the
+previous stroke's pitch on 21 of the 48 sixteenths. **On a direct input
+every wrong name is a boundary, not an estimate.** (`clean-lead-120bpm`
+reads 7% at +30ms and 56% at +90ms under the same probe, and 28 of its 43
+labels read the *previous* note 15ms before their onset: that take's labels
+sit well ahead of the pick, which is a property of its first-pass timing and
+not of the estimator.)
+
+### The extras, one by one
+
+`scripts/measure-di-extras-census.ts`, from the tracker's own trace and the
+matcher's own verdict. DI triplet, 21: eight step-opened Notes ended by the
+pick 72–196ms later at the pitch the pick then plays (the next note fretted
+before it is picked); five step-opened at a pitch neither neighbour has,
+four of them stubs of 53–67ms (D#5, F5, G5, F4 at confidence 0.7–0.8) and
+one of 107ms, all ending on the pick; seven attack-opened by a transient
+40–130ms before the pick — the
+preparation click the fine-hop function no longer fires on under the veto;
+one tail fragment. Cowboy DI, 4: three first-string fragments of 133–160ms
+kept out of `absorbAttackFragments` by `restruck && announced`, and one
+373ms pre-strum transition. Matched Notes are step-opened as often as
+attack-opened on the triplet take (27 to 28), so the trigger alone is not
+the discriminator; the pairing — a step-opened Note ENDED by an accepted
+attack within a quarter second at the pitch it plays — is.
+
+### Chords: one octave error, twice
+
+`scripts/measure-di-chord-evidence.ts`. `c2` reads Em at +120/+200/+300ms
+(0.99–1.00) and Em7 at +500 and +1200ms, where D5 (salience 3.7–4.8) is the
+third partial of a G3 (1.1–1.4) that lost the cancellation to G4 (3.3).
+`p14` reads Gsus2 at +40 and +120ms, where A4 (2.1–2.2) is the third partial
+of a D3 (1.45) that lost to D4 (4.8–5.1), and G5 from +200ms. Both are f
+chosen over f/2, leaving 3×(f/2) unclaimed; the bass-only sub-harmonic check
+in `kernels/missing-fundamental.ts` is the repair, applied to every
+candidate. `c1` reads D at +40/+120ms and never blooms: the open D voicing
+D3 A3 D4 F#4 is the harmonic series of D2, YIN reads 73Hz at 0.96, and
+`maxMonophonicConfidence` vetoes a chord whose period no string is sounding.
+
+### Observed, and refuted as a detector: the dip before the pick
+
+The 5ms envelope around the strokes the kernel loses: `s6` falls 17dB by
++10ms and rebounds to a −20dB stroke at +40ms; `s40` falls 26dB by +30ms and
+rebounds at +60ms; `s20`, the same-level re-pick 63ms after `s19`, falls
+13dB by +25ms and is back at its previous level by +30ms; the terminal hand
+mute falls 28dB and never rebounds. On this take the pick damps the string
+before it plays it, which is a witness of a different physical basis from
+every energy-increase witness in the same-pitch decision. Built as a
+detection function (`dip-rebound dB`, level-gated at the amplitude gate) it
+reads 97/127 covered at 90 off-label — sustain and room tone dip 6dB
+constantly — so it is not a detector. It is recorded as a candidate witness
+for the decision table, with the bar every candidate there has had to clear
+(0.73 AUC on the derivation rows) and no reading yet.
+
+### Where this leaves the direct input
+
+Six of the seven shapes above have a named mechanism and a measured repair;
+the seventh (`s14`) is the labeller's own exception. What none of them has
+is derivation material: the five 120bpm takes hold no quiet alternate-picked
+upstrokes, no re-picked legato and no direct-input chord change, so every
+constant the repairs need would today be fitted on the takes it is graded
+on. The roadmap names the three minutes of DI playing that would change
+that, and states a falsifier per stage.
