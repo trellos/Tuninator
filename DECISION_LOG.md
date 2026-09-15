@@ -177,6 +177,18 @@ are what keep later work from repeating them.
   hypotheses were tried and failed before the instrument was read; that ordering
   is the mistake, not the fallback.
 
+  *Amended 2026-09-15:* restricting this gate to MONOPHONIC Notes was proposed,
+  measured and refused. It was expected to be a no-op and is a regression —
+  false positives 314 -> 319, extra Notes 379 -> 383, missed unchanged — and it
+  fails at its own purpose: discards on the chord takes stay at 9 while firings
+  fall 31 to 17, because a power chord is a dyad and a decayed strum is one
+  ringing string, so `polyphonic` is silent exactly where the restriction was
+  wanted. All five lost discards are on `held-then-picked-amped`, which is
+  monophonic by construction, so the flag also fires wrongly on distorted
+  single-note material. The finding is about the flag rather than the idea; a
+  per-Note test on the predecessor's `harmonyBloomed` is the untested
+  alternative. `src/` is unchanged.
+
 ---
 
 #### [DECISION-029]: Keep the automated re-timing of the two gridded DI sections; the A3 sixteenth section is flagged, not reverted

@@ -4815,6 +4815,55 @@ That is the third time in this one entry that the offline simulation disagreed
 with the engine. The rule is now explicit: **on this decision, a bench number is
 a hypothesis and only `npm run eval` plus `measure-splits.ts` settle it.**
 
+### Restricting the gate to monophonic Notes: measured, and refused
+
+The owner asked whether the deep lane should recognise obvious polyphony and
+keep this gate off chord material, on the reasoning that a strum spreads six
+strings over tens of milliseconds so a short span there can be a legitimate
+partial rather than a tail. The premise is sound and the corpus backs it: about
+107 chord labels against 1,485 single-note ones, so the bar is essentially
+underived on strummed material.
+
+The tracker already has the flag. `contextHarmonic` is a smoothed harmonic
+estimate, `record.polyphonic` is it thresholded at 0.5, and
+`fast/rearticulation.ts` already branches the re-articulation decision on it
+into a separate chord path that deliberately never falls through. So the change
+was one condition: do not raise the bar on a polyphonic Note.
+
+**It was expected to be a no-op and it is a regression.**
+
+| | shipped | monophonic-only |
+|---|---|---|
+| missed labels | 159 | 159 |
+| false positives | **314** | 319 |
+| events split | **318** | 322 |
+| extra Notes | **379** | 383 |
+
+It also fails at its own purpose, which is the informative half. Firings on the
+chord takes fall 31 to 17, but **discards on the chord takes go 9 to 9 — not one
+of the cases the restriction exists to prevent is prevented.** Those nine sit at
+moments the tracker does not read as harmonic: a power chord is a dyad, and a
+strum that has decayed to one ringing string is monophonic by this estimate.
+
+Every one of the five lost discards is on `held-then-picked-six-strings-120bpm-amped`
+(58 firings / 25 discards down to 45 / 20), which is monophonic by construction —
+one string plucked at a time. So the flag reads polyphonic on distorted
+single-note material, which is the same compression-and-distortion problem that
+makes that take the worst in the corpus.
+
+**The measured statement is therefore about the flag, not about the idea:**
+`polyphonic` is a room-context estimate, and at this decision it is wrong in both
+directions — silent on the chord cases that want it and firing on the distorted
+monophonic ones that do not. Reverted; the shipped gate is unchanged at 159 /
+314 / 379.
+
+The idea is not dead, only this implementation of it. A per-Note claim would be
+the thing to try instead of a room-context one: `harmonyBloomed` on the
+PREDECESSOR records that the Note shedding the fragment actually proved itself a
+chord, which is a much stronger statement than "the room has been harmonic
+lately". That is untested, and it belongs with the separate chord question
+below.
+
 ### What this does not do
 
 The amp-sim takes still carry most of the defect — `held-then-picked-amped` is
