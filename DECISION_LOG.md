@@ -105,9 +105,16 @@ are what keep later work from repeating them.
   branch, so its net `src/` diff is empty. The merge is **byte-identical to
   the DI branch** on the same instruments. The merge therefore has one engine
   parent, and no interaction between the two lines of work exists. Readings -
-  derivation 84 Notes / 2 missed / 8 extra, unmoved across all four trees;
-  held-out 30 missed / 84 extra to 24 / 72; the eight takes 126 missed /
-  255 extra to 111 / 265. `npm run eval` PASSES (the one informational failure,
+  derivation 84 Notes / 2 missed / 8 extra, unmoved across all four trees on
+  those axes, and one derivation cell moves on naming (`power-chords-c-a-g-e`
+  7 of 8 exact to 8 of 8, the virtual-pitch bloom), so "the derivation set did
+  not move" holds for segmentation and not for label accuracy; held-out
+  30 missed / 84 extra to 24 / 72; the eight takes 126 missed / 255 extra to
+  111 / 265. Corpus-wide over all 1,590 labelled events: 158 missed to 137,
+  347 false positives to 345, pitch class 88.7% to 89.9%, exact 83.8% to
+  84.9%, and by `measure-splits.ts` 342 split events to 340 with strays flat
+  at 20 to 21 - the accuracy gain is events recovered, not fragmentation
+  traded for it. `npm run eval` PASSES (the one informational failure,
   `power-chords-b-a-g-fsharp` exact accuracy at 72.7% against an 80%
   informational bar, is pre-existing on `main` and unchanged). Five of the
   eight takes read below the per-fixture best of the two parent engines, all

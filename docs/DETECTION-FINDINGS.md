@@ -4692,8 +4692,14 @@ no interaction between the two lines of work exists to find.
 | `main` / same-pitch | 2 missed, 8 extra | 30 missed, 84 extra | 126 missed, 255 extra |
 | merge / DI | 2 missed, 8 extra | 24 missed, 72 extra | 111 missed, 265 extra |
 
-The derivation set does not move, as it did not on the DI branch: 84 Notes,
-2 missed, 8 extra, bit-identical across all four trees.
+The derivation set does not move **on the segmentation axes**, as it did not
+on the DI branch: 84 Notes, 2 missed, 8 extra, bit-identical across all four
+trees. It does move on naming, which the DI branch's own "held to
+bit-identical numbers" wording does not cover and its Stage 3 note does:
+`power-chords-c-a-g-e-c-d-fsharp-e-120bpm` goes 7 of 8 exact to 8 of 8, the
+virtual-pitch bloom naming the open D voicing. One derivation event, in the
+improving direction, and the only derivation cell that differs between
+`main` and the merge on any axis the eval reports.
 
 **On the eight takes the repair is not the one-sided win it is on the mic and
 amp takes.** It finds 15 more of the 1,131 events and pays 10 more extra
