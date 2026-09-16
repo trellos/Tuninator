@@ -86,7 +86,6 @@ await recognizer.dispose();  // stop, then release the mic and worklet
   chords bloom, and how the recognizer works underneath.
 - [**Evaluation**](docs/EVALUATION.md) — what it gets right and wrong, measured against 459
   hand-labelled events.
-- [**Migrating from 0.1**](docs/MIGRATION.md)
 
 ## License
 

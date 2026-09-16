@@ -7,6 +7,177 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-043]: Publish from GitHub Actions on a release tag, with provenance; OIDC trusted publishing after a token-authenticated bootstrap
+* **Date:** 2026-09-16
+* **Status:** Accepted
+* **Owner:** Project structure (mechanism as preferred by the repository owner)
+* **Context:** The first publish of `tuninator` (DECISION-039). The owner's
+  preference was a publish from GitHub Actions on a tag, with `--provenance`
+  and OIDC, so that each version on npm is attested to the commit that built
+  it; an interactive `npm login` is not available to an agent session, and a
+  long-lived publish token in the repository is the credential class behind
+  the 2025 npm supply-chain incidents. Two registry constraints shape the
+  mechanism, both verified against npm's documentation and the CLI source:
+  a trusted publisher can only be configured on a package that **already
+  exists**, and staged publishing "cannot stage a brand-new package". So the
+  very first publish of the name cannot use OIDC; every later one can.
+  Trusted publishing also needs npm 11.5.1+, which Node 20 (the toolchain
+  pin) does not carry.
+* **Decision:** `.github/workflows/publish.yml`, triggered by a `v*` tag.
+  It calls `ci.yml` as a reusable workflow (a one-line `workflow_call`
+  trigger added there) so the tagged commit passes the exact verification
+  bar every push to main gets, then a separate job checks the tag name
+  against `package.json`, asserts npm ≥ 11.5.1, installs with
+  `--ignore-scripts`, skips a version already on the registry, and runs
+  `npm publish --provenance` — `prepublishOnly` rebuilds from that checkout.
+  Authentication is OIDC: the npm CLI attempts the token exchange in every
+  GitHub Actions run and, when it succeeds, overrides any configured token;
+  when it fails it falls through to `NODE_AUTH_TOKEN`. The first publish
+  therefore uses a granular access token (read-write, bypass-2FA, shortest
+  expiry) held as the `NPM_TOKEN` secret for one run; the trusted publisher
+  (`trellos` / `Tuninator` / `publish.yml`) is then configured on the
+  now-existing package and both the token and the secret are deleted. The
+  same workflow serves both phases unchanged. `id-token: write` is granted
+  to the publish job only, and nothing but this repository's own scripts
+  runs while it is held. The publish job runs Node 24 for its npm; the
+  library does not run on Node, so the toolchain pin is not a consumer
+  constraint (DECISION-042).
+* **Alternatives Considered:** Publishing 0.2.0 by hand (`npm login`, `npm
+  publish`) and reserving the workflow for later versions — workable and
+  documented as the fallback, rejected as the default because 0.2.0 would
+  carry no provenance and the workflow would be untested until 0.2.1. A
+  long-lived automation token as the standing mechanism — rejected: it is
+  exactly what trusted publishing exists to replace, and bypass-2FA tokens
+  lose direct publish around January 2027 regardless. Staged publishing
+  with human approval — attractive for later, unavailable for a first
+  publish, and the tag push is already the human gate. Duplicating the CI
+  steps inside `publish.yml` instead of calling `ci.yml` — rejected: two
+  copies of the verification bar drift. A GitHub environment with required
+  reviewers — not added; the tag is the approval, and an environment name
+  would have to be mirrored in the trusted-publisher configuration.
+* **Consequences:** Pushing a `v*` tag **is** the publish, which `AGENTS.md`
+  §7 now says in bold. One manual bootstrap remains, and one manual
+  configuration step after it, both written into the workflow header. A
+  tag on a commit that fails the bar publishes nothing; a tag whose name
+  disagrees with `package.json` fails before anything is sent; re-running a
+  failed run cannot double-publish. Cost: the publish job re-runs typecheck,
+  tests and build through `prepublishOnly` after the verify job already ran
+  them — a minute of redundancy kept because that guard exists for hand
+  publishes too and removing it for CI would mean `--ignore-scripts` on the
+  publish itself.
+
+---
+
+#### [DECISION-042]: No `engines` field in the published package; `.nvmrc` pins the toolchain instead
+* **Date:** 2026-09-16
+* **Status:** Accepted
+* **Owner:** Repository owner
+* **Context:** `package.json` carried `"engines": { "node": ">=20" }`. Nothing
+  in the tarball runs on Node: all three bundles are built for the browser
+  and need `AudioContext`, `AudioWorklet` and `getUserMedia`. Node 20 is a
+  requirement of the dev toolchain alone — tsup, vitest, tsx, the eval — which
+  a consumer never installs. The field therefore warns a consumer on an older
+  Node with `EBADENGINE` for reasons that are ours, and under `engine-strict`
+  fails their install outright.
+* **Decision:** Remove `engines`. Add `.nvmrc` containing `20` so contributors
+  keep the pin through nvm/fnm/volta and `actions/setup-node`'s
+  `node-version-file`. `ci.yml` already pins `node-version: 20` and is
+  unchanged. The lockfile's root entry, which mirrors `engines`, was
+  regenerated by npm rather than edited.
+* **Alternatives Considered:** Keeping the field as documentation of the
+  toolchain — rejected: `engines` is read by the consumer's package manager,
+  not by contributors, and is the wrong place to document a dev requirement.
+  Widening it to `>=18` to stop the warning — rejected: still a claim about a
+  runtime the package does not target.
+* **Consequences:** No consumer sees an engine warning or an engine-strict
+  failure for a browser-only package. Contributors on the wrong Node lose the
+  `npm install` warning and get the `.nvmrc` prompt from their version manager
+  instead; CI remains the enforcement.
+
+---
+
+#### [DECISION-041]: No sourcemaps in the published package
+* **Date:** 2026-09-16
+* **Status:** Accepted
+* **Owner:** Repository owner
+* **Context:** The index and engine-worker builds emitted sourcemaps
+  (`sourcemap: true` in `tsup.config.ts`; the worklet build was already
+  `false`). `dist/index.js.map` (647.7 kB) and
+  `dist/tuninator-engine-worker.js.map` (592.0 kB) were 1.24 MB of the
+  1.77 MB unpacked package — each map larger than the bundle it describes,
+  because the engine's source is heavily commented and the maps carry it.
+* **Decision:** `sourcemap: false` on both builds. Measured on the same
+  tree: 13 files / 476.8 kB packed / 1.77 MB unpacked before, 11 files /
+  143.7 kB packed / 523.5 kB unpacked after (the file count also reflects
+  DECISION-040 and the new `CHANGELOG.md`). This trades debugging the
+  library inside a consumer's app for install weight, deliberately, and the
+  CHANGELOG says so in one line.
+* **Alternatives Considered:** Keeping the maps — rejected on the ratio: 70%
+  of every install for a facility most consumers never open, and the source
+  is a `git clone` away. Maps without `sourcesContent` — considered;
+  they would be small but would point at paths that do not exist in a
+  consumer's tree, which is worse than no map. Publishing maps to a separate
+  package — over-engineering for a 0.2.
+* **Consequences:** A stack trace from inside the bundle names `index.js`
+  lines rather than `src/` lines. Anyone who needs to step through the
+  library builds it from source, which the README's Docs list already points
+  at. The `//# sourceMappingURL` trailer is gone from both bundles, so no
+  browser devtools 404 on a missing map either.
+
+---
+
+#### [DECISION-040]: `docs/MIGRATION.md` stays in the repository and leaves the package and the README
+* **Date:** 2026-09-16
+* **Status:** Accepted
+* **Owner:** Repository owner
+* **Context:** `docs/MIGRATION.md` is the symbol-by-symbol map from the 0.1
+  pitch detector to the 0.2 recognizer. It was addressed to people upgrading
+  from a 0.1 that was never published: `npm view tuninator` returned 404 on
+  2026-09-16, and nothing at 0.1.x ever existed on the registry. It was in
+  `package.json`'s `files` and in the README's Docs list as live consumer
+  documentation, which is the ground DECISION-024 gave for keeping it.
+* **Decision:** Remove it from `files` and from the README Docs list. Keep the
+  file: it documents the 0.1 → 0.2 design delta — modes removed, the
+  timestamp epoch, overlapping Notes, hypotheses — and is worth having as
+  history. `CHANGELOG.md` links it on GitHub for anyone who built against a
+  0.1 checkout. **This voids one clause of DECISION-024** — "`README.md` links
+  it as the 0.1→0.2 upgrade guide for consumers, so it is live
+  documentation" — and no other part of that decision; its status stands.
+* **Alternatives Considered:** Deleting the file — rejected, it is the
+  clearest statement in the tree of why 0.2 has the shape it has. Keeping it
+  in the tarball as a cheap 11 kB — rejected: a consumer who installs 0.2.0
+  and finds a migration guide will look for the 0.1 it migrates from.
+* **Consequences:** The published package carries three docs pages (API, Note
+  model, evaluation), all about the version installed. A reader of the README
+  on npm no longer sees a link to a migration they cannot need.
+
+---
+
+#### [DECISION-039]: 0.2.0 is the first published version, tagged `v0.2.0`
+* **Date:** 2026-09-16
+* **Status:** Accepted
+* **Owner:** Repository owner
+* **Context:** The library is reviewed and ready to publish (DECISION-038).
+  `package.json` has read `0.2.0` since `f6cacf4`, because that is the API
+  the tree implements; the 0.1 series exists only in this repository's
+  history and was never on npm. The name `tuninator` was verified unclaimed
+  on 2026-09-16.
+* **Decision:** Ship as 0.2.0, tagged `v0.2.0` on the release commit. The
+  version is the one the API, the docs and this log already describe, and a
+  first release does not reset it. `CHANGELOG.md` opens with 0.2.0 and says
+  in a short section why the number is not 0.1.0 or 1.0.0.
+* **Alternatives Considered:** 0.1.0, as "the first release" — rejected: it
+  would name a published version after an unpublished design the docs
+  explicitly contrast with. 1.0.0 — rejected: the same-pitch re-articulation
+  decision is measured to a ceiling (DECISION-022, -028) and the amped
+  same-pitch labels are provisional; 0.x is honest about the API being open
+  to change on that front.
+* **Consequences:** Semver 0.x: minor versions may break. The tag convention
+  `v<version>` is what `publish.yml` triggers on and checks against
+  `package.json` (DECISION-043).
+
+---
+
 #### [DECISION-038]: Pre-publish prune — remove seams nothing calls, wire the channel meters the API already promised, keep every deliberately-unwired module
 * **Date:** 2026-09-16
 * **Status:** Accepted
@@ -66,6 +237,14 @@ are what keep later work from repeating them.
   the fields nothing read. Accepted debt: `EvalStats`/`FixtureReport` still
   carry more than `docs/EVALUATION.md` reads, and `EngineTuning.deepLatencyMs`
   stays public until a versioned API change removes it.
+* **Amendment (2026-09-16):** `bc313bc` recorded the `main` field and the
+  `sideEffects` list above but carried only `keywords`, `homepage` and
+  `bugs`; `package.json` still read `"sideEffects": false` with no `main`.
+  Both landed with the 0.2.0 release preparation (DECISION-039 to -043):
+  `main` is `./dist/index.js`, and `sideEffects` names
+  `./dist/tuninator-worklet.js` (calls `registerProcessor` on load) and
+  `./dist/tuninator-engine-worker.js` (installs its message handler on
+  load).
 
 ---
 

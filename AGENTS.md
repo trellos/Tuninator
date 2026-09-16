@@ -434,3 +434,28 @@ Every logged decision must use this exact schema:
    the next sequential ADR markdown file.
 4. **Link:** If this decision supersedes a previous one, immediately update the
    status of the older decision to "Superseded by [New ID]".
+
+---
+
+## 7. Releasing
+
+A release is a tag. `.github/workflows/publish.yml` runs on any `v*` tag: it
+re-runs the CI job against the tagged commit, checks the tag against
+`package.json`, and publishes to npm with provenance through OIDC trusted
+publishing — no token lives in this repository. The workflow's header comment
+is the procedure, including the one-time bootstrap for a name that does not
+exist on npm yet (DECISION-043).
+
+```bash
+# bump `version` in package.json, add the CHANGELOG.md entry, commit, then:
+git tag v0.2.0
+git push origin main v0.2.0
+```
+
+**Pushing the tag is the publish.** Unpublishing is restricted to a 72-hour
+window and burns the version number, so rehearse first: `npm run build` and
+`npm publish --dry-run`, and read every line of what it says it will send. The
+published package is `dist/`, three docs pages, `README.md`, `CHANGELOG.md`
+and `LICENSE` — `package.json`'s `files` — with no sourcemaps and no
+`engines` field, both deliberately (DECISION-041, DECISION-042). `.nvmrc`
+carries the toolchain's Node pin instead.
