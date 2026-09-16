@@ -65,6 +65,14 @@ are what keep later work from repeating them.
   them — a minute of redundancy kept because that guard exists for hand
   publishes too and removing it for CI would mean `--ignore-scripts` on the
   publish itself.
+* **Amendment (same day):** The first run of the workflow on `v0.2.0` failed
+  in the publish step with `EUSAGE: Can't generate provenance for new or
+  private package, you must set access to public` — nothing was sent, and
+  the verify job had passed. `--access public` had been left out as
+  redundant for an unscoped name; it is not redundant for a name the
+  registry has never seen when provenance is requested. The command is now
+  `npm publish --provenance --access public`, and the tag was moved to the
+  commit carrying that fix, since no release existed to point at.
 
 ---
 

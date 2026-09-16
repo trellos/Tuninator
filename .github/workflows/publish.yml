@@ -114,9 +114,12 @@ jobs:
       # assertions, so what is packed here was built from this checkout by
       # this run. --provenance is the default for OIDC publishes from a public
       # repository and is stated anyway, so a token-authenticated bootstrap
-      # publish is attested too rather than silently not.
+      # publish is attested too rather than silently not. --access public is
+      # not redundant for an unscoped name: npm refuses to attest a package it
+      # has never seen unless the access is stated, and the first publish of
+      # this package failed on exactly that.
       - name: Publish
         if: steps.registry.outputs.published == 'false'
-        run: npm publish --provenance
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
