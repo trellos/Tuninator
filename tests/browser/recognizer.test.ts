@@ -16,7 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecognizerError } from "../../src/errors.js";
 import { createRecognizer } from "../../src/browser/recognizer.js";
-import type { Note, RecognizerState } from "../../src/types.js";
+import type { Note, PitchFrame, RecognizerState } from "../../src/types.js";
 
 const SAMPLE_RATE = 48000;
 
@@ -137,8 +137,6 @@ function chunk(startSample: number, hz: number, amplitude = 0.3, hop = 640): unk
     type: "chunk",
     samples,
     startSample,
-    contextTime: 1.25 + startSample / SAMPLE_RATE,
-    sampleRate: SAMPLE_RATE,
     channelRms: [amplitude / 2],
     selectedChannel: 0,
   };
@@ -378,6 +376,21 @@ describe("the Note stream", () => {
     await loud.start();
     feed(220, 10);
     expect(loudFrames).toBe(10);
+  });
+
+  it("stamps the worklet's channel meters onto every pitch frame", async () => {
+    // The engine is handed one mono block and never sees the channels, so the
+    // metering the worklet measured has to reach the frame through the host.
+    const recognizer = createRecognizer({ diagnostics: { pitchFrames: true } });
+    const frames: PitchFrame[] = [];
+    recognizer.on("pitchFrame", (frame) => frames.push(frame));
+    await recognizer.start();
+    feed(220, 10);
+    expect(frames.length).toBeGreaterThan(0);
+    for (const frame of frames) {
+      expect(frame.channelRms).toEqual([0.15]);
+      expect(frame.selectedChannel).toBe(0);
+    }
   });
 
   it("unsubscribing actually unsubscribes", async () => {

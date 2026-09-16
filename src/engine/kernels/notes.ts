@@ -1,10 +1,7 @@
 /**
  * Frequency <-> MIDI <-> name <-> cents.
  *
- * CONTRACT FILE — signatures fixed; implementation owned by the DSP-core
- * workstream.
- *
- * Part of `src/core/` — no DOM, no globals, no npm imports.
+ * Part of `src/engine/` — no DOM, no globals, no npm imports.
  */
 
 import type { PitchClass, PitchNote } from "../../types.js";

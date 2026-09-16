@@ -98,36 +98,14 @@ export class RearticulationDetector implements IRearticulationDetector {
     this.bars = calibrate(config);
   }
 
-  isRearticulation(
-    attack: AttackEvidence,
-    frame: FastFrame,
-    gliding: boolean,
-    sustainedRms: number,
-    pitchDiffers: boolean,
-    decayExcess: number | null,
-    polyphonic: boolean,
-    soundedMs: number
-  ): boolean {
-    return this.verdict(
-      attack,
-      frame,
-      gliding,
-      sustainedRms,
-      pitchDiffers,
-      decayExcess,
-      polyphonic,
-      soundedMs
-    ).accepted;
-  }
-
   /**
-   * The same decision, with the test that made it named.
+   * The decision, with the test that made it named.
    *
-   * `isRearticulation` is this, thresholded. The reason is not for the tracker
-   * — which needs the boolean and nothing else — but for the ledger script,
-   * which has to be able to say WHICH line discarded a played note rather than
-   * that one of them did. Keeping the two in one function is the point: a
-   * separate explain-only copy would drift from the code that decides.
+   * The tracker reads `.accepted` and nothing else; the reason exists for the
+   * ledger script, which has to be able to say WHICH line discarded a played
+   * note rather than that one of them did. Keeping the two in one function is
+   * the point: a separate explain-only copy would drift from the code that
+   * decides.
    */
   verdict(
     attack: AttackEvidence,

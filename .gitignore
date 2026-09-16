@@ -42,9 +42,10 @@ temp/
 # `npm pack` from dist/; committing one ships a stale copy of the library.
 *.tgz
 
-# Training pipeline outputs: extracted row shards, checkpoints, scratch. The
-# weights that ship live in src/engine/ as a generated module; everything here
-# is reproducible from the committed pipeline plus the public datasets.
+# Training pipeline outputs: extracted row shards, checkpoints, scratch. A
+# model that passed its falsifiers would ship as a generated module under
+# src/engine/ (none has yet; see DECISION-021); everything here is reproducible
+# from the committed pipeline plus the public datasets.
 training/out/
 
 # Agent worktrees. Transient checkouts of this same repository, created for

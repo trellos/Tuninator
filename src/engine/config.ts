@@ -1,12 +1,12 @@
 /**
  * The recognizer's single tuning object.
  *
- * Successor to `core/policy.ts`, minus the thing that file existed for: modes.
- * A `Policy` was per-mode because `lead` and `chords` ran *different code* —
- * chord segmentation was driven by chord-label change, note segmentation by
- * pitch step, and a chord played in lead mode was simply never a chord. One
- * recognizer now runs the whole time, so what is left here is genuine tuning:
- * gates, ranges, window sizes and how patient the tracker should be.
+ * There are no modes. A per-mode policy would mean `lead` and `chords` run
+ * different code — chord segmentation driven by chord-label change, note
+ * segmentation by pitch step — and a chord played in lead mode is then simply
+ * never a chord. One recognizer runs the whole time, so what lives here is
+ * genuine tuning: gates, ranges, window sizes and how patient the tracker
+ * should be.
  *
  * Plain data, JSON-shaped: it crosses the worklet/worker port as a structured
  * clone, so no functions and no class instances.

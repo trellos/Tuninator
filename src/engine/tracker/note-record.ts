@@ -168,13 +168,6 @@ export class NoteRecord {
   readonly pendingHarmonyVotes = new Map<string, HarmonyVote>();
 
   /**
-   * The Note is over, but its `resolved`/`ended` events are held back until the
-   * deep lane has said its last word about it. A chord's identity is often only
-   * settled by analysis that started before the strum stopped.
-   */
-  closing = false;
-
-  /**
    * The deep lane has ruled on the region this Note lives in.
    *
    * `NoteLifecycle`'s `resolved` state has always existed and has only ever
@@ -409,7 +402,6 @@ export class NoteRecord {
     return confidenceModel.blend(this.confidenceParts());
   }
 
-  /** The name this Note would answer to right now. */
   /**
    * The pitch this Note is NAMED after, from the accumulated evidence.
    *

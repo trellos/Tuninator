@@ -1,18 +1,17 @@
 /**
  * The AudioWorklet side: capture only, no analysis.
  *
- * The old processor ran the entire detector on the audio thread. That is the
- * one place in a browser where being late is not a slow frame but a click, and
- * it made the deep lane impossible — deep analysis has to revisit audio from
- * hundreds of milliseconds ago, and the audio thread has neither the memory nor
- * the latitude to sit on that history.
+ * The audio thread is the one place in a browser where being late is not a
+ * slow frame but a click, and it has neither the memory nor the latitude to
+ * sit on the hundreds of milliseconds of history the deep lane revisits. So
+ * no analysis runs here.
  *
- * So this processor does three things, all of them cheap and all of them
+ * This processor does three things, all of them cheap and all of them
  * genuinely per-quantum work: meter the channels, decide which channel to read
  * (or sum them), and post one mono chunk per hop. Everything else happens in
  * the engine host. The cost is one hop (~12ms) plus a postMessage, well inside
- * the fast lane's budget, and the benefit is that the audio thread now has a
- * fixed, tiny, allocation-free workload.
+ * the fast lane's budget, and the benefit is that the audio thread has a fixed,
+ * tiny, allocation-free workload.
  *
  * This file is the entry point of the IIFE worklet bundle. The build asserts
  * the emitted bundle contains no `import`/`export`: AudioWorkletGlobalScope has
@@ -28,7 +27,6 @@ import {
 
 /* AudioWorkletGlobalScope declarations — not in the standard DOM lib. */
 declare const sampleRate: number;
-declare const currentTime: number;
 declare class AudioWorkletProcessorBase {
   readonly port: MessagePort;
   constructor(options?: unknown);
@@ -36,11 +34,8 @@ declare class AudioWorkletProcessorBase {
 declare const AudioWorkletProcessor: typeof AudioWorkletProcessorBase;
 declare function registerProcessor(name: string, ctor: unknown): void;
 
-/** Main thread -> worklet. */
-export type CaptureCommand =
-  | { type: "reset" }
-  /** Returning a drained buffer for reuse. See the transfer pool below. */
-  | { type: "recycle"; buffer: ArrayBuffer };
+/** Main thread -> worklet: a drained buffer coming back for reuse. See the pool below. */
+export type CaptureCommand = { type: "recycle"; buffer: ArrayBuffer };
 
 /** Worklet -> engine host. One message per hop, not per render quantum. */
 export type CaptureChunk = {
@@ -49,9 +44,6 @@ export type CaptureChunk = {
   samples: Float32Array;
   /** Absolute index of the first sample, so a dropped message is detectable. */
   startSample: number;
-  /** `AudioContext.currentTime` when this hop was captured. */
-  contextTime: number;
-  sampleRate: number;
   /** Unsummed per-channel RMS over the hop. */
   channelRms: number[];
   /** Which channel was read, or null when the channels were summed. */
@@ -111,16 +103,8 @@ class CaptureProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = (event: MessageEvent<CaptureCommand>) => {
       const command = event.data;
-      if (command.type === "recycle") {
-        if (this.pool.length < POOL_LIMIT) this.pool.push(command.buffer);
-      } else if (command.type === "reset") {
-        this.pendingFilled = 0;
-        this.startSample = 0;
-        this.totalSamples = 0;
-        this.resetChannelMeters();
-        this.selector?.reset();
-        this.appliedChannel = -1;
-      }
+      if (command.type !== "recycle") return;
+      if (this.pool.length < POOL_LIMIT) this.pool.push(command.buffer);
     };
   }
 
@@ -196,8 +180,6 @@ class CaptureProcessor extends AudioWorkletProcessor {
         type: "chunk",
         samples,
         startSample: this.startSample,
-        contextTime: currentTime,
-        sampleRate,
         channelRms: this.readChannelMeters(channelCount),
         selectedChannel: this.appliedChannel < 0 ? null : this.appliedChannel,
       };

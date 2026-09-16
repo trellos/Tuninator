@@ -12,11 +12,13 @@ pull request.
 over them, matches Notes one-to-one against the hand-written ground truth in `fixtures/labels/`,
 and exits nonzero when a fixture marked `required` misses a threshold.
 
-The corpus is **17 takes, 459 labelled events, about ten minutes of playing**, across two guitars,
-two tempos and three signal paths (direct, amp sim, room mic). Five takes at 120bpm are the
-derivation set — every tuned constant was chosen against those alone — and the twelve 140bpm Les
-Paul takes are **held out**: they are recorded, labelled and scored, but nothing is tuned on them.
-That separation is the only reason any number below means anything.
+The scored corpus is **17 takes, 459 labelled events, about ten minutes of playing**, across two
+guitars, two tempos and three signal paths (direct, amp sim, room mic). Five takes at 120bpm are
+the derivation set — every tuned constant was chosen against those, plus eight further 120bpm
+same-pitch takes (1,133 events, provisional labels) that run in every eval as calibration
+material and gate nothing — and the twelve 140bpm Les Paul takes are **held out**: they are
+recorded, labelled and scored, but nothing is tuned on them. That separation is the only reason
+any number below means anything.
 
 `npm run eval` currently **passes**: every required fixture meets its thresholds.
 
@@ -58,8 +60,8 @@ inside its gates — of the 22 takes that score it, nine have a median absolute 
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.
 - **Fast single-note lines also produce extra Notes.** The triplet takes emit 64–81 Notes for 55
-  labels. `npx tsx scripts/measure-splits.ts` puts the corpus at 99 of 459 events split with 107
-  extra Notes, and 63 of those 99 are the three triplet takes. The shape is one thing: a
+  labels. `npx tsx scripts/measure-splits.ts` puts the 17 scored takes at 86 of 459 events split
+  with 94 extra Notes, and 49 of those 86 are the three triplet takes. The shape is one thing: a
   correctly-named Note followed by a short SAME-PITCH tail fragment, so a single played event
   comes out as two.
 

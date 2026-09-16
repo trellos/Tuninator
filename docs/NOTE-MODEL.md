@@ -91,8 +91,8 @@ asserts it.
 
 That is what makes the offline evaluation trustworthy. There is no separate "offline recognizer";
 the eval feeds samples through the same `RecognitionEngine` in the same 128-sample render quanta
-the `AudioWorklet` delivers, and the deep lane is driven through an injected scheduler so a run is
-bit-reproducible.
+the `AudioWorklet` delivers, and the deep lane's latency is simulated in source time rather than
+measured on a clock, so a run is bit-reproducible.
 
 ### Two lanes over one timeline
 
@@ -105,8 +105,8 @@ full spectrum of that attack was, how many voices are in it, what chord it is, a
 that most changes the result — whether the fast lane's segmentation of a region was right at all.
 Its answers arrive as `NoteChange`s against Notes that already exist.
 
-Jobs are keyed by Note id and purpose so that a superseded job is coalesced rather than run, and a
-job whose audio has fallen out of the ring is dropped with a `status` diagnostic rather than
+Jobs are keyed by Note id and window so that a repeated request for the same window is coalesced
+rather than run twice, and a job whose audio has fallen out of the ring is dropped rather than
 answering about audio it no longer has.
 
 ### How the pitch reading works
@@ -122,8 +122,9 @@ resolution on fast high passages while keeping low notes reliable.
 Octave errors are YIN's known failure mode on guitar, so four mitigations stack: prefer the
 *first* CMND dip below threshold rather than the global minimum; a sub-harmonic check that prefers
 the higher octave when half the lag is equally periodic; an independent zero-crossing estimate,
-whose ~2× disagreement halves confidence because ZCR fails differently than YIN does; and a
-temporal median over recent voiced frames.
+which moves a reading that disagrees with it by two octaves or more onto the octave the zero
+crossings support, because ZCR fails differently than YIN does; and a temporal median over recent
+voiced frames.
 
 Onsets use **spectral flux** — the positive half-wave rectified difference between the arriving
 spectrum and the per-bin maximum over the last few hops — with an adaptive median threshold, run

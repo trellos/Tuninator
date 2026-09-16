@@ -25,10 +25,7 @@
  *      away entirely, off the spacing of the partials above it
  *      (`missing-fundamental.ts`).
  *
- * CONTRACT FILE — signatures fixed; implementation owned by the chord
- * workstream. Depends on `RealFFT` and `hannWindow` from `./fft.js`.
- *
- * Part of `src/core/` — no DOM, no globals, no npm imports.
+ * Part of `src/engine/` — no DOM, no globals, no npm imports.
  */
 
 import { RealFFT, hannWindow } from "./fft.js";

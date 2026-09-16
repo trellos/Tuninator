@@ -19,7 +19,7 @@
  * Selecting one channel cannot comb-filter, so this picks the loudest channel
  * instead — but "loudest" has to be decided carefully, hence everything below.
  *
- * Part of `src/core/` — no DOM, no globals, no npm imports, and no allocation
+ * Part of `src/engine/` — no DOM, no globals, no npm imports, and no allocation
  * after construction.
  */
 

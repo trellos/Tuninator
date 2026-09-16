@@ -5,10 +5,7 @@
  * close, or the best score is too low, this reports `unknown` with the
  * candidates in `alternatives` rather than a confident wrong label.
  *
- * CONTRACT FILE — signatures fixed; implementation owned by the chord
- * workstream.
- *
- * Part of `src/core/` — no DOM, no globals, no npm imports.
+ * Part of `src/engine/` — no DOM, no globals, no npm imports.
  */
 
 import type { PitchClass } from "../../types.js";

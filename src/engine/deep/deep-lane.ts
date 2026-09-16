@@ -27,23 +27,22 @@
 import type { SourceTimeMs } from "../../types.js";
 import type { EngineConfig } from "../config.js";
 import type {
-  DeepJobPurpose,
   DeepSegmentation,
   HarmonicReading,
   PitchActivation,
   RegionWindowReading,
   SpectralEvidence,
 } from "../contracts.js";
-import { segmentRegion } from "./resegment.js";
 import { AudioRing } from "../ring-buffer.js";
 import { SampleClock } from "../clock.js";
 import { HarmonicInterpreter } from "./harmonic.js";
 import { MultiPitchAnalyzer } from "./multi-pitch.js";
+import { segmentRegion } from "./resegment.js";
 import { SpectralAnalyzer } from "./spectral.js";
 
+/** One window of audio to analyse on behalf of a Note that is sounding in it. */
 export type DeepRequest = {
   noteId: string;
-  purpose: DeepJobPurpose;
   /** Inclusive start of the audio to analyse. */
   fromSample: number;
   /** Exclusive end. */
@@ -54,7 +53,6 @@ export type DeepRequest = {
 
 export type DeepResult = {
   noteId: string;
-  purpose: DeepJobPurpose;
   at: SourceTimeMs;
   evidence: SpectralEvidence;
   activations: PitchActivation[];
@@ -173,7 +171,7 @@ export class DeepLane {
    * decayed tail looks like.
    */
   request(request: DeepRequest): void {
-    const key = `${request.noteId}:${request.purpose}:${request.toSample}`;
+    const key = `${request.noteId}:${request.toSample}`;
     this.pending.set(key, request);
     while (this.pending.size > MAX_PENDING) {
       const oldest = this.pending.keys().next();
@@ -206,34 +204,12 @@ export class DeepLane {
     };
   }
 
-  /** Reassign a Note's pending work — used when a Note is split or absorbed. */
-  reassign(fromNoteId: string, toNoteId: string): void {
-    for (const [key, request] of [...this.pending]) {
-      if (request.noteId !== fromNoteId) continue;
-      this.pending.delete(key);
-      this.request({ ...request, noteId: toNoteId });
-    }
-  }
-
   /** Notes with work still queued. A Note is not finished until this is empty. */
   busyNoteIds(): ReadonlySet<string> {
     const out = new Set<string>();
     for (const request of this.pending.values()) out.add(request.noteId);
     for (const id of this.pendingRegion?.holdNoteIds ?? []) out.add(id);
     return out;
-  }
-
-  forget(noteId: string): void {
-    for (const [key, request] of [...this.pending]) {
-      if (request.noteId === noteId) this.pending.delete(key);
-    }
-    const region = this.pendingRegion;
-    if (region !== null && region.holdNoteIds.includes(noteId)) {
-      this.pendingRegion = {
-        ...region,
-        holdNoteIds: region.holdNoteIds.filter((id) => id !== noteId),
-      };
-    }
   }
 
   clear(): void {
@@ -288,7 +264,6 @@ export class DeepLane {
       const reading = this.harmonic.interpret(evidence, activations);
       results.push({
         noteId: request.noteId,
-        purpose: request.purpose,
         // The result describes the audio it analysed, not the moment it ran.
         at: this.clock.toMs(request.toSample),
         evidence,
@@ -394,10 +369,5 @@ export class DeepLane {
       windowCount: windows.length,
       confidence: segments.length === 0 ? 0 : confidence / segments.length,
     };
-  }
-
-  /** Run every pending job regardless of its due time. Used by `flush()`. */
-  drainAll(ring: AudioRing): DeepDrain {
-    return this.drain(Number.POSITIVE_INFINITY, ring);
   }
 }

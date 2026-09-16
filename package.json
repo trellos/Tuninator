@@ -4,6 +4,20 @@
   "description": "UI-free browser library turning guitar microphone input into a streaming musical event recognizer: Notes that start early and are revised as the evidence improves.",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "guitar",
+    "pitch-detection",
+    "onset-detection",
+    "chord-detection",
+    "web-audio",
+    "audioworklet",
+    "music",
+    "typescript"
+  ],
+  "homepage": "https://github.com/trellos/Tuninator#readme",
+  "bugs": {
+    "url": "https://github.com/trellos/Tuninator/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/trellos/Tuninator.git"

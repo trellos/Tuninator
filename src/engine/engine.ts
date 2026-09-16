@@ -18,7 +18,6 @@
 import type { Note, PitchFrame, SourceTimeMs, Timebase } from "../types.js";
 import { SampleClock } from "./clock.js";
 import type { EngineConfig } from "./config.js";
-import { RENDER_QUANTUM } from "./config.js";
 import type { FastFrame } from "./contracts.js";
 import { DeepLane } from "./deep/deep-lane.js";
 import { FastLane } from "./fast/fast-lane.js";
@@ -203,7 +202,6 @@ export class RecognitionEngine {
     for (const note of this.tracker.activeNoteIds()) {
       this.deep.request({
         noteId: note,
-        purpose: "harmony",
         fromSample,
         toSample,
         notBefore: frame.at + this.config.deep.latencyMs,
@@ -262,11 +260,6 @@ export class RecognitionEngine {
     for (const segmentation of drain.segmentations) {
       for (const emission of this.tracker.applySegmentation(segmentation)) out.push(emission);
     }
-  }
-
-  /** The block size the capture side is expected to deliver. */
-  static get renderQuantum(): number {
-    return RENDER_QUANTUM;
   }
 }
 

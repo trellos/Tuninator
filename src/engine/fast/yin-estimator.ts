@@ -9,8 +9,8 @@
  * and high enough to be trustworthy is what makes 125ms sixteenths resolvable
  * without losing low E.
  *
- * Ported from `core/pitch-engine.ts`, which conflated this with hop scheduling,
- * onset detection and frame assembly. Here it does one thing.
+ * This file does one thing: pitch. Hop scheduling, onset detection and frame
+ * assembly live in `fast-lane.ts`.
  *
  * Part of `src/engine/` — no DOM, no globals, no clock reads, no npm imports.
  */

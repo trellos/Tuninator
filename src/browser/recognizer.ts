@@ -1,16 +1,15 @@
 /**
  * The DOM adapter: microphone and worklet in, `Recognizer` out.
  *
- * Successor to `tuninator.ts`. Everything musical has moved into
- * `src/engine/`; what is left here is the part that genuinely needs a browser —
- * permissions, an `AudioContext`, an `AudioWorkletNode`, and the teardown that
- * releases all three.
+ * Everything musical lives in `src/engine/`; what is here is the part that
+ * genuinely needs a browser — permissions, an `AudioContext`, an
+ * `AudioWorkletNode`, and the teardown that releases all three.
  *
- * Three fixes to the old adapter are visible in its shape:
+ * Three commitments are visible in its shape:
  *  - `stop()` is async and flushes, so a Note still sounding gets its
  *    `noteEnded` instead of being silently dropped.
- *  - `dispose()` exists at all, and only closes an `AudioContext` this file
- *    created — a caller-supplied context belongs to the caller.
+ *  - `dispose()` only closes an `AudioContext` this file created — a
+ *    caller-supplied context belongs to the caller.
  *  - every rejection is a real `RecognizerError`, so it can be thrown, caught
  *    by type, and carry a stack.
  */
@@ -18,6 +17,7 @@
 import { Emitter } from "../emitter.js";
 import { RecognizerError, toRecognizerError } from "../errors.js";
 import { resolveEngineConfig, snapHop } from "../engine/config.js";
+import type { TrackerEmission } from "../engine/tracker/note-tracker.js";
 import type {
   Note,
   PitchFrame,
@@ -136,7 +136,10 @@ class BrowserRecognizer implements Recognizer {
       node.port.onmessage = (event: MessageEvent<CaptureChunk>) => {
         const chunk = event.data;
         if (chunk.type !== "chunk") return;
-        engine.push(chunk.samples, chunk.startSample);
+        engine.push(chunk.samples, chunk.startSample, {
+          channelRms: chunk.channelRms,
+          selectedChannel: chunk.selectedChannel,
+        });
       };
       node.onprocessorerror = () => {
         this.fail(
@@ -181,10 +184,7 @@ class BrowserRecognizer implements Recognizer {
 
   /* ------------------------------------------------------------------ */
 
-  private deliver(
-    emissions: ReadonlyArray<import("../engine/tracker/note-tracker.js").TrackerEmission>,
-    frames: readonly PitchFrame[]
-  ): void {
+  private deliver(emissions: readonly TrackerEmission[], frames: readonly PitchFrame[]): void {
     for (const frame of frames) this.emitter.emit("pitchFrame", frame);
     for (const emission of emissions) {
       switch (emission.type) {
