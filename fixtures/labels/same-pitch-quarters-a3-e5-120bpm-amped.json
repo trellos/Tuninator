@@ -1,0 +1,1026 @@
+{
+  "version": 1,
+  "title": "Same pitch quarters A3 then E5, 120bpm (Amped)",
+  "sourceAudio": "../audio/Same Pitch Quarters Amped A3 E5 120bpm.mp3",
+  "instrument": "guitar-amped",
+  "tempoBpm": 120,
+  "tuning": [
+    "E2",
+    "A2",
+    "D3",
+    "G3",
+    "B3",
+    "E4"
+  ],
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +55ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
+  "events": [
+    {
+      "id": "a1",
+      "startMs": 2050,
+      "endMs": 2550,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a2",
+      "startMs": 2550,
+      "endMs": 3030,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a3",
+      "startMs": 3030,
+      "endMs": 3490,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a4",
+      "startMs": 3490,
+      "endMs": 3985,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a5",
+      "startMs": 3985,
+      "endMs": 4460,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a6",
+      "startMs": 4460,
+      "endMs": 4960,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a7",
+      "startMs": 4990,
+      "endMs": 5490,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a8",
+      "startMs": 5500,
+      "endMs": 6000,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a9",
+      "startMs": 6015,
+      "endMs": 6500,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a10",
+      "startMs": 6500,
+      "endMs": 7000,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a11",
+      "startMs": 7015,
+      "endMs": 7515,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a12",
+      "startMs": 7525,
+      "endMs": 8020,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a13",
+      "startMs": 8020,
+      "endMs": 8520,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a14",
+      "startMs": 8520,
+      "endMs": 9015,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a15",
+      "startMs": 9015,
+      "endMs": 9500,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a16",
+      "startMs": 9500,
+      "endMs": 10000,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a17",
+      "startMs": 10010,
+      "endMs": 10500,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a18",
+      "startMs": 10500,
+      "endMs": 10980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a19",
+      "startMs": 10980,
+      "endMs": 11480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a20",
+      "startMs": 11485,
+      "endMs": 11985,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a21",
+      "startMs": 11990,
+      "endMs": 12490,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a22",
+      "startMs": 12490,
+      "endMs": 12975,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a23",
+      "startMs": 12975,
+      "endMs": 13445,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a24",
+      "startMs": 13445,
+      "endMs": 13945,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a25",
+      "startMs": 13945,
+      "endMs": 14445,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a26",
+      "startMs": 14460,
+      "endMs": 14955,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a27",
+      "startMs": 14955,
+      "endMs": 15455,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a28",
+      "startMs": 15480,
+      "endMs": 15980,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a29",
+      "startMs": 15990,
+      "endMs": 16480,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a30",
+      "startMs": 16480,
+      "endMs": 16975,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a31",
+      "startMs": 16975,
+      "endMs": 17475,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "a32",
+      "startMs": 17510,
+      "endMs": 18010,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "e1",
+      "startMs": 18025,
+      "endMs": 18480,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e2",
+      "startMs": 18480,
+      "endMs": 18980,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e3",
+      "startMs": 18980,
+      "endMs": 19470,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e4",
+      "startMs": 19470,
+      "endMs": 19960,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e5",
+      "startMs": 19960,
+      "endMs": 20440,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e6",
+      "startMs": 20440,
+      "endMs": 20940,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e7",
+      "startMs": 20945,
+      "endMs": 21445,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e8",
+      "startMs": 21460,
+      "endMs": 21960,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e9",
+      "startMs": 21970,
+      "endMs": 22455,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e10",
+      "startMs": 22455,
+      "endMs": 22945,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e11",
+      "startMs": 22945,
+      "endMs": 23435,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e12",
+      "startMs": 23435,
+      "endMs": 23920,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e13",
+      "startMs": 23920,
+      "endMs": 24420,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e14",
+      "startMs": 24445,
+      "endMs": 24935,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e15",
+      "startMs": 24935,
+      "endMs": 25435,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e16",
+      "startMs": 25435,
+      "endMs": 25935,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e17",
+      "startMs": 25955,
+      "endMs": 26425,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e18",
+      "startMs": 26425,
+      "endMs": 26910,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e19",
+      "startMs": 26910,
+      "endMs": 27410,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e20",
+      "startMs": 27440,
+      "endMs": 27930,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e21",
+      "startMs": 27930,
+      "endMs": 28430,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e22",
+      "startMs": 28435,
+      "endMs": 28935,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e23",
+      "startMs": 28940,
+      "endMs": 29440,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e24",
+      "startMs": 29445,
+      "endMs": 29945,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e25",
+      "startMs": 29950,
+      "endMs": 30445,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e26",
+      "startMs": 30445,
+      "endMs": 30935,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e27",
+      "startMs": 30935,
+      "endMs": 31425,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e28",
+      "startMs": 31425,
+      "endMs": 31925,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e29",
+      "startMs": 31930,
+      "endMs": 32410,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e30",
+      "startMs": 32410,
+      "endMs": 32910,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e31",
+      "startMs": 32915,
+      "endMs": 33415,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e32",
+      "startMs": 33435,
+      "endMs": 33915,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e33",
+      "startMs": 33915,
+      "endMs": 34405,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e34",
+      "startMs": 34405,
+      "endMs": 34905,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e35",
+      "startMs": 34940,
+      "endMs": 35440,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e36",
+      "startMs": 35450,
+      "endMs": 35930,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e37",
+      "startMs": 35930,
+      "endMs": 36420,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e38",
+      "startMs": 36420,
+      "endMs": 36920,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e39",
+      "startMs": 36920,
+      "endMs": 37420,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    },
+    {
+      "id": "e40",
+      "startMs": 37420,
+      "endMs": 37920,
+      "kind": "note",
+      "label": "E5",
+      "pitches": [
+        "E5"
+      ],
+      "pitchClasses": [
+        "E"
+      ],
+      "required": true
+    }
+  ]
+}

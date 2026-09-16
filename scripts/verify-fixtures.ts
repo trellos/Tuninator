@@ -23,7 +23,8 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve as resolvePath } from "node:path";
+import { pathToFileURL } from "node:url";
 import { ChromaAnalyzer } from "../src/engine/kernels/chroma.js";
 import { describeFrequency, nameToMidi, midiToFrequency } from "../src/engine/kernels/notes.js";
 import { YinDetector, peak as windowPeak, rms as windowRms } from "../src/engine/kernels/yin.js";
@@ -115,7 +116,7 @@ type LabelReport = {
   concerns: string[];
 };
 
-type FixtureReport = {
+export type FixtureReport = {
   stem: string;
   wavPath: string;
   sampleRate: number;
@@ -131,9 +132,9 @@ type FixtureReport = {
 /* Envelope + attacks                                                          */
 /* -------------------------------------------------------------------------- */
 
-type Envelope = { hopMs: number; rms: Float64Array; peak: Float64Array };
+export type Envelope = { hopMs: number; rms: Float64Array; peak: Float64Array };
 
-function envelopeOf(mono: Float32Array, sampleRate: number): Envelope {
+export function envelopeOf(mono: Float32Array, sampleRate: number): Envelope {
   const hop = Math.max(1, Math.round((ENVELOPE_HOP_MS / 1000) * sampleRate));
   const win = Math.max(hop, Math.round((ENVELOPE_WINDOW_MS / 1000) * sampleRate));
   const count = Math.max(0, Math.floor((mono.length - win) / hop) + 1);
@@ -164,7 +165,7 @@ function envelopeOf(mono: Float32Array, sampleRate: number): Envelope {
  * own detector would make this report agree with the engine by construction,
  * which is exactly the circularity a ground-truth check has to avoid.
  */
-function attackTimesMs(env: Envelope): number[] {
+export function attackTimesMs(env: Envelope): number[] {
   const baselineFrames = Math.max(2, Math.round(60 / env.hopMs));
   const out: number[] = [];
   let lastMs = -Infinity;
@@ -283,7 +284,14 @@ function probeSpan(
 /* Per-fixture verification                                                    */
 /* -------------------------------------------------------------------------- */
 
-function verifyFixture(fixture: DecodeOutcome): FixtureReport {
+/**
+ * Exported so another script can score a PROPOSED label set with this exact
+ * code — same constants, same window, same concern wording — instead of
+ * reimplementing it and hoping the numbers are comparable. Pass a
+ * `DecodeOutcome` with its `label` replaced by the proposal. Nothing here reads
+ * or writes `fixtures/labels/**`.
+ */
+export function verifyFixture(fixture: DecodeOutcome): FixtureReport {
   const wav = readWav(readFileSync(fixture.wavPath));
   const mono = downmixToMono(wav.samples, wav.channels);
   const sampleRate = wav.sampleRate;
@@ -555,9 +563,18 @@ function main(): number {
   return 0;
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
-  process.stderr.write(`verify-fixtures: ${(error as Error).message}\n`);
-  process.exitCode = 1;
+/* Run only when invoked directly, so another script can import `verifyFixture`
+   without triggering a full 25-fixture pass. Same guard `decode-fixtures.ts`
+   uses, for the same reason. */
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolvePath(process.argv[1])).href;
+
+if (invokedDirectly) {
+  try {
+    process.exitCode = main();
+  } catch (error) {
+    process.stderr.write(`verify-fixtures: ${(error as Error).message}\n`);
+    process.exitCode = 1;
+  }
 }

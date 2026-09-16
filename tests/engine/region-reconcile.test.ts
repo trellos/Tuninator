@@ -84,6 +84,7 @@ function frame(
             fluxRatio: 2,
             heldSharpness: 0.6,
             heldFluxRatio: 2,
+      dipRatio: 1,
             strength: 0.9,
           }
         : null,

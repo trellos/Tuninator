@@ -45,6 +45,7 @@ import type {
   PitchActivation,
   RegionSegment,
 } from "../contracts.js";
+import type { FineOnset } from "../kernels/fine-onset.js";
 import { SampleClock } from "../clock.js";
 import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
 import { PitchChangeDetector, centsBetween, isOctaveJump } from "../fast/pitch-change.js";
@@ -104,6 +105,8 @@ export type TrackerTraceEvent =
       fluxRatio: number;
       heldFluxRatio: number;
       riseRatio: number;
+      /** How far the envelope FELL before the transient. See `AttackEvidence.dipRatio`. */
+      dipRatio: number;
       /** `frame.rms / sustainedRms`: the envelope against the Note's own baseline. */
       envelopeOverBaseline: number;
       /** The onset kernel itself fired on this hop, as against the envelope witness. */
@@ -248,6 +251,122 @@ const BEND_IS_ONE_NOTE_CENTS = 150;
 /** Bend movement below this is not worth an event, in cents. */
 const BEND_EPSILON = 10;
 
+/**
+ * The fretting hand arriving before the pick.
+ *
+ * On a single string the next note is fretted before it is picked, and a
+ * hammer-on or pull-off changes the ringing string's pitch tens of
+ * milliseconds before any pick lands. The fast lane opens a Note on that
+ * pitch step — "a legato step is two Notes" — and the pick then
+ * re-articulates it, so one played note comes out as two. Measured on the
+ * direct-input lead take, that is 8 of its 21 extra Notes at 72–196ms before
+ * the pick, plus 5 shorter stubs of a pitch neither neighbour has, the
+ * string half-stopped as the finger moves.
+ *
+ * A step-opened Note that ENDS on a pick within `PREFIX_MAX_MS` at the pitch
+ * the pick then plays, and that carried no transient of its own, is that
+ * pick's preparation and is absorbed into the picked Note — boundary at the
+ * pick, name from the picked Note's own frames. A held hammer-on stays a
+ * Note, and so does one that moves on to another pitch. These are held-out
+ * readings until derivation material with re-picked legato exists
+ * (`DECISION-033`).
+ */
+const PREFIX_MAX_MS = 250;
+/** Longest silence between the prefix ending and the pick. */
+const PREFIX_GAP_MS = 100;
+/** A stroke this close to a Note's start means it was picked, not fretted. */
+const PREFIX_TRANSIENT_MS = 30;
+/**
+ * How long before a step-opened Note's start a stroke still explains it.
+ *
+ * A pick the re-articulation detector refuses opens nothing; the pitch
+ * detector then opens the Note once the new pitch has settled, 40–48ms after
+ * the stroke on the derivation lead take (`clean-lead` `s8`), and the region
+ * lane places a pitch-step boundary 62ms after a pick the fast lane missed
+ * on the room-mic sixteenths (`s8` there too). A stroke inside this window
+ * means the step WAS the pick, arriving late — not the fretting hand. On the
+ * direct-input triplet take the closest prefix follows the pick before it by
+ * 93ms (`t10` to `t11`), so the window is bounded on both sides; the mic and
+ * DI readings are held-out.
+ */
+const PREFIX_LOOKBACK_MS = 80;
+/** An onset this close to a contact the fine witness read is that contact. */
+const CONTACT_MASK_MS = 15;
+/** How long before a pitch step the contact that caused it may sit. See `contactLed`. */
+const CONTACT_LEAD_MS = 30;
+/**
+ * How far the string has to be damped for a fine onset with no rebound to
+ * read as a contact. On the direct input the pick landing on the string, or
+ * the fretting hand arriving, damps it 12–24dB and nothing follows; a quiet
+ * upstroke on the room-mic sixteenths reads a dip of 3–6dB and a rebound of
+ * 2–6dB, and is a note somebody played. The bar sits between them.
+ */
+const CONTACT_DIP_DB = -10;
+
+/**
+ * How far below the lowest detected fundamental the fast lane's voted pitch
+ * must sit before it is read as a chord's virtual pitch rather than a note.
+ * An octave, less a semitone of grid slack; a fifth below (the missing
+ * fundamental of one low string heard through a speaker) stays a note.
+ */
+const VIRTUAL_PITCH_SEMITONES = 11;
+/**
+ * The local note rate, and the shape of the estimator that reads it.
+ *
+ * Taken unchanged from the `PaceEstimator` in `docs/DETECTION-FINDINGS.md`
+ * ("The constants are absolute milliseconds"): a ring of recent inter-onset
+ * intervals, the median of the last eight, ignoring gaps too short to be two
+ * notes, dropped after a silence. Nothing is fitted to these — the two bars
+ * that ARE derived live in `tracking.rateFragmentSpanFraction` and
+ * `tracking.rateFragmentDipRatio`.
+ *
+ * One property matters more than accuracy here, and it was measured rather
+ * than assumed: a phantom boundary INSERTS an onset, which splits one true
+ * interval into two short ones, so the estimate is dragged FAST by exactly the
+ * errors the bar it feeds exists to remove. A fast rate gives a SHORTER bar and
+ * therefore merges LESS, so the corruption is self-limiting rather than
+ * self-reinforcing. Scaling the rate to 0.5x was measured to cost no labels.
+ */
+const RATE_GAPS = 8;
+/**
+ * Which recent gap to take as the interval. 0 is the shortest, 1 the longest.
+ *
+ * NOT the median, and the reason is a measured asymmetry rather than taste. A
+ * MISSED onset merges two intervals into one and can only make a gap LONGER; a
+ * PHANTOM onset splits one interval in two and can only make a gap SHORTER.
+ * The bar this feeds is a fraction of the interval, so a long reading raises it
+ * and suppresses real notes, while a short reading lowers it and merely does
+ * less. Only one of those two errors is dangerous, and it is the one that
+ * missed onsets cause.
+ *
+ * A median was tried first and failed in the pipeline exactly there: on
+ * `lead-line-amped-sixteenths`, where the recognizer already misses a third of
+ * the onsets, the surviving gaps are two and three sixteenths long, the median
+ * read ~2.5x the true interval, and the raised bar cost a played note and took
+ * that fixture's pitch-class gate below its threshold. A low percentile is
+ * immune to that by construction, because dropping onsets never produces a
+ * SHORT gap.
+ */
+const RATE_PERCENTILE = 0.5;
+const RATE_MIN_INTERVAL_MS = 50;
+const RATE_RESET_MS = 1500;
+/**
+ * There is deliberately NO fallback rate.
+ *
+ * An earlier version fell back to a whole note at 120bpm when it had no gaps
+ * yet, and that single line was the whole of a measured regression: on
+ * `lead-line-amped-sixteenths` the first Note of the take is 147ms long and
+ * real, the fallback set its bar to 0.35 x 500 = 175ms, and it was suppressed —
+ * costing a played note and taking that fixture's pitch-class gate under its
+ * threshold. Every percentile of the estimator failed identically, because at
+ * the start of a take none of them has any gap to read.
+ *
+ * The rule's claim is "shorter than a note at the pace currently being played".
+ * With no pace measured there is no such claim to make, so `localIoiMs` returns
+ * null and the caller leaves the bar alone. Abstaining is free here: it costs
+ * only the first notes of a take, where nothing has yet gone wrong.
+ */
+
 export class NoteTracker {
   private readonly config: EngineConfig;
   private readonly clock: SampleClock;
@@ -289,6 +408,21 @@ export class NoteTracker {
   /** The same transients as sample indices, so the deep lane can address them. */
   private readonly attackSamples: number[] = [];
   /**
+   * The attacks the fast lane ACTED on, oldest first: the broadband kernel's
+   * firings above the gate. A fine onset landing within
+   * `transient.fineOnsetDedupeMs` of one of these is the same stroke, already
+   * handled, and must not re-articulate it a second time.
+   */
+  private readonly actedAttackTimes: SourceTimeMs[] = [];
+  /**
+   * The fine onsets the envelope read as a CONTACT rather than a stroke: flux
+   * with no rebound out of the dip behind it. The pick landing on the string,
+   * the fretting hand arriving — a transient nobody played a note with. Any
+   * onset on `attackTimes` within `CONTACT_MASK_MS` of one of these is that
+   * contact seen by a coarser witness, and `strokeNear` does not count it.
+   */
+  private readonly contactTimes: SourceTimeMs[] = [];
+  /**
    * How polyphonic the audio has been lately, independent of any one Note.
    *
    * Polyphony is a property of what is sounding, not of the Note the tracker
@@ -314,6 +448,14 @@ export class NoteTracker {
   private lastEndedAt: SourceTimeMs | null = null;
 
   /**
+   * When each Note opened, oldest first, for the local-rate estimate.
+   *
+   * Every opening goes in, phantoms included: that is what a causal estimator
+   * has. See the constants above for why that is safe here.
+   */
+  private readonly openTimes: number[] = [];
+
+  /**
    * Where segmentation decisions go when anybody is listening. Null in every
    * production path, and checked rather than called, so tracing costs one
    * comparison per decision and allocates nothing.
@@ -328,6 +470,7 @@ export class NoteTracker {
   }
 
   reset(): void {
+    this.openTimes.length = 0;
     this.notes.clear();
     this.closing.length = 0;
     this.ended.length = 0;
@@ -336,6 +479,8 @@ export class NoteTracker {
     this.attackBurstStart = null;
     this.attackTimes.length = 0;
     this.attackSamples.length = 0;
+    this.actedAttackTimes.length = 0;
+    this.contactTimes.length = 0;
     this.lastEndedAt = null;
     this.contextHarmonic = 0;
     this.contextUpdatedAt = null;
@@ -434,11 +579,27 @@ export class NoteTracker {
         frame.attack.at - burst.at <= config.tracking.backdateWindowMs;
       this.attackBurstStart = continues ? burst : frame.attack;
       this.lastAttack = frame.attack;
+      this.actedAttackTimes.push(frame.attack.at);
+      if (this.actedAttackTimes.length > ATTACK_HISTORY) this.actedAttackTimes.shift();
+    }
+
+    /* (a0) Strokes the fine-hop witness confirmed since the last frame. They
+     *      describe audio tens of milliseconds old and act only where the
+     *      broadband kernel did not; see `handleFineOnset`. */
+    if (frame.fineOnsets !== undefined) {
+      for (const onset of frame.fineOnsets) this.handleFineOnset(onset, frame, out);
     }
 
     let active = this.current();
     /** Set when a split ends a Note whose successor should inherit its decay. */
     let splitFrom: NoteRecord | null = null;
+    /**
+     * `dipRatio` at a SAME-PITCH split, for the Note that split is about to
+     * open. Null when nothing split, or when the split changed pitch — a
+     * boundary the pitch itself vouches for is not a tail-fragment candidate.
+     * See `tracking.rateFragmentSpanFraction`.
+     */
+    let splitSamePitchDip: number | null = null;
 
     /* (a) An attack over something already sounding: a restrum or a re-pick.
      *     Only a genuine energy injection counts, and never mid-glide — a bend
@@ -553,6 +714,7 @@ export class NoteTracker {
           fluxRatio: frame.attack.fluxRatio,
           heldFluxRatio: frame.attack.heldFluxRatio,
           riseRatio: frame.riseRatio,
+          dipRatio: frame.attack.dipRatio,
           envelopeOverBaseline: frame.rms / Math.max(active.sustainedRms, 1e-9),
           kernelOnset: frame.attack.flux,
           bloomed: active.harmonyBloomed,
@@ -588,6 +750,7 @@ export class NoteTracker {
         // It inherits the decay: a restrum re-excites the strings that were
         // already ringing, so the curve is continuous through the split.
         splitFrom = active;
+        if (!pitchDiffers) splitSamePitchDip = frame.attack.dipRatio;
         active = null;
       }
     }
@@ -709,6 +872,18 @@ export class NoteTracker {
           splitFrom,
           splitFrom !== null
         );
+        // A Note opened by a same-pitch boundary that had no envelope dip under
+        // it is a suspected tail fragment: it has to outlast a fraction of the
+        // interval currently being played before it is announced at all. One
+        // that dies first is dropped by `end()`, which already discards a Note
+        // that never cleared its bar — so this refuses the fragment rather than
+        // announcing and retracting it, and costs latency only on a boundary
+        // that is doubtful in both witnesses at once.
+        const bars = this.config.tracking;
+        if (splitSamePitchDip !== null && splitSamePitchDip >= bars.rateFragmentDipRatio) {
+          const ioi = this.localIoiMs(active.startTime);
+          if (ioi !== null) active.rateFragmentBarMs = bars.rateFragmentSpanFraction * ioi;
+        }
       }
     }
 
@@ -784,10 +959,19 @@ export class NoteTracker {
     // the one thing a single sounding string does that six do not is have a
     // period, which YIN finds with near-total confidence.
     const meanConfidence = record.frames > 0 ? record.confidenceSum / record.frames : 0;
+    // A period no string is sounding is a chord's, not a note's. An open D
+    // (D3 A3 D4 F#4) is the harmonic series of D2 — partials 2, 3, 4 and 5 —
+    // so YIN finds a confident 73Hz period in it and the monophonic veto
+    // below refused to let the first D chord of the direct-input take bloom
+    // at all; it was emitted as the note "D2". When the voted pitch sits an
+    // octave or more below the LOWEST fundamental the spectrum actually
+    // holds, the confidence is the chord's periodicity, and the veto — which
+    // exists to keep a single picked note from blooming — does not apply.
+    const virtualPitch = this.isVirtualPitch(record, activations);
     const harmonicNow =
       polyphony >= this.config.harmony.minPolyphony &&
       evidence.voiceSpreadSemitones >= this.config.harmony.minVoiceSpreadSemitones &&
-      meanConfidence <= this.config.harmony.maxMonophonicConfidence
+      (meanConfidence <= this.config.harmony.maxMonophonicConfidence || virtualPitch)
         ? 1
         : 0;
     // Time-based rather than per-reading, so the estimate describes the music
@@ -890,7 +1074,8 @@ export class NoteTracker {
     const enoughEvidence = record.polyphonyHops >= this.config.harmony.minEvidenceHops;
     const meanPitchConfidence =
       record.frames > 0 ? record.confidenceSum / record.frames : 0;
-    const monophonic = meanPitchConfidence > this.config.harmony.maxMonophonicConfidence;
+    const monophonic =
+      meanPitchConfidence > this.config.harmony.maxMonophonicConfidence && !virtualPitch;
     if (!record.polyphonic || monophonic || !enoughEvidence) return out;
 
     const winner = bestHarmonyVote(record.harmonyVotes, this.config.harmony.minEvidenceHops);
@@ -1008,6 +1193,333 @@ export class NoteTracker {
       record.bump(type);
     }
     return out;
+  }
+
+  /**
+   * Absorb the fretting hand's preparation into the Note the pick opened.
+   *
+   * Two ways in. When a picked Note is announced — the moment its own frames
+   * can say what pitch it plays — it looks back for the Note just before it
+   * (`claimPrefix`). When the region lane later carves a pitch step out of a
+   * ringing Note's tail, the carved Note looks forward for the pick that
+   * ended it (`offerPrefix`): on the direct-input triplet take that is where
+   * most prefixes come from, the fast lane having read the hammer-on as the
+   * old note continuing and the region lane having found the step afterwards.
+   *
+   * See `PREFIX_MAX_MS`. The candidate is a prefix when the fretting hand
+   * opened it — a pitch step, or a transient the fine witness read as a
+   * contact — with no stroke behind it, it ended within a quarter second on a
+   * pick, and either it carries the picked Note's pitch class or it is a stub
+   * at a pitch neither the picked Note nor the note before it has. Its events
+   * stand as history; the recognizer's final position is that it was the
+   * picked Note's preparation, delivered as a `structuralRevision` on that
+   * Note. The picked Note's start does not move: the pick is the boundary.
+   */
+  private claimPrefix(survivor: NoteRecord, out: TrackerEmission[]): void {
+    if (survivor.prefixClaimed) return;
+    survivor.prefixClaimed = true;
+    if (!this.isPicked(survivor)) return;
+
+    let predecessor: NoteRecord | null = null;
+    const consider = (record: NoteRecord): void => {
+      if (record === survivor || record.merged || record.endTime === null) return;
+      if (record.startTime >= survivor.startTime) return;
+      const gap = survivor.startTime - record.endTime;
+      if (gap < -1 || gap > PREFIX_GAP_MS) return;
+      if (predecessor === null || record.endTime > (predecessor.endTime as number)) predecessor = record;
+    };
+    for (const record of this.notes.values()) consider(record);
+    for (const record of this.closing) consider(record);
+    for (const record of this.ended) consider(record);
+    if (predecessor !== null) this.tryClaimPrefix(predecessor, survivor, out);
+  }
+
+  /**
+   * The region lane has carved `prefix` out of the past: find the pick that
+   * ended it. A boundary the region put on a fast-lane transient is a stroke
+   * by the region's own account and is not offered. Its energy witness does
+   * not separate the cases — a hammer-on injects energy too, and on the
+   * direct-input triplet take the region calls two of the six prefixes an
+   * energy rise — so a pitch step and an energy rise are both offered and
+   * left to the stroke test.
+   */
+  private offerPrefix(prefix: NoteRecord, segment: RegionSegment, out: TrackerEmission[]): void {
+    if (prefix.endTime === null || prefix.merged) return;
+    let successor: NoteRecord | null = null;
+    const consider = (record: NoteRecord): void => {
+      if (record === prefix || record.merged) return;
+      if (record.startTime <= prefix.startTime) return;
+      const gap = record.startTime - (prefix.endTime as number);
+      if (gap < -1 || gap > PREFIX_GAP_MS) return;
+      if (successor === null || record.startTime < successor.startTime) successor = record;
+    };
+    for (const record of this.notes.values()) consider(record);
+    for (const record of this.closing) consider(record);
+    for (const record of this.ended) consider(record);
+    if (successor === null || !this.isPicked(successor)) return;
+    const refused = segment.boundary === "attack" ? "region-attack" : null;
+    this.tryClaimPrefix(prefix, successor, out, refused);
+  }
+
+  private tryClaimPrefix(
+    prefix: NoteRecord,
+    survivor: NoteRecord,
+    out: TrackerEmission[],
+    /** A reason the offer already failed, traced here so every candidate is accounted for. */
+    refused: string | null = null
+  ): void {
+    const duration = (prefix.endTime as number) - prefix.startTime;
+    const decline = (reason: string): void => {
+      if (this.trace === null) return;
+      this.trace({
+        kind: "declined",
+        at: prefix.startTime,
+        noteId: prefix.id,
+        intoId: survivor.id,
+        reason: `prefix:${reason}`,
+        durationMs: duration,
+        fellTo: prefix.maxRms === 0 ? 1 : prefix.rms / prefix.maxRms,
+      });
+    };
+
+    if (refused !== null) return decline(refused);
+    // The fretting hand opened it: a pitch step, or a transient the fine
+    // witness read as a contact. A stroke opened a note somebody played.
+    const contactOpened = prefix.trigger === "attack" && this.contactNear(prefix.startTime);
+    if (prefix.trigger !== "pitchChange" && !contactOpened) return decline("trigger");
+    if (prefix.harmonyBloomed) return decline("decided");
+    if (duration > PREFIX_MAX_MS) return decline("too-long");
+    // Fretted, not picked: no stroke at its own start, nor in the window
+    // before it where a refused pick opens a Note late on the pitch settling.
+    if (this.strokeNear(prefix.startTime, PREFIX_LOOKBACK_MS, PREFIX_TRANSIENT_MS)) {
+      return decline("stroke");
+    }
+
+    const prefixClass = pitchClassIndex(prefix.dominantMidi());
+    const survivorClass = pitchClassIndex(survivor.dominantMidi());
+    if (prefixClass === null || survivorClass === null) return decline("unpitched");
+    let claim = prefixClass === survivorClass;
+    if (!claim && this.contactLed(prefix)) {
+      // A stub at a pitch nobody played: the string half-stopped between
+      // the note before it and the one the pick then plays. Only when the
+      // fine witness saw the hand land — a contact at its start, or just
+      // before the pitch step it opened on. A step alone at a pitch neither
+      // neighbour has is as often the neighbour misread as a transition.
+      const before = this.recordSoundingAt((prefix.startTime - 1) as SourceTimeMs);
+      const beforeClass =
+        before === undefined || before.id === prefix.id ? null : pitchClassIndex(before.dominantMidi());
+      claim = beforeClass !== null && prefixClass !== beforeClass;
+    }
+    if (!claim) return decline("pitch");
+
+    prefix.merged = true;
+    if (this.trace !== null) {
+      this.trace({
+        kind: "absorbed",
+        at: prefix.startTime,
+        noteId: prefix.id,
+        intoId: survivor.id,
+        durationMs: duration,
+        intoStartTime: survivor.startTime,
+        burstAt: prefix.burstAt,
+        intoBurstAt: survivor.burstAt,
+      });
+    }
+    const revisionNumber = survivor.bump("structuralRevision");
+    out.push({
+      type: "changed",
+      note: survivor.snapshot(),
+      change: {
+        type: "structuralRevision",
+        at: survivor.startTime,
+        revisionNumber,
+        relation: "absorbed",
+        relatedNoteIds: [prefix.id],
+      },
+    });
+  }
+
+  /**
+   * A Note the pick opened: an attack the fine witness did not read as a
+   * contact, or a pitch step with a stroke at it — the re-articulation
+   * detector refuses a pick into a ringing string often enough that on the
+   * direct-input triplet take half the played notes open on the pitch step
+   * the same hop.
+   */
+  private isPicked(record: NoteRecord): boolean {
+    if (record.harmonyBloomed) return false;
+    if (record.trigger === "attack") return !this.contactNear(record.startTime);
+    return this.strokeNear(record.startTime, PREFIX_TRANSIENT_MS, PREFIX_TRANSIENT_MS);
+  }
+
+  /** An onset in `[at - before, at + after]` that the fine witness did not read as a contact. */
+  private strokeNear(at: SourceTimeMs, before: number, after: number): boolean {
+    for (const onset of this.attackTimes) {
+      if (onset < at - before || onset > at + after) continue;
+      if (!this.contactNear(onset)) return true;
+    }
+    return false;
+  }
+
+  private contactNear(at: SourceTimeMs): boolean {
+    for (const contact of this.contactTimes) {
+      if (Math.abs(contact - at) <= CONTACT_MASK_MS) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The hand landed at this Note's start, or in the `CONTACT_LEAD_MS` before
+   * the pitch step it opened on: the pitch detector needs a few hops of the
+   * new pitch before it opens, so the contact leads the step by 16–21ms on
+   * the direct-input triplet take.
+   */
+  private contactLed(record: NoteRecord): boolean {
+    for (const contact of this.contactTimes) {
+      const lead = record.startTime - contact;
+      if (lead >= -CONTACT_MASK_MS && lead <= CONTACT_LEAD_MS) return true;
+    }
+    return false;
+  }
+
+  /**
+   * A stroke the fine-hop witness confirmed, delivered after the fact.
+   *
+   * Recorded for the region lane whatever else happens: "energy arrived at
+   * exactly here" is the half of the answer the region cannot produce for
+   * itself. It ACTS only where the broadband kernel did not — a fine onset
+   * within `fineOnsetDedupeMs` of an attack the fast lane already acted on is
+   * that attack — and only over silence or a single sounding note. Over a
+   * chord it does nothing: a strum's interior is full of transient-looking
+   * energy, and the witnesses that judge it (`sharpEnough`, the decay curve)
+   * were derived for the broadband reading and stay in charge there.
+   *
+   * The boundary is backdated onto the onset's own sample. The frames the
+   * old Note absorbed since then were the new note's, which on the case this
+   * exists for — a note re-picked at its own pitch — costs nothing, and on a
+   * new pitch costs a few hops of votes the successor makes up at once.
+   */
+  private handleFineOnset(onset: FineOnset, frame: FastFrame, out: TrackerEmission[]): void {
+    const config = this.config;
+    const at = this.clock.toMs(onset.atSample);
+
+    // In order, for the region lane: this onset predates the newest entries.
+    let index = this.attackTimes.length;
+    while (index > 0 && (this.attackTimes[index - 1] as number) > at) index--;
+    if (index === 0 || (this.attackTimes[index - 1] as number) !== at) {
+      this.attackTimes.splice(index, 0, at);
+      this.attackSamples.splice(index, 0, onset.atSample);
+      if (this.attackTimes.length > ATTACK_HISTORY) {
+        this.attackTimes.shift();
+        this.attackSamples.shift();
+      }
+    }
+    // A contact: the string was damped hard and nothing followed. See
+    // `CONTACT_DIP_DB` for what this must not catch.
+    const contact =
+      onset.reboundDb < config.transient.fineOnsetReboundDb && onset.dipDb <= CONTACT_DIP_DB;
+    if (contact) {
+      this.contactTimes.push(at);
+      if (this.contactTimes.length > ATTACK_HISTORY) this.contactTimes.shift();
+    }
+
+    for (const acted of this.actedAttackTimes) {
+      if (Math.abs(acted - at) <= config.transient.fineOnsetDedupeMs) return;
+    }
+
+    const active = this.current();
+    if (active === null) {
+      // Nothing was sounding: the stroke opens a Note, backdated to the pick
+      // but never over the end of whatever finished after it. Energy has to
+      // have followed the transient — a hand brushing a string between
+      // chords makes flux and no rebound.
+      if (onset.reboundDb < config.transient.fineOnsetReboundDb) return;
+      let start = at;
+      if (this.lastEndedAt !== null && start < this.lastEndedAt) start = this.lastEndedAt;
+      const opened = this.begin(
+        "attack",
+        frame,
+        out,
+        { at: start, atSample: this.clock.toSamples(start), frequencyHz: frame.pitch.frequencyHz },
+        null,
+        false
+      );
+      opened.lastAudibleAt = frame.at;
+      return;
+    }
+
+    if (active.harmonyBloomed || active.polyphonic) return;
+    if (at <= active.startTime) return;
+    if (at - active.startTime < config.tracking.minStableMs) return;
+    // A bend sweeps the spectrum and fires flux witnesses inside one note.
+    if (this.pitchChange.isGliding()) return;
+    // The pick landed on the string, then played it. Without the dip this is
+    // sustain ripple the flux happened to read; without the rebound it is a
+    // contact or a mute that no stroke followed.
+    if (onset.dipDb > config.transient.fineOnsetDipDb) return;
+    if (onset.reboundDb < config.transient.fineOnsetReboundDb) return;
+
+    if (this.trace !== null) {
+      this.trace({
+        kind: "rearticulation",
+        at,
+        noteId: active.id,
+        accepted: true,
+        reason: "fine-onset",
+        settled: true,
+        soundedMs: at - active.startTime,
+        settleBarMs: config.tracking.minStableMs,
+        pitchDiffers: false,
+        gliding: false,
+        glideCents: this.pitchChange.glideCents(),
+        decayExcess: active.decay.excess(at, frame.rms),
+        sharpness: 0,
+        heldSharpness: 0,
+        fluxRatio: onset.value,
+        heldFluxRatio: 0,
+        riseRatio: frame.riseRatio,
+        // The fine witness measures this same fall, in dB rather than as a
+        // ratio — `dipAround` reads the 5ms envelope minimum against its prior
+        // maximum, which is what `AttackEvidence.dipRatio` is. Converted rather
+        // than left at 1, because 1 means "nothing fell" and something did.
+        dipRatio: 10 ** (onset.dipDb / 20),
+        envelopeOverBaseline: frame.rms / Math.max(active.sustainedRms, 1e-9),
+        kernelOnset: false,
+        bloomed: active.harmonyBloomed,
+      });
+    }
+    active.restruck = true;
+    this.end(active, at, out);
+    const successor = this.begin(
+      "attack",
+      frame,
+      out,
+      { at, atSample: onset.atSample, frequencyHz: frame.pitch.frequencyHz },
+      active,
+      false
+    );
+    // The stroke has been sounding since the pick: the rebound was measured
+    // before this Note existed. Without this its "sounded" clock starts at
+    // the dip, where the frames are gated, and the next stroke 100ms later
+    // finds it too young to be ended.
+    successor.lastAudibleAt = frame.at;
+  }
+
+  /**
+   * Is the pitch this Note voted for one that no detected fundamental is
+   * sounding — an octave or more below the lowest of them?
+   *
+   * `activations` arrive ascending in MIDI, so the first is the lowest. Two
+   * of them are required: a single fundamental with the vote an octave under
+   * it is the ordinary missing-fundamental reading of one note, which the
+   * bass estimator handles and which must stay a note.
+   */
+  private isVirtualPitch(record: NoteRecord, activations: readonly PitchActivation[]): boolean {
+    if (activations.length < 2) return false;
+    const voted = record.dominantMidi();
+    if (voted === null) return false;
+    const lowest = (activations[0] as PitchActivation).midi;
+    return lowest - voted >= VIRTUAL_PITCH_SEMITONES;
   }
 
   /** Opens the Note that takes over when the harmony changes mid-ring. */
@@ -1867,6 +2379,9 @@ export class NoteTracker {
     // though both facts arrive at once and both are backdated.
     this.end(record, to, out);
     this.lastEndedAt = floor;
+    // A pitch step carved out of a ringing Note's tail may be the fretting
+    // hand arriving before the pick that ended it. See `claimPrefix`.
+    if (parent !== null) this.offerPrefix(record, segment, out);
     return record;
   }
 
@@ -1978,6 +2493,8 @@ export class NoteTracker {
       this.absorbArticulationFragment(record, predecessor);
     }
     this.notes.set(record.id, record);
+    this.openTimes.push(at);
+    if (this.openTimes.length > RATE_GAPS * 4) this.openTimes.shift();
     if (this.trace !== null) {
       this.trace({ kind: "opened", at, noteId: record.id, trigger });
     }
@@ -2123,6 +2640,7 @@ export class NoteTracker {
           lifecycle: record.lifecycle,
         };
         out.push({ type: "started", note: record.snapshot() });
+        this.claimPrefix(record, out);
         continue;
       }
 
@@ -2198,6 +2716,29 @@ export class NoteTracker {
     }
   }
 
+  /**
+   * The interval between notes the player is currently producing, in ms.
+   *
+   * Median of the recent gaps between Note openings. Strictly causal — only
+   * openings at or before `at` are read — and deliberately built from the
+   * tracker's own output, because that is the only thing available live.
+   */
+  private localIoiMs(at: SourceTimeMs): number | null {
+    const gaps: number[] = [];
+    for (let i = this.openTimes.length - 1; i > 0 && gaps.length < RATE_GAPS; i--) {
+      const later = this.openTimes[i] as number;
+      // Strictly before: the opening being judged must not enter its own estimate.
+      if (later >= at) continue;
+      const gap = later - (this.openTimes[i - 1] as number);
+      if (gap > RATE_RESET_MS) break;
+      if (gap < RATE_MIN_INTERVAL_MS) continue;
+      gaps.push(gap);
+    }
+    if (gaps.length === 0) return null;
+    gaps.sort((a, b) => a - b);
+    return gaps[Math.min(gaps.length - 1, Math.round((gaps.length - 1) * RATE_PERCENTILE))] as number;
+  }
+
   private end(record: NoteRecord, at: SourceTimeMs, out: TrackerEmission[]): void {
     this.notes.delete(record.id);
     const endAt = Math.max(at, record.startTime);
@@ -2230,6 +2771,7 @@ export class NoteTracker {
         lifecycle: record.lifecycle,
       };
       out.push({ type: "started", note: record.snapshot() });
+      this.claimPrefix(record, out);
     }
 
     // The sound is over, but the recognizer may not have finished thinking. A

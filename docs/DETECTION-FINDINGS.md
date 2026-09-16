@@ -3948,6 +3948,1081 @@ periodicity is correct and still scored wrong — is not refuted by any of this.
 It is the finding the current architecture was built to answer, and it is kept
 in `docs/archive/detection-rearchitecture-handoff.md`.
 
+## Forward absorption: the instruments were wrong, then the mechanism was refuted
+
+The standing conclusion was that "the defect behind the largest block of splits
+is a same-pitch boundary inside one event, not a name arriving late", and that
+absorption reaches backward only. Both halves were tested against the 120bpm
+same-pitch material (DECISION-026, 1,131 events across eight fixtures). The
+first half is right and was being **under-reported by a factor of six**. The
+second is right, and the mechanism that would fix it is refuted.
+
+### The split-shape classifier could not see the shape it was built to find
+
+`measure-split-shape.ts` reported **18** `same pitch twice` splits corpus-wide,
+against 102 `named as before`. That reading is wrong, for two independent
+reasons, and both are the error class this file already records four times: a
+rule that was correct for the material it was written against.
+
+**The name tests were ordered previous-name first.**
+
+```
+offset < -45ms            -> predecessor's own
+name === previous.label   -> named as before      <- reached first
+name === label.label      -> same pitch twice     <- unreachable when they coincide
+```
+
+On same-pitch material `previous.label === label.label`, so every split whose
+leader began here and was correctly named fell into the naming bucket. On
+`same-pitch-eighths-a3-120bpm-amped` — a take where all 184 labels are A3 — 49
+of 50 splits sit on a same-pitch label pair, and the take reported **one**
+`same pitch twice`. The categories' own definitions settle the order: `named as
+before` is a claim that the NAME is wrong, `same pitch twice` that the BOUNDARY
+is. When the names coincide the name is not wrong. Reordered, with an
+`ambiguous` column counting where the two coincide:
+
+| shape | before | after |
+|---|---|---|
+| predecessor's own | 146 | 146 |
+| named as before | 102 | **7** |
+| same pitch twice | **18** | **113** |
+| named as neither | 28 | 28 |
+
+**`predecessor's own` uses a 45ms window against labels carrying up to 65ms of
+offset.** The amp-sim renders' labels were calibrated on the DI render and
+applied unchanged (`docs/SAME-PITCH-MATERIAL.md`), and `verify-fixtures.ts` puts
+their median offset at −35, +65, +25 and +45ms. Measured leader offsets on the
+four amped takes run median −42, −30, −38 and −25ms against that −45ms bar: the
+bucket boundary sits inside the label set's own placement error, so on these
+takes the column separates nothing. A leader that begins "before" a label which
+itself sits late is that label's own Note. The column is now documented as an
+upper bound rather than retuned, because the labels are read-only.
+
+### An instrument that uses no label onset at all
+
+`measure-tail-fragments.ts` (new) classifies each Note past the first by the
+**label's** pitch class — ground truth — and the gap to the Note before it.
+Neither test reads a label onset, so a systematically late label set cannot move
+the count.
+
+```
+  TOTAL                     split 294   extras 318
+    same pitch (contiguous)   294
+    detached                    0
+    other pitch                24
+    median shortest Note     93ms      median longest    227ms
+```
+
+**294 of 318 extra Notes are same-pitch and contiguous with their neighbour, and
+not one is detached.** On the six same-pitch fixtures it is 175 of 175 — every
+extra Note, without exception. The defect is exactly what the standing
+conclusion said it was; only the instrument disagreed.
+
+One number there rules out the cheap fixes. The median shortest Note in a split
+event is **93ms**, against `tracking.minStableMs` 55 and `deep.minSegmentMs` 90.
+These fragments are not sub-threshold blips that a bar could be raised past —
+they are above every suppression threshold the engine has, and the median
+longest is only 227ms, so the two Notes are of comparable size. The "~130ms Note
+then a ~70ms tail" shape quoted from the amped triplet take is one instance, not
+the population.
+
+### There is no forward path, confirmed by reading
+
+- `absorbArticulationFragment()` moves the survivor's **start** back onto a
+  predecessor stub. Backward.
+- `absorbAttackFragments()` walks `closing`/`ended` for candidates ending at or
+  before the survivor's start. Backward — and gated on `justNamed`, which
+  requires `harmonyLabel !== null`, so on monophonic lead material it is never
+  reached at all.
+- `carveAfter()`, `splitAtSegments()`, `insertFromSegment()` are additive: they
+  create Notes, never retract one.
+- `mergeWithinSegment()` is the only mechanism that extends a survivor's **end**
+  over a following Note, and it is gated behind `deep.regionMerge`, false.
+
+So an announced Note cannot today swallow a following same-pitch fragment. That
+absence is the defect's proximate cause.
+
+### Which path opens the fragment
+
+Over the 294 same-pitch extras, from the tracker's own trace:
+
+```
+  opened by    attack 154    pitchChange 133    (no trace) 7
+  accepted re-articulation at that start:
+    sharpness 195   envelope-rise 38   none 30   new-pitch 23
+    ring-out-sharpness 5   chord-decay-excess 3
+```
+
+`sharpness` — `rearticulationSharpness`, the prospective fast-lane decision with
+the measured 0.73 AUC ceiling — accounts for two thirds. The other half of the
+population is opened by a pitch step with no attack behind it at all.
+
+### `regionMerge`, re-opened on 20x the material, and refuted
+
+The existing negative on `deep.regionMerge` was taken on 78 derivation events:
+false positives 6 → 10, fragmentation 11/78 → 12/78. Re-run on the full 1,595-
+event corpus it is far worse than that comment suggests. **Falsifier stated in
+advance: missed labels must not rise above 161, and splits and extras must both
+fall.**
+
+| | baseline | `regionMerge` | + absorb only non-attack Notes |
+|---|---|---|---|
+| split events | 336 | 234 | 328 |
+| extra Notes | 403 | 264 | 389 |
+| same-pitch contiguous extras | 294 | 165 | 278 |
+| **missed labels** | **161** | **383** | **175** |
+| eval informational failures | 1 | 4 | 2 |
+
+Enabled, it buys 139 fewer extra Notes for **222 lost played notes**. The ledger
+names the mechanism exactly: `opened but never emitted` goes 0 → **184** —
+`mergeWithinSegment` sets `merged` on the absorbed Notes and `projectEmissions`
+drops them, so 184 notes somebody played are opened by the tracker and never
+reach the consumer. All three sixteenths takes lose their pitch-class gate,
+which is the 107ms subdivision against 85ms windows: "the region found one event
+here" is not a claim those windows can make at that spacing.
+
+The second column is the interesting one. Restricting the merge to absorb only
+Notes whose `trigger` is not `"attack"` — a discriminator already recorded, no
+new constant, and precisely the retrospective evidence the fragment's own
+history offers — cuts the losses from 222 to 14. It does not rescue the
+direction: it now trades **14 extra Notes for 14 missed labels, one for one**,
+and the per-fixture breakdown shows the two happening in the same places.
+
+```
+  fixture                                        split      extras     missed
+  same-pitch-eighths-sixteenths-e5-120bpm-di     21 -> 19   21 -> 19   21 -> 24
+  same-pitch-eighths-sixteenths-e5-120bpm-amped  29 -> 27   37 -> 34   16 -> 20
+  same-pitch-eighths-a3-120bpm-amped             56 -> 55   60 -> 59    9 -> 12
+  lead-line-amped-sixteenths-e-fsharp-140bpm      4 -> 3     6 -> 5    13 -> 15
+  lead-line-di-sixteenths-e-fsharp-140bpm         —          —          6 -> 8
+```
+
+It also introduces an informational gate failure on
+`lead-line-amped-sixteenths-e-fsharp-140bpm` (pitch class) that baseline does
+not have. Both variants reverted; `src/` is unchanged by this pass.
+
+### The listening kit could not be re-scored, and nothing here rests on it
+
+The brief for this pass asks that the second-annotation figures be re-scored
+before being relied on — the 6/6 agreement on extra-note points, the 0.875/0.938
+implied ceiling, the control bar at n=2. **They could not be.** The kit writes
+everything under `.cache/relabel/` and `build-relabel-kit.ts` says in its header
+that those outputs are never committed, so the partially-filled answer sheet
+exists on the owner's machine and not in the repository;
+`npx tsx scripts/score-relabel.ts` has no input here.
+
+That is recorded rather than worked around because the honest consequence is
+worth stating: **none of the conclusions above use those figures.** Every number
+in this section comes from the corpus and the tracker's own trace.
+
+**And the two halves of that kit disagree on precisely this axis, which the
+brief does not say.** What is committed to this repository is the MACHINE pass,
+and "The label ceiling, measured" above reports it hearing an onset at **55 of
+106** extra-Note boundaries where the shipped labels have none — closing that
+the strict corroborated reading barely moves the figure, that it is not
+concentrated on any one signal path, and that "an 'extra Note' at a moment where
+an independent annotator hears an articulation is not unambiguously the
+detector's error", which "machine-only cannot settle". The human figures the
+brief quotes point the other way — 6 of 6 agreeing with the shipped labels, zero
+`ann+ lab-` — and they are **n=6 on a control bar of n=2**, recorded in the
+brief's prose and nowhere else in this tree. The section above still describes
+the human half as "built and waiting"; whoever ran the partial pass did not
+commit its results, so there is no answer sheet and no updated table to check
+them against.
+
+| | extra-note points | annotator hears, labels lack |
+|---|---|---|
+| machine pass (committed, scored) | 106 | **55** |
+| human pilot (brief prose only) | 6 | **0** |
+
+The direction of that unresolved disagreement matters here, and it runs against
+forward absorption rather than for it. The negative above is measured against
+LABELS — a miss is a label with no Note — so labels undercounting cannot
+manufacture one, and the 161 → 383 and 161 → 175 results stand whichever
+annotator is right. But if the machine pass is even partly right, some fraction
+of the 294 same-pitch extras are articulations somebody played that the labels
+do not carry, and absorbing those costs real notes the miss count never sees.
+The uncertainty makes forward absorption look better than it is, not worse.
+
+Do not cite either half as corroboration without re-running it, and do not cite
+the human figures at all until they are committed.
+
+### What this establishes
+
+The brief asked whether the **retrospective** question ("that fragment already
+happened — with its full duration, its decay, and whether it carried its own
+attack witness, was it one?") sits on the better side of the 0.73 AUC ceiling
+that eight experiments put on the **prospective** one. On this evidence it does
+not. The most conservative retrospective rule available — absorb only where the
+fast lane witnessed no fresh energy whatsoever, over a span the region lane
+positively called one event — still cannot tell which of two same-pitch Notes
+the player did not play. It gives back a real note for every phantom it removes.
+
+That is a stronger statement than "regionMerge does not pay for itself", and it
+is worth not re-deriving: the extra evidence a fragment's own history carries is
+not the missing ingredient. The signal-path result from DECISION-026 says where
+the missing ingredient is instead — split rates go 8% → 71%, 3% → 30% and 7% →
+50% between the DI and amped renders of the *same performance*, so whatever
+separates a real re-pick from a spurious boundary survives a direct input and
+collapses under compression. A witness that survives compression is the open
+problem, and it is an onset-feature question, not a segmentation-bookkeeping one.
+
+## The envelope dip: the best witness yet, and still not enough
+
+The previous section closed forward absorption by measuring that the deep
+lane's retraction destroys real notes. This one asks the other half of the
+question — is there a witness that separates a real re-pick from an invented
+boundary at all — and answers it with a number that is both the best this
+project has measured and still insufficient, for a reason that is arithmetic
+rather than acoustic.
+
+The prompt for it was the owner's, looking at his own waveforms: the notes are
+plainly separate to the eye, even on the amp-sim renders and even at sixteenth
+spacing, so what is the recognizer failing to see?
+
+### What the recognizer can see at the moment it decides
+
+Every witness available to the re-articulation decision, scored over 1,103
+accepted articulations landing within 70ms of a label and 229 landing nowhere
+near one:
+
+```
+  witness                 AUC    median real   median spurious
+  sharpness               0.698          5.13             3.19
+  fluxRatio               0.695          2.05             1.39
+  heldSharpness           0.583          2.01             1.54
+  heldFluxRatio           0.569          1.68             1.41
+  troughRatio             0.525          1.33             1.22
+  riseRatio               0.506          1.11             1.11
+  fellFraction            0.398          0.86             0.94
+```
+
+**The best witness available is the one already in use**, `sharpness`, at 0.698
+— under this project's standing 0.73 bar. That single table explains every
+negative below: any gate built from these is reshuffling a 0.70 discriminator.
+
+The envelope family reads as noise, and that is the informative part rather
+than a disappointment. Every reading on that record is taken AT the transient,
+by which point the new energy has arrived. None of them can see whether
+anything fell beforehand, which is precisely the question the eye answers from
+a waveform.
+
+### The dip, measured on the audio rather than on the tracker
+
+A plain RMS envelope of the raw samples, with no engine state involved: at each
+boundary, `min(RMS)` over the span just before it against `max(RMS)` over the
+span before that.
+
+```
+  real re-picks    n=1570   median 0.350
+  spurious splits  n=106    median 0.763
+  AUC 0.763 corpus-wide, 0.743 on the 120bpm same-pitch material
+```
+
+Above the bar, and better than anything the engine computes. **The evidence the
+owner was pointing at is real and it is in the audio.**
+
+It is also robust in a way that matters, because three separate things were
+expected to break it and none did.
+
+**Window length does not matter.** Holding overlap fixed at 4x and varying only
+the RMS window, on the same material:
+
+```
+   5ms 0.768    10ms 0.771    20ms 0.797    40ms 0.801    85ms 0.773
+```
+
+Flat across a seventeenfold range. This refutes a plausible-sounding diagnosis
+that was made here before it was measured: that the deep lane is blind because
+it reads its envelope through the 85.3ms window the 4096-point FFT needs for
+pitch, and that a finer envelope would fix it. It would not. An 85ms envelope
+separates as well as a 5ms one.
+
+**Overlap does not rescue a long window, and does not need to.** The deep lane
+runs 4096-sample windows at a 1024-sample hop. Overlap yields more samples of a
+smeared curve rather than a less smeared one — the minimum across overlapping
+85ms windows spanning a 40ms gap is still dominated by the notes bracketing it.
+That reasoning is correct as far as it goes and turns out not to be the binding
+constraint, per the table above.
+
+**Anchoring beats windowing offline and loses in the pipeline.** Anchored on the
+preceding onset rather than a fixed window, separability rises to 0.797. Built
+into the engine it LOST eleven held-out notes, because offline the anchor was a
+LABEL and in the engine it can only be a detected attack — and on the amp-sim
+takes the kernel fires several transients per pick, so every phantom re-anchored
+the span. This is the archived lineage's "a bench ranking is not a pipeline
+ranking" in its purest form: the offline figure was reading ground truth.
+
+### Seven configurations, one exchange rate
+
+Baseline: 336 events split, 403 extra Notes, 161 missed labels.
+
+| gate | splits | extras | missed |
+|---|---|---|---|
+| baseline | 336 | 403 | **161** |
+| `regionMerge` on | 234 | 264 | **383** |
+| `regionMerge`, non-attack Notes only | 328 | 389 | **175** |
+| flux-ratio witness at 1.3 | 263 | 299 | **255** |
+| dip, windowed, bar 0.99 | 324 | 386 | **173** |
+| dip, windowed, age-gated | 335 | 402 | **164** |
+| dip, short windows | 314 | 364 | **195** |
+| dip, anchored on accepted articulations | 63 held-out splits | — | 39 held-out misses |
+
+Every one of them trades roughly one real note per phantom removed. The
+derivation sweep is flat — 10 split and 10 extras at every value of every
+constant tried — so none of these could be honestly derived there either; the
+old derivation set holds three instances of the phenomenon.
+
+One configuration came close enough to be worth recording precisely. The
+windowed dip at a bar of 0.99 leaves derivation misses at 2 and held-out misses
+at 30, both unchanged, while taking held-out splits from 73 to 65 — a clean win
+on hand-labelled data. All twelve of its added misses fall on the 120bpm
+same-pitch material, whose labels are generated. It was still not shipped,
+because five of those twelve are on a DIRECT take with the better labels, and
+the ledger attributes them to the new gate by name: `rejected: no-dip` 0 -> 5 on
+`same-pitch-eighths-sixteenths-e5-120bpm-di`. Sixteenths at 120bpm are 125ms
+apart against a 240ms reach — the window-versus-spacing error, committed inside
+the attempted repair. Age-gating the test so it only applies to notes older than
+its own span removes the harm and the benefit together: splits 336 -> 335.
+
+### Why 0.78 is not enough, which is arithmetic
+
+At this decision there are roughly five real re-picks for every invented
+boundary. A witness at 0.78 AUC still has heavily overlapping distributions —
+real p75 0.684 against spurious median 0.763 — so at that prior, a threshold
+catching one phantom catches about one real note. Reaching a favourable trade
+needs something near 0.95, not a better-placed bar on a 0.78 reading.
+
+**So the per-boundary threshold family is exhausted, and that is the finding.**
+Not "this witness is bad": the witness is the best one measured here and it is
+above the bar. The shape of the problem is wrong for it. What a listener uses on
+this material is not one number at one boundary — it is four evenly spaced
+events carrying the same envelope shape, which is a claim about a SEQUENCE. The
+two nearest things tried in this repository, joint region segmentation by
+dynamic programming and a local-rate gate, were both measured and rejected, and
+neither is a full sequence decoder over the envelope. That is where the next
+attempt belongs, and it should not begin by re-deriving the seven rows above.
+
+## The re-timed labels, checked from the other render
+
+`fixtures/labels/**` was edited twice on 2026-09-14 on the owner's instruction:
+`b5cf94b` applied nine corrections from his own listening pass over fifteen
+disputed points, and `7a216fe` re-timed the two gridded DI sections
+(`same-pitch-eighths-a3-120bpm-di`, `same-pitch-eighths-sixteenths-e5-120bpm-di`)
+automatically with `scripts/retime-gridded-labels.ts` — roughly 330 labels moved
+on envelope evidence. `docs/validate-relabelled-material-prompt.md` asked for an
+adversarial check of the second pass, assuming it unsound until shown otherwise,
+with `src/` untouched and no detector output consulted. **Verdict: the
+re-timing holds on three of its four sections by evidence it never saw, is
+unverifiable but not worse on the fourth, and is kept.** The nine ear
+corrections stand throughout. Nothing under `fixtures/` changed in this pass.
+
+### Why the re-timing's own 6/6 could not count
+
+The script checks itself against six picks the owner confirmed by ear and
+reports 6/6 within 30ms. Four of those six are values it is forbidden to move
+(`LOCKED`), so it cannot fail them; only `s1662` (25.572s) and `s1698` (30.075s)
+test anything, and both were already within 3ms on the grid. Everything below
+is built to avoid that property.
+
+### What was reproduced first
+
+- Running the script on the `b5cf94b` labels (from git, never through the
+  working tree) reproduces `7a216fe` **byte for byte** on both files. The
+  commit is what the script produces; there is no hand edit hiding in it.
+- Structural: all eight same-pitch and held-then-picked files strictly ordered,
+  no `endMs > next.startMs`, no `endMs <= startMs`; contiguity preserved
+  (182/182 and 190/190 `endMs == next.startMs` on the two re-timed files).
+  Counts 183/183/191/190/72/72/120/120 as required. All eight locked values
+  intact, all five removed ids absent.
+- The lock does work: unlocked, the script proposes 19.745s for `s1615` over
+  the owner's 19.613s, exactly as the commit message says it once did.
+- `npm run eval` PASS, zero required failures, the one pre-existing
+  informational failure (`power-chords-b-a-g-fsharp-b-a-g-e-140bpm`);
+  `clean-lead-120bpm` gated pitch class 92.9%.
+- The neighbour-yield rule dropped exactly one proposal (`s1614` → 19.618s).
+
+### The two renders are 2.5ms apart, not 20–90ms
+
+The brief records two earlier offset measurements that disagreed (envelope
+correlation 9/12/25/56ms; onset matching 80/10/90/80ms). Cross-correlating a
+plain onset-strength function (half-wave-rectified log-RMS rise, 10ms window,
+2.5ms hop, no shared code with `src/engine/**`) between the DI and amped
+renders over the whole file, ±400ms:
+
+| take | lag | r at peak | runner-up (>30ms away) |
+|---|---|---|---|
+| `eighths-sixteenths-e5` | **2.5ms** | 0.545 (0.637 HF-weighted) | 0.257 at 240ms |
+| `eighths-a3` | **2.5ms** | 0.243 (0.223) | 0.065 at 258ms |
+| `quarters` (control) | 2.5ms (−17.5 HF) | 0.232 (0.294) | 0.118 at −30ms |
+
+Per-section lags agree (2.5/2.5, 2.5/7.5ms). The onset-function peaks of the
+two e5 renders coincide to ≤5ms pick by pick, and the owner's own ear gave the
+*same* time on both renders for three picks (25.572, 30.075, 31.344s). The
+renders are one performance, time-aligned to within one hop. Both earlier
+methods were wrong, and the 240–258ms runner-ups are the eighth-note period —
+the trap an onset-matching method with a window wider than the spacing falls
+into.
+
+### Cross-render: do the re-timed DI labels sit on picks in the amped audio?
+
+For each label set, each label (+2.5ms) is scored against the amped render two
+ways: the nearest amped onset-function peak within ±62ms (half a sixteenth,
+further bounded at the midpoints to the neighbouring labels), and the
+onset-function maximum within ±12.5ms of the label ("OSF@label"), against the
+same statistic at uniformly spaced points across the section ("chance"). Three
+label sets: the DI grid+ear (`b5cf94b`), the re-timed DI (`7a216fe`), and the
+amped file's own untouched labels. Broadband OSF; HF-weighted in parentheses.
+
+| e5 section | label set | within 25ms of an amped peak | \|Δ\| median / p90 | OSF@label | chance |
+|---|---|---|---|---|---|
+| eighths (64) | DI grid+ear | 57 | 13 / 30 | 0.84 (0.86) | 0.07 (0.11) |
+| eighths (64) | **DI re-timed** | 59 | 8 / 26 | 0.67 (0.81) | |
+| eighths (64) | amped's own | 61 | 10 / 20 | 0.79 (0.81) | |
+| sixteenths (127) | DI grid+ear | 118 | 10 / 25 | 0.18 (0.30) | 0.10 (0.17) |
+| sixteenths (127) | **DI re-timed** | **124** | 10 / **21** | **0.49 (0.66)** | |
+| sixteenths (126) | amped's own | 111 | 13 / 28 | 0.12 (0.25) | |
+
+With the peak floor raised from 0.05 to 0.2 of the section's 95th percentile
+(fewer, stronger peaks): sixteenths within-25ms goes grid 99, re-timed **115**,
+amped's own 87. The control — `quarters`' measured labels against its amped
+render — scores 67/72 within 25ms and OSF@label 0.20 against chance 0.04, so
+this is what "labels on picks" looks like on this instrument. In the e5
+sixteenth section the re-timed labels sit on 2.7× the amped onset energy the
+grid did (0.49 vs 0.18, chance 0.10); in the eighths section the grid was
+already on the picks and the re-timing changes little (both ≈0.8, chance 0.07).
+**This is evidence from audio the re-timing never read.**
+
+On `a3` the check has no power: OSF@label is at chance for every label set in
+both sections (0.05–0.13 against 0.07), the render correlation is 0.24, and
+`verify-fixtures.ts` finds an attack for 2 of the 183 amped labels. The A3
+amp-sim render is too compressed for a crude onset function to see picks. What
+the same instrument says on the DI audio (semi-circular for the re-timed set,
+which came from a different DI envelope statistic): a3 eighths within-25ms
+50 → 68 of 72, sixteenths 63 → 94 of 111.
+
+### `verify-fixtures.ts`: the concern count is blind here, the offsets are not
+
+Concern counts barely moved (a3-di 60 → 59, e5-di 47 → 47 on the `b5cf94b`
+baseline; the brief's 61/48 are the pre-ear figures) and the re-timing commit
+called the verifier "a crude instrument". The dismissal reaches the right
+conclusion for the wrong reason. A label earns an onset concern only when *no*
+energy rise exists inside a search bounded at the midpoints to its neighbours —
+±62.5ms at sixteenth spacing — and no move in this pass exceeds 90ms, so **the
+count cannot see a move smaller than the window by construction.** The
+verifier's per-label `nearestAttackDeltaMs` can, and it uses a different
+window (20ms/10ms hop), a different rule (1.35× rise over a 60ms baseline) and
+none of the re-timer's prominence logic. Verifier attack offset, p10..p90,
+`b5cf94b` → `7a216fe`:
+
+| section | labels with an attack found | p10..p90 before | p10..p90 after | \|Δ\|≥40ms before → after |
+|---|---|---|---|---|
+| a3 eighths | 69/72 | −40..+40 | −33..−10 | 22 → 0 |
+| a3 sixteenths | 54 → 55 of 111 | −50..+50 | −28..−5 | 32 → 0 |
+| e5 eighths | 64/64 | −20..+20 | −18..−8 | 1 → 1 |
+| e5 sixteenths | 80/127 | −30..+30 | −18..0 | 10 → 1 |
+
+The spread tightens three- to four-fold on every section and lands on a
+constant −13 to −20ms: the re-timed labels sit at the RMS *peak*, the verifier
+fires at the *rise*, and that lag is uniform where before it was scattered.
+Per-label "closer/farther" counts (e.g. e5 sixteenths 49 closer, 27 farther)
+are inflated by that constant and are not the right reading. On `a3-di` the
+verifier's unsupported list (span never above the engine's gate) went from
+eleven labels to six.
+
+### Inter-onset intervals against a human reference
+
+A grid has zero spread by construction. A human does not. `quarters-di` and
+`held-then-picked-di` carry measured one-to-one onsets and are the reference
+for how this player's intervals scatter.
+
+| series | n | nominal | SD | MAD | within ±20 / ±40ms |
+|---|---|---|---|---|---|
+| **human:** `quarters-di` | 71 | 500 | 16.5 | 10 | 85% / 99% |
+| **human:** `held-then-picked-di`, quarter-note IOIs | 95 | 500 | 20.1 | 10 | 83% / 94% |
+| e5 eighths, grid+ear | 63 | 250 | 0.0 | 0 | 100% |
+| e5 eighths, re-timed | 63 | 250 | 21.5 | 12 | 75% / 90% |
+| e5 sixteenths, re-timed, both ends moved | 104 | 125 | **22.0** | 13 | 82% / 98% |
+| e5 sixteenths, re-timed, ≥1 end still on grid | 22 | 125 | 38.6 | 20 | 55% / 82% |
+| a3 eighths, re-timed | 71 | 250 | 21.3 | 14 | 62% / 93% |
+| a3 sixteenths, re-timed, both ends moved | 46 | 125 | 35.8 | 16 | 70% / 87% |
+| a3 sixteenths, re-timed, ≥1 end still on grid | 64 | 125 | 45.2 | 40 | 23% / 47% |
+
+The re-timed e5 sections and the a3 eighths scatter like the human reference
+(SD 21–22ms against 16–20; MAD 12–14 against 10): not tighter than a player,
+which would have meant snapping to something periodic, and not wildly looser,
+which would have meant losing the beat. The a3 sixteenth section does not: 22
+of its 110 intervals are under 85ms and 17 are over 175ms, in 22 adjacent
+short/long pairs, and **every one of the 39 involves one of the 33 labels the
+re-timing left on the grid.** That is the interleaving the brief warned about,
+quantified.
+
+### The ear points, leave-one-out
+
+Unlocking one owner-confirmed label at a time and reading the script's
+proposal for it is a genuine accuracy measurement at six points; the 6/6 above
+is not.
+
+| label | owner's ear | proposal, unlocked | Δ |
+|---|---|---|---|
+| a3 `s1627` | 23275 | 23280 | +5 |
+| e5 `s1662` | 25572 | 25583 | +10.5 |
+| e5 `s1684` | 28339 | 28345 | +6 |
+| e5 `s1698` | 30075 | 30075 | 0 |
+| e5 `s16108` | 31344 | 31348 | +3.5 |
+| e5 `s1615` | 19613 | **19745** | **+132** |
+
+Five of six within 11ms. The sixth is a whole sixteenth off, and the
+neighbourhood explains it. Peaks in both renders between 19.0 and 20.1s sit at
+19042, 19275, 19370 (weak), 19513, 19617 (weak, prominence 1.2), 19750, 19837
+(weak), 19978, 20090 — nine picks, alternating strong and weak, for the nine
+labels `s1610`–`s1618`. Counted in order, the pick at 19617 is `s1614`'s and
+19750 is `s1615`'s, which is exactly what the unlocked script proposed. The
+owner reported a *time* (19.613s, correct — he heard the weak pick the envelope
+barely registers); the lock enforces an *id*, `s1615`, that the ear never
+asserted. With the lock, the yield rule then freezes `s1614` on its grid
+position, 38ms before the real pick at 19613, and the pick at 19750 carries no
+label at all. The same 38ms pair exists in `b5cf94b`, where the correction was
+applied to `s1615` without revisiting `s1614`; `7a216fe` preserved it rather
+than created it. It is the one place the lock made the labels worse than the
+unlocked method would have, and it needs the owner to say which sixteenth the
+19.613s pick is, not a re-run.
+
+### The A3 sixteenth section, specifically
+
+- The re-timer located 78 of 111 picks. A plain onset function on the DI finds
+  84–89 events in the section at a sane floor (74 at a strict one), against 111
+  labels: roughly a third of this player's off-beat sixteenths on A3 are too
+  quiet for any envelope method, and the labels for those stay on the grid,
+  up to ±65ms from where the pick would be by interpolation. The 33 are `s166
+  s1611 s1614 s1618 s1623 s1625 s1627 s1630 s1636 s1638 s1641 s1643 s1646
+  s1648 s1650 s1652 s1658 s1659 s1663 s1667 s1675 s1677 s1679 s1681 s1683
+  s1685 s1687 s1690 s1693 s1696 s1697 s1699 s16107` (the four unmoved eighths
+  are `e823 e834 e842 e870`; on e5, `e817 e824 e831 e833 e844 e856 e864` and
+  `s164 s169 s1614 s1615 s1669 s1670 s1678 s1684 s1694 s1696 s1698 s16108`).
+- Where a pick is missing the alignment's skip choice can be an exact tie. At
+  `s1652`–`s1654` (grid 26355/26480/26605; picks 26285, 26420, 26540, then a
+  240ms gap to 26780) the two assignments cost 265 each; the script skipped
+  `s1652`, the count-consistent reading skips `s1654`. Both label the same
+  real picks — only the phantom's position differs — so this is not a cascade,
+  but it is a coin toss the method cannot call.
+- The section has pick-like events with no label at both ends, in the grid and
+  the re-timed set alike: 19.89s (prominence 5.3, between `e872` at 19.760 and
+  `s161` at 20.020, 130ms from each) and 33.96s (prominence 6.5, 145ms after the
+  last label). With `s1692` removed by ear the section holds 111 labels; the
+  audio shows 112–113 pick-like events. Whether the take ends at 33.815s or
+  33.960s, and whether the sixteenths begin a pickup early, is the player's to
+  say.
+- Around the removed `s1692` (31.355s) the DI shows a weak rise at 31.357s
+  (0.29 against ≈3.3 for the strong picks) and nothing at all near 31.16s; the
+  ear's "no pick" is consistent with the audio. Around e5's removed `s1628`
+  (21.325s) the DI shows a weak event at 21.302s of the same strength (0.88) as
+  the events at 21.050s and 21.552s that the re-timing *did* label (`s1626`,
+  `s1630`). The ear outranks the envelope; the owner may still want to hear
+  those three off-beats as a set.
+
+Per label, nothing in this section got worse: 78 labels moved onto DI events
+(median |Δ| 43ms, p90 62, none beyond 68) and 33 stayed where they were. As a
+*sequence* it is now non-physical, and no instrument available here can verify
+it from the other render. It is flagged, not reverted: a wholesale revert would
+discard the three verified sections to protect a fourth that a revert would not
+improve.
+
+### The amped labels were never the DI timings
+
+`docs/SAME-PITCH-MATERIAL.md` said the amped renders carry the DI timings. For
+the two fast takes they do not, and never did: each render's grid was anchored
+on its *own* first envelope rise, which fires late on the compressed signal, so
+the amped grids sit **195ms (A3) and 225ms (E5) after the DI grids** while the
+audio is aligned to 2.5ms. The owner's corrections show it directly: the same
+physical pick at 31.344s is `s16108` in `e5-di` and `s16106` in `e5-amped`; the
+same phantom at 21.3s is `s1628` in DI and `s1626` in amped. Consequences:
+
+- The brief's fourth declared weakness — that the DI removal at 34.050 should
+  carry to `e5-di`, and so on — transfers by id, which is invalid here. There is
+  no `e5-di` label at 34.050 to remove (its last is 33.810, and the amped
+  `s16128` at 34.050 the owner removed sat *after* the last pick of the
+  performance precisely because that grid runs 225ms late).
+- In the sixteenth sections the amped files' own labels sit at chance on their
+  own audio (OSF@label 0.12 against 0.10; 87 of 126 within 25ms of a strong
+  peak against 115 for the re-timed DI labels +2.5ms). The amped eighth labels
+  are on picks. The natural repair is to carry the re-timed DI *times*, not
+  ids, across at +2.5ms — a label edit, so the owner's call.
+- `quarters` really is identical on both renders (0 of 72 differ);
+  `held-then-picked`'s amped labels differ from its DI labels by a median 15ms
+  (max 26).
+
+### What this leaves for the owner
+
+1. Which sixteenth the 19.613s pick is (`s1614` by count), and with it the
+   phantom at 19.575 and the unlabelled pick at 19.750.
+2. Whether `a3`'s sixteenths begin at 19.89s and end at 33.96s (111 labels
+   against 112–113 events).
+3. Whether to carry the re-timed DI times to the amped files at +2.5ms.
+4. The three weak off-beats at 21.050 / 21.302 / 21.552s in `e5-di`, two of
+   which are labelled and one of which he removed.
+
+**Resolved the same day, by ear.** The owner listened to the four DI sections
+named above and gave every pick attack he heard (37 times in all). Applied
+verbatim: on `e5-di`, `s1610`–`s1620` and `s1626`–`s1632` take his times,
+which puts the 19.614s pick on `s1614` and 19.744s on `s1615` exactly as the
+count said, and `s1628` is restored at 21.297s, a pick he now hears 28ms before
+the grid position he had judged empty. On `a3-di`, `e869`, `e871`, `e872`,
+`s161`–`s167` and `s16108`–`s16112` take his times; both section-end events are
+real picks and are now labelled (`s160` at 19.875s, `s16113` at 33.955s, the
+latter "slight"); `e870` (grid 19.230s) had no pick under it and is removed;
+and two very weak picks at 19.131s and 19.599s are deliberately *not*
+labelled — he calls them bad playing and says missing them is fine, and a
+label here is by definition an event the recognizer must find. Of the 31 labels
+he timed that the re-timing had moved, the re-timing was within 5ms of his ear
+on 21, within 15ms on 29, and 25ms out on one (`s16110`). Counts are now 192
+(`e5-di`) and 184 (`a3-di`). Items 1, 2 and 4 above are closed; item 3 (the
+amped files) is deferred on his instruction, and the remaining DI work is the
+A3 sixteenth section's 33 unmoved labels, which the same listening method can
+settle in seven time windows.
+
+Every window used here was checked against the material's spacing before being
+trusted: the nearest-peak search is bounded at ±62ms and at the midpoints to
+the neighbouring labels, the onset function's peak-separation is 20ms, and its
+window 10ms — all under the 125ms sixteenth. Numbers in this section come from
+scratch scripts kept outside the tree; the repository scripts they were built
+on are `verify-fixtures.ts` (run with the `b5cf94b` labels substituted in
+memory, the tree untouched) and `retime-gridded-labels.ts` (run against the
+`b5cf94b` labels with output redirected away from `fixtures/`).
+
+## A tail fragment is short FOR THE PACE: the first gate that costs nothing
+
+DECISION-028 closed the per-boundary threshold family and named what it thought
+came next: "what a listener uses on this material is not one number at one
+boundary — it is four evenly spaced events carrying the same envelope shape,
+which is a claim about a SEQUENCE." This is that claim, built, measured and
+shipped. It is the first change in this line that removes phantom Notes at
+**zero cost in played ones**.
+
+### The measurement that reopened it
+
+`measure-restrike-oracle.ts` had already found the discriminator and then hidden
+it. Its candidates had to end "by a pitch step", and on the same-pitch material
+— where 294 of the corpus's 318 same-pitch contiguous extras live — the next
+event is the SAME pitch, so almost none qualified: 218 candidates against a
+corpus carrying 407 extra Notes. `measure-rate-relative-merge.ts` widens the set
+to every Note opened by an accepted, settled, same-pitch re-articulation, which
+is 1,237 decisions, 408 of them spurious.
+
+On that population the discriminator is much stronger than anything previously
+measured here:
+
+```
+  fragment span / true local interval   AUC 0.905
+  fragment span alone (control)         AUC 0.788
+  pair span / true local interval       AUC 0.867
+  boundary age / true local interval    AUC 0.666
+  dipRatio at the boundary              AUC 0.616
+```
+
+For scale, the whole of DECISION-028 ran on witnesses topping out at 0.698, and
+its best new one, the envelope dip, reached 0.763. The reason the rate matters
+is visible in the raw distributions: the spurious fragments sit at a median 1.01
+of a local interval when you measure the PAIR they form with their predecessor,
+and the real ones at 1.98. One played note split in two, against two played
+notes. The corresponding absolute numbers do not separate at all — the median
+spurious fragment is 93ms and a real sixteenth at 140bpm is 107ms, which is why
+a bar of 80ms costs 77 played notes and one of 100ms costs 173.
+
+### The estimator is the binding constraint, and the failure is one-directional
+
+Replacing the true rate with one the engine could actually hold — the median of
+the last eight gaps between Note openings — drops the same test from 0.905 to
+0.805, barely above the no-rate control. That gap is the circularity: a phantom
+INSERTS an onset, which splits one true interval into two short ones, so the
+estimate is corrupted by exactly the errors it exists to correct.
+
+Three repairs were measured and only the last matters.
+
+| repair | result |
+|---|---|
+| upper percentile of the recent gaps | AUC 0.805 -> 0.829; bias fixed (reads fast on 396 of 1171 rather than 753); end-to-end trade no better |
+| autocorrelation of the audio envelope | **failed**: envelope/true spreads 0.31 (p25) to 2.02 (p75), octave errors both ways, AUC 0.622 |
+| two-pass — strict merge, re-read the rate from survivors | +2 missed for -32 false positives; no better than one pass |
+
+The audio-side estimator is worth recording as a negative, because it is the
+obvious idea: read the pace from the signal, where no segmentation error can
+reach it. `docs/SAME-PITCH-MATERIAL.md` already says why it cannot be trusted —
+"in the E5 take the strongest envelope periodicity sits at the note period,
+while in the A3 take it sits at twice it, on the accent" — and taking the
+shortest qualifying lag rather than the strongest did not rescue it.
+
+What does make the estimator safe is an asymmetry rather than an accuracy. A
+missed onset merges two intervals and can only make a gap LONGER; a phantom
+splits one and can only make it SHORTER. The bar is a FRACTION of the interval,
+so a long reading raises it and suppresses real notes while a short reading
+merely does less. Only one of the two errors is dangerous.
+
+### The second witness is what makes it free
+
+The rate test alone, at every bar worth having, costs one played note on
+`lead-line-di-sixteenths` — hand-labelled held-out data at 107ms spacing, where
+a real note and a fragment are genuinely the same length. Adding the envelope
+dip as a second, INDEPENDENT condition — one reads time, the other energy —
+removes that cost entirely:
+
+```
+  DERIVATION (bar chosen here)                     HELD OUT (reported after)
+  fragment/rate <= 0.30 AND dip >= 0.85   +0 missed, -27 fp     +0 missed, -3 fp
+  fragment/rate <= 0.35 AND dip >= 0.85   +0 missed, -35 fp     +0 missed, -4 fp
+  fragment/rate <= 0.40 AND dip >= 0.85   +2 missed, -40 fp     +0 missed, -4 fp
+```
+
+0.35 is the last bar that costs nothing on derivation; 0.40 costs two. The dip
+bar of 0.85 is deliberately high — at 0.5 the rule fires four times as often and
+takes labels with it at every span bar tried.
+
+### Shipped as an announce bar, not a retraction
+
+The fragment's own span is only known once it has ended, so the obvious
+implementation is a deep-lane retraction: announce the Note, then withdraw it
+with `structuralRevision` / `relation: "absorbed"`. Measured against the far
+simpler alternative — never announce it at all, and let `end()` discard it as a
+Note that failed its bar, which is machinery that already exists — the two give
+**identical** numbers (DERIV +0 missed / -35 fp; HELD-OUT +0 / -4). So the
+simple one ships. A suspected fragment is announced only once it has outlasted
+`tracking.rateFragmentSpanFraction` of the local interval; latency is paid only
+on a boundary that is doubtful in both witnesses at once, and at sixteenth
+spacing the computed bar falls below `minStableMs` and the rule is inert.
+
+### The bench lied, twice, and the pipeline caught it
+
+Worth recording in full, because this repository has now hit "a bench ranking is
+not a pipeline ranking" five times and two of them are in this entry.
+
+The offline simulation predicted -43 emitted Notes and zero missed labels. The
+first engine build gave **-25 extras and a NEW informational failure**, on
+`lead-line-amped-sixteenths`'s pitch-class gate. Simulating a merge on a
+detection list assumes the rest of the pipeline is unchanged, and it is not:
+refusing to announce a Note changes what the tracker has open, what the deep
+lane re-segments, and what absorbs what.
+
+Diagnosis by instrument rather than by hypothesis, after two guesses had already
+failed. The suppressed Note was `n3` on that take: 147ms long, real, and killed
+by a bar of 175ms. 175 is `0.35 x 500`, and 500 was the estimator's FALLBACK —
+a whole note at 120bpm, applied at 3.7s into a take playing 107ms sixteenths,
+before any gap had been measured. Every percentile of the estimator failed
+identically because at the start of a take none of them has a gap to read. **The
+fix is to abstain**: the rule's claim is "shorter than a note at the pace
+currently being played", and with no pace measured there is no such claim, so
+`localIoiMs` returns null and the bar is left alone. Removing that one fallback
+took the corpus from 320 splits with a regression to 318 with none.
+
+### End to end
+
+Measured with the labels as of the same day's listening pass, `npm run eval`
+PASS with the single pre-existing informational failure
+(`power-chords-b-a-g-fsharp-b-a-g-e-140bpm`), 499 tests passing, and
+`fixtures/` untouched.
+
+| | before | after |
+|---|---|---|
+| missed labels | 159 | **159** |
+| false positives | 346 | **314** |
+| events split | 339 | **318** |
+| extra Notes | 407 | **379** |
+| detections | 1779 | 1747 |
+| `clean-lead` gated pitch class | 92.9% | 92.9% |
+
+Per fixture, where it moved: `held-then-picked-amped` 61 -> 48 split and 78 ->
+60 extras, `same-pitch-eighths-sixteenths-e5-amped` 30 -> 26 and 38 -> 34,
+`same-pitch-eighths-a3-amped` 56 -> 55, `same-pitch-quarters-amped` 51 -> 50,
+`lead-line-amped-quarter-eighth-triplet` 26 -> 25, `lead-line-mic-quarter-eighth-triplet`
+14 -> 13. Nothing regressed on any fixture.
+
+The envelope dip from DECISION-028 ships as a WITNESS here while the gate that
+decision rejected does not: `AttackEvidence.dipRatio` is now load-bearing, and
+the `rearticulationDipRatio` bar that scored one-real-note-per-phantom on its
+own is removed rather than left inert.
+
+### The ceiling of this lever, measured on top of the shipped change
+
+Asked afterwards, because the obvious next move is a better tempo estimator and
+it is worth knowing what one could buy. The rate was replaced with the oracle —
+the median gap between the LABELS around each candidate, which no causal
+detector can have — and the same gate re-run over the corpus as it now stands.
+Derivation false positives, against the post-change baseline of 232:
+
+| gate | derivation fp | derivation missed |
+|---|---|---|
+| shipped, estimated rate, span 0.35, dip 0.85 | **-35** | **+0** |
+| ORACLE rate, span 0.35, dip 0.85 | -49 | +3 |
+| ORACLE rate, span 0.50, dip 0.85 | -72 | +5 |
+| ORACLE rate, span 0.70, dip 0.85 | -84 | +37 |
+| ORACLE rate, span 0.50, no dip condition | -172 | +24 |
+| ORACLE rate, span 0.90, no dip condition | -193 | +365 |
+
+**A perfect clock is worth about twice the reach and it is no longer free.** The
+last row bounds the whole lever: even removing every fragment short for the pace
+caps out near -193 on derivation, and the cost curve is vertical long before it.
+Tempo estimation is therefore not where the remaining phantoms are, and a future
+attempt should not start by building a better one.
+
+What the same run says is where they are: on this population fragment span over
+the true rate scores **0.926** AUC and the dip that gates it scores **0.636**. A
+gate is as wide as its weaker half, and every boundary witness this project has
+measured sits at or below 0.70. **The second witness is the binding constraint,
+not the clock.**
+
+### Three ways to read the rhythm instead, all measured, none kept
+
+Prompted by the owner, who asked whether the recent-note-duration estimate could
+be biased better, and observed that fast notes come in groups so a lone very
+short note before a long one is musically implausible. All three were measured
+on the same 1,237 candidates, on top of the shipped change.
+
+**The gap shape.** For each candidate, the gap to the Note before it against the
+gap to the Note after it. This needs no rate estimate at all, which is why it
+was worth trying: the estimator is the binding constraint on everything else
+here. The distributions confirm the picture and correct its direction — the
+phantom is the TAIL of a played note, not its head, so it sits LATE in the note
+it was cut from:
+
+```
+  gapAfter / gapBefore    spurious  median 0.36   matched  median 1.00
+  AUC 0.779, with no clock anywhere in it
+```
+
+Better than the dip (0.636) and close to the causal rate test (0.826). It is
+nonetheless **the same quantity already in the table above** under another name:
+a tail fragment ends where the next Note begins, so its `gapAfter` IS its span,
+and `gapAfter / gapBefore` is `fragment / predecessor span`, measured at exactly
+0.779. End to end it is dominated — `<= 0.40` with the dip removes 28 derivation
+false positives for **+7 missed labels**, against 35 for zero. OR-ing it onto the
+shipped gate is strictly worse than the shipped gate alone.
+
+**The run length.** How many consecutive gaps around this one are the same
+length, within 40%. The owner's "more than three of them" stated as a feature.
+AUC 0.686, and unusable: spurious runs have a median length of 1 and so do the
+first quartile of REAL notes. Chords and slow passages make a real note isolated
+by construction, so `runLength < 2` takes 145 played notes off the derivation
+set.
+
+**A different percentile of the recent gaps.** p75 and p90 rank better than the
+median (0.837 and 0.851 against 0.826), and the bench said p90 with the span bar
+re-chosen to 0.20 was worth seven more derivation false positives for free. **In
+the pipeline it is worse**: false positives 323 against 314 and extra Notes 386
+against 379, because p90 reads about 1.13x the median and 0.20 x 1.13 is
+stricter than the shipped 0.35, not looser. Every p90 bar loose enough to beat
+the shipped one costs played notes. The median at 0.35 stands.
+
+That is the third time in this one entry that the offline simulation disagreed
+with the engine. The rule is now explicit: **on this decision, a bench number is
+a hypothesis and only `npm run eval` plus `measure-splits.ts` settle it.**
+
+### Restricting the gate to monophonic Notes: measured, and refused
+
+The owner asked whether the deep lane should recognise obvious polyphony and
+keep this gate off chord material, on the reasoning that a strum spreads six
+strings over tens of milliseconds so a short span there can be a legitimate
+partial rather than a tail. The premise is sound and the corpus backs it: about
+107 chord labels against 1,485 single-note ones, so the bar is essentially
+underived on strummed material.
+
+The tracker already has the flag. `contextHarmonic` is a smoothed harmonic
+estimate, `record.polyphonic` is it thresholded at 0.5, and
+`fast/rearticulation.ts` already branches the re-articulation decision on it
+into a separate chord path that deliberately never falls through. So the change
+was one condition: do not raise the bar on a polyphonic Note.
+
+**It was expected to be a no-op and it is a regression.**
+
+| | shipped | monophonic-only |
+|---|---|---|
+| missed labels | 159 | 159 |
+| false positives | **314** | 319 |
+| events split | **318** | 322 |
+| extra Notes | **379** | 383 |
+
+It also fails at its own purpose, which is the informative half. Firings on the
+chord takes fall 31 to 17, but **discards on the chord takes go 9 to 9 — not one
+of the cases the restriction exists to prevent is prevented.** Those nine sit at
+moments the tracker does not read as harmonic: a power chord is a dyad, and a
+strum that has decayed to one ringing string is monophonic by this estimate.
+
+Every one of the five lost discards is on `held-then-picked-six-strings-120bpm-amped`
+(58 firings / 25 discards down to 45 / 20), which is monophonic by construction —
+one string plucked at a time. So the flag reads polyphonic on distorted
+single-note material, which is the same compression-and-distortion problem that
+makes that take the worst in the corpus.
+
+**The measured statement is therefore about the flag, not about the idea:**
+`polyphonic` is a room-context estimate, and at this decision it is wrong in both
+directions — silent on the chord cases that want it and firing on the distorted
+monophonic ones that do not. Reverted; the shipped gate is unchanged at 159 /
+314 / 379.
+
+The idea is not dead, only this implementation of it. A per-Note claim would be
+the thing to try instead of a room-context one: `harmonyBloomed` on the
+PREDECESSOR records that the Note shedding the fragment actually proved itself a
+chord, which is a much stronger statement than "the room has been harmonic
+lately". That is untested, and it belongs with the separate chord question
+below.
+
+### What this does not do
+
+The amp-sim takes still carry most of the defect — `held-then-picked-amped` is
+48 of 120 events split after this, against 8 of 120 on the direct render of the
+same performance. The rule removes the fragments that are short for the pace and
+sit on a boundary with no gap under it; it says nothing about a fragment that is
+a full note long, and DECISION-026's headline gap between signal paths is
+unchanged in kind. What has changed is that the sequence framing is no longer a
+hypothesis: it is measured at 0.905 against 0.698 for everything read at the
+boundary, and the first gate built on it costs nothing.
+
+## Rhythm features at the boundary: the learned-model gate, and it fails
+
+DECISION-030 shipped a rate-relative fragment bar and measured its leading
+feature at 0.926 AUC against a true clock — far above the 0.698 every witness
+read AT the boundary tops out at. The obvious follow-up is a learned model, and
+DECISION-021 already spent a conv net on this decision and lost. So before
+training anything a second time, the cheap gate: **offer the same rhythm
+features to a plain logistic regression on the existing decision table and see
+whether they move cross-take generalisation.** A regression is the floor. If the
+information does not show up there, no network over the same inputs will find
+it.
+
+The falsifier was stated before running: leave-one-take-out AUC must clear
+0.702 (the best single witness in-sample) by more than the spread across folds,
+AND at a threshold costing zero labels it must remove materially more than the
+0 of 635 false positives that everything currently removes.
+
+**Both clauses fail.** The result is negative and nothing is wired.
+
+### The runs
+
+Derivation, 1,627 rows / 992 positives / 13 takes, L2 logistic regression at
+lambda 0.01. Group **P** is PROSPECTIVE — available at the instant the decision
+is made: the local note rate, `soundedMs` over that rate, the last gap over that
+rate, and the coefficient of variation of the last eight gaps. Group **R** is
+RETROSPECTIVE — time from the decision to the next Note boundary, raw and over
+the rate, defined for accepted and rejected rows alike.
+
+| configuration | cols | in-sample | 5-fold | **LOTO** | FP at zero label cost |
+|---|---|---|---|---|---|
+| twelve witnesses (control) | 12 | 0.717 | 0.711 | **0.593** | 635 / 635 |
+| twelve + P | 17 | 0.741 | 0.733 | **0.603** | 633 / 635 |
+| twelve + R | 15 | 0.721 | 0.712 | **0.592** | 635 / 635 |
+| twelve + P + R | 19 | 0.742 | 0.733 | **0.603** | 633 / 635 |
+| P alone | 5 | 0.626 | 0.622 | **0.539** | 634 / 635 |
+| R alone | 3 | 0.583 | 0.584 | **0.431** | 634 / 635 |
+
+Clearing the bar would need 0.828. The best configuration reaches 0.603, which
+misses by 0.099 before any margin is asked of it. Two false positives of 635
+become removable, 0.3%. A lambda sweep changes nothing (LOTO 0.603 / 0.602 /
+0.574 / 0.399 at 0.01 / 0.1 / 1 / 10).
+
+What DID move is in-sample 0.717 -> 0.742 and pooled 5-fold 0.711 -> 0.733, and
+pooled held-out 0.723 -> 0.749. All three pool across takes, which is precisely
+the within-take scale memorisation this table exists to expose. None of it
+reaches LOTO. Every configuration still accepts all 254 held-out negatives at
+the zero-label operating point.
+
+### The retrospective group is the WEAKER one, which was not the expectation
+
+The brief said in advance that "P fails but R passes" would be a positive
+result, because it would mean the evidence does not exist when the fast lane
+must decide and a retraction-based design is required. That did not happen. R
+moves LOTO by −0.001 and scores 0.431 alone, worse than chance out-of-take. The
+fitted model gives `nextBoundaryOverIoi` a weight of −0.01, i.e. it discards it.
+**There is no case here for announcing and retracting.**
+
+The one way R could have been fake was checked and ruled out: a split's own
+`opened` lands at the burst, at or before the deciding hop, so a naive
+definition would read ~0 on every accept and merely re-encode `accepted`.
+Excluded by trace order and timestamp, accepted rows read a median 147ms and
+rejected 267ms, so the feature is defined and non-degenerate on both halves.
+
+### Per feature, and what carries the little there is
+
+| feature | group | oriented AUC | rows present |
+|---|---|---|---|
+| `soundedOverIoi` | P | **0.708** | 1496 |
+| `gapCv8` | P | 0.601 | 1399 |
+| `localIoiMs` | P | 0.578 | 1496 |
+| `nextBoundaryMs` | R | 0.573 | 1627 |
+| `nextBoundaryOverIoi` | R | 0.533 | 1496 |
+| `gapBeforeOverIoi` | P | 0.525 | 1496 |
+
+`soundedOverIoi` is the only new feature to beat any existing witness.
+Pace-normalising `soundedMs` takes it 0.646 -> 0.708, a real +0.062 — the
+DECISION-030 framing working exactly as advertised — but it correlates 0.794
+with raw `soundedMs` and still only ties `fluxRatio` at 0.702. In the exhaustive
+sweep over all 171 pairs the best is now `fluxRatio` + `localIoiMs` at 0.687
+LOTO, ahead of the previous best pair at 0.679, and still under `fluxRatio`
+alone in sample.
+
+### Where the rate abstains is where it was most needed
+
+`localIoiMs` is missing on 131 of 1,627 derivation rows (8.0%) and 79 of 564
+held out (14.0%), and the missingness is wildly take-dependent:
+
+```
+  cowboy-chords-c-d-em-g-c-d-em-am-120bpm   20 of 28 rows (71%)
+  the three 140bpm cowboy takes             59-64%
+  power-chords-c-a-g-e-c-d-fsharp-e-120bpm  62%
+  the eight same-pitch takes                0.4-1.3%
+```
+
+On sparse chord material the openings are far enough apart that the 1,500ms
+reset keeps firing and no rate exists. That is the correct behaviour — no pace
+measured, no claim made, which is the fix DECISION-030 had to make — but it
+means **Group P abstains on exactly the material where the existing witnesses
+are weakest.** Adding P also *hurts* `held-then-picked-amped`, 0.479 -> 0.463,
+the largest negative-heavy take in the set. Four of twelve folds sit below 0.52
+in every configuration.
+
+### The real finding: two benches in this repository measure different things
+
+This is the part worth carrying forward, and it was not what the experiment was
+looking for.
+
+`measure-rate-relative-merge.ts` scores the rate feature at 0.826. On this
+table the same idea reads 0.533. The estimate is not the reason. Scored on the
+rate study's OWN sub-population — accepted, settled, same-pitch, 1,038
+derivation rows, where `nextBoundaryMs` IS the child Note's span — the same
+feature on the same rows gives:
+
+```
+  against the rate study's target    0.805   (span alone 0.796)
+  against this table's target        0.526
+```
+
+The first reproduces the rate study's 0.81 / 0.79 almost exactly, so the feature
+and the estimator are fine. **The two targets are different questions, and they
+disagree on 278 of 1,038 rows — 26.8%.**
+
+- This table asks a BOUNDARY-shaped question: does an uncovered label begin
+  within 70ms of this decision, so should the split have been made?
+- The rate study asks an OUTCOME-shaped question: did the matcher pair the Note
+  this split created with a label, so is this emitted Note surplus?
+
+162 rows have a boundary that was right while the child went unpaired; 116 have
+a boundary that was wrong while the child got the label. Both files describe
+themselves as being about the same-pitch re-articulation decision.
+
+**Which one is correct depends on what is being decided, and the shipped gate
+operates on the outcome-shaped one.** A consumer scoring one target per pick
+pays for surplus Notes, not for boundaries. So:
+
+- For a question about surplus Notes, the outcome-shaped target is the right
+  one and this decision table is the wrong instrument.
+- For a question about segmentation, the boundary-shaped target is right.
+- **DECISION-021's rejection of the learned onset head was measured against the
+  boundary-shaped target**, on 161 rows with 59 positives. That verdict stands
+  for the question it asked. It is not evidence about a model trained and judged
+  on surplus Notes, which is a different experiment that has never been run.
+
+That is the fifth instance of "a bench ranking is not a pipeline ranking" in
+this document, and the sharpest: not a bench disagreeing with the engine, but
+two benches disagreeing with each other about the ground truth for a quarter of
+their shared rows.
+
 ## Lessons carried over from the retired lineage
 
 DECISION-023 closed the pre-rewrite `src/core/` lineage on its held-out numbers.
@@ -4000,3 +5075,745 @@ axis spends four fifths of its points below 1kHz while the partials separating a
 guitar note from its octave are the high ones. The full list, including the
 Viterbi-over-NNLS variants and the NNLS octave arbiter, is in §8 of the archived
 handoff.
+
+## The direct input, measured to its ceiling
+
+The four DI takes — 127 held-out events on one guitar, one performer and one
+interface — were asked the prior question every miss and every extra reduces
+to: is the information in the signal, and which function sees it. Four
+scripts, every number read on the held-out takes with the constants chosen on
+the take measured, which makes each one a CEILING and not a result; the plan
+built on them is `docs/DI-ACCURACY-ROADMAP.md`. Engine at `f3bf223`, bit
+identical before and after: nothing here changed a detection.
+
+Where the DI stands under the shipping engine: 6 missed (all six on the
+sixteenths, all six "no transient within the window"), 25 extra Notes (21 on
+the triplet take, 4 on the cowboy take), 117 of 127 named exactly, onsets
+inside every gate.
+
+### Onsets: at a 2.67ms hop, log-compressed flux sees 126 of 127
+
+`scripts/measure-di-onset-ceiling.ts`, seven causal functions at a
+128-sample hop, each swept over its whole range and scored under
+NEAREST-label attribution inside ±30ms (narrower than the 63ms rushed pair
+`s19`/`s20`; the ±60ms reading that once produced "48/48" on this material
+is the window-wider-than-the-spacing error and is not repeated):
+
+| function, best point per take, summed over the four DI takes | covered | off-label | at 0 off-label |
+|---|---|---|---|
+| linear flux over frame magnitude (the kernel's shape) | 126/127 | 88 | 50/127 |
+| band-limited flux 1.5–6kHz | 126/127 | 72 | 11/127 |
+| log-compressed flux | 126/127 | 23 | 90/127 |
+| SuperFlux (±1-bin max-filtered reference) | 126/127 | 17 | 90/127 |
+| SuperFlux minus its trailing 100ms median | 126/127 | 15 | 107/127 |
+| 1.5kHz-highpassed 1ms envelope rise | 114/127 | 179 | 23/127 |
+| order-16 LPC prediction residual | 125/127 | 189 | 69/127 |
+
+The sixteenths read 47/48 for every flux variant against the kernel's 42;
+the one uncovered is `s14`, the label the labeller placed by subdivision.
+Listed candidate by candidate, the eleven off-label firings on the
+sixteenths at that point are nine candidates 32–51ms before a downstroke,
+each followed within 65ms by a candidate 13–30× stronger, one candidate
+43ms before the interpolated `s14`, and the terminal mute; on the triplet
+take the three are 52–65ms before an eighth note with the envelope
+collapsing behind them. **They are the pick landing on the
+string before the stroke.** With the veto "a candidate followed within 65ms
+by one ≥4× stronger is a preparation" the triplet take reads 55/55 with zero
+off-label, the power chords 16/16 with zero, the sixteenths 47/48 with two
+(the terminal mute; a candidate 43ms before the interpolated `s14`), the
+cowboy chords 8/8 with one strum-internal transient 68ms after the strum.
+126/127, six off-label, all six accounted for.
+
+**Refuted in the same pass.** A single fixed threshold across the four takes:
+with the preparation veto the best points sit at 0.145 (sixteenths), 1.86
+(triplet), 0.49 (power chords) and 3.0 (cowboy chords) on the
+median-subtracted SuperFlux, and at a single 0.25 the sixteenths and power
+chords hold (47/48 with 2 off-label, 16/16 with 1) while the triplet take
+fires 27 times and the cowboy take 65 times off-label, 27 and 48 of those
+with the envelope falling behind them. So the fine function is a proposal
+stage and whether energy followed remains the tracker's question. A mute
+veto keyed on the 20ms envelope 35ms later falling under half its value 5ms
+before takes the triplet take to 55/55 with zero off-label at 0.25, leaves
+the cowboy take's 65 where they were, and removes `s6` and `s40`, two real
+strokes that are picked and damped inside 40ms; refined to require no rise
+at all in the 5ms envelope within 16ms it still removes them, because their
+rebound comes 25–35ms after the label. Not the right form.
+
+### Pitch: given the boundary, the engine names the note by +15ms
+
+`scripts/measure-di-pitch-ceiling.ts`, the engine's own dual-window
+estimator with a fresh median, on windows ending a fixed distance after the
+LABELLED onset. Pitch class correct on the triplet take (55): 64% at +10ms,
+96% at +15, 98% at +20, 100% at +30 and +45; on the sixteenths (48): 60%,
+100%, 96%, 96%, 100%. Exact reads the same. No label unnamed by +90ms on
+either take. The pitch 15ms before the pick reads nothing at all on 46 of
+the 55 triplet labels — the string is damped by the pick's contact — and the
+previous stroke's pitch on 21 of the 48 sixteenths. **On a direct input
+every wrong name is a boundary, not an estimate.** (`clean-lead-120bpm`
+reads 7% at +30ms and 56% at +90ms under the same probe, and 28 of its 43
+labels read the *previous* note 15ms before their onset: that take's labels
+sit well ahead of the pick, which is a property of its first-pass timing and
+not of the estimator.)
+
+### The extras, one by one
+
+`scripts/measure-di-extras-census.ts`, from the tracker's own trace and the
+matcher's own verdict. DI triplet, 21: eight step-opened Notes ended by the
+pick 72–196ms later at the pitch the pick then plays (the next note fretted
+before it is picked); five step-opened at a pitch neither neighbour has,
+four of them stubs of 53–67ms (D#5, F5, G5, F4 at confidence 0.7–0.8) and
+one of 107ms, all ending on the pick; seven attack-opened by a transient
+40–130ms before the pick — the
+preparation click the fine-hop function no longer fires on under the veto;
+one tail fragment. Cowboy DI, 4: three first-string fragments of 133–160ms
+kept out of `absorbAttackFragments` by `restruck && announced`, and one
+373ms pre-strum transition. Matched Notes are step-opened as often as
+attack-opened on the triplet take (27 to 28), so the trigger alone is not
+the discriminator; the pairing — a step-opened Note ENDED by an accepted
+attack within a quarter second at the pitch it plays — is.
+
+### Chords: one octave error, twice
+
+`scripts/measure-di-chord-evidence.ts`. `c2` reads Em at +120/+200/+300ms
+(0.99–1.00) and Em7 at +500 and +1200ms, where D5 (salience 3.7–4.8) is the
+third partial of a G3 (1.1–1.4) that lost the cancellation to G4 (3.3).
+`p14` reads Gsus2 at +40 and +120ms, where A4 (2.1–2.2) is the third partial
+of a D3 (1.45) that lost to D4 (4.8–5.1), and G5 from +200ms. Both are f
+chosen over f/2, leaving 3×(f/2) unclaimed; the bass-only sub-harmonic check
+in `kernels/missing-fundamental.ts` is the repair, applied to every
+candidate. `c1` reads D at +40/+120ms and never blooms: the open D voicing
+D3 A3 D4 F#4 is the harmonic series of D2, YIN reads 73Hz at 0.96, and
+`maxMonophonicConfidence` vetoes a chord whose period no string is sounding.
+
+### Observed, and refuted as a detector: the dip before the pick
+
+The 5ms envelope around the strokes the kernel loses: `s6` falls 17dB by
++10ms and rebounds to a −20dB stroke at +40ms; `s40` falls 26dB by +30ms and
+rebounds at +60ms; `s20`, the same-level re-pick 63ms after `s19`, falls
+13dB by +25ms and is back at its previous level by +30ms; the terminal hand
+mute falls 28dB and never rebounds. On this take the pick damps the string
+before it plays it, which is a witness of a different physical basis from
+every energy-increase witness in the same-pitch decision. Built as a
+detection function (`dip-rebound dB`, level-gated at the amplitude gate) it
+reads 97/127 covered at 90 off-label — sustain and room tone dip 6dB
+constantly — so it is not a detector. It is recorded as a candidate witness
+for the decision table, with the bar every candidate there has had to clear
+(0.73 AUC on the derivation rows) and no reading yet.
+
+### Where this left the direct input, and what was then built
+
+Six of the seven shapes above had a named mechanism and a measured repair;
+the seventh (`s14`) is the labeller's own exception. None of them had
+derivation material — the five 120bpm takes hold no quiet alternate-picked
+upstrokes, no re-picked legato and no direct-input chord change — so the
+constants below are held-out readings, each stated as such where it is
+declared, and the derivation set's job was to stay exactly where it was.
+It did: `clean-lead` 42/43 at 1 extra, `chords-a-bm` 16/16 at 0, the five
+takes together 84 Notes, 2 missed, 8 extra before and after every change in
+this section. The two stages that shipped are the single-note ones; the
+chord stage shipped one exception and refuted its other half.
+
+## The direct input, repaired to its measured shapes
+
+Where the four DI takes stand after `DECISION-033`'s first two stages
+(`npm run eval`, twelve 140bpm takes held out):
+
+| take | labels | Notes | missed | extra | named exactly | pitch class |
+|---|---|---|---|---|---|---|
+| `cowboy-chords-di` | 8 | 12 (was 12) | 0 | 4 (was 4) | 6/8 | 8/8 |
+| `power-chords-di` | 16 | 16 | 0 | 0 | 15/16 | 16/16 |
+| `lead-line-di` triplet | 55 | 64 (was 76) | 0 | 9 (was 21) | 54/55 | 54/55 |
+| `lead-line-di` sixteenths | 48 | 46 (was 42) | 2 (was 6) | 0 | 46/48 (was 42) | 46/48 |
+| **total** | **127** | **138 (was 146)** | **2 (was 6)** | **13 (was 25)** | **121/127 (was 117)** | **124/127 (was 120)** |
+
+Across all twelve held-out takes: 429 Notes for 459 labels (was 435), 24
+missed (was 30), 72 extra (was 84). Beyond the DI, the amped sixteenths
+find one more stroke (38 → 39 of 48), the mic sixteenths one more (39 → 40,
+carrying the wrong name), and the mic triplet, the three chord takes and
+the three power takes read what they read before. `power-chords-120` names
+8/8 (was 7/8) from the chord exception below. Nothing else moves.
+
+The downstream ledger (`measure-downstream-ledger.ts --all`) reads 26
+missed labels (was 32), and `measure-splits.ts` 88 of 459 events split
+into 96 extra Notes (was 99 into 107): the DI triplet 23 → 11 split, the
+cowboy-amped take 4 → 3, the amped sixteenths 4 → 5 and the DI sixteenths
+0 → 1 (a fine re-articulation each, inside a label the matcher still pairs
+once), no derivation take moved. The sixteenths' remaining misses on the
+ledger are the same causes as before — too young to be ended, band-only
+transient, never announced — on the amped and mic takes the fine witness
+does not reach.
+
+### Stage 1: the fine-hop witness, corroborated by the dip it was refuted as
+
+`src/engine/kernels/fine-onset.ts` is §2.1's function as a kernel: a
+1024-point window read every 128-sample render quantum, `log(1 + 200·|X|)`
+on magnitudes scaled to the window (the factor of 200 rather than 20 is
+what makes the reading the same on a −40dBFS direct input and a room mic),
+the reference per bin the maximum over the frames 8–24ms back, max-filtered
+over ±1 bin, rectified and summed, minus a trailing 100ms median; local
+maxima over ±13ms above a threshold, 40ms dead time, and the 65ms
+preparation veto (a candidate at least 4× stronger inside the following
+65ms is the pick this one was the contact for). `FastLane` runs it between
+hops and hands what it confirms to the tracker on the next frame
+(`FastFrame.fineOnsets`), where it may open a Note over silence or
+re-articulate the one sounding.
+
+**The threshold, swept on the eval with the witness acting alone**
+(`TUNINATOR_FINE_ONSET=θ npm run eval`). At θ=1 the derivation set fails:
+`clean-lead` 1 → 4 extras, `chords-a-bm` 0 → 1, `cowboy-120` 4 → 7. At 1.5
+`clean-lead` sits at 3 and `cowboy-120` at 7. At 2.5 and 4 `clean-lead`
+sits at 2 (one contact 40–42ms before an acted pick), the amped triplet at
+27 → 32, the DI triplet at 21 → 23 — the two new extras are pick contacts 86
+and 128ms before quarter-note picks, past the veto's reach and not
+separable from a quiet stroke by flux or envelope alone. At every θ from 1
+to 4 the DI sixteenths read 46 of 48 with 0 extras, the mic sixteenths 40,
+the amped sixteenths 41 at θ ≤ 1.5 and 39 above. The witness alone cannot
+be neutral on the derivation set at any threshold that helps.
+
+**Corroboration is what makes it neutral.** §2.5's dip — refuted as a
+detector at 97/127 covered for 90 off-label — is exactly the reading that
+separates a stroke from the flux the witness fires on otherwise. The fast
+lane reads the 5ms envelope around each confirmed onset: `dipDb`, the
+minimum over [−20, +15ms] against the maximum over [−45, −20ms];
+`reboundDb`, the maximum over [+5, +40ms] against that minimum. To
+re-articulate a sounding Note a fine onset needs a dip of at least 6dB and
+a rebound of at least 6dB; to open a Note over silence it needs the
+rebound. With that, and a 55ms dedupe against the broadband kernel's own
+acted attacks (40ms left the `clean-lead` contact through), θ=2.5 reads:
+derivation 84 / 2 / 8, identical; amped triplet back at 27, DI triplet back
+at 21, DI sixteenths 46 (0 extras), mic sixteenths 40, amped sixteenths 39.
+The constants (`transient.fineOnset*`) are held-out readings and say so.
+
+**One clock.** A Note the fine witness opens is under the amplitude gate
+for the hops the dip covers, and the tracker's sounded clock reads zero
+until a frame is audible — `s7` was found, opened, and ended 40ms later as
+"too young". A fine-opened or fine-succeeded Note starts its sounded clock
+at the frame that opened it. Of the sixteenths' remaining two: `s14` is the
+labeller's exception; `s6`, the stroke that falls 17dB by +10ms, is
+confirmed by the witness and its Note is never announced.
+
+### Stage 2: the fretting hand's preparation belongs to the pick
+
+The rule, in `note-tracker.ts` (`claimPrefix`, `offerPrefix`,
+`tryClaimPrefix`): the Note just before a picked Note is that Note's
+preparation — absorbed into it by a `structuralRevision`, boundary at the
+pick — when the fretting hand opened it (a pitch step, or a transient the
+fine witness read as a *contact*), no stroke lies within 80ms before or
+30ms after its start, it ended within a quarter second on the pick, and
+either it carries the picked Note's pitch class or it is contact-led and
+carries a pitch neither the picked Note nor the note before it has. Five
+things were learned building it, each from a measurement that said the
+draft was wrong.
+
+**Most prefixes are the region lane's.** The census's eight step-opened
+prefixes on the DI triplet are, six of them, Notes the region lane carves
+out of the ringing note's tail (`splitAtSegments`) after the pick's Note has
+already been announced — the fast lane read the hammer-on as the old note
+continuing. A rule that runs only when the picked Note is announced finds
+nothing there. So it runs from both ends: at the picked Note's
+announcement, and when the region lane carves a step (`beginFromSegment`),
+which then looks forward for the pick that ended it. Two of the six arrive
+on the region's `energyRise` boundary rather than `pitchChange` — a
+hammer-on injects energy — so only a boundary the region put on a
+fast-lane *attack* is refused. A `rose` flag on segments, tried as the
+discriminator, refused those two and let through the one region-created
+Note on the mic sixteenths that is a picked note the fast lane missed
+(`s8`): reverted.
+
+**What a contact is.** The direct input's contacts — the pick landing, the
+finger arriving — read a dip of 12–24dB and a rebound of 1–5dB
+(`F6973` −23/3, `F6069` −22/3, `F15104` −24/3, `F24755` −13/5, `F25595`
+−12/1). The mic sixteenths' quiet upstrokes read a dip of 3–6dB and a
+rebound of 2–6dB (`F7827` −3/2, `F9488` −3/2, `F6360` −6/6). A contact
+test of "dip past 6dB, or rebound under 3dB" ate five of those upstrokes
+(`s8`, `s16`, `s17`, `s31`, `s46`, each absorbed as the prefix of the
+same-pitch stroke after it — the sixteenths repeat a pitch four times a
+beat). A contact is a dip of at least 10dB with a rebound under 6dB
+(`CONTACT_DIP_DB`); the mic sixteenths lose nothing to it, and it masks
+any onset within 15ms of it — the broadband kernel fires on the same
+contact 40–130ms before the pick, which is the census's seven
+attack-opened extras.
+
+**The look-back.** A pick the re-articulation detector refuses opens
+nothing, and the pitch detector opens the Note when the new pitch has
+settled: 40–48ms after the stroke on `clean-lead` (`s8`, a real 200ms note
+the draft rule absorbed into the pick after it), 62ms after a stroke the
+fast lane missed on the mic sixteenths (`s8` there too, the region's
+boundary). The closest DI prefix follows the pick before it by 93ms
+(`t10`→`t11`). 80ms, with those three readings on either side of it.
+
+**A step alone is not a stub.** The draft absorbed any step-opened Note
+shorter than one articulation at a pitch neither neighbour has. On the mic
+triplet `t20` is read as one pitch for 93ms and as B4 for 53ms before the
+next pick; the rule took the B4 half — the correct half — as a transition
+out of the misread one. A stub needs the hand seen landing: a contact at
+its start (four on the DI triplet: D#5 120ms, G5 67ms, F5 107ms, F4 67ms)
+or within 30ms before the step (two: F5 stubs led by contacts 21 and 18ms
+earlier). Two DI stubs with no contact stay (`n17` G5 53ms, `n20` B4
+107ms), and `t20` stays a match.
+
+**The strum-spread exemption is refuted.** Dropping
+`absorbAttackFragments`' `restruck && announced` refusal for Notes under
+200ms took `cowboy-120` 4 → 2, `cowboy-di` 4 → 2 and `cowboy-mic` 5 → 4
+extras — and absorbed the `spicy-chords` Cmaj9 into the E5 after it (the
+chord lost, one confidently-wrong name) and a mic power-chord stroke into
+its neighbour. The refusal stays; the three DI strum fragments stay with
+it. Peak-level ratios were tried as a further discriminator and measure
+nothing: a region-created Note inherits its parent's peak.
+
+**What is left on the DI triplet**, the nine, by the tracker's own trace:
+four attack-opened by a transient the fine witness read as a stroke (an
+A#4 the pitch settles out of in 40ms; A4 and C5 Notes of 133ms picked
+between labels; the take's final A4 re-pick); three step-opened with a
+stroke at their start (`n39` G5 behind a 21dB dip that rebounds 6dB, at
+the bar; `n62` B4; `n95` E5 66ms after the pick before it, its flux at
+−5/1dB, which is not a contact); the two stubs above. Every one has a transient the
+witnesses call a stroke or nothing at all; none is separable by what the
+tracker can currently read.
+
+### Stage 3: one chord exception shipped, the octave rule refuted
+
+`isVirtualPitch`: a Note whose deep-lane activations sit at least 11
+semitones under the fast lane's voted pitch may bloom into a chord despite
+monophonic-looking confidence — the open D voicing's period is D2's, and no
+string plays D2. `power-chords-120` reads 8/8 (was 7/8); nothing else moves.
+The octave-consistent cancellation of §2.4 was built in `kernels/chroma.ts`
+twice: the loose form named both DI chords and cost `spicy-chords` an
+extra, read the mic triplet's `e18` A4 as Dsus2 and moved the cowboy-amped
+onset median from 92 to 145ms; the tightened form still lost `e18` and
+left `c2` at Em7. Both reverted. `c1` and `c2` stand where §2.4 left them.
+
+## The DI repair, scored on the eight 120bpm takes it was never measured against
+
+The fine-hop witness, the pre-pick prefix and the virtual-pitch bloom were
+built and read against the twelve held-out takes and the five derivation
+takes, under the rule that the derivation set must not move. The eight
+120bpm same-pitch takes (1,131 labelled events) existed on another branch at
+the time and were not in that reading. Bringing the two together makes them
+scoreable, and the first thing worth recording is what the repair does to
+material it was not measured on.
+
+Four trees, one fixture set. `main`, each source branch and the merge were
+measured with the eight takes present in all four — the two branch trees as
+detached worktrees with `fixtures/` checked out from the merge, so every
+tree saw byte-identical audio and labels.
+
+Two results are structural rather than numeric. **The same-pitch branch and
+`main` are byte-identical** on `measure-downstream-ledger.ts --all` and
+`measure-splits.ts`, every fixture, both axes: that branch tried two engine
+gates (a second flux witness on the monophonic re-pick fallback, then a
+backward-looking envelope dip) and reverted both, so its net `src/` diff
+against `main` is empty. **The merge is byte-identical to the DI branch** on
+the same two instruments. So the merge has one engine parent, not two, and
+no interaction between the two lines of work exists to find.
+
+| | derivation (78) | held out (381) | the eight (1,131) |
+|---|---|---|---|
+| `main` / same-pitch | 2 missed, 8 extra | 30 missed, 84 extra | 126 missed, 255 extra |
+| merge / DI | 2 missed, 8 extra | 24 missed, 72 extra | 111 missed, 265 extra |
+
+The derivation set does not move **on the segmentation axes**, as it did not
+on the DI branch: 84 Notes, 2 missed, 8 extra, bit-identical across all four
+trees. It does move on naming, which the DI branch's own "held to
+bit-identical numbers" wording does not cover and its Stage 3 note does:
+`power-chords-c-a-g-e-c-d-fsharp-e-120bpm` goes 7 of 8 exact to 8 of 8, the
+virtual-pitch bloom naming the open D voicing. One derivation event, in the
+improving direction, and the only derivation cell that differs between
+`main` and the merge on any axis the eval reports.
+
+**On the eight takes the repair is not the one-sided win it is on the mic and
+amp takes.** It finds 15 more of the 1,131 events and pays 10 more extra
+Notes, and the per-fixture readings do not all point the same way: five of
+the eight sit below the per-fixture best of the two parent engines, all five
+on the extras axis.
+
+| fixture | `main` | merge |
+|---|---|---|
+| `same-pitch-eighths-sixteenths-e5-120bpm-di` | 21 missed, 18 extra | **8 missed**, 19 extra |
+| `same-pitch-quarters-a3-e5-120bpm-di` | 2 missed, 1 extra | 1 missed, **5 extra** |
+| `same-pitch-eighths-a3-120bpm-di` | 63 missed, 3 extra | 63 missed, **6 extra** |
+| `same-pitch-eighths-sixteenths-e5-120bpm-amped` | 14 missed, 30 extra | 13 missed, **32 extra** |
+| `same-pitch-quarters-a3-e5-120bpm-amped` | 2 missed, 82 extra | 2 missed, **83 extra** |
+
+A per-fixture best of two engines is not a thing any single engine can be,
+so this is not a defect of the merge — it is the DI repair's own cost,
+charged on material the DI branch did not hold. The cause is one mechanism.
+Running the merge with `transient.fineOnsetThreshold = 0` (the witness off,
+by config override, no source change) returns every one of the five to its
+`main` reading on the extras axis, and the tracker's own trace says the same
+thing from the other side: the causes that shrink between `main` and the
+merge are `no transient within the window` (42 → 39 on the A3 eighths DI,
+11 → 1 on the E5 DI), `transient below the amplitude gate` and
+`rejected: gated` — the fine witness supplying boundaries the 13.3ms
+broadband kernel never proposed. Where the fragment it opens does not reach
+`announceThresholdMs` it lands as `never announced` (4 → 7); where it does,
+it is an extra Note.
+
+The prefix and bloom rules on their own (the same override) are the opposite
+trade: on the eight takes, 130 missed and 247 extra against `main`'s 126 and
+255. They lose four events and remove eight extras. The two mechanisms are
+not separable by sign — the fine witness buys events with extras and the
+prefix rules buy extras with events — and on the DI triplet they are not
+even independent: with the witness off, `lead-line-di-quarter-eighth-triplet`
+goes from 0 missed to 1, a note the witness pays back.
+
+### The dip requirement, measured off: a DI-only trade that leaves the amped renders where they were
+
+`fineOnsetDipDb` is what stops a fine onset re-articulating a sounding note
+unless the 5ms envelope dipped first — the pick landing on the string before
+it plays it. On `held-then-picked-six-strings-120bpm-di` it is what refuses
+the take's misses: the witness sees each with a 19–26dB rebound and the dip
+test vetoes it.
+
+Falsifier, stated before the run: the override must hold the derivation set
+at 84 Notes / 2 missed / 8 extra **and** not lose ground on the twelve
+held-out takes; derivation movement refuses it on the spot.
+
+It clears both. With `transient.fineOnsetDipDb = 0` (override, no source
+change) the derivation set does not move at all, and the held-out takes go
+from 24 missed / 72 extra to **23 / 72** — one event better, no extras. The
+take it was aimed at goes from 14 missed / 5 extra to **1 missed / 9 extra**,
+its last miss a G4 (`p5c1h`) with no transient in the window at all. Across
+the eight takes: 111 missed / 265 extra → **89 / 278**.
+
+**It is refused anyway, on three counts.**
+
+*Both axes.* Corpus-wide the trade is 137 missed / 345 extra → 114 / 358:
+23 events bought with 13 extra Notes. `measure-splits.ts` reads it the same
+way, 340 split / 410 extra → 351 / 421. A net loss on the extras axis is a
+finding and not a commit, and this one is not marginal.
+
+*Where the events come from.* All 23 are on held-out (1) and on the eight
+unassigned takes (22). Setting a shipped constant from those readings fits it
+to held-out data and to PROVISIONAL generated labels that
+`docs/SAME-PITCH-MATERIAL.md` records as not matching the player's own
+description on two of the four takes. The eight takes gate nothing precisely
+because they are not confirmed; they cannot calibrate a constant either.
+
+*What it does not touch.* **All four amped renders are bit-identical with the
+dip requirement off** — 1/71, 9/44, 13/32 and 2/83 missed/extra, and 60/77,
+57/62, 33/41 and 51/82 split/extra, before and after. Every split on the
+eight takes is same-pitch and contiguous, and on the amped renders that is
+the open problem; the dip override moves none of it. It is a direct-input
+effect end to end, which is consistent with where it was derived and with
+DECISION-028's reading that compression is what removes the separation.
+
+The dip requirement stays at −6dB. What would settle it is the DI derivation
+material DECISION-033 already names as its precondition, plus a reviewed
+label pass over the eight takes — not a threshold read off the takes
+themselves.
+
+### Why the merge does not move the split axis at all
+
+Worth stating as a number rather than an impression, because the question comes
+up every time the corpus is re-scored: `measure-tail-fragments.ts` reads
+**296 same-pitch contiguous fragments on `main` and 296 on the merge.** Not
+nearly the same — the same. `detached` stays 0 and `other pitch` stays 24, so
+the whole 320-fragment population is unchanged in shape as well as in count.
+Split *events* go 342 to 340 and the composition shifts between fixtures (the
+DI triplet 23 to 11, the eight takes 243 to 252), but the defect itself does
+not move.
+
+That is what the DI repair is: a PROPOSAL-side change. The fine-hop witness
+adds boundaries where the 13.3ms broadband kernel proposed none, and the prefix
+rule absorbs a pre-pick fragment BACKWARD into the note the pick plays.
+Neither can remove a boundary struck inside a note that is already sounding,
+and that is the whole of this defect.
+
+`measure-split-cause.ts` confirms it from the other end by naming the site that
+accepted each of the 296:
+
+```
+sharpness                199      envelope-rise             35
+(no rearticulation)       30      new-pitch                 21
+ring-out-sharpness         4      fine-onset                 4
+chord-decay-excess         3
+```
+
+**The fine witness accepts four of the 296.** Two thirds are accepted by
+`sharpness`, a test that predates this work and that neither branch touched.
+The thirty with no accepted rearticulation within 60ms did not come from the
+re-articulation path at all — the region lane or a Note ending and restarting —
+and are a separate defect sharing a symptom.
+
+And the readings at those wrong boundaries are not marginal: sharpness has a
+**median of 3.94 and a p90 of 9.78** where they were accepted. The engine is
+not failing to compute something at these instants. It is reading a real
+spectral rise and calling it a pick, which is exactly DECISION-028's 0.698 AUC
+ceiling seen from the phantom side instead of the missed side. The same
+decision that lets a quiet re-pick through is the one that lets a compressed
+note's own sustain through, which is why the two failure modes cannot be traded
+off by moving a threshold: at roughly five real re-picks per phantom, all seven
+configurations DECISION-028 measured removed about one real note per phantom.
+The `fineOnsetDipDb = 0` reading above is that same exchange rate in the other
+direction — 23 events recovered, splits 340 to 351.
+
+The physical root is unchanged and is where the asymmetry points: on the *same
+performance*, `same-pitch-quarters-a3-e5` splits 71% of its events on the amped
+render and 12% on the DI, and `held-then-picked-six-strings` 50% against 7%.
+Compression re-inflates the decay and the amp's harmonic re-excitation puts
+genuine flux inside one note. A listener does not judge these instants in
+isolation — the rhythm and a monotonically decaying envelope across the phrase
+are what make a single picked note obvious to an ear — and that is the sequence
+claim DECISION-028 named as the precondition, not another per-boundary gate.
+
+#### Why the deep lane does not already do this
+
+The obvious objection is that re-segmenting over more of the phrase is the deep
+lane's whole job. It is, and the reason it does not reach this defect is three
+specific things rather than a missing lane.
+
+**One, its merge is switched off.** `deep.regionMerge` is `false`.
+`mergeWithinSegment` is the only path that removes a boundary over a region,
+and DECISION-028 (a) measured it on: 383 missed labels against a 161 baseline.
+
+**Two, the local absorber is forbidden from these Notes by name.**
+`absorbAttackFragments` would accept them on size — `mergeMaxFragmentMs` is
+250 and these fragments run 93 to 227ms — but it declines any candidate that
+is `restruck && announced`. That is exactly this population: 199 of the 296
+carry an accepted re-articulation, and every one clears the 55ms
+`minStableMs` announce bar. The guard is deliberate and its reason is in the
+comment above it: retracting an announced re-articulation drags the survivor's
+start back over a stroke it did not begin, which is how a run of picked notes
+comes out as one long chord. DECISION-019 is the same rule from the other side.
+
+**Three, and the load-bearing one: the region segmenter sequences windows, not
+events.** `deep/resegment.ts` turns a span into a sequence of events with two
+witnesses — the dominant fundamental changed and stayed changed, and the
+envelope rose above the quietest point since the last boundary. Both are
+decided at one boundary from the windows around it. Neither compares a
+candidate boundary to the OTHER boundaries in the phrase, which is the
+regularity a listener uses. The lane has the audio to do it: `ringSeconds` is
+4, about two bars at 120bpm, while a region caps at `maxRegionMs` 1200. So the
+context is in the ring and unread, and "the deep lane looks at more of the
+phrase" is true of its window sequence and not yet true of its event sequence.
+That is the same gap DECISION-028 named, located in a file.
+
+### The rate gate's ceiling, re-measured with the same-pitch material in the corpus
+
+"The causal rate estimator: built, measured, reverted" above closed the local
+rate on a stated ceiling: **8 emitted Notes** at an oracle rate, which is not
+worth a mechanism. That reading was taken on a 459-label corpus — its own
+end-to-end table says `99 / 459` — and 459 is the corpus WITHOUT the eight
+120bpm same-pitch takes. It therefore measured the rate gate on material that
+barely contains the phenomenon, which is precisely DECISION-022's complaint
+about every ceiling this project had taken to that point.
+
+Re-run unchanged on the merged tree (1,590 labels, `measure-restrike-oracle.ts`,
+no source change), the same oracle gate reads:
+
+```
+  candidates 280    spurious (drop) 219    matched to a label (KEEP) 61
+
+  sounded/IOI <= 0.40 (oracle)   missed 138 (+1)   merged 214   emitted  77
+  sounded/IOI <= 0.35 (oracle)   missed 137 (+0)   merged 206   emitted  71
+  sounded/IOI <= 0.30 (oracle)   missed 137 (+0)   merged 178   emitted  51
+  sounded/IOI <= 0.20 (oracle)   missed 137 (+0)   merged 109   emitted  26
+
+  rate x 0.50 .. x 0.90          missed 137 (+0)   emitted 26 .. 73
+  rate x 1.50                    missed 144 (+7)
+```
+
+**71 emitted Notes at zero missed-label cost, against the 8 that closed the
+line.** Nine times the payoff, on the axis the correction above established as
+the only one that counts.
+
+The mechanism for the difference is the same threshold arithmetic that entry
+identified, and it is worth stating because it makes the result predictable
+rather than lucky. The gate removes something a consumer can see only when
+`0.40 x rate` clears the announcement bar of 55-90ms. The recorded median
+oracle IOI at these candidates was **154ms**, giving a 62ms gate — marginal.
+On the merged corpus the spurious candidates' median oracle IOI is **222ms**,
+giving 89ms — clear of the bar with room. The same-pitch takes are slower
+material than the 140bpm lead lines the old ceiling was dominated by, so the
+gate's whole benefit region is where this material actually sits.
+
+**This does not reopen the causal estimator; it makes it testable again, and
+that distinction is the finding.** The circularity is untouched: the rate
+estimate is corrupted by the over-segmentation it exists to correct, and no
+amount of new material fixes that. What changes is whether the known shortfall
+still lands below the usable band. `PaceEstimator` read a median of **0.82** of
+the oracle rate, and on the old corpus 0.82 x 154ms gave a 50ms gate, under the
+bar — which is exactly why it achieved 2 emitted Notes against the oracle's 8.
+On this corpus 0.82 x 222ms gives a 73ms gate, over it.
+
+So the falsifier for rebuilding `PaceEstimator` (reverted, not in the tree)
+is stated in advance and is narrow: **it must reach at least 35 emitted Notes —
+half the oracle's 71 — at no cost in missed labels on the derivation set and no
+net loss on the twelve held-out takes.** Below that it is the same shuffle the
+entry above reverted, and the ratio form is closed for good rather than
+pending. Note what it cannot be fitted on: the eight takes' labels are
+PROVISIONAL, so the 71 is a ceiling measured against unreviewed ground truth,
+and the label review is a precondition for believing the number rather than the
+direction.
+
+**A gap in the corpus that this line would depend on, and that no fixture
+covers:** every one of the 25 takes is metronomic, at 120 or 140bpm. Nothing
+here plays rubato, accelerates, or holds a note past the beat. A rate gate
+assumes regularity, and its failure mode is merging notes a player actually
+played while slowing down. The quantile-0.25 reading is the existing mitigation
+— reading a passage as faster than it is only declines merges — but it was
+derived on metronomic material and its safety on expressive playing is
+untested and currently untestable here.
+
+### The two pace attempts, side by side, and the one combination neither ran
+
+"A tempo estimate that runs live and biases the engine toward whole notes and
+away from fragments" has been built **twice** in this repository, and both are
+recorded above in different places. Reading them together is the useful thing,
+because each found a different defect and each repair is in the other's entry.
+
+| | attempt 1: constants at a reference pace | attempt 2: the ratio gate |
+|---|---|---|
+| where | "The reference pace, derived on the five originals" | "The causal rate estimator: built, measured, reverted" |
+| the estimate | median of the last 8 inter-onset gaps, fed from **every accepted transient** | quantile 0.25 of the last 8, fed **once per attack burst** |
+| what it drove | every duration constant: `minStableMs` x4, `articulationMs` x2, `minRestrumMs`, `ringOutMs`, `mutedRestrumWindowMs`, `releaseGraceMs`, `changeStableMs` | one merge gate: absorb when `soundedMs < 0.40 x rate` |
+| verdict | reverted | reverted |
+| why | an ORACLE pace buys nothing on the sixteenths, and scaling by the TRUE rate **costs the derivation set** 4 detections and 3 labels | causal rate reached 2 emitted Notes against the oracle's 8 |
+
+Three findings fall out of the pair that neither entry states alone.
+
+**The feed, not the ring, was attempt 1's real defect.** Attempt 1's estimator
+read the amp-path lead take (197ms per note) as FASTER than the sixteenths take
+(105ms) — a straight inversion. Attempt 2 diagnosed it: one pick crossing six
+strings is one stroke with several transients, so feeding every transient reads
+a passage as several times faster than it is played, and feeding per attack
+burst instead moved whole-corpus extras 107 to 102. **Attempt 1 was never
+re-run with attempt 2's feed.** Its oracle row is therefore the only sound part
+of its verdict, and its measured-pace rows describe an estimator that has since
+been fixed.
+
+**Two of the constants attempt 1 scaled are physics, not tempo, and the
+derivation set said so.** `releaseGraceMs` carried all of the derivation damage
+by itself: how long silence must persist before a Note has ended is a property
+of the string's decay and the amplitude gate. `changeStableMs` is bounded by
+how long the chroma path needs to turn over. Both are wrong to scale in
+principle, and a third attempt should scale neither. That is a narrowing of the
+hypothesis, not a refutation of it: attempt 1 tested "scale every duration" and
+found one constant that must not be scaled.
+
+**Both attempts were measured without the same-pitch material.** Attempt 1's
+oracle table lists the sixteenths takes, the lead lines and `clean-lead`;
+attempt 2's end-to-end table reads `99 / 459`. The ceiling entry above puts the
+oracle gate at **71 emitted Notes on 1,590 labels against the 8 that closed
+it**, for a reason that is arithmetic rather than hopeful: the gate is visible
+only when `0.40 x rate` clears the 55-90ms announce bar, and this material's
+candidates sit at a 222ms median rate against the old 154ms.
+
+**So the untested combination is specific:** attempt 1's target (bias the
+segmentation decision toward whole notes) with attempt 2's feed (per attack
+burst, quantile 0.25), scaling only the announce and absorb constants and
+explicitly NOT `releaseGraceMs` or `changeStableMs`, measured on the merged
+corpus. Nobody has run that. It is not a new idea — it is the intersection of
+two reverted ones, and both refutations' stated causes have a repair in the
+other's entry.
+
+**One further shape neither attempt used.** Both were hard thresholds at a
+boundary. `tracker/hypotheses.ts` already holds a stateful trail
+(`candidate -> contender -> leading -> confirmed`), which is where a *prior*
+would live rather than a gate — weighting a segmentation hypothesis by how well
+its note lengths fit the passage, instead of merging or not merging at one
+instant. DECISION-036 makes that admissible by accepting retroactive amendment
+as the contract. It is untested and unmeasured, and stated here so it is not
+mistaken for a result.
+
+### The third pace attempt: built with both corrections, and it misses its own bar at the oracle's operating point
+
+The falsifier stated in the entry above was **35 emitted Notes removed — half
+the oracle's 71 — at no cost in missed labels on the derivation set and no net
+loss on the twelve held-out takes.** The combination it was stated for was built:
+`tracker/pace.ts` (ring of 8 gaps, quantile 0.25, fed once per attack burst,
+null until three gaps, forgotten after 1.5s of silence — attempt 2's feed and
+quantile, attempt 1's target) driving `absorbAtPace()` in `note-tracker.ts`,
+which hands a same-pitch fragment back to the Note it split from when the
+fragment sounded for less than `pace.absorbRatio` of the local stroke length.
+
+The candidate is the oracle's candidate exactly — a Note opened by an accepted,
+settled, same-pitch re-articulation that has ended by stepping away to another
+pitch — so the shipped rule and the oracle that bounded it are the same rule.
+Shipped at `absorbRatio: 0`, verified byte-identical to the merge on
+`measure-downstream-ledger.ts --all` with the gate off.
+
+| `absorbRatio` | derivation missed | held-out missed | the eight | ALL missed | split events | extra Notes | Notes removed |
+|---|---|---|---|---|---|---|---|
+| off | 2 | 24 | 111 | 137 | 340 | 410 | — |
+| 0.30 | 2 | 23 | 112 | 137 | 341 | 408 | 2 |
+| **0.35** | 2 | 23 | 113 | 138 | 338 | 401 | **9** |
+| 0.40 | 2 | 23 | 113 | 138 | 329 | 391 | 19 |
+| 0.50 | 2 | 24 | 113 | 139 | 315 | 368 | 42 |
+| 0.60 | 2 | 24 | 115 | 141 | 304 | 353 | 57 |
+
+**At the oracle's own operating point it fails, and not narrowly: 9 Notes
+against a bar of 35 at 0.35, and 19 at 0.40 where the oracle removed 77.** The
+derivation set does not move at any ratio tried, and the held-out takes gain a
+label at 0.30 through 0.40 rather than losing one, so the mechanism is not
+dangerous — it is mostly inert. That is the same shuffle attempt 2 was reverted
+for, reproduced with attempt 2's own corrections in place, and the ratio form of
+this gate is therefore closed as a shipping candidate on the reading it was
+given.
+
+**The honest wrinkle, stated rather than buried.** At `0.50` the sweep clears
+every clause of the falsifier as written: 42 Notes removed, derivation unmoved,
+held-out back at its baseline 24 with no net loss. It is not being shipped on
+that, for two reasons and one of them is disqualifying on its own.
+
+*The borrowed constant.* There is a principled argument for 0.50 rather than a
+fitted one: attempt 2 measured its causal estimator at **0.82** of the oracle
+rate, and 0.40 / 0.82 = 0.49, so 0.50 is the causal ratio that reproduces the
+oracle's effective duration bar. But that 0.82 was measured on a *different
+implementation* of a different estimator against a 459-label corpus, and it has
+**not been re-measured for this one**. Until it is, 0.50 is a number chosen
+because this table shows it clearing the bar, which is fitting on held-out and
+provisional-label material, and the difference between "derived" and "fitted"
+here is exactly one measurement that has not been taken.
+
+*The two labels.* 0.50 costs two labels on the eight takes (111 to 113), so the
+corpus-wide reading is 42 extra Notes removed for 2 missed. That is a far better
+exchange than the roughly one-for-one every energy witness produced, and it is
+still a net loss on the missed axis, which the standing bar calls a finding
+rather than a commit. Both labels are on takes whose ground truth is PROVISIONAL
+and which `docs/SAME-PITCH-MATERIAL.md` records as not matching the player's
+description on two of four — so the cost is measured against annotations that
+cannot yet carry it.
+
+**Where the removed Notes come from, which is the finding and was not how the
+verdict above was first framed.** Leading with "9 against a bar of 35" put the
+weight on a bar chosen as half the oracle's figure, which is an arbitrary
+fraction rather than a test of whether the change is worth having. Split by
+material, the reading says something sharper and less flattering to both sides:
+
+| `absorbRatio` 0.40, extra Notes | off | 0.40 | delta |
+|---|---|---|---|
+| derivation (5 takes, 78 events) | 13 | 13 | **0** |
+| held out (12 takes, 381 events) | 83 | 82 | **-1** |
+| the eight (1,131 events, PROVISIONAL labels) | 314 | 296 | **-18** |
+
+**Eighteen of the nineteen removed Notes are on the eight takes.** On the
+seventeen takes whose labels have been reviewed the mechanism does essentially
+nothing: derivation is exactly unmoved, and held-out moves by one Note on each
+axis (one extra removed, one missed label recovered) which is a shuffle — the
+amped triplet take gives up two extras while the mic triplet take gains one.
+The missed cost divides the same way: -1 on held-out, +2 on the eight.
+
+So the exchange rate is good — 19 extras for 1 missed corpus-wide at 0.40, and
+42 for 2 at 0.50, against the roughly one-for-one every energy witness produced
+— and it is almost entirely an exchange rate measured against annotations that
+`docs/SAME-PITCH-MATERIAL.md` records as not matching the player's description
+on two of the four takes. **The verdict is therefore "not yet decidable", not
+"not worth having".** If the eight takes' labels survive review, a 19-for-1
+trade at the oracle's own operating point is a change this project would take;
+if they do not, both the benefit and the cost move and the reading has to be
+taken again. The label review is the blocker in the strict sense that the entire
+measured effect sits on the unreviewed side of the corpus.
+
+**What is retained and what is closed.** `pace.absorbRatio` stays 0 and the
+ratio gate is closed at its stated operating point. `PaceEstimator` stays, with
+`tests/engine/pace.test.ts` asserting both of the defects that sank the earlier
+attempts: a pace fed per transient cannot recover the stroke length, and a pace
+is forgotten across a rest rather than carried. It is retained because a
+sequence model over the envelope — DECISION-028's actual opening, and the thing
+this gate is not — needs a pace, and this one's two known defects are fixed and
+covered. **The next measurement is named and small:** this estimator's own
+ratio to the oracle rate at the candidates, per take. If it is 0.82, 0.50 is
+derived and the gate is worth re-reading against reviewed labels. If it is not,
+the ratio form is finished.

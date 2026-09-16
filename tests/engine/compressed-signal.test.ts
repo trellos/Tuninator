@@ -45,7 +45,8 @@ function attack(
   fluxRatio: number,
   heldSharpness: number,
   heldFluxRatio: number,
-  riseRatio = 1
+  riseRatio = 1,
+  dipRatio = 1
 ): AttackEvidence {
   return {
     at: 1000,
@@ -58,6 +59,7 @@ function attack(
     fluxRatio,
     heldSharpness,
     heldFluxRatio,
+    dipRatio,
     strength: 0.8,
   };
 }

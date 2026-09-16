@@ -195,6 +195,57 @@ export type EngineConfig = {
     attackBandFloorFactor: number;
     /** Minimum interval between accepted attacks, ms. */
     minIntervalMs: number;
+    /**
+     * Threshold of the fine-hop onset witness, on its median-subtracted
+     * log-flux scale. Zero switches the witness off.
+     *
+     * The broadband kernel decides at the 13.3ms hop with a 60ms dead time,
+     * and on a direct input that is what loses the quiet strokes of an
+     * alternate-picked run: it reaches 42 of the 48 DI sixteenths where the
+     * same physics read every 128 samples with log compression reaches 47,
+     * and every stroke it loses is lost at the kernel. See
+     * `kernels/fine-onset.ts` for the witness and
+     * `docs/DI-ACCURACY-ROADMAP.md` for the measurements.
+     *
+     * A fine onset only ACTS where the broadband kernel did not — it is
+     * deduplicated against accepted attacks within `fineOnsetDedupeMs` — and
+     * only over a single sounding note or silence, never over a chord, so a
+     * strummed take's hand noise stays with the witnesses that already judge
+     * it. Its constants are held-out readings until derivation material with
+     * quiet alternate-picked upstrokes exists (`DECISION-033`).
+     */
+    fineOnsetThreshold: number;
+    /** Least separation between two fine onsets, ms. Under the 63ms rushed pair on the DI sixteenths. */
+    fineOnsetMinIntervalMs: number;
+    /**
+     * How long a stronger fine candidate may follow before the earlier one is
+     * the pick landing on the string rather than a stroke. Measured on the DI
+     * takes: the contact precedes the stroke by 32–65ms.
+     */
+    fineOnsetPreparationMs: number;
+    /** How much stronger the follower must be to veto the earlier candidate: 13–30× measured. */
+    fineOnsetPreparationRatio: number;
+    /**
+     * A fine onset within this of an attack the fast lane acted on is that
+     * attack. Wider than the preparation window's lower end because the
+     * pick's contact can precede the broadband kernel's own firing by 40ms
+     * and read nearly as strong in flux; no two strokes in the corpus are
+     * this close (a sixteenth at 200bpm is 75ms).
+     */
+    fineOnsetDedupeMs: number;
+    /**
+     * How far the 5ms envelope must have DIPPED around a fine onset before it
+     * may re-articulate a note that is still sounding, dB (negative), and how
+     * far it must have come back up afterwards, dB (positive).
+     *
+     * The pick lands on the string before it plays it. On the DI sixteenths
+     * every quiet re-pick the broadband kernel loses is a 13–28dB dip followed
+     * by a rebound 20–35ms later; sustain ripple never dips that far that
+     * fast, and a contact or a hand mute that no stroke follows dips without
+     * rebounding. Over silence neither is asked for. See `FastLane.dipAround`.
+     */
+    fineOnsetDipDb: number;
+    fineOnsetReboundDb: number;
     /** RMS window for the envelope-rise test, ms. */
     envelopeWindowMs: number;
     /** Baseline the envelope-rise test measures against, ms. */
@@ -474,6 +525,50 @@ export type EngineConfig = {
      * buzz and the tail of the previous chord look like.
      */
     minUnpitchedStableMs: number;
+    /**
+     * How long a suspected same-pitch tail fragment must last to be announced,
+     * as a fraction of the LOCAL note rate.
+     *
+     * Applies only to a Note opened by a same-pitch re-articulation whose
+     * boundary showed no envelope dip (`rateFragmentDipRatio`). Such a Note is
+     * announced only once it has sounded for this fraction of the interval
+     * currently being played; one that dies first is dropped by `end()` as a
+     * Note that never cleared its bar, which is machinery that already exists.
+     *
+     * **Why the rate has to be in it.** The defect is one played note emitted
+     * as a correctly-named Note plus a same-pitch fragment butted against it.
+     * Every fixed-duration bar tried against that failed, because the fragment
+     * is 93ms at the corpus median and a real sixteenth at 140bpm is 107ms —
+     * the two populations are not separable in absolute time, and a bar of 80
+     * or 100ms costs 77 and 173 played notes. Relative to the local interval
+     * they separate well: measured over 1,237 same-pitch re-articulations,
+     * fragment span over the true local interval scores 0.905 AUC against 0.788
+     * for the span alone. A phantom is short BECAUSE it is a piece of one note;
+     * a real note is a note long at whatever pace is being played.
+     *
+     * 0.35 is the largest value that costs zero missed labels on the derivation
+     * material (0.40 costs two). Held out, it costs none either and removes
+     * four spurious Notes. See DECISION-029 and the findings entry.
+     */
+    rateFragmentSpanFraction: number;
+    /**
+     * How little the envelope may have fallen before a boundary for the Note it
+     * opens to be treated as a suspected fragment.
+     *
+     * `AttackEvidence.dipRatio` near 1 means nothing fell: the transient landed
+     * inside a note still sounding at full strength, which is what an invented
+     * boundary looks like and what a real re-pick does not. It is the second,
+     * INDEPENDENT witness here — one reads energy, the other reads time — and
+     * the pair is what makes the rule free. The rate test alone at any useful
+     * bar costs a played note on `lead-line-di-sixteenths`; with this condition
+     * added it costs none anywhere, because the fragments it then removes are
+     * only those that are both too short for the pace AND sit on a boundary
+     * with no gap under it.
+     *
+     * Deliberately high. At 0.85 the rule fires on a quarter of the candidates
+     * it would at 0.5, and takes no labels with it at any span bar tried.
+     */
+    rateFragmentDipRatio: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -765,6 +860,13 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     attackBandHiHz: 6000,
     attackBandFloorFactor: 0.08,
     minIntervalMs: 60,
+    fineOnsetThreshold: 2.5,
+    fineOnsetMinIntervalMs: 40,
+    fineOnsetPreparationMs: 65,
+    fineOnsetPreparationRatio: 4,
+    fineOnsetDedupeMs: 55,
+    fineOnsetDipDb: -6,
+    fineOnsetReboundDb: 6,
     envelopeWindowMs: 20,
     envelopeBaselineMs: 80,
     envelopeRiseRatio: 1.35,
@@ -791,6 +893,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   tracking: {
     minStableMs: 55,
     minUnpitchedStableMs: 90,
+    rateFragmentSpanFraction: 0.35,
+    rateFragmentDipRatio: 0.85,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

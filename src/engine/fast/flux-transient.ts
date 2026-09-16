@@ -51,6 +51,8 @@ export class FluxTransientDetector implements ITransientDetector {
   private readonly baselineFrames: number;
   private lastAttackAt: SourceTimeMs | null = null;
   private lastRiseRatio = 1;
+  private lastDipRatio = 1;
+  private historyFrames = 1;
 
   constructor(sampleRate: number, config: EngineConfig, hopSamples: number) {
     this.config = config;
@@ -88,6 +90,10 @@ export class FluxTransientDetector implements ITransientDetector {
       1,
       Math.round((config.transient.envelopeBaselineMs / 1000) * sampleRate / hopSamples)
     );
+    // The dip witness looks back over the baseline window and the same span
+    // again behind it, so the ring has to hold three of them rather than two.
+    // See `AttackEvidence.dipRatio`.
+    this.historyFrames = this.baselineFrames * 3;
   }
 
   get riseRatio(): number {
@@ -105,6 +111,7 @@ export class FluxTransientDetector implements ITransientDetector {
     this.rmsHistory.length = 0;
     this.lastAttackAt = null;
     this.lastRiseRatio = 1;
+    this.lastDipRatio = 1;
   }
 
   observe(
@@ -130,8 +137,29 @@ export class FluxTransientDetector implements ITransientDetector {
     const riseRatio = shortRms / Math.max(baseline, 1e-9);
     this.lastRiseRatio = riseRatio;
 
+    // Did the envelope FALL before this hop? `min` over the window just behind
+    // us against `max` over the window behind THAT. Computed on history only,
+    // before this hop is pushed, so an arriving attack cannot lift the body it
+    // is measured against. See `AttackEvidence.dipRatio`.
+    let dipRatio = 1;
+    {
+      const n = this.rmsHistory.length;
+      const dipFrom = Math.max(0, n - this.baselineFrames);
+      const bodyFrom = Math.max(0, n - this.baselineFrames * 3);
+      if (dipFrom > bodyFrom) {
+        let lo = Number.POSITIVE_INFINITY;
+        for (let i = dipFrom; i < n; i++) lo = Math.min(lo, this.rmsHistory[i] as number);
+        let hi = 0;
+        for (let i = bodyFrom; i < dipFrom; i++) hi = Math.max(hi, this.rmsHistory[i] as number);
+        // A body with no energy in it says nothing: leave the witness silent
+        // rather than manufacture a dip out of a divide by almost zero.
+        if (hi > 1e-9 && Number.isFinite(lo)) dipRatio = Math.min(1, lo / hi);
+      }
+    }
+    this.lastDipRatio = dipRatio;
+
     this.rmsHistory.push(shortRms);
-    if (this.rmsHistory.length > this.baselineFrames * 2) this.rmsHistory.shift();
+    while (this.rmsHistory.length > this.historyFrames) this.rmsHistory.shift();
 
     // Each detector is told the gate its own output is judged against, so its
     // dead time is only ever spent on an onset this lane could have used.
@@ -183,6 +211,7 @@ export class FluxTransientDetector implements ITransientDetector {
       fluxValue: fluxResult.flux,
       envelope,
       riseRatio,
+      dipRatio,
       sharpness,
       fluxRatio,
       heldSharpness,

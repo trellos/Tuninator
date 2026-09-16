@@ -129,6 +129,8 @@ DERIVATION (every tuned constant comes from here, and only here)     78 events
   chords-a-bm-g-d-2x-120bpm, clean-lead-120bpm,
   cowboy-chords-c-d-em-g-c-d-em-am-120bpm, power-chords-c-a-g-e-c-d-fsharp-e-120bpm,
   spicy-chords-cmaj9-g-am11
+  + the eight 120bpm same-pitch takes, assigned as calibration material by
+    DECISION-028. See the paragraph below: they are derivation, not held out.
 
 HELD OUT (scored every run, never fitted)                           381 events
   four Les Paul performances x three signal paths (DI / amp sim / room mic):
@@ -138,6 +140,58 @@ HELD OUT (scored every run, never fitted)                           381 events
 The held-out set is four performances heard three ways, not twelve independent
 samples — keep that in mind before treating a twelve-take result as more
 statistically solid than it is.
+
+**Eight further fixtures are CALIBRATION material, and gate nothing.** The
+120bpm same-pitch material (DECISION-026) — four takes, DI and amped, 1,133
+events — was recorded to answer DECISION-022, and the owner has since assigned
+it as calibration material (DECISION-028), which is what makes any sweep on the
+same-pitch decision derivable at all: the five originals above hold about seven
+instances of the phenomenon, all in one take, and are flat across every constant
+ever tried on it. **So "derivation" now means the five originals PLUS these
+eight**, and the twelve 140bpm takes remain the held-out set — DECISION-030's
+two bars were chosen on that combined set and the held-out figures read only
+afterwards. They still carry no
+`eval.config.json` entries and generated labels that are still
+PROVISIONAL: the player has reviewed fifteen points by ear, and the two gridded
+DI sections were re-timed against the audio and validated (DECISION-029), but
+the amped renders of the two fast takes are still on their own grids and one DI
+sixteenth section is flagged as unreliable. It gates nothing and is fitted by
+nothing until someone assigns it and finishes reviewing the labels. Read
+`docs/SAME-PITCH-MATERIAL.md` before using it for either purpose.
+
+**Two structural questions that WERE open are now closed, and a third is not.**
+Whether `quarters`' E5 section is 8 measures or 10, and whether `eighths A3`
+contains a sixteenth section, were both answered by the player and the labels
+corrected to follow — an earlier warning here that two takes contradict his
+description was stale and is retired. What is NOT settled:
+`eighths-sixteenths-e5` carries 191 DI events against 190 amped for one
+performance, and the two sets disagree about which picks exist. Both cannot be
+true, and it is the owner's to settle.
+
+**The amped renders of the two gridded takes are far further out than 65ms.**
+`7a216fe` re-timed their DI labels and left the amped twins behind. Measured on
+the current files, amped minus DI per paired event:
+
+```
+quarters-a3-e5           median    0ms   (still byte-identical)
+eighths-a3               median +187ms   (p10 +137, p90 +235)
+eighths-sixteenths-e5    median +215ms   (p10 +187, p90 +240)
+held-then-picked         median  +15ms   (uniform)
+```
+
+So `docs/SAME-PITCH-MATERIAL.md`'s reasoning that identical timings rule out a
+labelling difference does not hold for those two, and anything downstream of it
+needs re-checking.
+
+**Do not use the `verify-fixtures.ts` concern count as a label-quality target.**
+Its concerns share one reason, "no energy rise within …", and on the amped
+renders that rule is defeated by a head noise floor above the engine's
+`rmsGate` — 14.3% and 31.3% of their own envelope peak on two of them. The
+floors below which no label placement can take those counts are 62, 176, 110
+and 45. Judge placement by the offset distribution instead; driving the concern
+count down would be fitting labels to a crude instrument's blind spots.
+Note also that the derivation predicate is implemented three different ways
+across the measurement scripts, and these stems fall on opposite sides of them.
 
 ### Measurement scripts
 
@@ -185,6 +239,44 @@ any further reading of that ceiling seriously. Three briefs
 `docs/learned-onset-head-prompt.md`) have all been run to their verdicts and
 carry status banners saying so — read them before re-deriving the same
 conclusions, not as work to pick up.
+
+### `docs/DI-ACCURACY-ROADMAP.md` — the direct input, measured to its ceiling
+
+The four DI takes were measured function by function
+(`scripts/measure-di-onset-ceiling.ts`, `measure-di-pitch-ceiling.ts`,
+`measure-di-extras-census.ts`, `measure-di-chord-evidence.ts`): the
+information behind every remaining DI defect is in the signal, and the
+roadmap names a staged repair with a falsifier per stage. Read it before
+touching the onset kernel's hop, the tracker's handling of a pitch step that
+a pick then re-articulates, or the chroma kernel's cancellation loop. Its
+Stages 1 and 2 are built (`kernels/fine-onset.ts`; `claimPrefix` and its
+contact and stroke tests in `note-tracker.ts`) with every constant a
+held-out reading, under the rule that the derivation set must not move —
+`docs/DETECTION-FINDINGS.md`, "The direct input, repaired to its measured
+shapes", records what each draft of those rules cost on the mic takes and
+why it was changed. Its Stage 0 (new DI derivation recordings) is still
+what turns those readings into derived constants, per DECISION-022's rule.
+**Before comparing any two AUCs in this repository, check they share a target
+(DECISION-032).** `measure-decision-separability.ts` scores a BOUNDARY-shaped
+question — should this split have been made — and `measure-rate-relative-merge.ts`
+an OUTCOME-shaped one — is this emitted Note surplus. Both describe themselves as
+being about the same-pitch re-articulation decision, and **they disagree on 26.8%
+of their shared rows.** The same feature reads 0.805 against one and 0.526
+against the other on identical rows. Fragmentation questions take the
+outcome-shaped target; segmentation questions take the boundary-shaped one. The
+often-quoted 0.698 boundary ceiling and the 0.926 rate figure are NOT on the same
+scale.
+
+**What did finally move it (DECISION-030)** is the one framing those studies all
+lacked: judging a fragment against the LOCAL NOTE RATE rather than against a
+fixed duration. Every witness read AT the boundary tops out at 0.698 AUC and the
+best absolute-duration bar costs 77 played notes; a fragment's span over the
+local inter-onset interval scores 0.905, and a gate built on it with the
+envelope dip as a second witness takes the corpus from 339 events split to 318
+and 407 extra Notes to 379 **with missed labels unchanged at 159**. Before
+proposing anything on this decision, read that entry: the ceiling results above
+are about single numbers at single boundaries, and they do not bound a claim
+about a sequence.
 
 ### `docs/archive/` — closed lines of work
 

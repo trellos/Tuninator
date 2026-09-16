@@ -11,12 +11,25 @@
  *    `OWN_ONSET_MS`. It is the previous event's Note, or a fragment of it,
  *    charged here by the nearest-label rule. Nothing about this label was
  *    misnamed.
- *  - `named as before`    it began on this label and carries the PREVIOUS
- *    label's name. This is the pitch-lag shape: the boundary is right and the
- *    name describes audio from before it.
  *  - `same pitch twice`   it began on this label and carries this label's own
  *    name. A boundary the player did not put there.
+ *  - `named as before`    it began on this label and carries the PREVIOUS
+ *    label's name, and NOT its own. This is the pitch-lag shape: the boundary
+ *    is right and the name describes audio from before it.
  *  - `named as neither`   something else entirely.
+ *
+ * **The two name tests are ordered own-name-first, and the order matters.**
+ * Where consecutive labels carry the SAME pitch the two tests both pass, and
+ * they are asking different questions: `named as before` is a claim that the
+ * name is WRONG, `same pitch twice` that the boundary is wrong. When the names
+ * coincide the name is not wrong — there is no naming defect to report — so the
+ * split belongs to the segmentation shape. Testing previous-name first, as this
+ * script originally did, made `same pitch twice` unreachable on exactly the
+ * material recorded to study it: on `same-pitch-eighths-a3` every label is A3,
+ * so all 20 of that take's correctly-named splits were filed as a naming defect
+ * and the take reported one `same pitch twice`. The `ambiguous` column below
+ * counts the splits where the two names coincide, so the reach of this ordering
+ * is visible rather than assumed.
  *
  * Usage:
  *   npx tsx scripts/measure-split-shape.ts
@@ -48,6 +61,8 @@ type Row = {
   counts: Map<Shape, number>;
   /** Of the `predecessor's own` leaders, how many carry the PREVIOUS label's name. */
   predecessorNamed: number;
+  /** Splits where this label and the one before it carry the same pitch. */
+  ambiguous: number;
 };
 
 function main(): void {
@@ -86,7 +101,13 @@ function main(): void {
       assigned.set(owner.id, bucket);
     }
 
-    const row: Row = { stem: fixture.stem, split: 0, counts: new Map(), predecessorNamed: 0 };
+    const row: Row = {
+      stem: fixture.stem,
+      split: 0,
+      counts: new Map(),
+      predecessorNamed: 0,
+      ambiguous: 0,
+    };
     if (detail) console.log(`\n  ${fixture.stem}`);
     for (let i = 0; i < labels.length; i++) {
       const label = labels[i] as (typeof labels)[number];
@@ -100,12 +121,16 @@ function main(): void {
       const shape: Shape =
         offset < -OWN_ONSET_MS
           ? "predecessor's own"
-          : previous !== null && name === previous.label
-            ? "named as before"
-            : name === label.label
-              ? "same pitch twice"
+          : name === label.label
+            ? "same pitch twice"
+            : previous !== null && name === previous.label
+              ? "named as before"
               : "named as neither";
       row.counts.set(shape, (row.counts.get(shape) ?? 0) + 1);
+      // Where this label and the one before it carry the same pitch, the two
+      // name tests cannot separate a naming defect from a segmentation one.
+      // Counted so the ordering above is auditable instead of silent.
+      if (previous !== null && previous.label === label.label) row.ambiguous++;
       if (shape === "predecessor's own" && previous !== null && name === previous.label) {
         row.predecessorNamed++;
       }
@@ -126,13 +151,14 @@ function main(): void {
     "same pitch twice",
     "named as neither",
   ];
-  const table: string[][] = [["fixture", "split events", ...shapes, "...named as ITS own label"]];
+  const table: string[][] = [["fixture", "split events", ...shapes, "...named as ITS own label", "ambiguous"]];
   for (const r of rows) {
     table.push([
       r.stem,
       String(r.split),
       ...shapes.map((s) => String(r.counts.get(s) ?? 0)),
       String(r.predecessorNamed),
+      String(r.ambiguous),
     ]);
   }
   table.push([
@@ -140,6 +166,7 @@ function main(): void {
     String(rows.reduce((n, r) => n + r.split, 0)),
     ...shapes.map((s) => String(rows.reduce((n, r) => n + (r.counts.get(s) ?? 0), 0))),
     String(rows.reduce((n, r) => n + r.predecessorNamed, 0)),
+    String(rows.reduce((n, r) => n + r.ambiguous, 0)),
   ]);
   const width: number[] = [];
   for (const row of table) row.forEach((c, i) => (width[i] = Math.max(width[i] ?? 0, c.length)));
@@ -156,7 +183,16 @@ function main(): void {
   console.log(
     `\n  A leader beginning more than ${OWN_ONSET_MS}ms before its label's own onset did not\n` +
       "  begin here: it is the previous event's Note, charged to this label by the\n" +
-      "  nearest-label rule. Only the second column is a naming defect.\n"
+      "  nearest-label rule. Only `named as before` is a naming defect; `same pitch\n" +
+      "  twice` is a segmentation one.\n" +
+      "\n" +
+      `  CAUTION on \`predecessor's own\`. Its ${OWN_ONSET_MS}ms window is narrower than the\n` +
+      "  label-placement offset some takes carry, so on those it separates nothing:\n" +
+      "  a leader that begins 'before' a label which itself sits late is this\n" +
+      "  label's own Note. The amp-sim renders of the 120bpm same-pitch material\n" +
+      "  are the case in point — their labels were calibrated on the DI render and\n" +
+      "  applied unchanged, and `verify-fixtures.ts` puts their median offset at up\n" +
+      "  to 65ms. Read that column on those takes as an upper bound, not a count.\n"
   );
 }
 

@@ -11,7 +11,7 @@
 
 import type { Note, PitchFrame, RecognizerOptions } from "../types.js";
 import { RecognitionEngine } from "../engine/engine.js";
-import { RENDER_QUANTUM, resolveEngineConfig } from "../engine/config.js";
+import { RENDER_QUANTUM, resolveEngineConfig, type EngineConfig } from "../engine/config.js";
 import type { RigCalibration } from "../engine/rig-profile.js";
 import type { FastFrame } from "../engine/contracts.js";
 import type {
@@ -42,6 +42,14 @@ export type AnalyzeOptions = Pick<RecognizerOptions, "engine" | "diagnostics"> &
    * is bit-identical to not having this parameter at all.
    */
   calibration?: RigCalibration;
+  /**
+   * Adjust the resolved engine config before the engine is built.
+   *
+   * Offline only, for sweeps: a measurement script can move a constant
+   * `EngineTuning` does not expose without that constant becoming public
+   * API. Nothing in the library sets this.
+   */
+  overrideConfig?: (config: EngineConfig) => void;
 };
 
 export type AnalyzeResult = {
@@ -89,6 +97,7 @@ function run(
     ...(wantFrames ? { pitchFrames: true } : {}),
   });
   if (options?.calibration !== undefined) config.calibration = { ...options.calibration };
+  options?.overrideConfig?.(config);
   const engine = new RecognitionEngine(sampleRate, config);
   if (options?.trackerTrace !== undefined) engine.setTrackerTrace(options.trackerTrace);
 
