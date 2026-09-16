@@ -4,6 +4,8 @@ Tuninator is a browser library that turns guitar microphone input into **musical
 
 It generates a `Note` object when a pitch is detected. As Tuninator listens to more audio it refines that note--possibly blooming into a chord, a bend to a different pitch, and tracking the end. Events are generated for each change.
 
+Under the hood there are two lanes of analysis. A fast lane answers quickly when a new note starts. A slow lane analyzes the context and improves accuracy and detects polyphony for things like chords.
+
 Tuninator is written in TypeScript without runtime dependencies. Audio capture runs in an `AudioWorklet`. The recognition engine runs on the main thread by default and can be moved to a Web Worker.
 
 This is just a little library I made to help write guitar stuff. If it helps you do something rad please reach out. If you know more about audio processing and see it doing boneheaded things, also please reach out.
