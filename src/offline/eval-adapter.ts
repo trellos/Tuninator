@@ -27,12 +27,8 @@ import type { Note } from "../types.js";
 import type { TrackerEmission } from "../engine/tracker/note-tracker.js";
 import type { DetectedEvent } from "./matcher.js";
 
-export type EvalProjection = {
-  /** One entry per ended Note, in start order. */
-  detections: DetectedEvent[];
-};
-
 export type EvalProjections = {
+  /** One entry per ended Note, in start order. */
   final: DetectedEvent[];
   fast: DetectedEvent[];
   /** Per-Note revision statistics, reported alongside accuracy. */

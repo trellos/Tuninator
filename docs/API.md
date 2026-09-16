@@ -1,7 +1,8 @@
 # API reference
 
-The full type surface lives in [`src/types.ts`](../src/types.ts). The event list
-is in [the README](../README.md#events); everything else is here.
+The full type surface ships as `dist/index.d.ts` (source: `src/types.ts` in the
+repository). The event list is in [the README](../README.md#events); everything
+else is here.
 
 ---
 
@@ -186,7 +187,7 @@ The microphone processors default to **off**. `echoCancellation`, `noiseSuppress
 
 | `host` | Behaviour |
 |---|---|
-| `"inline"` *(default)* | The engine runs on the main thread. One fast hop is a few hundred microseconds and the deep lane is budgeted and droppable. |
+| `"inline"` *(default)* | The engine runs on the main thread. One fast hop is a few hundred microseconds, and the deep lane's work per hop is bounded and its jobs droppable. |
 | `"worker"` | The engine runs in a Web Worker. Needs `engineUrl` pointing at `dist/tuninator-engine-worker.js`, shipped the same way as the worklet asset. |
 
 ```bash

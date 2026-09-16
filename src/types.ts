@@ -329,12 +329,12 @@ export type PitchFrame = {
 /**
  * Detector tuning.
  *
- * There are no modes. The old `lead`/`chords`/`rhythm`/`raw` split forced the
- * caller to declare in advance what the player was about to do, and got the
- * wrong answer whenever they were wrong — a chord played in lead mode was a
- * note. One recognizer now runs the whole time, and a Note blooms into a chord
- * when the evidence supports it. What is left is genuine tuning: gates, ranges
- * and how patient the recognizer should be.
+ * There are no modes. A `lead`/`chords` switch would force the caller to
+ * declare in advance what the player is about to do, and get the wrong answer
+ * whenever they are wrong — a chord played in lead mode would be a note. One
+ * recognizer runs the whole time, and a Note blooms into a chord when the
+ * evidence supports it. What is left is genuine tuning: gates, ranges and how
+ * patient the recognizer should be.
  */
 export type EngineTuning = {
   minFrequencyHz?: number;
@@ -445,8 +445,7 @@ export interface Recognizer {
   start(): Promise<void>;
   /**
    * Stops listening and flushes both lanes, so every Note still open gets its
-   * `noteEnded` before this resolves. The old synchronous `stop()` dropped
-   * whatever was in flight.
+   * `noteEnded` before this resolves.
    */
   stop(): Promise<void>;
   /** `stop()` plus releasing the microphone, worklet and any context we made. */

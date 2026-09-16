@@ -1,11 +1,8 @@
 /**
  * YIN pitch detection with guitar-specific octave-error mitigation.
  *
- * CONTRACT FILE — signatures fixed; implementation owned by the DSP-core
- * workstream.
- *
- * Part of `src/core/` — no DOM, no globals, no npm imports. `detect()` must be
- * allocation-free: every buffer is preallocated in the constructor.
+ * Part of `src/engine/` — no DOM, no globals, no npm imports. `detect()` must
+ * be allocation-free: every buffer is preallocated in the constructor.
  */
 
 export type YinOptions = {
@@ -29,7 +26,7 @@ export type YinResult = {
   cmnd: number | null;
 };
 
-/** Default absolute threshold on the CMND curve (matches `policy.pitch.yinThreshold`). */
+/** Default absolute threshold on the CMND curve (matches `config.pitch.yinThreshold`). */
 const DEFAULT_THRESHOLD = 0.13;
 
 /**

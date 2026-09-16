@@ -1,11 +1,10 @@
 /**
  * Radix-2 FFT. No dependencies.
  *
- * Shared by the onset detector (1024-point) and the chroma analyser
- * (4096-point), so it is implemented up front rather than left as a contract:
- * it is the one module two workstreams both build on.
+ * Shared by the onset detectors (1024-point) and the chroma analyser
+ * (4096-point).
  *
- * Part of `src/core/` — no DOM, no globals, no npm imports. All scratch is
+ * Part of `src/engine/` — no DOM, no globals, no npm imports. All scratch is
  * preallocated in the constructor; `forward` and `magnitudes` never allocate.
  */
 

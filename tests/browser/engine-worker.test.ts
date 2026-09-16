@@ -123,6 +123,17 @@ describe("the engine in a worker", () => {
     expect(port.sent.filter((message) => message.type === "recycle")).toHaveLength(5);
   });
 
+  it("echoes a hop's channel meters back with the output it produced", () => {
+    // The engine never sees channels; the host stamps the metering onto the
+    // frames afterwards, so it has to come back attached to the right hop.
+    const port = fakePort();
+    port.send({ type: "init", sampleRate: SAMPLE_RATE, config: DEFAULT_ENGINE_CONFIG });
+    const meters = { channelRms: [0.02, 0.31], selectedChannel: 1 };
+    port.send({ type: "push", samples: new Float32Array(HOP), startSample: 0, meters });
+    const output = port.sent.find((message) => message.type === "output");
+    expect(output?.type === "output" ? output.meters : undefined).toEqual(meters);
+  });
+
   it("answers a flush even when nothing was ever pushed", () => {
     const port = fakePort();
     port.send({ type: "init", sampleRate: SAMPLE_RATE, config: DEFAULT_ENGINE_CONFIG });

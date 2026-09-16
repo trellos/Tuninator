@@ -92,7 +92,7 @@ function overRingingChord(
   a: AttackEvidence,
   options: { rms: number; sustainedRms: number; decayExcess: number | null; soundedMs: number }
 ): boolean {
-  return detector.isRearticulation(
+  return detector.verdict(
     a,
     frame(options.rms),
     false,
@@ -101,7 +101,7 @@ function overRingingChord(
     options.decayExcess,
     true,
     options.soundedMs
-  );
+  ).accepted;
 }
 
 describe("an amp sim's sustain is not a re-strum", () => {
@@ -204,7 +204,7 @@ describe("a chord the recognizer could not NAME is still a chord", () => {
     // Treated as a single note, the weak fallback accepts it on sharpness
     // alone, which is the behaviour that chopped the amped chords.
     expect(
-      detector.isRearticulation(
+      detector.verdict(
         evidence,
         frame(state.rms),
         false,
@@ -213,7 +213,7 @@ describe("a chord the recognizer could not NAME is still a chord", () => {
         state.decayExcess,
         false,
         state.soundedMs
-      )
+      ).accepted
     ).toBe(true);
   });
 });

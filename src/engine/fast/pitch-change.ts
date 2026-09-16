@@ -22,6 +22,7 @@
 
 import type { EngineConfig } from "../config.js";
 import type { FastFrame, IPitchChangeDetector, PitchChangeEvidence } from "../contracts.js";
+import { centsBetween } from "../kernels/notes.js";
 
 const CENTS_PER_OCTAVE = 1200;
 
@@ -42,10 +43,6 @@ export function isOctaveJump(cents: number): boolean {
   if (Math.abs(cents) < CENTS_PER_OCTAVE / 2) return false;
   const octaves = cents / CENTS_PER_OCTAVE;
   return Math.abs(octaves - Math.round(octaves)) * CENTS_PER_OCTAVE < OCTAVE_FLIP_TOLERANCE_CENTS;
-}
-
-export function centsBetween(hz: number, refHz: number): number {
-  return CENTS_PER_OCTAVE * Math.log2(hz / refHz);
 }
 
 export class PitchChangeDetector implements IPitchChangeDetector {

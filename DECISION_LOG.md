@@ -7,6 +7,68 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-038]: Pre-publish prune — remove seams nothing calls, wire the channel meters the API already promised, keep every deliberately-unwired module
+* **Date:** 2026-09-16
+* **Status:** Accepted
+* **Owner:** Project structure
+* **Context:** A code review ahead of publishing to npm, asked to make the
+  code readable, keep the architecture straightforward, and remove
+  deprecated and unused code and signs of drift. A reference scan of every
+  export under `src/` found two kinds of unreferenced code. One kind the log
+  keeps on purpose (DECISION-010, -013, -023, -024, -037). The other kind
+  nothing anywhere calls: `IDeepScheduler`/`DeepJob` (an injected scheduler
+  the deep lane never had — it drains by source time), `DeepJobPurpose` with
+  three values never requested, `DeepLane.reassign`/`forget`/`drainAll`,
+  `EnginePort.now()` and the `now` on every worker output message, the
+  worklet's `reset` command and its `contextTime`/`sampleRate` chunk fields,
+  `NoteTracker.flush`/`currentHarmonyOf`, `NoteRecord.closing`, a second
+  `centsBetween`, an `isRearticulation` wrapper the tracker never used, a
+  `sort` whose comparator always returns 0, and parameters `void`ed inside
+  the functions that take them. Separately, `PitchFrame.channelRms` and
+  `selectedChannel` are documented in `docs/API.md` and measured by the
+  worklet on every hop, and were dropped at the recognizer's port handler, so
+  no consumer could ever have seen them. Seven kernel headers still said
+  "Part of `src/core/`" (a tree DECISION-023 retired), six carried "CONTRACT
+  FILE — owned by the X workstream" banners from a parallel-workstream era,
+  and the top-level docs described an injected scheduler and a `status`
+  diagnostic that do not exist. DECISION-037 still said `tracker/pace.ts`
+  was retained, a day after `a10d0e5` removed it.
+* **Decision:** Remove the unreferenced seams above and the lineage banners;
+  consolidate `centsBetween` in `kernels/notes.ts`; carry the worklet's
+  channel meters through `EnginePort.push(samples, startSample, meters)` and
+  stamp them onto that hop's `PitchFrame`s in the host — the worker entry
+  echoes them back with its output, so the engine still never sees channels
+  and both hosts stamp the exact hop. Declare `sideEffects` for the two
+  bundles that register themselves on load rather than `false` for the whole
+  package, and add `main`, `keywords`, `homepage` and `bugs` for the
+  registry. Amend DECISION-037 to record the withdrawal. **Keep**
+  `kernels/click.ts`, `kernels/whitened-bands.ts`, `rig-profile.ts` and the
+  calibration seam, `deep.regionMerge`/`regionCorrectPitch`,
+  `transient.fluxMaxFilterSemitones` and `training/`: each is unwired by a
+  logged decision and driven by its measurement script, and DECISION-024's
+  rule stands — unwired is not dead here.
+* **Alternatives Considered:** Pruning by reachability alone — rejected, per
+  DECISION-024. Removing `channelRms`/`selectedChannel` from the public type
+  instead of wiring them — rejected: the worklet already measures them, the
+  API doc already promises them, and the missing piece was a dozen lines.
+  Stamping meters in the recognizer from the most recently captured chunk —
+  rejected for the worker host, where that chunk can be a hop or two ahead
+  of the frames arriving; echoing them through the port keeps both hosts
+  exact for one small structured clone per hop. Removing `deepLatencyMs`
+  from `EngineTuning` (an offline knob on the public surface) — deferred:
+  dropping a public option is a versioned change, not a cleanup.
+* **Consequences:** No detection change: `npm run eval` produces a report
+  byte-identical to the pre-prune run (only `generatedAt` differs), and
+  `docs/EVALUATION.md` still matches it. The suite goes from 510 tests to 511
+  (one test of `DeepLane.forget` removed, two added for meters through each
+  host). `EnginePort` loses `now()` and `getTimebase()` no longer returns
+  null; both were internal. `CaptureChunk` and the worker protocol shrink by
+  the fields nothing read. Accepted debt: `EvalStats`/`FixtureReport` still
+  carry more than `docs/EVALUATION.md` reads, and `EngineTuning.deepLatencyMs`
+  stays public until a versioned API change removes it.
+
+---
+
 #### [DECISION-037]: The third pace attempt ships disabled; the ratio gate misses its stated bar at the oracle's operating point
 * **Date:** 2026-09-15
 * **Status:** Rejected
@@ -82,6 +144,15 @@ are what keep later work from repeating them.
   than fitted and the gate deserves re-reading against reviewed labels; if it
   is not, the ratio form is finished. The label review on the eight takes is a
   precondition for either reading, since two of the cost labels sit there.
+* **Amendment (2026-09-16):** The retained module described above was
+  withdrawn the same day, in `a10d0e5`, when the branches were reconciled:
+  DECISION-030's announce-bar form of the same rate insight measured better
+  (32 fewer extra Notes and 21 fewer split events for zero missed labels) and
+  does not retract a Note, so the absorb mechanism — `tracker/pace.ts`, its
+  test, the `pace.*` config block and `absorbAtPace()` — came out rather
+  than being merged alongside a second rate estimator doing the same job. The
+  rate estimator the tracker uses is `localIoiMs` in `note-tracker.ts`.
+  The absorb form is closed; the announce-bar form is not.
 
 ---
 

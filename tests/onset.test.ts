@@ -351,7 +351,7 @@ describe("minIntervalMs", () => {
 
   it("uses the supplied timestamps, not elapsed calls", () => {
     // Same signal, same hop, but timestamps scaled 10x: the gate must follow
-    // the timestamps. `src/core/` reads no clock, so this is the only input.
+    // the timestamps. `src/engine/` reads no clock, so this is the only input.
     const { signal } = repeatedAttacks({ hz: 196, count: 6, spacingMs: 300, decayMs: 220 });
     const detector = makeDetector({ minIntervalMs: 2000 });
     const frame = new Float32Array(FFT);

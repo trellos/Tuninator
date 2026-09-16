@@ -51,7 +51,6 @@ export class FluxTransientDetector implements ITransientDetector {
   private readonly baselineFrames: number;
   private lastAttackAt: SourceTimeMs | null = null;
   private lastRiseRatio = 1;
-  private lastDipRatio = 1;
   private historyFrames = 1;
 
   constructor(sampleRate: number, config: EngineConfig, hopSamples: number) {
@@ -111,7 +110,6 @@ export class FluxTransientDetector implements ITransientDetector {
     this.rmsHistory.length = 0;
     this.lastAttackAt = null;
     this.lastRiseRatio = 1;
-    this.lastDipRatio = 1;
   }
 
   observe(
@@ -156,8 +154,6 @@ export class FluxTransientDetector implements ITransientDetector {
         if (hi > 1e-9 && Number.isFinite(lo)) dipRatio = Math.min(1, lo / hi);
       }
     }
-    this.lastDipRatio = dipRatio;
-
     this.rmsHistory.push(shortRms);
     while (this.rmsHistory.length > this.historyFrames) this.rmsHistory.shift();
 

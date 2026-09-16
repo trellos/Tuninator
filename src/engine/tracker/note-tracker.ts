@@ -1,23 +1,18 @@
 /**
  * The semantic centre: fast-lane evidence in, evolving Notes out.
  *
- * Successor to `core/event-tracker.ts`, and the file the rewrite exists for.
- * Three things changed, and they are all consequences of one another:
+ * Three commitments shape everything in this file, and they are consequences
+ * of one another:
  *
- *  1. **Notes live in a Map, not in an `active: Active | null`.** The old
- *     tracker could represent exactly one sounding thing, so a note beginning
- *     while another still rang was structurally impossible — which is precisely
- *     what a restrum over a ringing chord, and a fast run over a decaying tail,
- *     both are. The Map is here from the first phase even while only one Note
- *     opens at a time, because retrofitting it later means rewriting every
- *     path in this file.
+ *  1. **Notes live in a Map.** A tracker that can hold exactly one sounding
+ *     thing cannot represent a note beginning while another still rings — which
+ *     is precisely what a restrum over a ringing chord, and a fast run over a
+ *     decaying tail, both are.
  *
- *  2. **There are no modes.** The old chord path and note path were different
- *     code reached by a caller-declared mode, and a chord played in lead mode
- *     was simply never a chord. Here one path runs, segmentation is driven by
- *     the same three cues regardless of what is being played — an attack, a
- *     pitch step, a harmony change — and a Note blooms into a chord when the
- *     deep lane finds evidence for one.
+ *  2. **There are no modes.** One path runs, segmentation is driven by the same
+ *     three cues regardless of what is being played — an attack, a pitch step,
+ *     a harmony change — and a Note blooms into a chord when the deep lane
+ *     finds evidence for one.
  *
  *  3. **A Note is a belief, not a measurement.** It starts as soon as there is
  *     evidence something was played and improves from there, and every
@@ -47,8 +42,8 @@ import type {
 } from "../contracts.js";
 import type { FineOnset } from "../kernels/fine-onset.js";
 import { SampleClock } from "../clock.js";
-import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
-import { PitchChangeDetector, centsBetween, isOctaveJump } from "../fast/pitch-change.js";
+import { centsBetween, describeFrequency, midiToFrequency } from "../kernels/notes.js";
+import { PitchChangeDetector, isOctaveJump } from "../fast/pitch-change.js";
 import { RearticulationDetector } from "../fast/rearticulation.js";
 import type { HypothesisTransition } from "./hypotheses.js";
 import { NoteRecord, type HarmonyVote } from "./note-record.js";
@@ -161,13 +156,6 @@ export type TrackerTraceEvent =
  * becoming the leader, becoming settled, or being ruled out are all things a UI
  * showing the recognizer's thinking would want to react to.
  */
-const EMPTY_SET: ReadonlySet<string> = new Set<string>();
-
-/** No-op comparator: `Array.prototype.sort` is stable, so this preserves order. */
-function stableByNothing(): number {
-  return 0;
-}
-
 const NOTABLE_STATES = new Set(["leading", "confirmed", "discredited", "superseded", "incorporated"]);
 
 function queueTransitions(record: NoteRecord, transitions: HypothesisTransition[]): void {
@@ -852,7 +840,6 @@ export class NoteTracker {
       active = this.begin(
         "pitchChange",
         frame,
-        out,
         { at, atSample, frequencyHz: pitchChange.toHz },
         previous,
         pitchStillArriving
@@ -867,7 +854,6 @@ export class NoteTracker {
         active = this.begin(
           struck ? "attack" : "pitchChange",
           frame,
-          out,
           null,
           splitFrom,
           splitFrom !== null
@@ -910,12 +896,12 @@ export class NoteTracker {
           this.end(active, active.silentSince as SourceTimeMs, out);
           active = null;
         } else {
-          this.observe(active, frame, gliding);
+          this.observe(active, frame);
         }
       } else {
         active.unvoicedSince = null;
         active.silentSince = null;
-        this.observe(active, frame, gliding);
+        this.observe(active, frame);
       }
     }
 
@@ -1439,7 +1425,6 @@ export class NoteTracker {
       const opened = this.begin(
         "attack",
         frame,
-        out,
         { at: start, atSample: this.clock.toSamples(start), frequencyHz: frame.pitch.frequencyHz },
         null,
         false
@@ -1493,7 +1478,6 @@ export class NoteTracker {
     const successor = this.begin(
       "attack",
       frame,
-      out,
       { at, atSample: onset.atSample, frequencyHz: frame.pitch.frequencyHz },
       active,
       false
@@ -1831,8 +1815,6 @@ export class NoteTracker {
     const named = candidates.filter((record) => record.harmonyLabel !== null);
     const open = candidates.filter((record) => record.harmonyLabel === null);
 
-
-
     // The region has decided how many events its span contains and where each
     // of them began. Everything from here reconciles the Notes onto THAT
     // decision rather than proposing boundaries into the partition the fast
@@ -1975,7 +1957,6 @@ export class NoteTracker {
     return this.begin(
       "attack",
       frame,
-      out,
       { at: pending.at, atSample: pending.atSample, frequencyHz: frame.pitch.frequencyHz },
       previous,
       false
@@ -2385,18 +2366,14 @@ export class NoteTracker {
     return record;
   }
 
-  /** The harmony a Note currently answers to, for segmentation decisions. */
-  currentHarmonyOf(noteId: string): string | null {
-    return this.notes.get(noteId)?.harmonyLabel ?? null;
-  }
-
   /**
    * Stop every Note that is still sounding, without letting any of them go.
    *
-   * Separate from `flush` so the engine can close the take's last Notes, have
-   * the deep lane rule on the region they live in, and only then release them.
-   * The last event of a recording is exactly the one whose region has not
-   * settled, and it should not be the one event that never gets a verdict.
+   * Separate from `releaseClosed` so the engine can close the take's last
+   * Notes, have the deep lane rule on the region they live in, and only then
+   * release them. The last event of a recording is exactly the one whose
+   * region has not settled, and it should not be the one event that never gets
+   * a verdict.
    */
   closeOpenNotes(at: SourceTimeMs): TrackerEmission[] {
     const out: TrackerEmission[] = [];
@@ -2407,19 +2384,11 @@ export class NoteTracker {
     return out;
   }
 
-  /** Ends every open Note. Called on stop, and at the end of offline input. */
-  flush(at: SourceTimeMs): TrackerEmission[] {
-    const out = this.closeOpenNotes(at);
-    this.releaseClosed(EMPTY_SET, out, true);
-    return out;
-  }
-
   /* ------------------------------------------------------------------ */
 
   private begin(
     trigger: NoteOriginTrigger,
     frame: FastFrame,
-    out: TrackerEmission[],
     override: { at: SourceTimeMs; atSample: number; frequencyHz: number | null } | null,
     /**
      * The Note this one is splitting away from, if any. Its decay state carries
@@ -2499,12 +2468,11 @@ export class NoteTracker {
       this.trace({ kind: "opened", at, noteId: record.id, trigger });
     }
     if (frequencyHz !== null) this.pitchChange.clearAfterSplit(frequencyHz, at);
-    void out;
     return record;
   }
 
   /** Folds one hop's evidence into a Note. */
-  private observe(record: NoteRecord, frame: FastFrame, gliding: boolean): void {
+  private observe(record: NoteRecord, frame: FastFrame): void {
     const config = this.config;
     const t = frame.at;
 
@@ -2619,7 +2587,6 @@ export class NoteTracker {
     if (record.lifecycle === "started" && record.soundedMs >= config.tracking.minStableMs) {
       record.lifecycle = "enriching";
     }
-    void gliding;
   }
 
   /** Emits `started` once identity has settled, and `changed` on real changes. */
@@ -2778,7 +2745,6 @@ export class NoteTracker {
     // chord's identity is routinely settled by deep analysis that started
     // before the strum stopped, so the closing events wait for it — otherwise
     // the answer a consumer keeps is the one from before the evidence arrived.
-    record.closing = true;
     this.closing.push(record);
   }
 
@@ -2789,6 +2755,7 @@ export class NoteTracker {
    * @param force release even Notes nobody has ruled on — the end of a take
    */
   releaseClosed(busy: ReadonlySet<string>, out: TrackerEmission[], force = false): void {
+    // Backwards, so the `splice` below leaves the indices still to visit valid.
     for (let i = this.closing.length - 1; i >= 0; i--) {
       const record = this.closing[i] as NoteRecord;
       if (!force) {
@@ -2813,19 +2780,8 @@ export class NoteTracker {
       this.ended.push(record);
       if (this.ended.length > this.config.tracking.endedNoteHistory) this.ended.shift();
     }
-    // Closing Notes are emitted newest-last, so a consumer sees them in the
-    // order they stopped sounding rather than in queue order.
-    out.sort(stableByNothing);
   }
 
-  /**
-   * The Note that was sounding at `at`, live or already finished.
-   *
-   * Pitch evidence arrives later than the audio it describes, so by the time a
-   * frame can be voted on, the Note it belongs to may have ended — on a fast
-   * run that is most of the run. Attributing it to whatever is sounding NOW
-   * instead is what gave each Note a share of its predecessor's pitch.
-   */
   /**
    * Can this Note defend the reading it is stepping away from?
    *
@@ -2854,6 +2810,14 @@ export class NoteTracker {
     return from > Math.min(name, to) && from < Math.max(name, to);
   }
 
+  /**
+   * The Note that was sounding at `at`, live or already finished.
+   *
+   * Pitch evidence arrives later than the audio it describes, so by the time a
+   * frame can be voted on, the Note it belongs to may have ended — on a fast
+   * run that is most of the run. Attributing it to whatever is sounding NOW
+   * instead is what gave each Note a share of its predecessor's pitch.
+   */
   private recordSoundingAt(at: SourceTimeMs): NoteRecord | undefined {
     let best: NoteRecord | undefined;
     const consider = (record: NoteRecord): void => {

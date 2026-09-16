@@ -7,28 +7,25 @@
  * schedules hops and assembles one `FastFrame` per hop from the estimators —
  * it does no DSP of its own.
  *
- * Successor to the scheduling half of `core/pitch-engine.ts`. The order of work
- * inside a hop is load-bearing: transient detection runs BEFORE pitch, because
- * an attack invalidates the pitch history. The temporal median holds the
- * previous note's frequencies, and letting them outvote the first frames of a
- * new note delays its identity by up to `medianFrames` hops — on a 166ms
- * triplet that lag is enough to push the Note's dominant pitch onto the
- * following note.
+ * The order of work inside a hop is load-bearing: transient detection runs
+ * BEFORE pitch, because an attack invalidates the pitch history. The temporal
+ * median holds the previous note's frequencies, and letting them outvote the
+ * first frames of a new note delays its identity by up to `medianFrames` hops
+ * — on a 166ms triplet that lag is enough to push the Note's dominant pitch
+ * onto the following note.
  *
  * Part of `src/engine/` — no DOM, no globals, no clock reads, no npm imports.
  */
 
-import type { EngineConfig } from "../config.js";
-import { snapHop } from "../config.js";
+import { RENDER_QUANTUM, snapHop, type EngineConfig } from "../config.js";
 import type { FastFrame, ITransientDetector, PitchEvidence } from "../contracts.js";
 import { SampleClock } from "../clock.js";
 import { AudioRing } from "../ring-buffer.js";
 import { peak as windowPeak, rms as windowRms } from "../kernels/yin.js";
+import { FineOnsetDetector, type FineOnset } from "../kernels/fine-onset.js";
 import { FluxTransientDetector } from "./flux-transient.js";
 import { NoiseFloorTracker } from "./noise-floor.js";
 import { YinEstimator } from "./yin-estimator.js";
-import { FineOnsetDetector, type FineOnset } from "../kernels/fine-onset.js";
-import { RENDER_QUANTUM } from "../config.js";
 
 /**
  * How far below the amplitude gate the fine witness still reads, as the band

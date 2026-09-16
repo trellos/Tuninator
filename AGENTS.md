@@ -81,8 +81,10 @@ sample range, and answers questions the fast lane cannot: the full spectrum of
 an attack, how many voices are in it, what chord it is, and — the thing that
 changes results most — whether the fast lane's segmentation of a region was
 right at all. Its answers arrive as `NoteChange`s against Notes that already
-exist. Offline, it is driven through a deterministic scheduler so a run is
-bit-reproducible; live, it is budgeted and droppable.
+exist. Its latency is simulated in source time rather than measured on a clock,
+so an offline run is bit-reproducible and a live run sees the deep lane arrive
+at the same point in the music; a job whose audio has aged out of the ring is
+dropped rather than answered wrongly.
 
 ### The tracker (`src/engine/tracker/`)
 
@@ -103,7 +105,7 @@ enrichment, correction, or structural revision (split/merge, with a backdated
 `InlineEngineHost` (main thread, default) and `WorkerEngineHost` (a Web
 Worker, `dist/tuninator-engine-worker.js`). The worker host mirrors the
 engine's Note state on the main thread rather than round-tripping every read,
-because four of `EnginePort`'s methods are synchronous and a worker cannot be.
+because three of `EnginePort`'s methods are synchronous and a worker cannot be.
 A test (`tests/browser/engine-worker.test.ts`) asserts both hosts produce
 identical Notes, timestamps and event ordering for the same audio — that
 property is what makes offering the worker host safe at all.

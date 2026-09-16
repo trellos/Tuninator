@@ -2,12 +2,13 @@
  * Matching and scoring for the offline eval harness.
  *
  * This module answers one question: given a list of ground-truth labels and a
- * list of detected `MusicEvent`s, which detection corresponds to which label,
- * and how good was the correspondence?
+ * list of `DetectedEvent`s (Notes flattened by `eval-adapter.ts`), which
+ * detection corresponds to which label, and how good was the correspondence?
  *
  * It is deliberately dependency-free — no audio, no detector, not even
- * `core/notes.js`. That is the point: the scoring rules have to be trustworthy
- * *before* the detector works, so they are unit-testable on hand-built cases.
+ * `kernels/notes.js`. That is the point: the scoring rules have to be
+ * trustworthy *before* the detector works, so they are unit-testable on
+ * hand-built cases.
  *
  * Two conventions used throughout:
  *  - A "canonical" note is sharp-spelled scientific notation, e.g. `A#2`.
@@ -42,9 +43,9 @@ export type LabeledEvent = {
 };
 
 /**
- * The subset of `MusicEvent` the matcher needs. A real `MusicEvent` satisfies
- * this structurally, so `eval.ts` passes them straight through and tests can
- * hand-build two-line literals.
+ * One recognizer answer, flattened for scoring: which of a Note's several
+ * answers is *the* answer is decided in `eval-adapter.ts`, not here. Small
+ * enough that tests can hand-build two-line literals.
  */
 export type DetectedEvent = {
   id: string;

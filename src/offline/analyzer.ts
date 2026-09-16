@@ -19,8 +19,6 @@ import type {
   TrackerTraceEvent,
 } from "../engine/tracker/note-tracker.js";
 
-export { RENDER_QUANTUM };
-
 export type AnalyzeOptions = Pick<RecognizerOptions, "engine" | "diagnostics"> & {
   /** Collect every PitchFrame. Off by default — 20s at 12ms is ~1700 frames. */
   captureFrames?: boolean;

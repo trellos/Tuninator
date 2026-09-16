@@ -43,7 +43,7 @@ describe("scheduling", () => {
     const { deep, ring } = lane();
     ring.write(chord([48, 55, 60], 8192));
     deep.request({
-      noteId: "n1", purpose: "harmony",
+      noteId: "n1",
       fromSample: 0, toSample: deep.windowSize, notBefore: 500,
     });
     expect(deep.drain(499, ring).results).toHaveLength(0);
@@ -59,7 +59,7 @@ describe("scheduling", () => {
     const window = DEFAULT_ENGINE_CONFIG.harmony.fftSize;
     ring.write(chord([48, 55, 60], window)); // C
     deep.request({
-      noteId: "n1", purpose: "harmony",
+      noteId: "n1",
       fromSample: 0, toSample: window, notBefore: 0,
     });
     ring.write(chord([50, 57, 62], window)); // D, written after queueing
@@ -73,7 +73,7 @@ describe("scheduling", () => {
     const ring = new AudioRing(8192);
     ring.write(chord([48, 55, 60], 8192));
     deep.request({
-      noteId: "n1", purpose: "harmony",
+      noteId: "n1",
       fromSample: 0, toSample: deep.windowSize, notBefore: 0,
     });
     ring.write(chord([50, 57, 62], 8192)); // pushes the queued range out
@@ -86,7 +86,7 @@ describe("scheduling", () => {
   it("coalesces a repeated request for the same window", () => {
     const { deep } = lane();
     const request = {
-      noteId: "n1", purpose: "harmony" as const,
+      noteId: "n1",
       fromSample: 0, toSample: 4096, notBefore: 0,
     };
     deep.request(request);
@@ -99,26 +99,18 @@ describe("scheduling", () => {
     // would throw away the readings that separate a Bm from the B5 its decayed
     // tail looks like.
     const { deep } = lane();
-    deep.request({ noteId: "n1", purpose: "harmony", fromSample: 0, toSample: 4096, notBefore: 0 });
-    deep.request({ noteId: "n1", purpose: "harmony", fromSample: 640, toSample: 4736, notBefore: 0 });
+    deep.request({ noteId: "n1", fromSample: 0, toSample: 4096, notBefore: 0 });
+    deep.request({ noteId: "n1", fromSample: 640, toSample: 4736, notBefore: 0 });
     expect(deep.pendingCount).toBe(2);
   });
 
   it("reports which Notes it still owes an answer to", () => {
     const { deep, ring } = lane();
     ring.write(chord([48, 55, 60], 8192));
-    deep.request({ noteId: "n1", purpose: "harmony", fromSample: 0, toSample: 4096, notBefore: 100 });
+    deep.request({ noteId: "n1", fromSample: 0, toSample: 4096, notBefore: 100 });
     expect([...deep.busyNoteIds()]).toEqual(["n1"]);
     deep.drain(100, ring);
     expect(deep.busyNoteIds().size).toBe(0);
-  });
-
-  it("forgets a Note's work when the Note is gone", () => {
-    const { deep } = lane();
-    deep.request({ noteId: "n1", purpose: "harmony", fromSample: 0, toSample: 4096, notBefore: 0 });
-    deep.request({ noteId: "n2", purpose: "harmony", fromSample: 0, toSample: 4096, notBefore: 0 });
-    deep.forget("n1");
-    expect([...deep.busyNoteIds()]).toEqual(["n2"]);
   });
 
   it("timestamps a result by the audio it describes, not by when it ran", () => {
@@ -126,7 +118,7 @@ describe("scheduling", () => {
     ring.write(chord([48, 55, 60], 16384));
     const toSample = 8192;
     deep.request({
-      noteId: "n1", purpose: "harmony",
+      noteId: "n1",
       fromSample: toSample - deep.windowSize, toSample, notBefore: 0,
     });
     const result = deep.drain(9999, ring).results[0];
@@ -143,7 +135,7 @@ describe("determinism", () => {
       ring.write(chord([48, 55, 60, 64, 67], 16384));
       for (let i = 0; i < 4; i++) {
         deep.request({
-          noteId: "n1", purpose: "harmony",
+          noteId: "n1",
           fromSample: i * 640, toSample: i * 640 + deep.windowSize, notBefore: i * 13,
         });
       }
@@ -162,7 +154,7 @@ describe("what it hears", () => {
     const { deep, ring } = lane();
     ring.write(chord([48, 52, 55], 16384)); // C3 E3 G3
     deep.request({
-      noteId: "n1", purpose: "harmony",
+      noteId: "n1",
       fromSample: 8192 - deep.windowSize, toSample: 8192, notBefore: 0,
     });
     const result = deep.drain(1e9, ring).results[0];
@@ -182,7 +174,7 @@ describe("what it hears", () => {
     const { deep, ring } = lane();
     ring.write(chord([40, 47, 52], 16384));
     deep.request({
-      noteId: "n1", purpose: "harmony",
+      noteId: "n1",
       fromSample: 8192 - deep.windowSize, toSample: 8192, notBefore: 0,
     });
     const result = deep.drain(1e9, ring).results[0];

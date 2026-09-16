@@ -5,10 +5,7 @@
  * RMS envelope alone misses a re-picked same-pitch note, which the eval scores
  * as a missed event. Spectral flux is what catches it.
  *
- * CONTRACT FILE — signatures fixed; implementation owned by the DSP-core
- * workstream.
- *
- * Part of `src/core/` — no DOM, no globals, no npm imports.
+ * Part of `src/engine/` — no DOM, no globals, no npm imports.
  */
 
 import { RealFFT, hannWindow } from "./fft.js";
@@ -567,7 +564,7 @@ export class OnsetDetector {
 
     if (!audible) isOnset = false;
     if (isOnset && this.lastOnsetMs !== null) {
-      // Timestamps come from the caller; `src/core/` never reads a clock.
+      // Timestamps come from the caller; `src/engine/` never reads a clock.
       if (timestampMs - this.lastOnsetMs < this.minIntervalMs) isOnset = false;
     }
     if (isOnset) this.lastOnsetMs = timestampMs;

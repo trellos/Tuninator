@@ -298,12 +298,14 @@ export interface IRearticulationDetector {
   /**
    * Is this attack a genuine re-articulation over what is already sounding?
    *
+   * Answers with the deciding test named (see `RearticulationVerdict`), so the
+   * tracker reads `.accepted` and a ledger can say which line said no.
+   *
    * @param attack the arriving energy
    * @param gliding whether the pitch is currently sweeping
    * @param sustainedRms the rolling baseline of what is already sounding
-   * @param pitchDiffers the arriving pitch is not the sounding Note's own
    */
-  isRearticulation(
+  verdict(
     attack: AttackEvidence,
     frame: FastFrame,
     gliding: boolean,
@@ -318,18 +320,6 @@ export interface IRearticulationDetector {
     /** The sounding Note is a chord, on the deep lane's evidence. */
     polyphonic: boolean,
     /** How long the sounding Note has already lasted, ms. */
-    soundedMs: number
-  ): boolean;
-
-  /** The same decision with its deciding test named. See `RearticulationVerdict`. */
-  verdict(
-    attack: AttackEvidence,
-    frame: FastFrame,
-    gliding: boolean,
-    sustainedRms: number,
-    pitchDiffers: boolean,
-    decayExcess: number | null,
-    polyphonic: boolean,
     soundedMs: number
   ): RearticulationVerdict;
 }
@@ -354,26 +344,6 @@ export interface IHarmonicInterpreter {
     activations: readonly PitchActivation[]
   ): HarmonicReading;
 }
-
-/**
- * How deep jobs get from "queued" to "run".
- *
- * Injected rather than assumed so the offline harness can drain the queue
- * deterministically after each hop with a configurable simulated latency, while
- * the browser host drains it in budgeted slices. A replay test asserts the two
- * produce identical event streams.
- */
-export interface IDeepScheduler {
-  /** Queue work to run once source time has advanced to at least `notBefore`. */
-  schedule(job: DeepJob): void;
-  /** Run everything now due at `now`. Returns the jobs that ran. */
-  drain(now: SourceTimeMs): void;
-  /** Drop everything pending. */
-  clear(): void;
-  readonly pending: number;
-}
-
-export type DeepJobPurpose = "harmony" | "bend" | "multiPitch" | "resegment";
 
 /* -------------------------------------------------------------------------- */
 /* Region re-segmentation                                                      */
@@ -450,19 +420,6 @@ export type DeepSegmentation = {
   windowCount: number;
   /** Mean per-segment confidence, or 0 when there are no segments. */
   confidence: number;
-};
-
-export type DeepJob = {
-  /** Jobs with the same key coalesce: a newer one supersedes an older one. */
-  key: string;
-  noteId: string;
-  purpose: DeepJobPurpose;
-  /** Sample range to analyse. */
-  fromSample: number;
-  toSample: number;
-  /** Source time the result may be applied at. */
-  notBefore: SourceTimeMs;
-  run: () => void;
 };
 
 /* -------------------------------------------------------------------------- */

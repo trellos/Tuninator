@@ -1,9 +1,9 @@
 /**
  * Minimal WAV reader/writer for Node. No dependencies.
  *
- * CONTRACT FILE — signatures fixed; implementation owned by the harness
- * workstream. Only needs to handle what `scripts/decode-fixtures.ts` produces:
- * 16-bit PCM, mono, 48kHz.
+ * Only needs to handle what `scripts/decode-fixtures.ts` produces: 16-bit PCM,
+ * mono, 48kHz. The other PCM and float widths are read too, for scripts that
+ * ingest material from elsewhere.
  *
  * The chunk walk is real rather than a fixed 44-byte header assumption: ffmpeg
  * writes a `LIST`/`INFO` chunk between `fmt ` and `data`, so anything that

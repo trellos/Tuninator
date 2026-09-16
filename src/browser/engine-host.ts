@@ -8,12 +8,12 @@
  * never change a Note, a timestamp, or an event ordering.
  *
  * The inline host is the default because it is strictly simpler and the work is
- * small: one fast hop is a few hundred microseconds, and the deep lane is
- * budgeted and droppable. The worker host exists for applications that already
- * have a busy main thread.
+ * small: one fast hop is a few hundred microseconds, and the deep lane's work
+ * per hop is bounded and its jobs droppable. The worker host exists for
+ * applications that already have a busy main thread.
  */
 
-import type { Note, PitchFrame, SourceTimeMs, Timebase } from "../types.js";
+import type { Note, PitchFrame, Timebase } from "../types.js";
 import type { EngineConfig } from "../engine/config.js";
 import { RecognitionEngine } from "../engine/engine.js";
 import type { TrackerEmission } from "../engine/tracker/note-tracker.js";
@@ -28,15 +28,26 @@ const RECENT_NOTES = 64;
  *
  * A flush is a round trip, and a worker that has died — or never came up —
  * answers nothing. Without a bound, `stop()` and `dispose()` would never
- * settle, which is precisely the failure the old `stop(): void` had and the
- * async signature exists to fix. Generous against a real round trip, which is
- * sub-millisecond, and short against a human waiting for a button.
+ * settle. Generous against a real round trip, which is sub-millisecond, and
+ * short against a human waiting for a button.
  */
 const FLUSH_TIMEOUT_MS = 250;
 
 export type EngineOutbound = {
   emissions: TrackerEmission[];
   frames: PitchFrame[];
+};
+
+/**
+ * What the capture worklet measured about the input channels over one hop.
+ *
+ * The engine never sees channels — it is handed one mono block — so the
+ * metering rides alongside the hop through the host and is stamped onto the
+ * `PitchFrame`s that hop produced. See `PitchFrame.channelRms`.
+ */
+export type ChannelMeters = {
+  channelRms: number[];
+  selectedChannel: number | null;
 };
 
 /**
@@ -47,19 +58,31 @@ export type EngineOutbound = {
  * asynchronous is what keeps the adapter free of `if (worker)`.
  */
 export interface EnginePort {
-  /** Feed one captured hop. */
-  push(samples: Float32Array, startSample: number): void;
+  /** Feed one captured hop. `meters`, when given, is stamped onto its frames. */
+  push(samples: Float32Array, startSample: number, meters?: ChannelMeters): void;
   /** End every open Note. */
   flush(): Promise<void>;
   /** Subscribe to everything the engine produces. */
   onOutput(handler: (output: EngineOutbound) => void): void;
   getActiveNotes(): Note[];
   getNote(id: string): Note | undefined;
-  getTimebase(): Timebase | null;
-  now(): SourceTimeMs;
+  getTimebase(): Timebase;
   /** Returns a drained buffer to whoever owns the pool, if anyone does. */
   onRecycle(handler: (buffer: ArrayBuffer) => void): void;
   dispose(): Promise<void>;
+}
+
+/** The hop's channel metering, on every frame the hop produced. */
+function withChannelMeters(
+  frames: PitchFrame[],
+  meters: ChannelMeters | undefined
+): PitchFrame[] {
+  if (meters === undefined || frames.length === 0) return frames;
+  return frames.map((frame) => ({
+    ...frame,
+    channelRms: meters.channelRms,
+    selectedChannel: meters.selectedChannel,
+  }));
 }
 
 /** The engine on the main thread. Chunks arrive and are processed inline. */
@@ -73,10 +96,13 @@ export class InlineEngineHost implements EnginePort {
     this.engine = new RecognitionEngine(sampleRate, config, originContextTime);
   }
 
-  push(samples: Float32Array, startSample: number): void {
+  push(samples: Float32Array, startSample: number, meters?: ChannelMeters): void {
     if (this.disposed) return;
     const result = this.engine.processChunk(samples, startSample);
-    this.output?.({ emissions: result.emissions, frames: result.frames });
+    this.output?.({
+      emissions: result.emissions,
+      frames: withChannelMeters(result.frames, meters),
+    });
     // The capture worklet transferred this buffer away; hand it back so the
     // audio thread's pool never has to allocate in steady state.
     this.recycle?.(samples.buffer as ArrayBuffer);
@@ -108,10 +134,6 @@ export class InlineEngineHost implements EnginePort {
     return this.engine.getTimebase();
   }
 
-  now(): SourceTimeMs {
-    return this.engine.now;
-  }
-
   async dispose(): Promise<void> {
     this.disposed = true;
     this.output = null;
@@ -122,10 +144,10 @@ export class InlineEngineHost implements EnginePort {
 /**
  * The engine in a Web Worker.
  *
- * `EnginePort` is synchronous on four of its methods and a worker cannot be, so
- * this host keeps a main-thread MIRROR of the answers rather than asking: the
- * emission stream already carries every Note snapshot the engine produces, so
- * `getActiveNotes` and `getNote` are reads of what the worker last said, and
+ * `EnginePort` is synchronous on three of its methods and a worker cannot be,
+ * so this host keeps a main-thread MIRROR of the answers rather than asking:
+ * the emission stream already carries every Note snapshot the engine produces,
+ * so `getActiveNotes` and `getNote` are reads of what the worker last said, and
  * `getTimebase` is arithmetic the host can do itself. The mirror can only ever
  * lag the worker by one message, which is the same staleness a caller already
  * accepts from a snapshot — `Note.revisionNumber` is how it is checked.
@@ -144,7 +166,6 @@ export class WorkerEngineHost implements EnginePort {
   private readonly flushes = new Map<number, () => void>();
   private output: ((output: EngineOutbound) => void) | null = null;
   private recycle: ((buffer: ArrayBuffer) => void) | null = null;
-  private sourceNow: SourceTimeMs = 0;
   private nextFlushId = 1;
   private disposed = false;
 
@@ -184,9 +205,11 @@ export class WorkerEngineHost implements EnginePort {
   private receive(message: EngineWorkerMessage): void {
     switch (message.type) {
       case "output":
-        this.sourceNow = message.now;
         for (const emission of message.emissions) this.mirror(emission);
-        this.output?.({ emissions: message.emissions, frames: message.frames });
+        this.output?.({
+          emissions: message.emissions,
+          frames: withChannelMeters(message.frames, message.meters),
+        });
         return;
       case "recycle":
         this.recycle?.(message.buffer);
@@ -214,12 +237,13 @@ export class WorkerEngineHost implements EnginePort {
     this.active.set(emission.note.id, emission.note);
   }
 
-  push(samples: Float32Array, startSample: number): void {
+  push(samples: Float32Array, startSample: number, meters?: ChannelMeters): void {
     if (this.disposed) return;
     const buffer = samples.buffer as ArrayBuffer;
-    this.worker.postMessage({ type: "push", samples, startSample } satisfies EngineWorkerCommand, [
-      buffer,
-    ]);
+    this.worker.postMessage(
+      { type: "push", samples, startSample, meters } satisfies EngineWorkerCommand,
+      [buffer]
+    );
   }
 
   async flush(): Promise<void> {
@@ -255,10 +279,6 @@ export class WorkerEngineHost implements EnginePort {
 
   getTimebase(): Timebase {
     return { sampleRate: this.sampleRate, originContextTime: this.originContextTime };
-  }
-
-  now(): SourceTimeMs {
-    return this.sourceNow;
   }
 
   async dispose(): Promise<void> {

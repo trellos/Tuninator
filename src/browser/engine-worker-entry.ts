@@ -14,7 +14,8 @@
 import type { EngineConfig } from "../engine/config.js";
 import { RecognitionEngine } from "../engine/engine.js";
 import type { TrackerEmission } from "../engine/tracker/note-tracker.js";
-import type { PitchFrame, SourceTimeMs } from "../types.js";
+import type { PitchFrame } from "../types.js";
+import type { ChannelMeters } from "./engine-host.js";
 
 /** Host -> worker. */
 export type EngineWorkerCommand =
@@ -24,7 +25,13 @@ export type EngineWorkerCommand =
       config: EngineConfig;
       originContextTime?: number;
     }
-  | { type: "push"; samples: Float32Array; startSample: number }
+  | {
+      type: "push";
+      samples: Float32Array;
+      startSample: number;
+      /** Echoed back on the output this hop produces; the host stamps frames. */
+      meters?: ChannelMeters;
+    }
   | { type: "flush"; id: number }
   | { type: "dispose" };
 
@@ -34,8 +41,8 @@ export type EngineWorkerMessage =
       type: "output";
       emissions: TrackerEmission[];
       frames: PitchFrame[];
-      /** The engine's source clock after this chunk, so the host can mirror it. */
-      now: SourceTimeMs;
+      /** The `meters` of the `push` this answers, when it had any. */
+      meters?: ChannelMeters;
     }
   /**
    * The buffer the host transferred, handed straight back.
@@ -85,7 +92,7 @@ export function serveEngine(port: {
             type: "output",
             emissions: result.emissions,
             frames: result.frames,
-            now: engine.now,
+            meters: command.meters,
           });
           const buffer = command.samples.buffer as ArrayBuffer;
           port.postMessage({ type: "recycle", buffer }, [buffer]);
@@ -98,7 +105,6 @@ export function serveEngine(port: {
               type: "output",
               emissions: result.emissions,
               frames: result.frames,
-              now: engine.now,
             });
           }
           port.postMessage({ type: "flushed", id: command.id });
