@@ -304,9 +304,9 @@ const VIRTUAL_PITCH_SEMITONES = 11;
  * Taken unchanged from the `PaceEstimator` in `docs/DETECTION-FINDINGS.md`
  * ("The constants are absolute milliseconds"): a ring of recent inter-onset
  * intervals, the median of the last eight, ignoring gaps too short to be two
- * notes, dropped after a silence. Nothing is fitted to these — the two bars
- * that ARE derived live in `tracking.rateFragmentSpanFraction` and
- * `tracking.rateFragmentDipRatio`.
+ * notes, dropped after a silence. Nothing is fitted to these — the bars that
+ * ARE derived live in `tracking.rateFragmentSpanFraction`,
+ * `tracking.rateFragmentDipRatio` and the `rateFragmentNoRise*` trio.
  *
  * One property matters more than accuracy here, and it was measured rather
  * than assumed: a phantom boundary INSERTS an onset, which splits one true
@@ -354,6 +354,38 @@ const RATE_RESET_MS = 1500;
  * null and the caller leaves the bar alone. Abstaining is free here: it costs
  * only the first notes of a take, where nothing has yet gone wrong.
  */
+
+/**
+ * The fraction of the local interval a Note opened by a same-pitch boundary
+ * must outlast before it is announced, or null when the boundary is not a
+ * suspected tail fragment.
+ *
+ * Two shapes of suspicion, each with its own bar (see `tracking`): a boundary
+ * with no envelope dip under it — the transient landed in a note still at
+ * full strength — and one over which no energy arrived — the envelope after
+ * it is no louder than the 80ms before it — provided the dip is not the deep
+ * one a pick's contact leaves. A boundary showing both takes the longer bar.
+ * `dip` and `rise` are null when nothing split at the same pitch.
+ */
+export function rateFragmentSpanFraction(
+  dip: number | null,
+  rise: number | null,
+  bars: EngineConfig["tracking"]
+): number | null {
+  let fraction: number | null = null;
+  if (dip !== null && dip >= bars.rateFragmentDipRatio) {
+    fraction = bars.rateFragmentSpanFraction;
+  }
+  if (
+    rise !== null &&
+    dip !== null &&
+    rise < bars.rateFragmentNoRiseRatio &&
+    dip >= bars.rateFragmentNoRiseDipRatio
+  ) {
+    fraction = Math.max(fraction ?? 0, bars.rateFragmentNoRiseSpanFraction);
+  }
+  return fraction;
+}
 
 export class NoteTracker {
   private readonly config: EngineConfig;
@@ -588,6 +620,11 @@ export class NoteTracker {
      * See `tracking.rateFragmentSpanFraction`.
      */
     let splitSamePitchDip: number | null = null;
+    /**
+     * `riseRatio` at the same split: the second shape of the same suspicion,
+     * read on the direct input. See `tracking.rateFragmentNoRiseRatio`.
+     */
+    let splitSamePitchRise: number | null = null;
 
     /* (a) An attack over something already sounding: a restrum or a re-pick.
      *     Only a genuine energy injection counts, and never mid-glide — a bend
@@ -738,7 +775,10 @@ export class NoteTracker {
         // It inherits the decay: a restrum re-excites the strings that were
         // already ringing, so the curve is continuous through the split.
         splitFrom = active;
-        if (!pitchDiffers) splitSamePitchDip = frame.attack.dipRatio;
+        if (!pitchDiffers) {
+          splitSamePitchDip = frame.attack.dipRatio;
+          splitSamePitchRise = frame.attack.riseRatio;
+        }
         active = null;
       }
     }
@@ -859,16 +899,21 @@ export class NoteTracker {
           splitFrom !== null
         );
         // A Note opened by a same-pitch boundary that had no envelope dip under
-        // it is a suspected tail fragment: it has to outlast a fraction of the
-        // interval currently being played before it is announced at all. One
-        // that dies first is dropped by `end()`, which already discards a Note
-        // that never cleared its bar — so this refuses the fragment rather than
-        // announcing and retracting it, and costs latency only on a boundary
-        // that is doubtful in both witnesses at once.
-        const bars = this.config.tracking;
-        if (splitSamePitchDip !== null && splitSamePitchDip >= bars.rateFragmentDipRatio) {
+        // it, or no energy arriving over it, is a suspected tail fragment: it
+        // has to outlast a fraction of the interval currently being played
+        // before it is announced at all. One that dies first is dropped by
+        // `end()`, which already discards a Note that never cleared its bar —
+        // so this refuses the fragment rather than announcing and retracting
+        // it, and costs latency only on a boundary that is doubtful in both
+        // witnesses at once.
+        const fraction = rateFragmentSpanFraction(
+          splitSamePitchDip,
+          splitSamePitchRise,
+          this.config.tracking
+        );
+        if (fraction !== null) {
           const ioi = this.localIoiMs(active.startTime);
-          if (ioi !== null) active.rateFragmentBarMs = bars.rateFragmentSpanFraction * ioi;
+          if (ioi !== null) active.rateFragmentBarMs = fraction * ioi;
         }
       }
     }

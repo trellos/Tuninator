@@ -5817,3 +5817,155 @@ covered. **The next measurement is named and small:** this estimator's own
 ratio to the oracle rate at the candidates, per take. If it is 0.82, 0.50 is
 derived and the gate is worth re-reading against reviewed labels. If it is not,
 the ratio form is finished.
+
+## The rate gate's second witness: a same-pitch boundary over which no energy arrived, read on the direct input
+
+*Iteration 1 of the slow-note-splits loop (`docs/slow-note-splits-loop-prompt.md`,
+DECISION-044). Journal entry in `docs/slow-note-splits-loop-log.md`; DECISION-045.*
+
+### What the shipped gate could not see
+
+DECISION-030's rate gate holds a Note opened by a same-pitch re-articulation
+back from announcement until it has outlasted 0.35 of the local inter-onset
+interval — but only when the boundary under it showed no envelope dip
+(`dipRatio >= 0.85`). The dip is the gate's second witness, and it was chosen
+on the whole corpus, where the amped renders dominate. Read on the slow subset
+per signal path (a bench over `analyzeSamples` with `trackerTrace`, every
+accepted same-pitch re-articulation paired to the eval matcher's verdict on
+the Note it opened, EMITTED Notes only — the never-announced ones are the "64
+against 8" trap the record already names), the direct input turns out to be
+a column the gate never touches:
+
+```
+  slow subset, DI: 180 emitted same-pitch candidates, 26 spurious, 154 matched
+    accepting site of the 26:  sharpness 24   fine-onset 2   envelope-rise 0
+    dipRatio     spurious med 0.64 (p10 0.17, p90 0.77)    matched med 0.12 (p90 0.38)
+    riseRatio    spurious med 0.77 (p25 0.63, p75 0.94)    matched p10 1.01, med 2.76
+    fragment / causal IOI (shipped estimator)
+                 spurious med 0.42 (p75 0.51, p90 0.75)    matched p10 0.68, med 0.86
+    AUC (spurious lower): riseRatio 0.909, fragment/IOI 0.894, sharpness 0.823
+```
+
+Not one of the 26 DI phantoms reaches the dip bar of 0.85 — their median is
+0.64 — so on the direct input the shipped gate is inert, and every one of them
+was announced. This also corrects the journal's premise for the DI column: the
+whole-take `measure-split-cause.ts` count put `envelope-rise` first on DI (20
+of 40), but among EMITTED slow-subset phantoms `envelope-rise` accepts none.
+The envelope-rise fragments are the ones the existing bars already refuse
+before announcement; what reaches the consumer comes through `sharpness`.
+
+What the DI phantoms share is that no energy arrived. `AttackEvidence.riseRatio`
+— the short envelope over its 80ms baseline — sits at 0.77 for them, and a
+real re-pick on the same recordings rises to at least 1.01. On the direct
+input a pick that lands is louder than the string it lands on, because
+nothing in the chain is holding the level flat. The dip reads the same
+physics from the other side: a real DI re-pick damps the string on contact
+(`dipRatio` median 0.12), a phantom does not (0.64). The two are independent
+witnesses of the same absence — one that the string was never touched, the
+other that nothing was added — and the shipped gate had only the first, set
+where the direct input never goes.
+
+The amped and mic column is a different population and this entry does not
+claim it: 147 spurious against 238 matched, `riseRatio` 0.502 AUC (spurious
+median 1.04, matched 1.03 — a compressor makes them identical), `dipRatio`
+0.452, nothing above 0.65. That matches every earlier reading of the amped
+takes and is why the falsifier below asks only that the column not get worse.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation missed labels up by no more than 1 (the emitted-only bench
+predicted +1, on `held-then-picked-six-strings-120bpm-amped` with no dropped
+candidate near the label — a matcher reassignment, to be diagnosed); slow
+subset DI split events down by at least 10; the amped and mic column not
+worse; the twelve held-out takes not worse, read once; eval PASS.
+
+### What was built
+
+`tracking.rateFragmentNoRiseRatio` (0.8), `tracking.rateFragmentNoRiseDipRatio`
+(0.4) and `tracking.rateFragmentNoRiseSpanFraction` (0.5): a same-pitch
+boundary with `riseRatio` under 0.8 and `dipRatio` at or above 0.4 sets an
+announce bar of 0.5 × the local interval on the Note it opens. The shipped
+dip form is unchanged; a boundary that fails both witnesses takes the longer
+bar. The decision is the exported `rateFragmentSpanFraction()` in
+`note-tracker.ts`, covered by `tests/engine/rate-fragment.test.ts` on vectors
+read off the corpus. With `rateFragmentNoRiseRatio` at 0 the engine is
+bit-identical to `main` (verified in the pipeline, every fixture).
+
+### The sweep, derivation predicate "not 140bpm" (5 originals + 8 same-pitch takes)
+
+```
+  rise <  frac  dip >=   slow DI split   slow amped+mic   deriv missed   deriv fp   deriv extras
+  off                     45/327          158/334          113            241        298
+  0.75   0.5   0.4        39              158              114            231        292
+  0.8    0.5   0.4        35              158              114            227        288
+  0.85   0.5   0.4        35              157              114            226        287
+  0.8    0.45  0.4        36              158              114            229        289
+  0.8    0.55  0.4        35              158              115            224        287
+  0.8    0.5   0.3        35              158              114            227        288
+  0.8    0.5   0.5        35              158              114            227        288
+```
+
+The rise bar has a cliff on both sides: 0.75 gives up four of the ten DI
+events, 0.85 starts to reach the amped column (one event) and the bench put
+the nearest real re-picks at 0.82–0.89 (`same-pitch-eighths-a3-120bpm-di`,
+`held-then-picked-six-strings-120bpm-di` after a long hold — each a note whose
+predecessor was still loud when it was picked). 0.5 on the span is the
+largest value that costs nothing beyond the one diagnosed below; 0.55 costs a
+second label. The dip floor is flat from 0.3 to 0.5 — the derivation set
+cannot see it, so it stays at the value the DI readings put it at (phantoms
+0.44–0.85, real re-picks 0.38 at p90) as a floor rather than a tuned edge.
+
+Held out, read once at 0.8 / 0.5 / 0.4: missed 24 → 24, false positives 70 →
+69, split events 75 → 74 (`lead-line-amped-quarter-eighth-triplet-140bpm`
+gives up one phantom), every other take bit-identical.
+
+### The one label that moved, by instrument
+
+`held-then-picked-six-strings-120bpm-amped`, label `p1c4q4` (F#2 at 17535ms).
+On `main` the label's own onset, at 17506ms, is refused as `chord-not-sharp`
+— that is unchanged, and it is one of the ledger's existing causes on this
+take. What credited the label on `main` was Note `n31`, opened at 17840ms:
+305ms after the label's onset, outside the matcher's 300ms onset window, paired
+on 133ms of time overlap alone. The boundary that opened it reads `riseRatio`
+0.51 and `dipRatio` 0.79 — half the baseline energy, no contact — inside a
+chord ringing at 853ms; the new witness holds it to 253ms (0.5 × a 507ms
+interval), it lives 120ms, and `end()` drops it. So the derivation count reads
++1 missed, and what was lost is a phantom that had been standing in for a
+label the engine had already missed at its onset. Nothing that was played on
+time is lost anywhere on the derivation set; the label is on the PROVISIONAL
+side of the corpus.
+
+This is reported as it reads — +1 on the derivation missed count — and the
+verdict is the owner's. The letter of the standing bar ("missed labels may not
+rise") is broken by one; the intent of it is not, and the trade is fourteen
+emitted phantoms on the direct input for that one overlap credit.
+
+### Numbers, before → after
+
+```
+  slow subset (--subset=slow)  DI 52/54 → 42/44 split/extra    amped+mic 189/245 → 188/244
+  corpus (measure-splits)      316 / 379 / 20  →  305 / 368 / 20   split / extra / strays
+  by material                  derivation missed 113 → 114, fp 241 → 227
+                               held-out   missed  24 →  24, fp  70 →  69
+  eval                         PASS, 0 required failures, the one pre-existing informational
+  tests                        511 → 522
+```
+
+Per take on the direct input: `same-pitch-eighths-sixteenths-e5-120bpm-di`
+22 → 13 of 64 slow labels split (extras 24 → 15 on the whole take),
+`same-pitch-eighths-a3-120bpm-di` 6 → 5, `held-then-picked-six-strings-120bpm-di`
+8 → 8, `same-pitch-quarters-a3-e5-120bpm-di` 9 → 9. The quarters take's nine
+are `fine-onset` and near-unity-rise boundaries (0.94–0.99) this witness does
+not reach, and the held-then-picked take's eight are mostly re-picks credited
+a neighbour's name rather than tail fragments.
+
+### What this closes and what it opens
+
+The ledger's row C9 asked whether `riseRatio` separates DI phantoms from real
+re-picks and whether a bar on it removes fragments at +0 missed. Separation:
+yes, 0.909. The bar: at +1 on an overlap credit, with the ten-event gain on
+one take. The remaining DI slow splits are not this shape — the E5 take's
+thirteen survivors sit at rise 0.8–1.0 with the real re-picks at 1.01, which
+is the overlap the 0.8 bar stops at — so the next DI gain needs a witness
+other than the envelope's level, or the direct-input recordings from the
+owner's rig the journal already asks for.

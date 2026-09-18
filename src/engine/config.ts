@@ -569,6 +569,56 @@ export type EngineConfig = {
      * it would at 0.5, and takes no labels with it at any span bar tried.
      */
     rateFragmentDipRatio: number;
+    /**
+     * The second shape a suspected same-pitch fragment can take: a boundary
+     * where nothing ARRIVED, read on the direct input.
+     *
+     * `rateFragmentDipRatio` asks whether the envelope fell before the
+     * transient. On the direct input it never fell far enough to answer: the
+     * emitted same-pitch fragments in the slow subset on DI carry a median
+     * dip of 0.64, so the shipped gate has nothing to say to them and every
+     * one of them was announced. What they do share is that no energy came
+     * in. `AttackEvidence.riseRatio` — the short envelope over its 80ms
+     * baseline — sits at a median 0.77 on those fragments, while a real
+     * re-pick on the same recordings rises to 1.01 at its tenth percentile.
+     * A pick that lands is louder than what it lands on; an invented boundary
+     * is not.
+     *
+     * A same-pitch boundary with `riseRatio` under this bar, and a dip no
+     * deeper than `rateFragmentNoRiseDipRatio`, gets the announce bar of
+     * `rateFragmentNoRiseSpanFraction` × the local interval, exactly as the
+     * dip form does. The two forms are independent witnesses of the same
+     * absence: one says the string was never damped by a pick, the other
+     * that no pick's energy arrived. Either alone is a suspected fragment; a
+     * real re-pick shows both.
+     *
+     * 0.8 is the largest value that costs no played note on the derivation
+     * material; at 0.9 it takes three, each a real re-pick whose rise the
+     * 80ms baseline under-reads (0.82-0.89) because the note before it was
+     * still loud. The bench put the nearest real note 0.02 away, which is
+     * why this does not sit higher.
+     */
+    rateFragmentNoRiseRatio: number;
+    /**
+     * How little the envelope may have fallen for the no-rise form to apply.
+     *
+     * A boundary with a deep dip under it is a pick making contact, whatever
+     * the rise reads: the fragments the no-rise form is for have dips of
+     * 0.44-0.85, the real re-picks on the direct input 0.38 at their ninetieth
+     * percentile. Read against the same rows it costs nothing between 0.3
+     * and 0.5 on the derivation material and one fewer held-out label at 0.4
+     * than at 0.3; it is here as a floor, not a tuned edge.
+     */
+    rateFragmentNoRiseDipRatio: number;
+    /**
+     * The announce bar for the no-rise form, as a fraction of the local
+     * interval. Higher than `rateFragmentSpanFraction` because the population
+     * it separates sits further from the real notes: the DI fragments close
+     * at a median 0.42 of the causal interval (0.51 at the third quartile),
+     * the real re-picks last 0.68 at their tenth percentile. 0.5 is the
+     * largest value that costs nothing on derivation; 0.55 costs one label.
+     */
+    rateFragmentNoRiseSpanFraction: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -895,6 +945,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minUnpitchedStableMs: 90,
     rateFragmentSpanFraction: 0.35,
     rateFragmentDipRatio: 0.85,
+    rateFragmentNoRiseRatio: 0.8,
+    rateFragmentNoRiseDipRatio: 0.4,
+    rateFragmentNoRiseSpanFraction: 0.5,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

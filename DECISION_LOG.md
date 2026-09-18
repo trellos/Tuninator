@@ -7,6 +7,77 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-045]: The rate gate gains a second witness for the direct input — a same-pitch boundary over which no energy arrived — at fourteen emitted phantoms for one overlap credit
+* **Date:** 2026-09-18
+* **Status:** Proposed
+* **Owner:** Detection architecture; the ship decision is the project owner's (DECISION-044's loop, iteration 1)
+* **Context:** DECISION-030's rate gate holds a same-pitch fragment back
+  from announcement for 0.35 of the local interval when the boundary under it
+  showed no envelope dip (`dipRatio >= 0.85`). Read per signal path on the
+  slow subset (`docs/DETECTION-FINDINGS.md`, "The rate gate's second
+  witness"), the direct input is a column that witness never reaches: the 26
+  emitted same-pitch phantoms on the DI slow takes have a median dip of 0.64
+  and every one of them was announced. What separates them from the 154 real
+  DI re-picks is `riseRatio`, the short envelope over its 80ms baseline —
+  0.77 at the median against 1.01 at the real re-picks' tenth percentile,
+  0.909 AUC — and their span over the causal interval (0.42 against 0.68).
+  On the amped and mic renders `riseRatio` is 0.502 AUC: a compressor makes
+  phantom and re-pick identical there, as every earlier reading found.
+* **Decision:** Add a second form to the same gate, behind three
+  `tracking` constants: a same-pitch boundary with `riseRatio` under
+  `rateFragmentNoRiseRatio` (0.8) and `dipRatio` at or above
+  `rateFragmentNoRiseDipRatio` (0.4) sets an announce bar of
+  `rateFragmentNoRiseSpanFraction` (0.5) × the local interval; a boundary
+  failing both witnesses takes the longer bar; the shipped dip form is
+  unchanged. The decision is `rateFragmentSpanFraction()` in
+  `note-tracker.ts`, unit-tested on corpus vectors. Swept on the derivation
+  predicate: the rise bar has a cliff on both sides (0.75 gives up four of
+  ten DI events, 0.85 reaches the amped column and the bench's nearest real
+  re-picks sit at 0.82–0.89); the span bar costs a second label at 0.55; the
+  dip floor is flat from 0.3 to 0.5 and stays where the readings put it.
+  Result on derivation: slow DI split events 45 → 35 of 327, false positives
+  241 → 227, missed 113 → 114; amped and mic column 158 → 158. Held out, read
+  once: missed 24 → 24, false positives 70 → 69. Eval PASS.
+* **Alternatives Considered:** (a) **`riseRatio` as a gate at the boundary
+  itself** — rejected without building: DECISION-028 closed every single
+  witness at the boundary, and the bench confirms why — 0.909 on DI is
+  0.502 through an amp, and a boundary gate cannot tell which it is looking
+  at; as the second witness of a rate gate it acts only on a Note that is
+  also too short for the pace, which is what makes it safe on the amped
+  renders. (b) **Raising `rearticulationRiseRatio` or narrowing the
+  `sharpness` fallback in `rearticulation.ts`** — rejected: the same
+  boundary gate, and the sharpness fallback is what accepts the real DI
+  re-picks whose rise the 80ms baseline under-reads. (c) **A prospective
+  bar on the predecessor's age over the local interval**, so the fragment is
+  refused rather than opened — bench-falsified at 0.45–0.55 AUC on every
+  population; the phantom's predecessor is a normal-length note. (d) **The
+  rise bar at 0.9**, which reaches three more DI phantoms — rejected: it
+  takes three real re-picks with it (`lead-line-sixteenths` s34,
+  `same-pitch-eighths-a3-di` s16103, `held-then-picked-di` p4c4q4), each a
+  note picked while its predecessor was still loud. (e) **Reverting on the
+  +1 missed** as the letter of DECISION-044's bar requires — the reading is
+  recorded and the call left to the owner: the label (`p1c4q4`,
+  `held-then-picked-six-strings-120bpm-amped`, PROVISIONAL) was missed at
+  its own onset on `main` (`chord-not-sharp`) and credited by a phantom Note
+  opened 305ms later on 133ms of overlap; the change drops that phantom, and
+  nothing played on time is lost anywhere on the derivation set.
+* **Consequences:** Positive — the first change since DECISION-030 to move
+  the direct input's same-pitch column, and the first to touch the slow
+  subset at all: the E5 eighths DI take splits 13 of 64 slow labels instead
+  of 22, fourteen phantoms fewer reach a consumer, held-out is one phantom
+  better and nothing worse, the amped column is bit-identical, and the
+  witness is off with one constant. It also corrects the loop's DI premise:
+  emitted DI phantoms come through `sharpness`, not `envelope-rise`.
+  Negative — one derivation label on the provisional side reads as missed
+  where a late phantom used to stand in for it, so the standing "missed may
+  not rise" bar is broken by one on the letter; the gain sits almost
+  entirely on one take (17 of the 26 DI phantoms were there), which is
+  narrow evidence; and the remaining DI slow splits are the shape this
+  witness stops at (rise 0.8–1.0 against real re-picks from 1.01), so the
+  next DI gain needs a different witness or the owner's own recordings.
+
+---
+
 #### [DECISION-044]: The same-pitch split is worked as a loop, judged on a quarters-and-eighths subset per signal path, with a journal as the hand-off between sessions
 * **Date:** 2026-09-18
 * **Status:** Proposed

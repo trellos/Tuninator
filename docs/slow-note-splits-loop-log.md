@@ -179,9 +179,11 @@ is half a beat short at the median.
 | C4 | Pace absorb at 0.40 — the named measurement only (estimator / oracle ratio per take) | — | DECISION-037: "not yet decidable" | ratio ≈ 0.82 ⇒ 0.50 is derived | blocked on the label review (owner) |
 | C5 | Rate gate restricted by the PREDECESSOR's `harmonyBloomed` | tracker | DECISION-030 amendment (room-context flag regressed) | chord-take extras fall, nothing else moves | open (door 5) |
 | C6 | Lower the amplitude gate so decayed slow strings reach the witnesses | fast | DECISION-035 names it, unmeasured | ledger `rejected: gated` falls at no extras cost | open (door 6, misses not splits) |
-| C7 | Instrument only: the slow subset re-measured with `analysis.rmsGate` overridden to the values GOATerizer can pass (0.002, 0.0005, 0.00008) — does lowering the gate raise splits, and by which accepting site? | measurement | none; the consumer runs the engine here and the corpus never has | a stated split count per gate value; if splits rise, the loop's target moves to the gate the player actually plays at | open, cheap, do first |
+| C7 | Instrument only: the slow subset re-measured with `analysis.rmsGate` overridden to the values GOATerizer can pass (0.002, 0.0005, 0.00008) — does lowering the gate raise splits, and by which accepting site? | measurement | none; the consumer runs the engine here and the corpus never has | a stated split count per gate value; if splits rise, the loop's target moves to the gate the player actually plays at | **spent, iteration 1**: 260 / 286 / 293 split at 0.002 / 0.0005 / 0.00008; all of it `held-then-picked-di` 8 → 45 as its gated misses become splits |
 | C8 | Instrument only: the slow subset at 44.1kHz (resample the decoded fixtures, run the same engine) — does the hop grid move the numbers? | measurement | none | bit-identical is the hope; a moved count is a finding about every ms-denominated constant | open, cheap |
-| C9 | DI: the `envelope-rise` acceptance. On the outcome-shaped population, DI takes only, read `riseRatio` and `rms / sustainedRms` at the phantoms against the real re-picks; then whether a note past `ringOutMs` with a trustworthy decay fit should reach the ring-out branch instead of the rolling-baseline test | fast | the sweep that set `rearticulationRiseRatio` 1.2 (swept DOWN on the five originals for sensitivity; raising it was not the question asked); "Hypotheses tested and rejected" rows on `restrumSharpness` | separation ≥ 0.80 AUC on DI rows, then a bar that removes DI fragments at +0 missed on derivation | open — first for the DI column |
+| C9 | DI: the `envelope-rise` acceptance. On the outcome-shaped population, DI takes only, read `riseRatio` and `rms / sustainedRms` at the phantoms against the real re-picks; then whether a note past `ringOutMs` with a trustworthy decay fit should reach the ring-out branch instead of the rolling-baseline test | fast | the sweep that set `rearticulationRiseRatio` 1.2 (swept DOWN on the five originals for sensitivity; raising it was not the question asked); "Hypotheses tested and rejected" rows on `restrumSharpness` | separation ≥ 0.80 AUC on DI rows, then a bar that removes DI fragments at +0 missed on derivation | **spent, iteration 1**: `riseRatio` 0.909 on emitted DI rows (0.502 amped); shipped as the rate gate's second witness, DECISION-045, at +1 on an overlap credit; the emitted DI phantoms are `sharpness`-accepted, not `envelope-rise` |
+| C9b | A PROSPECTIVE bar on the predecessor's age over the local interval, so the fragment is refused rather than opened | tracker | DECISION-030 (announce bar on the fragment's own span) | 0.80 AUC on the outcome-shaped population | **closed, iteration 1**: 0.45–0.55 AUC on every population; the predecessor is a normal-length note |
+| C10 | The DI slow splits the no-rise witness stops at: the E5 take's 13 survivors read rise 0.8–1.0 against real re-picks from 1.01, the quarters DI take's 9 are `fine-onset` and near-unity rise. A witness other than the envelope's level (C2a/C2b band-limited, or the owner's own recordings) | fast | DECISION-045 (rise bar at 0.9 costs three real re-picks whose predecessor was still loud) | DI slow split below 42 of 365 at +0 missed; amped not worse | open — after doors 1–3 or the owner's recordings |
 
 ## Owner-side blockers (living)
 
@@ -222,4 +224,100 @@ is half a beat short at the median.
 - Exit rule: <continue | exit, reason>.
 ```
 
-*(No iterations yet. The baseline above is iteration 0.)*
+### Iteration 1 — 2026-09-18 — KEPT (pending the owner's call on one label) — the rate gate gains a DI-shaped second witness: a same-pitch boundary over which no energy arrived
+
+- Candidate: **C9** (the DI column's accepting site and `riseRatio`), built as
+  a second witness on DECISION-030's rate gate rather than a boundary gate.
+  Nearest closed relative: the single-witness boundary gates of DECISION-028
+  (`riseRatio` among them, ≤ 0.698 AUC on the whole corpus). The difference:
+  read per signal path on EMITTED Notes, `riseRatio` separates DI phantoms
+  from DI re-picks at 0.909 while being 0.502 through an amp; and it acts only
+  on a Note also too short for the local pace, which is what keeps it off the
+  amped column where the boundary reading is worthless.
+- Falsifier, stated before measuring: derivation missed up by no more than 1
+  (bench predicted +1 on `held-then-picked-amped`, to be diagnosed); slow DI
+  split events down by ≥ 10; amped+mic column not worse; held-out not worse,
+  read once; eval PASS.
+- Built: `src/engine/config.ts` (`tracking.rateFragmentNoRiseRatio` 0.8,
+  `rateFragmentNoRiseDipRatio` 0.4, `rateFragmentNoRiseSpanFraction` 0.5),
+  `src/engine/tracker/note-tracker.ts` (`rateFragmentSpanFraction()`, the
+  rise captured beside the dip at a same-pitch split),
+  `tests/engine/rate-fragment.test.ts` (11 tests on corpus vectors); gate:
+  `rateFragmentNoRiseRatio` = 0 is bit-identical to `main` (verified in the
+  pipeline, every fixture).
+- Sweep (derivation predicate: not 140bpm — 5 originals + 8 same-pitch
+  takes): rise bar 0.75 / 0.8 / 0.85 → slow DI split 39 / 35 / 35 of 327,
+  amped 158 / 158 / 157, missed 114 at all three (0.85 starts to reach the
+  amped column; the bench's nearest real re-picks sit at 0.82–0.89); span
+  0.45 / 0.5 / 0.55 → 36 / 35 / 35, missed 114 / 114 / **115**; dip floor
+  0.3 / 0.4 / 0.5 → flat (35, 114 each). Off: 45, 158, 113.
+- Numbers, before → after:
+    slow subset      DI 52/54 → 42/44     amped+mic 189/245 → 188/244     total 241/299 → 230/288
+    corpus           316 / 379 / 20 → 305 / 368 / 20
+    tail fragments   267 same pitch / 0 detached / 23 other → 252 / 0 / 23 (extras 290 → 275)
+    ledger MISSED    137 → 138; `held-then-picked-six-strings-120bpm-amped` 1 → 2, cause `chord-not-sharp` (the label's own onset, unchanged; what moved is the late phantom that had credited it — below)
+    by material      derivation missed 113 → 114, fp 241 → 227, extras 298 → 288; held-out missed 24 → 24, fp 70 → 69, split 75 → 74 (read once, after)
+    eval             PASS; required 0 failures; informational the one pre-existing (`power-chords-b-a-g-fsharp-b-a-g-e-140bpm` exact 72.7%)
+    consumer view    not retracting — the fragment is never announced
+    tests            522 passing (511 + 11)
+- Per take, DI: `same-pitch-eighths-sixteenths-e5-120bpm-di` 22 → 13 of 64,
+  `same-pitch-eighths-a3-120bpm-di` 6 → 5, held-then-picked DI 8 → 8,
+  quarters DI 9 → 9, lead-line DI 7 → 7. Amped+mic: bit-identical on every
+  derivation take; `lead-line-amped-quarter-eighth-triplet-140bpm` (held-out)
+  21 → 20.
+- The one label that moved, by instrument (`--detail`, trace): `p1c4q4` F#2
+  at 17535ms on the amped held-then-picked take. Its own onset at 17506ms is
+  refused `chord-not-sharp` on `main` and still is. On `main` the label was
+  credited by Note `n31`, opened at 17840ms — 305ms late, outside the
+  matcher's 300ms onset window, paired on 133ms of overlap — from a boundary
+  reading rise 0.51, dip 0.79 inside an 853ms chord. The new witness holds it
+  to 253ms (0.5 × 507ms), it lives 120ms, `end()` drops it. Nothing played on
+  time is lost on the derivation set; the label is PROVISIONAL.
+- Verdict and why: kept, with the call left to the owner. The falsifier as
+  stated passes on every line (+1 exactly, −10 exactly, amped and held-out
+  not worse, PASS); the letter of §2's "MISSED may not rise" is broken by one,
+  and the one is an overlap credit standing in for a label the engine had
+  already missed. The trade is fourteen emitted phantoms on the direct input
+  for that.
+- What a GOATerizer player would notice: **on a direct input**, E5 eighths at
+  120bpm split 22 of 64 before and 13 of 64 after — nine more notes held on
+  time are read as one Note instead of two; A3 eighths 6 → 5; quarters and
+  the held-then-picked passage unchanged at 9 and 8. **Through an amp or a
+  room mic**, nothing changes: quarters at 120bpm still split 50 of 72,
+  eighths 37 of 71 and 24 of 64. Nothing played on time is lost on either
+  path. The tutorial's own shape — a note re-picked out of a rest — is still
+  not in the corpus, so this is the nearest measured thing, not the thing.
+- Findings section: "The rate gate's second witness: a same-pitch boundary
+  over which no energy arrived, read on the direct input"; DECISION-045;
+  commit on `claude/project-thread-46x8sd`.
+- Ledger changes: C7 spent (result below), C9 spent (this iteration), the
+  predecessor-age form added as closed, C10 added for what remains on DI.
+  New blocker: none; the owner's call on the +1 is the PR review.
+- Exit rule: continue. The DI column still splits 42 of 365 and the amped
+  column is untouched; doors 1–3 remain unrun.
+
+**C7, run this iteration (instrument only, no source change):** with
+`analysis.rmsGate` overridden to 0.002 / 0.0005 / 0.00008 (shipped 0.008), the
+slow subset reads 260 / 286 / 293 of 754 split (baseline 241), corpus extras
+434 / 463 / 468 (379), strays 206 / 311 / 465 (20), MISSED 116 / 112 / 111
+(137). The whole effect is one take: `held-then-picked-six-strings-120bpm-di`
+goes 8 → 18 → 37 → 45 split while its misses fall 14 → 7 → 5 → 3 — lowering
+the gate turns the DI re-picks the ledger records as `rejected: gated` into
+splits, not into clean Notes, because the quiet re-pick then meets the same
+sharpness fallback the phantoms come through. The other four DI slow takes
+move by 0–6. So if the owner's rig runs a gate the game calibrated low, his
+held-then-picked passage is a split problem there rather than a miss problem,
+and the witness shipped in this iteration is the one that acts on it.
+
+**A negative worth recording:** a PROSPECTIVE bar — refuse the boundary when
+the predecessor's age over the local interval is short, so the fragment is
+never opened — reads 0.45–0.55 AUC on every population (whole corpus, slow DI,
+slow amped). The phantom's predecessor is a normal-length note; it is the
+fragment that is short, and that is only known after it ends. The
+announce-bar form is the right shape and stays.
+
+**Premise corrected:** the DI paragraph above puts `envelope-rise` first among
+DI same-pitch splits (20 of 40, whole takes, `measure-split-cause.ts`). Among
+EMITTED Notes on the slow subset, `envelope-rise` accepts none of the 26 DI
+phantoms; 24 are `sharpness`, 2 `fine-onset`. The envelope-rise fragments are
+refused before announcement by bars that already exist.

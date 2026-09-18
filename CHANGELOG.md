@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- On a direct input, a same-pitch re-articulation over which no energy
+  arrived — the envelope after it no louder than the 80ms before it, with no
+  pick-contact dip under it — now has to outlast half the local note interval
+  before it is announced, the same rate gate that already held back a
+  boundary with no dip. Fourteen fewer phantom Notes on the DI same-pitch
+  takes; the amped renders are unchanged. `tracking.rateFragmentNoRiseRatio`
+  and its two companions in `src/engine/config.ts`; DECISION-045.
+
 ## 0.2.0 — 2026-09-16
 
 First release on npm.
