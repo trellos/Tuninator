@@ -192,7 +192,9 @@ is half a beat short at the median.
 | C16 | The announce bar for a Note the fine witness opened on a CONTACT: it gets `minStableMs` (55ms) where an attack-opened same-pitch contact gets the rate-fragment bar (half the local interval, 121ms on the E5 take), so it is announced before its own release arrives and the release test, which never moves an announced start, cannot reach it. `e818` on the E5 eighths DI take: fine-opened at 6122.67ms, announced at 55ms, gated release at +77ms. Candidate: a fine-opened Note whose fine onset read as a contact (`contactTimes`) takes the same suspected-fragment bar as an attack-opened no-rise split | tracker | DECISION-046 (the release test), DECISION-045 (the fragment bar), `handleFineOnset` | the fine-opened contacts on the DI takes counted, with how many are announced before a release arrives inside the window; then the bar applied at +0 derivation missed and the E5 take's `e817` charge cleared | **built and reverted, iteration 7** (DECISION-051): the premise was wrong — the fine witness delivers the contact 65ms late, so `e818`'s Note is born on the release's own hop, settled at 77ms and not yet announced, and DECISION-050's `!settled` refused it, not the announce bar. Built as the gated path without `!settled` (`isRelease` keeps `!announced`, so it reaches a fine-opened Note on its birth frame only): slow DI 29 → 27 (`e817`, `e35`), fp 211 → 210, missed 114 → 115 — `e36` on the quarters DI take, a stroke whose release re-excited the string to the gate's own level, has 13ms on its clock after the move and dies unannounced where it was announced with 75ms from the contact. Spent: the reachable rule is C17 |
 | C17 | The gated release on a Note the fine witness opened keeps the announce clock on the CONTACT: `handleFineOnset` opens a Note born settled on the contact, so the fine witness has already decided the stroke is a Note; the release (C16's path, reaching that Note on its birth frame) relocates its boundary and must not re-decide it, which it does today because `announceSoundedMs` reads from the moved `startTime`. Candidate: the clock reads from `ownStartTime` for a Note the gated release moved, as it already reads a different start than `startTime` for a Note that absorbed a stub. Reproduction: `e36`, quarters DI, 35445 → 35520ms, 13.33ms on the clock after the move | tracker | DECISION-051 (the path); DECISION-050 (the gated release); `announceSoundedMs` | derivation slow DI 29 → 27 with missed 114 → 114 (`e36` regained on overlap, its Note 35520–35547ms inside the label) and fp not up; every Note the rule announces that would otherwise die unannounced counted on the derivation takes, each matched to a label or charged as a false positive; held-out read once after | **spent, iteration 8** (DECISION-052): built as `tracking.releaseOnFineOpenedFrame`; slow DI 29 → 27, missed 114 → 114, fp 211 → 210, extras 270 → 268, amped/mic and held-out bit-identical; four Notes moved on their birth frame, `e36`'s newly announced and matched, none a false positive |
 | C18 | The region lane's envelope-rise boundary sits at the START of the first 85ms window whose RMS clears `segmentRiseRatio` (`resegment.ts`, `boundarySample`), which on a DI same-pitch stroke is in the mute; the fast lane's release transient inside that window is unread because the `attack` branch only reads the hop before the window's start. 4 of the 27: `a2`, `a4`, `a15` (quarters DI), `e825` (A3 eighths DI), Notes 55–63ms early | deep | the `attack` branch of `resegment.ts`; DECISION-046 (the same shape in the fast lane) | slow DI 27 → 23 or fewer at +0 missed and fp; amped and mic not worse | **built and reverted, iteration 9** (DECISION-053): the first transient inside the window — slow DI 27 → 34, fp 210 → 220, missed 114 → 109, amped/mic bit-identical. `attackSamples` carries band-only onsets (which fire at the mute's onset) and no rise, so the boundary lands on the mute or the contact as often as the release and leaves `minSegmentMs` of muted string as a Note. Spent: the reachable rule is C19 |
-| C19 | The transient list the deep lane reads carries each transient's kind (broadband or band-only) and the fast lane's rise on that hop, and an envelope-rise boundary is placed on the first BROADBAND transient inside its window whose rise clears `tracking.releaseRiseRatio`, else at the window's start as today. Reproduction: `a4`, quarters DI — window start 3427ms, band-only mute onset none, release transient 3466.67ms rise 2.00, label 3490ms; `e837`, E5 DI — contact 10983ms rise 0.56, release +67ms rise 3.41 | deep + tracker (the list) | DECISION-053 (the first transient); the `attack` branch of `resegment.ts` | derivation slow DI 27 → 23 or fewer, missed 114 → 109 or fewer kept, fp 210 not up, the ten extras of iteration 9 named and absent; amped and mic not worse; held-out read once after | open |
+| C19 | The transient list the deep lane reads carries each transient's kind (broadband or band-only) and the fast lane's rise on that hop, and an envelope-rise boundary is placed on the first BROADBAND transient inside its window whose rise clears `tracking.releaseRiseRatio`, else at the window's start as today. Reproduction: `a4`, quarters DI — window start 3427ms, band-only mute onset none, release transient 3466.67ms rise 2.00, label 3490ms; `e837`, E5 DI — contact 10983ms rise 0.56, release +67ms rise 3.41 | deep + tracker (the list) | DECISION-053 (the first transient); the `attack` branch of `resegment.ts` | derivation slow DI 27 → 23 or fewer, missed 114 → 109 or fewer kept, fp 210 not up, the ten extras of iteration 9 named and absent; amped and mic not worse; held-out read once after | **built and reverted, iteration 10** (DECISION-054): slow DI 27 → 27, missed 114 → 111, extras 268 → 269 (one duplicate Note), fp 210 → 210, amped/mic bit-identical, DECISION-053's ten extras absent. `a4` and `e836` moved onto their releases and the charge moved along the chain; `a2`, `a15`, `e825` unmoved because the rise lags the transient by one hop. Spent: the reachable rules are C20 and C21 |
+| C20 | The rise the region lane reads for a transient is the larger of its own hop's and the next hop's: the rise witness reads the long window, which lags the flux by one hop, so the hop carrying the transient reads the rise of the hop before it. `a2` 2520ms: 1.03 then 2.67; `a15` 9000ms: 0.91 then 2.00; `e825` 7973ms: 1.68 then 4.35; `a4` 3467ms read 2.0041 on its own hop and moved | tracker (the list) + deep | DECISION-054 (the rise on the transient's hop only) | derivation slow DI 27 → 24 or fewer with `a2`, `a15`, `e825` moved to within 40ms of their labels, missed 114 → 111 or fewer kept, fp not up, extras not up once C21 holds; amped and mic not worse; held-out read once after | open |
+| C21 | A segment the region lane carves whose start coincides with a Note that already begins there (within one hop) is that Note, not a new one: `splitAtSegments` takes `from = max(segment.from, record.startTime)` and never asks whether another Note starts at `from`. Before C19 an envelope boundary was a window start and never met a fast-lane boundary. Reproduction: A3 eighths DI, region 32040–32533ms, `attack@32293` beside `n135` starting 32293.33ms, duplicate `n137` 32293–32531ms | tracker | DECISION-054; DECISION-008 (structural revision) | under C19 or C20, the A3 duplicate absent and derivation extras not up; no label that a fast-lane Note already matched lost | open |
 
 ## Owner-side blockers (living)
 
@@ -204,6 +206,7 @@ is half a beat short at the median.
 | Does GOATerizer honour `structuralRevision` with `relation: "absorbed"`? | which form of C1 to build (retract vs never-announce) | 2026-09-18 | **Yes** (read from `trellos/goaterizer`, `src/input/tuninator-provider.ts`, its DECISION-105/110): an absorbed id becomes a `retract` that un-draws the bar, refunds a wrong-note charge and reopens an unjudged target. A verdict already shown is kept. Both forms of C1 therefore reach the game; see "What the consumer does with a split" below for why latency still matters. |
 | A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the recordings above being what the recognizer really hears, DI first | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. Briefed as `docs/goaterizer-capture-and-judgment-prompt.md`, to run in parallel in that repository. |
 | A tempo hint on `EngineTuning` (product decision; the record bounds its value at about twice the shipped gate's reach, and not free) | nothing in the loop; a consumer-side lever | 2026-09-18 | — |
+| The split instrument's forward reach: `measure-splits.ts` charges a Note that starts more than 40ms before its label to the label before it, so on a passage where every Note opens early (the DI same-pitch takes) fixing one boundary moves the charge to its neighbour and the column cannot fall one boundary at a time (iterations 5, 7, 10). Charge by nearest label start, or by most overlap? Every number in this journal moves with the answer | whether the DI slow-split column can read the boundary moves the loop is making | 2026-09-18 | — |
 
 ---
 
@@ -841,3 +844,54 @@ refused before announcement by bars that already exist.
   broadband transient in its window whose rise clears the release bar.
 - Exit rule: continue. One built-and-reverted iteration since the last
   kept one, and C19 is a new row with a stated falsifier.
+
+### Iteration 10 — 2026-09-18 — REVERTED — the region lane's boundary on the transient that rose: two boundaries right, the count flat through the chain, three sites short by one hop, one duplicate Note
+
+- Candidate: **C19**, the transient list carrying each transient's
+  witness and rise, and the envelope boundary on the first broadband
+  transient inside its window whose rise clears
+  `tracking.releaseRiseRatio`. Nearest closed relative: DECISION-053
+  (the first transient); the difference is the witness and the bar.
+- Falsifier, stated before measuring: derivation slow DI split 27 → 23 or
+  fewer (`a2`, `a4`, `a15`, `e825`); missed, fp and extras not up;
+  iteration 9's ten extras absent; amped and mic not worse; held-out
+  read once after.
+- Built: `RegionTransient` in `contracts.ts`; `attackRises` and
+  `transientsIn` in `note-tracker.ts`; `transients` on
+  `DeepRegionRequest` from both request sites in `engine.ts`, merged in
+  `deep-lane.ts`; `riseOnRisingTransient`, `transients`,
+  `transientRiseRatio` on `SegmentOptions`; `deep.segmentRiseOnRisingTransient`
+  (true; false = as shipped); two tests in `resegment.test.ts`.
+- Sweep (derivation predicate: not 140bpm): off → on, slow DI 27 → 27;
+  `a4` 3427 → 3467ms and `e836` moved onto their releases, charges moved
+  to `a4` and `e855`; `a2`, `a15`, `e825` unmoved (rise on the transient's
+  hop 1.03 / 0.91 / 1.68, next hop 2.67 / 2.00 / 4.35); one duplicate
+  Note at 32293ms on the A3 take.
+- Numbers, before → after:
+    slow subset      DI 27/327 → 27/327     amped+mic 152/334 → 152/334 (bit-identical per take)
+    corpus (deriv)   split 216 → 217, extras 268 → 269, strays 9, missed 114 → 111, fp 210 → 210, det 1307 → 1310
+    tail fragments   not re-run: reverted on the derivation result
+    ledger MISSED    not re-run: reverted on the derivation result
+    by material      derivation missed 114 → 111, extras 268 → 269; held-out NOT read
+    eval             not re-run on the candidate; the reverted engine is DECISION-052's
+    consumer view    region-lane Notes, announced ended; not retracting
+    tests            536 with the candidate; 534 after the revert
+- Verdict and why: reverted; extras up by one (the duplicate) and the
+  column flat. `src/` bit-identical to DECISION-052's (`git diff HEAD --
+  src/` empty).
+- What a GOATerizer player would notice: nothing changed this iteration.
+- Findings section: "The region lane's boundary on the transient that
+  rose: right where it reaches, unseen by the count, and short of three
+  sites by one hop"; DECISION-054; commit on
+  `claude/project-thread-46x8sd`.
+- Ledger changes: C19 spent; C20 added (the transient's rise is the
+  larger of its hop's and the next hop's); C21 added (a carved segment
+  whose start coincides with an existing Note's merges with it). New
+  owner-side item: the split instrument's 40ms forward reach charges an
+  early Note to the label before it, so a chain of early boundaries
+  cannot read better one boundary at a time; charging by nearest label
+  start or by most overlap is the owner's call, since every number moves.
+- Exit rule: two consecutive built-and-reverted iterations, each with a
+  new ledger row carrying a stated falsifier, so the rule's first clause
+  does not fire; C20 next, built together with C21 only if C20 alone
+  reproduces the duplicate.

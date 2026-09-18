@@ -6,6 +6,53 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-054]: The region lane's envelope boundary is not placed on the transient whose own hop rose over the muted string
+* **Date:** 2026-09-18
+* **Status:** Rejected
+* **Owner:** Detection architecture; DECISION-044's loop, iteration 10
+* **Context:** DECISION-053 placed an envelope-rise boundary on the first
+  transient inside the window that noticed the rise and read the mute as
+  often as the release, because the transient list carried band-only
+  onsets and no rise. This iteration gave the list each transient's
+  witness and rise (`RegionTransient`, carried tracker → engine → deep
+  lane) and placed the boundary on the first broadband transient whose
+  rise clears `tracking.releaseRiseRatio`
+  (`docs/DETECTION-FINDINGS.md`, "The region lane's boundary on the
+  transient that rose").
+* **Decision:** Built as `deep.segmentRiseOnRisingTransient` and reverted.
+  On derivation: slow DI split 27 → 27 of 327, split 216 → 217, extras
+  268 → 269, missed 114 → 111, false positives 210 → 210, the amped and
+  mic takes bit-identical; DECISION-053's ten extras absent. `a4` and
+  `e836` moved onto their releases (23ms from their labels) and the split
+  charge moved along the chain to `a4` and `e855`, so the column did not
+  fall. `a2`, `a15` and `e825` did not move: the long-window rise lags the
+  flux by one hop, so the hop carrying the transient reads 1.03, 0.91 and
+  1.68 and the next hop 2.67, 2.00 and 4.35. The one extra is a duplicate:
+  a moved boundary at 32293.33ms on the A3 eighths DI take coincides with
+  a fast-lane Note's start and `splitAtSegments` carves beside it. Held-out
+  not read. The types, the list and the tests went with the revert.
+* **Alternatives Considered:** (a) **The rise read on the transient's hop
+  or the next** — not built this iteration; ledger C20, with the three
+  unmoved sites as its reproduction. (b) **Merging a carved segment whose
+  start coincides with an existing Note's** — not built; ledger C21, with
+  the A3 duplicate at 32293ms. (c) **A lower bar for the transient's own
+  hop** — rejected: a bar under the release bar reads the contact
+  (DECISION-053's stubs) before it reads the lagged rise. (d) **Changing
+  the split instrument's 40ms forward reach** so a right boundary reads as
+  one fewer split whatever its neighbour does — not the loop's to decide;
+  put to the owner.
+* **Consequences:** Positive — the transient list's defects are corrected
+  in a form the next build can reuse (witness and rise on every transient);
+  the one-hop lag between the flux witness and the rise witness is named
+  with three sites; the reconciliation gap for a boundary that coincides
+  with an existing Note is named with one; two of the four region-lane
+  boundaries are shown to land on the release when the rule reaches them.
+  Negative — the engine did not move; the four labels stay charged; and the
+  count's chain reading now hides right boundaries on three of the last
+  six iterations.
+
+---
+
 #### [DECISION-053]: The region lane's envelope boundary is not placed on the first transient inside the window that noticed the rise
 * **Date:** 2026-09-18
 * **Status:** Rejected

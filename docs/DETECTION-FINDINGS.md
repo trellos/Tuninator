@@ -7007,3 +7007,104 @@ transient inside its window whose own rise clears the release bar
 that reads `a4`'s release (rise 2.00) and not the band-only mute onset at
 `a15`; on `e837` it reads past the contact (0.56) to the release (3.41).
 Its falsifier is this iteration's numbers with the ten extras absent.
+
+## The region lane's boundary on the transient that rose: right where it reaches, unseen by the count, and short of three sites by one hop
+
+DECISION-044's loop, iteration 10; DECISION-054. Built, measured, reverted.
+Ledger row C19: the transient list carries each transient's witness and
+rise, and an envelope-rise boundary is placed on the first broadband
+transient inside its window whose rise clears the release bar.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation slow DI split 27 → 23 or fewer, naming `a2`, `a4`, `a15`
+(quarters DI) and `e825` (A3 eighths DI); missed, false positives and
+extras not up; iteration 9's ten extras absent; amped and mic takes not
+worse; held-out read once after. Nothing to sweep: the bar is
+`tracking.releaseRiseRatio`, already fixed.
+
+### What was built
+
+`RegionTransient` in `contracts.ts` — sample, broadband or band-only, and
+`FastFrame.riseRatio` on the hop that carried it. The tracker keeps it
+beside `attackSamples` (`attackRises`, `transientsIn`), the engine passes
+it on both region-request paths as `DeepRegionRequest.transients`, the deep
+lane merges it by sample and hands it to `segmentRegion` with
+`transientRiseRatio` = `tracking.releaseRiseRatio`. Under
+`deep.segmentRiseOnRisingTransient` (true; false is the segmentation as
+shipped) the envelope branch places its boundary on the first broadband
+transient from the hop before the window's start to the window's end whose
+rise clears the bar, kind `attack`; with none, the window's start as
+before. Two tests on a handwritten sequence with three transients inside
+the noticing window — the band-only mute onset (rise 0.4), the contact
+(broadband, 0.7), the release (broadband, 2.4) — read the release, and the
+window's start with the rule off or with the release removed.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 27 → 27 of 327 (E5 eighths DI 7 → 6, A3 eighths DI 5 → 6, quarters DI 7 → 7); amped + mic 152 → 152 of 334, bit-identical per take
+    corpus (deriv)   split 216 → 217, extras 268 → 269, strays 9, missed 114 → 111, fp 210 → 210, det 1307 → 1310
+    held-out         not read; the derivation result decided the iteration
+    tests            536 with the two tests; 534 after the revert
+
+Iteration 9's ten extras are absent; the four 93–96ms stubs and the six
+longer ones alike. Three labels came back (`s1683` on the E5 take,
+`e856` and `s1699` on the A3 take). One extra Note appeared.
+
+### What moved, read on the segments and the final Notes
+
+`a4` moved as designed. The region 2040–4013ms carries two transients in
+the noticing window, the release at 3466.67ms (broadband, rise 2.0041) and
+a fine-onset entry at 3472ms (no rise recorded), and the segmentation reads
+`attack@3467` where it read `energyRise@3427`; the final Note is
+3467–3907ms, 23ms from its label where it was 63ms. `e836`'s Note moved the
+same way and `e835` is no longer charged. The count does not move for the
+reason DECISION-049 and DECISION-051 named: `a4`'s own Note, now inside
+`a4`'s span, shares it with `a5`'s Note, which starts 78ms early and
+always did, so the charge moves from `a3` to `a4`; on the A3 take
+`e856`'s regained Note starts 47ms before its label and is charged to
+`e855`. Two boundaries right, two charges moved along the chain, the
+column reads 27.
+
+`a2`, `a15` and `e825` did not move, and the frames say why: the rise
+witness reads the long window, which lags the flux by one hop, so the hop
+that carries the transient reads the rise of the hop before it. `a2`: the
+transient at 2520ms carries rise 1.03 and the next hop 2.67. `a15`: 9000ms
+carries 0.91, the next hop 2.00. `e825`: 7973.33ms (gated) carries 1.68,
+the next hop 4.35. `a4` moved because its transient's own hop happened to
+read 2.0041. The release's rise belongs to the transient one hop before
+it.
+
+The extra Note is a duplicate. On the A3 take the region 32040–32533ms
+reads `attack@32293` on a transient at 32293.33ms (broadband, rise 2.18)
+where the fast lane's own Note `n135` already starts, at 32293.33ms; the
+segment is carved as a new Note, `n137` 32293–32531ms, beside the one it
+duplicates, and `s1699` is credited by the duplicate. `splitAtSegments`
+takes `from = max(segment.from, record.startTime)` and never asks whether
+another Note already begins there; before this rule an envelope boundary
+was a window start and never coincided with a fast-lane boundary, so the
+question never arose.
+
+### Verdict
+
+Reverted: extras up by one, the slow DI count unchanged, and the keep
+rule reads those before it reads the two boundaries that are right. Two
+rows for the ledger. C20: the transient's rise is the larger of its own
+hop's and the next hop's, since the long-window rise lags the flux by one
+hop; on the three unmoved sites that reads 2.67, 2.00 and 4.35. C21: a
+carved segment whose start coincides with a Note that already begins
+there — within a hop — is not a new Note; the region lane's verdict is the
+existing boundary, and `splitAtSegments` should merge with it rather than
+carve beside it. Each names this iteration's site as its reproduction.
+
+And one thing the loop's instrument owes its owner. Three iterations have
+now placed boundaries right and read flat or worse because
+`measure-splits.ts` charges a Note that starts more than 40ms before its
+label to the label before it, so on a passage where every Note opens
+early — the direct-input same-pitch takes, exactly the material this loop
+exists for — fixing one boundary moves the charge to its neighbour, and
+the column cannot fall until every boundary in the chain is right at once.
+Charging a Note to the label whose start it is nearest to, or to the label
+it overlaps most, would read each right boundary as one fewer split. That
+is a change to the instrument, so every number in the journal moves with
+it, and it is the owner's call, not this loop's.
