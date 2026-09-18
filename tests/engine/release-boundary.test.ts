@@ -59,12 +59,12 @@ const withRatio = (ratio: number): EngineConfig => ({
 });
 
 /** The pick landing: a short broadband click, then the string damped under it. */
-function contact(hz: number, samples: number): Float32Array {
+function contact(hz: number, samples: number, click = 0.25): Float32Array {
   const out = sawtooth(hz, samples, 0.35 / 30);
   let seed = 7;
   for (let i = 0; i < ms(3); i++) {
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    out[i] = 0.25 * ((seed / 0x7fffffff) * 2 - 1);
+    out[i] = click * ((seed / 0x7fffffff) * 2 - 1);
   }
   return out;
 }

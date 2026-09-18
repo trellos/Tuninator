@@ -184,8 +184,9 @@ is half a beat short at the median.
 | C9 | DI: the `envelope-rise` acceptance. On the outcome-shaped population, DI takes only, read `riseRatio` and `rms / sustainedRms` at the phantoms against the real re-picks; then whether a note past `ringOutMs` with a trustworthy decay fit should reach the ring-out branch instead of the rolling-baseline test | fast | the sweep that set `rearticulationRiseRatio` 1.2 (swept DOWN on the five originals for sensitivity; raising it was not the question asked); "Hypotheses tested and rejected" rows on `restrumSharpness` | separation ≥ 0.80 AUC on DI rows, then a bar that removes DI fragments at +0 missed on derivation | **spent, iteration 1**: `riseRatio` 0.909 on emitted DI rows (0.502 amped); shipped as the rate gate's second witness, DECISION-045, at +1 on an overlap credit; the emitted DI phantoms are `sharpness`-accepted, not `envelope-rise` |
 | C9b | A PROSPECTIVE bar on the predecessor's age over the local interval, so the fragment is refused rather than opened | tracker | DECISION-030 (announce bar on the fragment's own span) | 0.80 AUC on the outcome-shaped population | **closed, iteration 1**: 0.45–0.55 AUC on every population; the predecessor is a normal-length note |
 | C10 | The DI slow splits the no-rise witness stops at: the E5 take's 13 survivors read rise 0.8–1.0 against real re-picks from 1.01, the quarters DI take's 9 are `fine-onset` and near-unity rise. A witness other than the envelope's level (C2a/C2b band-limited, or the owner's own recordings) | fast | DECISION-045 (rise bar at 0.9 costs three real re-picks whose predecessor was still loud) | DI slow split below 42 of 365 at +0 missed; amped not worse | **spent, iteration 2**: the survivors were a TIMING error, not phantoms — 27 of 35 open on the pick's contact, 45–70ms before the release the labels sit on. DECISION-046 moves the boundary; slow DI 35 → 30 on derivation at +0 missed, amped one extra better. What is left is C11–C13 |
-| C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | open — next |
+| C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | **built and reverted, iteration 3** (DECISION-047): 22 of 23 boundaries land within 33ms of their labels, score worse (slow DI 30 → 33, missed +2, fp +2) through C14 and two overlap credits. Re-run after C14 |
 | C12 | The release arriving on a hop the amplitude gate refuses (`gated`): the muted string is under `analysis.rmsGate` when the release begins, `rearticulation.ts` never sees it, the Note keeps the contact. 3 of the 30; plus 1 at 80ms, the edge of the window DECISION-046 reuses from `transient.articulationMs`, and 2 inside the window and over the bar that did not move (`a3`, `e830`), unread | tracker | DECISION-046; C7 (lowering the gate turns gated misses into splits, so the gate is not the lever) | the 3 + 1 + 2 fall at +0 derivation missed | open |
+| C14 | The pace estimator's cliff: `localIoiMs` is the median of the last eight opening gaps, and on material whose gaps sit in two clusters (the E5 take: eighths ~227ms, sixteenths ~120ms) one gap shortened by a 67ms boundary move tips it 227 → 160ms, so every bar denominated in it — DECISION-030's 0.35, DECISION-045's 0.5 — moves by a third. Reproduction: E5 DI take, 15907ms, `announceBarMs` 113 → 80 under DECISION-047's build. Candidates: gaps read from ATTACK times (which a boundary move does not change) rather than Note openings; a percentile or trimmed median that one gap cannot tip; or the bar denominated in the predecessor's own length | tracker | DECISION-030 (the estimator as built), DECISION-037 (estimator / oracle ratio "not yet decidable") | under DECISION-047's build re-applied, the two E5 false positives do not appear and derivation is not worse; the estimator/oracle ratio per take does not fall | open — next; unblocks C11 |
 | C13 | A sharpness ceiling on the CONTACT opening for DECISION-046: the two moves that cost something on held-out had a broadband transient of sharpness 9.9 and 12.8 at the "contact" (a mic sixteenth at 140bpm, a mic strum), the direct-input contacts read 0.5–6.6. A contact does not scrape. Read on held-out material, so not a constant this iteration | tracker | DECISION-046 (d) | derived on the DERIVATION predicate alone: an edge between the DI contacts and the loudest derivation openings the rule moves; then held-out read once — `lead-line-sixteenths` missed 10 → 8 is the prediction | open — derive, do not tune |
 
 ## Owner-side blockers (living)
@@ -418,3 +419,62 @@ refused before announcement by bars that already exist.
 - Exit rule: continue. The direct input still splits 30 of 327 on derivation,
   and 12 of those are this mechanism at two sites it does not yet reach (C11,
   C12); door 1 and door 3 remain unrun.
+
+### Iteration 3 — 2026-09-18 — REVERTED — a split whose burst began on a refused contact moved to the release: right on 22 of 23 boundaries, worse on the score through the pace estimator
+
+- Candidate: **C11**, the burst rule backdating a same-pitch split onto a
+  contact that was refused as a re-articulation (9 of the 30 remaining DI
+  slow splits). Nearest closed relative: DECISION-046, the same mechanism at
+  the unsettled-Note and absorbed-stub sites. The difference: here the
+  contact was refused, so the Note it landed in was still open, the release
+  split it, and the split took the burst's first attack as its boundary.
+- Falsifier, stated before measuring: derivation slow DI split down by at
+  least 6 of the 9; derivation missed and false positives not up; chord
+  takes bit-identical; held-out read once after the bar was chosen.
+- Built: `tracking.burstContactRiseRatio` (0 = off) in `config.ts`; step
+  (a)'s `rearticulated && settled` branch in `note-tracker.ts` (boundary =
+  the accepting attack when the burst's first rose under the bar, the
+  accepting attack rose by `releaseRiseRatio` or more, same pitch class);
+  two tests on a synthesized soft-click stroke. Reverted to bit-identical
+  (`git diff -- src/` empty against the iteration 2 commit); the tests went
+  with the code.
+- Sweep (derivation predicate: not 140bpm): bar 1.0 / 1.1 / 1.2 / 1.3 →
+  slow DI split 33 / 33 / 33 / 33 of 327 (off: 30), missed 116 (114), fp
+  225 (223), extras 284 (281), |onset| p90 90 (95). Flat — every refused
+  contact reads under 1.0 — and worse on every falsifier line.
+- Numbers, before → after: unchanged (reverted). At 1.2 for the record:
+    slow subset      DI 30 → 33 of 327 on derivation; quarters DI 8 → 7, held-then-picked DI 8 → 10, E5 eighths DI 9 → 11
+    by material      derivation missed 114 → 116, fp 223 → 225; held-out (read once) split 70 → 69, fp 67 → 65, missed 27 → 27, |onset| p90 67 → 63
+    eval             not run at 1.2 (reverted before verification)
+    tests            525 (the two added tests removed with the build)
+- The moves, by label: 23 `released` via `burst` on the three DI takes;
+  22 go from 40–107ms early to within 33ms of the label (held-then-picked
+  13, E5 5, quarters 5), one goes 10 → 77 on a label sitting on the
+  contact. Nothing the rule touched is a strum.
+- Why the score is worse: (1) `localIoiMs`, the median of the last eight
+  opening gaps, is tipped 227 → 160ms on the E5 take by one gap the move
+  shortened, so DECISION-045's announce bar for a no-rise fragment falls
+  113 → 80ms and two 80ms contact stubs (a contact the sharpness fallback
+  accepted, release on a gated hop — C12) are announced instead of dropped
+  (trace at 15907 and 16147ms: `announceBarMs` 113 → 80, `announced` false
+  → true). (2) Two overlap credits for labels the engine had not found at
+  their own onset (`e843` credited by an 80ms stub 177ms late; `p2c3q4`
+  credited across an octave by the C5 reading of a held C3) rest on stubs
+  the rule shortens to 13 and 40ms, which are then absorbed.
+- Verdict and why: reverted. The falsifier failed on every derivation line
+  and the loop's bar is the score, not the moves; the failure names a real
+  fragility — a pace estimate that one 67ms boundary move can shift by 67ms,
+  which applies to DECISION-046's moves as much as to these — and that is
+  the next candidate, ahead of re-running this one.
+- What a GOATerizer player would notice: nothing changed. On a direct
+  input a note re-picked while the previous one is still ringing (the
+  held-then-picked passage, five of its eight splits) still begins on the
+  pick's landing, 60–100ms before it sounds. Through an amp, nothing.
+- Findings section: "A burst that began on a refused contact: the boundary
+  belongs on the release, and moving it there reads worse through the pace
+  estimator"; DECISION-047 (rejected); commit on
+  `claude/project-thread-46x8sd`.
+- Ledger changes: C11 built and reverted, re-run after C14; C14 added (the
+  pace estimator's cliff on bimodal gaps, with a reproduction). No new
+  blockers.
+- Exit rule: continue. C14 next, then C11 again, then C12.

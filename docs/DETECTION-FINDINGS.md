@@ -6180,3 +6180,110 @@ the release (`classify-shape`, scratch):
 
 The first two shapes are the same mechanism read at two more sites, not new
 witnesses; they are ledger rows C11 and C12.
+
+## A burst that began on a refused contact: the boundary belongs on the release, and moving it there reads worse through the pace estimator
+
+DECISION-044's loop, iteration 3; DECISION-047. Built, measured, reverted. The mechanism
+is right at every site it touched and the score is worse, for a reason that
+is now its own ledger row.
+
+### The shape
+
+Of the 30 slow direct-input split events left after DECISION-046, 9 are a
+pick's contact REFUSED as a re-articulation (`no-energy-not-sharp` or
+`ring-out-not-sharp`, rise 0.56–0.93) with the release accepted 67–80ms
+later, on `envelope-rise` or `sharpness`. With the contact refused, the Note
+it landed in is still open when the release arrives, so the release splits
+it — and the split's boundary is "the FIRST attack of this burst", the
+contact. Five of the held-then-picked DI take's eight are this; the quarters
+DI take has two, the E5 eighths take two.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation slow DI split down by at least 6 of the 9; derivation missed and
+false positives not up; the chord takes, whose strums the burst rule exists
+for, bit-identical; held-out read once after the bar was chosen.
+
+### What was built
+
+`tracking.burstContactRiseRatio` (0 = off), read in step (a)'s
+`rearticulated && settled` branch: when the boundary would be the burst's
+first attack, that attack rose by less than the bar, the split does not
+change pitch class, and the attack in hand rose by `releaseRiseRatio` or
+more, the boundary is the attack in hand. The successor's start follows
+through `begin()`'s clamp to `lastEndedAt`. Traced as `released` via
+`burst`. Two unit tests on a synthesized stroke with a soft click on the
+contact (loud enough for the transient detector, too dull for the
+sharpness fallback) showed the split landing on the release with the rule on
+and on the contact with it off.
+
+### The sweep, derivation predicate "not 140bpm"
+
+```
+  bar      slow DI   split  extras  missed  fp    |onset| med / p90
+  off      30/327    225    281     114     223   23.7 / 95
+  1.0      33        227    284     116     225   23.3 / 90
+  1.1      33        227    284     116     225   23.3 / 90
+  1.2      33        227    284     116     225   23.3 / 90
+  1.3      33        227    284     116     225   23.3 / 90
+```
+
+Flat across the bar — every refused contact reads under 1.0 — and worse on
+every count the falsifier names: slow DI split up 3, missed up 2, false
+positives up 2. Per take: quarters DI 8 → 7 and onset p90 67 → 57ms;
+held-then-picked DI 8 → 10, missed 14 → 15; E5 eighths DI 9 → 11, missed
+8 → 9, fp 3 → 5. The chord takes on derivation are not bit-identical either:
+`cowboy-chords-c-d-em-g-c-d-em-am-120bpm` reads one split and one false
+positive fewer.
+
+### The moves themselves are right
+
+Every `released` event via `burst` at 1.2 on the three DI takes, with the
+label delta before → after:
+
+```
+  held-then-picked-di   13 moves   -107 → -40, -97 → -30, -100 → -33, -95 → -28, -78 → -12,
+                                   -65 → 2, -72 → 8, -70 → 10, -60 → 20, -40 → 27, -58 → 22,
+                                   -60 → 20, and one the other way: 10 → 77 (p4c1q3)
+  e5-eighths-di          5 moves   -57 → 10, -51 → 15, -57 → 10, -60 → 7, -55 → 12
+  quarters-di            5 moves   -78 → -12, -73 → -7, -68 → -2, -60 → 7, -73 → -7
+```
+
+Twenty-two of twenty-three boundaries move from 40–107ms early to within
+33ms of their label; the one that does not is a label sitting on the contact.
+On the held-then-picked take the moves are three times the rule's nine
+targets, because the refused-contact shape is under most of its re-picks
+whether or not the score counted them as splits.
+
+### Why the score is worse anyway
+
+Two readings, both indirect.
+
+1. **The pace estimator moves with the boundaries.** `localIoiMs` is the
+   median of the last eight gaps between Note openings. A boundary moved
+   67ms shortens one gap and lengthens the next, and on the E5 take, whose
+   gaps sit in two clusters (eighths at ~227ms, sixteenths at ~120ms), one
+   moved gap tips the median from 227 to 160ms. The announce bar
+   DECISION-045 sets for a same-pitch no-rise fragment is half the local
+   interval: 113ms before, 80ms after. Two contact-opened stubs of exactly
+   80ms — a contact the sharpness fallback accepted, whose release then
+   arrived on a `gated` hop (ledger C12) — that had been held back and
+   dropped now clear the bar and are announced. Trace at 15907 and 16147ms:
+   `announceBarMs` 113 → 80, `announced` false → true, nothing else
+   different. Both new false positives on that take are this.
+2. **Overlap credits.** `e843` on the E5 take was credited by an 80ms stub
+   177ms late; with the boundary on the release that stub is 13ms and is
+   absorbed, and the label's own pick, which the Note before it runs
+   through, reads as missed. `p2c3q4` on the held-then-picked take was
+   credited across an octave by the C5 reading of a held C3; the 120ms C3
+   stub that anchored the credit becomes 40ms and is absorbed. Both are
+   labels the engine had not found at their own onset.
+
+So the mechanism did what it says on 22 of 23 boundaries, and the score
+moved by four labels none of which is a note the engine had found and lost.
+It is still reverted: the loop's bar is the score on the derivation takes,
+the falsifier said "not up" on missed and false positives, and the failure
+names something real — a pace estimate that a 67ms boundary move can tip by
+67ms is a fragility this rule exposes rather than causes, and it will bite
+DECISION-046's moves too on any take whose gaps are bimodal. That is ledger
+row C14; C11 waits on it.

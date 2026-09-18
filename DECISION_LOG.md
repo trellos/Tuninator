@@ -7,6 +7,58 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-047]: A same-pitch split whose burst began on a refused contact is NOT moved to the release yet — the moves are right on 22 of 23 boundaries and the derivation score is worse through the pace estimator
+* **Date:** 2026-09-18
+* **Status:** Rejected (built, measured, reverted — DECISION-044's loop, iteration 3)
+* **Owner:** Detection architecture
+* **Context:** After DECISION-046, 9 of the 30 slow direct-input split events
+  left on derivation are a pick's contact refused as a re-articulation
+  (`no-energy-not-sharp`, `ring-out-not-sharp`; rise 0.56–0.93) with the
+  release accepted 67–80ms later; the release splits the still-open Note,
+  and the burst rule ("the boundary is the FIRST attack of this burst")
+  backdates the split onto the contact. Five of the held-then-picked DI
+  take's eight splits are this. `docs/DETECTION-FINDINGS.md`, "A burst that
+  began on a refused contact".
+* **Decision:** Not shipped. The rule — `tracking.burstContactRiseRatio`,
+  read at the split's backdate site: when the burst's first attack rose by
+  less than the bar and the accepting attack by `releaseRiseRatio` or more,
+  same pitch class, the boundary is the accepting attack — was built, swept
+  at 1.0 / 1.1 / 1.2 / 1.3 on the derivation predicate (flat: every refused
+  contact reads under 1.0), and reverted to bit-identical: slow DI split
+  30 → 33 of 327, missed 114 → 116, false positives 223 → 225, against a
+  falsifier of "down by at least 6, neither up". The 23 boundaries it moved
+  on the three DI takes went from 40–107ms early to within 33ms of their
+  labels on 22 of them (the other is a label on the contact); the score
+  moved through two indirect paths. (1) `localIoiMs` is the median of the
+  last eight opening gaps; on the E5 take, whose gaps sit in two clusters,
+  one gap shortened by 67ms tips the median 227 → 160ms, DECISION-045's
+  announce bar for a no-rise fragment falls 113 → 80ms, and two 80ms
+  contact stubs that had been dropped are announced. (2) Two overlap
+  credits for labels the engine had not found at their own onset (`e843`,
+  `p2c3q4`) rest on stubs the rule shortens to 13 and 40ms, which are then
+  absorbed.
+* **Alternatives Considered:** (a) **Keeping it on the strength of the
+  moves** — rejected: the loop's bar is the derivation score and the
+  falsifier was stated; the write-up carries the moves. (b) **Making the
+  pace estimator robust in the same iteration** (a percentile that ignores
+  one gap, or gaps read from attack times rather than Note openings) —
+  rejected here: a second mechanism in one iteration, and the estimator's
+  sensitivity deserves its own falsifier, since it applies to DECISION-046's
+  moves as much as to these. Ledger row C14, ahead of C11. (c) **Restricting
+  the rule to the held-then-picked shape** (a predecessor longer than the
+  local interval) — not tried: it would be tuned to one take, and the score
+  on that take is worse for the octave-credit reason, not the rule's.
+* **Consequences:** Positive — the refused-contact shape is confirmed as
+  the largest remaining direct-input timing error, and the exact site and
+  condition are recorded; the pace estimator's cliff on bimodal material is
+  now a named, measured fragility with a reproduction (E5 take, 15907ms,
+  `announceBarMs` 113 → 80) rather than a suspicion. Negative — the engine is
+  unchanged; the held-then-picked DI passage still starts its re-picks on
+  the pick's landing; a rule that is right on 22 of 23 boundaries stays out
+  until the estimator it disturbs is fixed.
+
+---
+
 #### [DECISION-046]: A Note opened on a pick's contact moves its boundary to the release — the first attack inside one articulation of the opening that rises over the muted string
 * **Date:** 2026-09-18
 * **Status:** Proposed
