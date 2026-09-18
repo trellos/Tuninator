@@ -24,6 +24,13 @@
   The estimate read 0.85 of the true interval before and 0.96 after; eight
   fewer phantom Notes on the amped quarters take and none lost.
   `tracking.paceIgnoresRetracted`; DECISION-048.
+- The release test that moves a contact-opened Note's start now reads the
+  hop the amplitude gate refused, since on a direct input the string under
+  the pick can still be under the gate when its release begins, and
+  measures its 80ms window in samples, where six hops is inside it rather
+  than 0.0000000000018ms past it. Two more direct-input boundaries sit on
+  the release; nothing lost on either set. `tracking.releaseOnGatedHop`;
+  DECISION-050.
 
 ## 0.2.0 — 2026-09-16
 

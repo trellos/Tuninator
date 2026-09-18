@@ -6,6 +6,71 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-050]: The release test reads the hop the amplitude gate refuses, and measures its window in samples
+* **Date:** 2026-09-18
+* **Status:** Proposed
+* **Owner:** Detection architecture; the ship decision is the project owner's (DECISION-044's loop, iteration 6)
+* **Context:** DECISION-046 moves a contact-opened Note's start to the
+  first attack inside one articulation window whose rise clears
+  `tracking.releaseRiseRatio`. Read on the trace at the current engine
+  (`docs/DETECTION-FINDINGS.md`, "The release can land on a hop the
+  amplitude gate refuses"), two of the remaining slow direct-input splits
+  are that release refused before the test ran: on `e851` of the E5
+  eighths DI take the release is six hops after the contact, which is 80ms
+  in exact arithmetic and 80.0000000000018 in doubles, so
+  `> articulationMs` put it outside the window; on `e815` the release's
+  hop reads under the gate (the string under the pick is very quiet on a
+  direct input, and the transient detector's window leads the gate's), so
+  `rearticulation.ts` returned `gated` and the tracker never asked whether
+  it was the release.
+* **Decision:** `tracking.releaseOnGatedHop` (true; false is
+  DECISION-046's test as shipped). When the verdict is `gated`, the Note
+  is unsettled and `isRelease` holds — contact-opened, unannounced, inside
+  the window, rise over the bar — the start moves to the attack, traced
+  `released` via `gated`. Nothing opens on the gated hop: the gate exists
+  to stop the fast lane opening a Note on room tone, and this reads a
+  ratio over the muted string in a Note that is already open and not yet
+  announced. And `isRelease` measures its window in samples,
+  `clock.durationSamples(articulationMs)` against the attack's and the
+  Note's sample positions, so the six-hop release is inside. Result on
+  derivation: slow DI split 30 → 29 of 327, split 219 → 218, extras
+  271 → 270, missed 114 → 114, false positives 211 → 211, the amped and
+  mic takes bit-identical; corpus 289 / 346 / 19 → 288 / 345 / 19; held
+  out, read once: identical on every take. Both labels the falsifier
+  named fell; the count is 29 rather than 28 because `e817`'s neighbour,
+  a fine-opened contact announced at 55ms before its own gated release
+  arrived at 77ms, is now charged to `e817` once `e817`'s own boundary is
+  right (three boundaries moved to within 10ms, one label's charge moved
+  along the chain). Eval PASS; 530 tests.
+* **Alternatives Considered:** (a) **Lowering the gate on direct input**
+  — rejected by ledger row C7 (DECISION-045's iteration): at the gates
+  GOATerizer can pass, the held-then-picked DI take's gated misses become
+  splits, 8 → 45. (b) **A tolerance in milliseconds on the window** —
+  rejected: the times are hop-quantised, so the comparison belongs in
+  samples, where it is exact; a tolerance would paper over the same
+  defect wherever else `articulationMs` is compared in milliseconds (the
+  burst `continues` test, the fragment length test), which are left as
+  they are and noted. (c) **Deferring the gated release to the next
+  ungated hop** so the fast lane literally never acts on a gated hop —
+  rejected as the same move with a hop of latency and one more piece of
+  state; the invariant is about opening Notes on room tone, and the start
+  of an unannounced Note moving is not that. (d) **Reading the gated
+  release on a settled or announced Note** — rejected: an announced start
+  is the consumer's, and `e818`'s case (announced at 55ms, release at
+  77ms) is an announce-bar question, ledger C16, not a release-test one.
+* **Consequences:** Positive — the release test now reaches every
+  contact-opened, unannounced Note whose release arrives inside the
+  window, gated or not, and the window is exact; two more direct-input
+  boundaries sit on the release; the fine-opened contact's announce bar
+  is named as the next mechanism on this shape. Negative — one more
+  reading of the fast lane on a gated hop, confined to moving an
+  unannounced start; the split count credits the rule by one where it
+  moved three boundaries, for the chain reason DECISION-049 named; and
+  `e839` (release 91ms after the contact) stays outside a window that is
+  `transient.articulationMs` by reuse rather than by measurement.
+
+---
+
 #### [DECISION-049]: The refused-contact burst rule is NOT shipped on the corrected pace estimate either — the estimator now holds, and the score cannot see the moves through the split instrument's chain reading and a ring-out clock that runs from the moved start
 * **Date:** 2026-09-18
 * **Status:** Rejected (built, measured, reverted — DECISION-044's loop, iteration 5; second build of DECISION-047's rule)

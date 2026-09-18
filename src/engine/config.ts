@@ -673,6 +673,25 @@ export type EngineConfig = {
      * DECISION-048.
      */
     paceIgnoresRetracted: boolean;
+    /**
+     * Whether the release test behind `releaseRiseRatio` reads a hop the
+     * amplitude gate refused. False is the test as DECISION-046 shipped it:
+     * a gated hop is refused before any witness is read.
+     *
+     * The gate exists to stop the fast lane opening a Note on room tone,
+     * and this opens nothing. On a direct input the string under the pick
+     * sits at a thirtieth of its level, under `analysis.rmsGate`, and the
+     * release begins there: the transient detector fires on the flux
+     * window, which leads the long RMS window the gate reads, so the hop
+     * that carries the release's rise is still gated and the Note keeps
+     * the contact. The E5 eighths DI take: contact accepted at 5626ms on
+     * the sharpness fallback, release at 5706ms with rise 3.66 refused
+     * `gated`, Note 76ms early. Reading the rise on that hop moves a start
+     * that has not been announced, in a Note that is already open, on a
+     * witness that is a ratio over the muted string rather than a level.
+     * See DECISION-050.
+     */
+    releaseOnGatedHop: boolean;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -1004,6 +1023,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rateFragmentNoRiseSpanFraction: 0.5,
     releaseRiseRatio: 2,
     paceIgnoresRetracted: true,
+    releaseOnGatedHop: true,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

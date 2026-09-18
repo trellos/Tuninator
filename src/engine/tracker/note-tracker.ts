@@ -129,8 +129,12 @@ export type TrackerTraceEvent =
       localIoiMs: number | null;
       /** What said the Note opened on a contact: the fine hop, or no rise. */
       contact: "fine" | "no-rise";
-      /** `stub` when a split stub was absorbed without lending its start. */
-      via: "unsettled" | "stub";
+      /**
+       * `stub` when a split stub was absorbed without lending its start;
+       * `gated` when the release was read on a hop the amplitude gate
+       * refused (`tracking.releaseOnGatedHop`).
+       */
+      via: "unsettled" | "stub" | "gated";
     }
   | {
       kind: "absorbed";
@@ -815,6 +819,34 @@ export class NoteTracker {
             localIoiMs: this.localIoiMs(frame.attack.at),
             contact: active.fineOpened ? "fine" : "no-rise",
             via: "unsettled",
+          });
+        }
+        active.startTime = frame.attack.at;
+        active.startSample = frame.attack.atSample;
+      }
+      // The same release, on a hop the amplitude gate refused: the string is
+      // still under the gate when it begins to speak, and the verdict above
+      // never read it. Nothing opens here — the Note is already open and
+      // unannounced, and only its start moves. See
+      // `tracking.releaseOnGatedHop`.
+      if (
+        !rearticulated &&
+        verdict.reason === "gated" &&
+        config.tracking.releaseOnGatedHop &&
+        !settled &&
+        this.isRelease(active, frame)
+      ) {
+        if (this.trace !== null) {
+          this.trace({
+            kind: "released",
+            at: frame.attack.at,
+            noteId: active.id,
+            from: active.startTime,
+            riseRatio: frame.riseRatio,
+            dipRatio: frame.attack.dipRatio,
+            localIoiMs: this.localIoiMs(frame.attack.at),
+            contact: active.fineOpened ? "fine" : "no-rise",
+            via: "gated",
           });
         }
         active.startTime = frame.attack.at;
@@ -1763,7 +1795,11 @@ export class NoteTracker {
     if (bar <= 0 || frame.attack === null) return false;
     if (active.announced || active.harmonyBloomed) return false;
     if (!isContactOpening(active)) return false;
-    if (frame.attack.at - active.startTime > this.config.transient.articulationMs) return false;
+    // In samples: attack times are hop-quantised, and six hops of 640 at
+    // 48kHz is 80ms in exact arithmetic and 80.0000000000018 in doubles
+    // (the E5 eighths DI take at 14627ms read outside the window by that).
+    const window = this.clock.durationSamples(this.config.transient.articulationMs);
+    if (frame.attack.atSample - active.startSample > window) return false;
     return frame.riseRatio >= bar;
   }
 

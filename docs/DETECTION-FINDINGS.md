@@ -6509,3 +6509,141 @@ boundary move does not shift (C15), because the moved start reopened the
 rolling-baseline test on a held note. C11 is spent; it is not the next
 mechanism to build, it is the one that will read clean once C12 and C15
 have.
+
+## The release can land on a hop the amplitude gate refuses, and the window it must land in is six hops, not 80.0000000000018 milliseconds
+
+DECISION-044's loop, iteration 6; DECISION-050. Built, measured, kept.
+Ledger row C12: the release arriving on a hop the gate refuses.
+
+### The shape, re-read at the current engine
+
+Before building, the 30 slow direct-input split events left after
+DECISION-048 were classified again with the same instrument as iteration 2
+(the shape of the early neighbour Note each label is charged with). The
+distribution is unchanged — 9 refused-contact bursts, 10 phantoms, 4 with
+no release-shaped onset, 3 gated releases, 1 at the window's edge, 2 in
+the window and unmoved, 1 weak — and every site was then read on the
+trace. That read changes what the ledger row promised.
+
+- `e851` → `e852` (E5 eighths DI), "release beyond 80ms (+80ms)": the
+  contact opened a Note at 14626.67ms on the sharpness fallback and the
+  release arrived at 14706.67ms, accepted `envelope-rise`, unsettled — and
+  `isRelease` refused it. Six hops of 640 samples at 48kHz is 80ms; in
+  doubles the two hop times subtract to 80.0000000000018, and
+  `> articulationMs` is true. The window is meant to be inclusive
+  ("inside one articulation window") and the same six-hop gap on
+  `e815`'s stroke subtracts to exactly 80. A comparison in milliseconds
+  on hop-quantised times is a coin toss at the edge.
+- `e815` → `e816` (E5 eighths DI), "gated release (+80ms)": the contact
+  at 5626.67ms, accepted on the sharpness fallback (sharpness 2.59, rise
+  0.77); the release at 5706.67ms with sharpness 5.86 and rise 3.66, on a
+  hop whose long-window RMS is under the gate, so `rearticulation.ts`
+  returned `gated` before any witness was read and the Note kept the
+  contact, 76ms early.
+- `e839` → `e840`, "gated release (+91ms)": the same, 91ms after a
+  contact the fine witness opened. Past the window; not this rule's.
+- `e835` → `e836`, "gated release (+67ms)": the early Note is the REGION
+  lane's, opened at the contact by its own segmentation; the fast lane
+  never opened anything there, so a fast-lane release test cannot reach
+  it.
+- `e830` → `e831`, "in window but unmoved": the fine witness delivered the
+  contact at 9397ms on a frame after the release (a band-only onset at
+  9466ms, rise 3.96) had already passed; the Note was opened backdated
+  onto a contact whose release was history.
+- `a3` → `a4` (quarters DI), "in window but unmoved": region-lane Notes
+  throughout that passage; the fast lane refuses every contact there at
+  the ring-out branch (`ring-out-below-floor`).
+
+So of the "3 + 1 + 2" the row named, two are reachable at the release
+test: `e851` by the window and `e815` by the gate.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation slow DI split 30 → 28, those two labels; derivation missed and
+false positives not up; amped and mic takes not worse; held-out read once
+after. Nothing to sweep: the key is a boolean and the window has no
+constant.
+
+### What was built
+
+`tracking.releaseOnGatedHop` (true; false is DECISION-046's test as
+shipped). In step (a) of the tracker, after the unsettled release test:
+when the verdict was `gated`, the Note is unsettled, and `isRelease` holds
+— contact-opened, unannounced, inside the window, rise over the bar — the
+start moves to the attack, traced as `released` via `gated`. Nothing
+opens: the amplitude gate exists to stop the fast lane opening a Note on
+room tone, and this reads a rise, a ratio over the muted string, in a Note
+that is already open and has not been announced. And `isRelease` now
+measures its window in samples, `clock.durationSamples(articulationMs)`
+against `attack.atSample - startSample`, so six hops is inside.
+
+Two tests on a synthesized stroke whose release begins under the gate: the
+first note decaying slowly enough to be over the gate when the pick lands,
+a soft contact click over a string damped to a hundred-and-twentieth, a
+release that speaks at a quarter of its level for 20ms before the string
+reaches it, and room noise so the measured floor puts the gate at
+`analysis.rmsGate`, raised to 0.03 for the test. Getting a synthetic
+release under the gate while still rising twofold over its own contact hop
+took most of the iteration: the rise witness's 80ms baseline and the
+release window are the same six hops, so the contact's own hop is always
+in the baseline, and a release loud enough to clear the bar over it is
+usually loud enough to clear the gate. The real stroke does it because the
+direct input's gate sits at the measured floor times 200, under the fixed
+cap, and the string under the pick is very quiet.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 30 → 29 of 327 (E5 eighths DI 9 → 8); amped + mic 152 → 152 of 334, bit-identical per take
+    corpus (deriv)   split 219 → 218, extras 271 → 270, strays 9, missed 114 → 114, fp 211 → 211, det 1308; |onset| med 25 → 23
+    window alone     the same 29 (`e851`); the gated path adds no label to the count and moves two boundaries
+    held-out (once)  identical on every line: split 70, extras 75, fp 66, missed 27, det 420
+    corpus (all)     289 / 346 / 19 → 288 / 345 / 19; slow subset 216 / 268 → 215 / 267; tail fragments 238 / 258 unchanged
+    ledger MISSED    141, unchanged
+    eval             PASS; tests 528 → 530
+
+### Why 29 and not 28
+
+`e851` fell to the window. `e815` fell to the gated path — and `e817`
+rose. Trace at 5690–6260ms, off and on:
+
+- `e816`'s Note, `n24`, moves from the contact (5626.67) to the release
+  (5706.67), 3ms from its label instead of 76ms early. Every other Note in
+  the chain shifts with it.
+- `e817`'s contact at 5893.33ms had been refused at the ring-out branch
+  (`ring-out-not-sharp`, the Note before it 253ms old) and then accepted
+  at 5960ms as `ring-out-sharpness`, a settled split that the burst rule
+  backdated onto the contact — the C11 shape, 57ms early. With `n24`
+  younger by 80ms the same contact reaches the rolling-baseline test
+  instead (`soundedMs` 173, under `ringOutMs`) and is accepted
+  `sharpness`; the Note it opens is unsettled when the release arrives at
+  5960ms, so DECISION-046's unsettled path moves it there. `e817`'s own
+  Note now sits 10ms from its label. This is ledger row C15's coupling —
+  the ring-out clock runs from the Note's start — read in the rule's
+  favour for once.
+- `e818`'s contact at 6122.67ms was opened by the fine witness; its
+  release at 6200ms is gated and 77ms later, inside the window, but the
+  Note was announced at 55ms of audible string (a fine-opened contact
+  gets the plain announce bar, not the same-pitch fragment bar the
+  attack-opened contact on `e816` got, 121ms), and an announced start does
+  not move. Before, that Note was charged to `e817` alongside a Note that
+  was not `e817`'s; now `e817`'s own Note is right and this one still
+  starts 67ms early, so `e817` reads split. The chain reading from
+  DECISION-049, one position along.
+
+Three boundaries right instead of one, and the count moves by one. The
+falsifier named the labels and both fell; the count it predicted assumed
+the neighbour would stand still, which DECISION-049 had already said it
+would not.
+
+### Verdict
+
+Kept. The keep rule holds with nothing against it — missed and false
+positives equal, splits and extras down, the amped and mic takes and every
+held-out take bit-identical — and the window comparison was a defect in
+DECISION-046's rule whatever the gate does. What is left of C12: `e839`
+(a gated release 91ms after a fine-opened contact, past the window),
+`e830` (the fine witness delivering a contact after its release had
+passed), `e835` and `a3` (region-lane Notes at the contact), and now
+`e818` (a fine-opened contact announced at 55ms, before its release
+arrives at 77ms). The last is the one with a mechanism in it: the
+announce bar for a Note the fine witness opened on a contact.

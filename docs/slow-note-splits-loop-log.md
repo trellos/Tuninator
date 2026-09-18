@@ -185,10 +185,11 @@ is half a beat short at the median.
 | C9b | A PROSPECTIVE bar on the predecessor's age over the local interval, so the fragment is refused rather than opened | tracker | DECISION-030 (announce bar on the fragment's own span) | 0.80 AUC on the outcome-shaped population | **closed, iteration 1**: 0.45–0.55 AUC on every population; the predecessor is a normal-length note |
 | C10 | The DI slow splits the no-rise witness stops at: the E5 take's 13 survivors read rise 0.8–1.0 against real re-picks from 1.01, the quarters DI take's 9 are `fine-onset` and near-unity rise. A witness other than the envelope's level (C2a/C2b band-limited, or the owner's own recordings) | fast | DECISION-045 (rise bar at 0.9 costs three real re-picks whose predecessor was still loud) | DI slow split below 42 of 365 at +0 missed; amped not worse | **spent, iteration 2**: the survivors were a TIMING error, not phantoms — 27 of 35 open on the pick's contact, 45–70ms before the release the labels sit on. DECISION-046 moves the boundary; slow DI 35 → 30 on derivation at +0 missed, amped one extra better. What is left is C11–C13 |
 | C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | **built and reverted, iteration 3** (DECISION-047): 22 of 23 boundaries land within 33ms of their labels, score worse (slow DI 30 → 33, missed +2, fp +2) through C14 and two overlap credits. **Re-run and reverted, iteration 5** (DECISION-049): the estimator holds (E5 fp 2 → 2), slow DI 30 → 30, missed +2 on the same two overlap credits, held-out fp 66 → 64; the held-then-picked take reads 8 → 10 because `measure-splits.ts` charges a Note 67ms early to the label before it and the rule moves the charge along the chain to the C12 shapes; and one moved start reopened the rolling-baseline test on a held note (C15). Spent: reads clean only after C12 and C15 |
-| C12 | The release arriving on a hop the amplitude gate refuses (`gated`): the muted string is under `analysis.rmsGate` when the release begins, `rearticulation.ts` never sees it, the Note keeps the contact. 3 of the 30; plus 1 at 80ms, the edge of the window DECISION-046 reuses from `transient.articulationMs`, and 2 inside the window and over the bar that did not move (`a3`, `e830`), unread | tracker | DECISION-046; C7 (lowering the gate turns gated misses into splits, so the gate is not the lever) | the 3 + 1 + 2 fall at +0 derivation missed | open |
+| C12 | The release arriving on a hop the amplitude gate refuses (`gated`): the muted string is under `analysis.rmsGate` when the release begins, `rearticulation.ts` never sees it, the Note keeps the contact. 3 of the 30; plus 1 at 80ms, the edge of the window DECISION-046 reuses from `transient.articulationMs`, and 2 inside the window and over the bar that did not move (`a3`, `e830`), unread | tracker | DECISION-046; C7 (lowering the gate turns gated misses into splits, so the gate is not the lever) | the 3 + 1 + 2 fall at +0 derivation missed | **spent, iteration 6** (DECISION-050): read on the trace, only 2 of the 6 are reachable at the release test — `e851` sits six hops after its contact, which is 80.0000000000018ms in doubles, and `e815`'s release hop is under the gate. Both fixed (`tracking.releaseOnGatedHop`, window in samples): slow DI 30 → 29, +0 missed, +0 fp, held-out identical; three boundaries right, one label's charge moved along the chain to `e818` (C16). The rest: `e839` release 91ms after a fine-opened contact (past the window); `e830` the fine witness delivering the contact after its release; `e835`, `a3` region-lane Notes at the contact |
 | C14 | The pace estimator's cliff: `localIoiMs` is the median of the last eight opening gaps, and on material whose gaps sit in two clusters (the E5 take: eighths ~227ms, sixteenths ~120ms) one gap shortened by a 67ms boundary move tips it 227 → 160ms, so every bar denominated in it — DECISION-030's 0.35, DECISION-045's 0.5 — moves by a third. Reproduction: E5 DI take, 15907ms, `announceBarMs` 113 → 80 under DECISION-047's build. Candidates: gaps read from ATTACK times (which a boundary move does not change) rather than Note openings; a percentile or trimmed median that one gap cannot tip; or the bar denominated in the predecessor's own length | tracker | DECISION-030 (the estimator as built), DECISION-037 (estimator / oracle ratio "not yet decidable") | under DECISION-047's build re-applied, the two E5 false positives do not appear and derivation is not worse; the estimator/oracle ratio per take does not fall | **spent, iteration 4** (DECISION-048): retracted openings struck out; derivation fp 223 → 211, extras 281 → 271, missed 114 → 114, amped slow 188 → 182; estimate / labels 0.85 → 0.96 at the median. The E5 stubs' bars read 133 and 140ms (were 113 and 100). C11 re-run next |
 | C13 | A sharpness ceiling on the CONTACT opening for DECISION-046: the two moves that cost something on held-out had a broadband transient of sharpness 9.9 and 12.8 at the "contact" (a mic sixteenth at 140bpm, a mic strum), the direct-input contacts read 0.5–6.6. A contact does not scrape. Read on held-out material, so not a constant this iteration | tracker | DECISION-046 (d) | derived on the DERIVATION predicate alone: an edge between the DI contacts and the loudest derivation openings the rule moves; then held-out read once — `lead-line-sixteenths` missed 10 → 8 is the prediction | open — derive, do not tune |
 | C15 | The ring-out clock runs from the Note's START: `rearticulation.ts` reaches the decay-fit branch at `soundedMs >= ringOutMs` (250), so a boundary moved 67ms later (DECISION-046 at two sites, C11 at a third) delays that branch by 67ms and a transient in the window is read by the rolling-baseline test instead. Reproduction: held-then-picked DI, 9213ms, `soundedMs` 280 → 213, `ring-out-not-sharp` → `sharpness`, a third Note on `p1c2q3`. Candidate: the clock the ring-out branch reads is the burst's first attack (the contact, where the string was excited and the decay the fit measures began), not the moved start | fast + tracker | DECISION-049; DECISION-046 (the moves it applies to first); the ring-out branch itself (`ringOutMs`) | first read, no build: on the derivation DI takes at the shipped engine, the `sharpness` acceptances 250–320ms after a moved start against those after an unmoved start, per take; then the anchored clock at +0 derivation missed, fp not up, and the E5 / held-then-picked DI phantom counts down by the number that read | open — read first |
+| C16 | The announce bar for a Note the fine witness opened on a CONTACT: it gets `minStableMs` (55ms) where an attack-opened same-pitch contact gets the rate-fragment bar (half the local interval, 121ms on the E5 take), so it is announced before its own release arrives and the release test, which never moves an announced start, cannot reach it. `e818` on the E5 eighths DI take: fine-opened at 6122.67ms, announced at 55ms, gated release at +77ms. Candidate: a fine-opened Note whose fine onset read as a contact (`contactTimes`) takes the same suspected-fragment bar as an attack-opened no-rise split | tracker | DECISION-046 (the release test), DECISION-045 (the fragment bar), `handleFineOnset` | the fine-opened contacts on the DI takes counted, with how many are announced before a release arrives inside the window; then the bar applied at +0 derivation missed and the E5 take's `e817` charge cleared | open |
 
 ## Owner-side blockers (living)
 
@@ -605,3 +606,66 @@ refused before announcement by bars that already exist.
   and C12 and C15 are open with stated falsifiers. C12 next (the release
   on a gated hop; its shapes are the chain positions C11 cannot reach),
   then C15's first read.
+
+### Iteration 6 — 2026-09-18 — KEPT — the release test reads the hop the gate refuses, and its window is six hops, not 80.0000000000018ms
+
+- Candidate: **C12**, the release arriving on a hop the amplitude gate
+  refuses. Nearest closed relative: DECISION-046, the release test itself;
+  the difference is that the test is reached on a gated hop, and that its
+  window is measured in samples.
+- Falsifier, stated before measuring: derivation slow DI split 30 → 28,
+  the two labels the trace read as reachable (`e851` at the window's
+  edge, `e815` under the gate); derivation missed and false positives not
+  up; amped and mic takes not worse; held-out read once after. Nothing to
+  sweep: a boolean and an exact comparison.
+- Built: `tracking.releaseOnGatedHop` (true; false = DECISION-046 as
+  shipped) in `config.ts`; step (a) of `note-tracker.ts` reads
+  `isRelease` when the verdict was `gated` and the Note is unsettled,
+  traced `released` via `gated`; `isRelease` compares
+  `attack.atSample - startSample` with `clock.durationSamples(80)`; two
+  tests on a synthesized stroke whose release begins under a raised gate.
+- Sweep (derivation predicate: not 140bpm): off → on, slow DI 30 → 29 of
+  327, E5 eighths DI 9 → 8; window fix alone reads the same 29 (`e851`);
+  the gated path moves `e816`'s and `e817`'s boundaries to within 10ms and
+  the split charge on `e815` moves to `e817`.
+- Numbers, before → after:
+    slow subset      DI 30/327 → 29/327     amped+mic 152/334 → 152/334 (bit-identical per take)
+    corpus           289 / 346 / 19 → 288 / 345 / 19; slow subset 216 / 268 → 215 / 267
+    tail fragments   238 / 258, same pitch 235 / detached 0 / other 23 — unchanged
+    ledger MISSED    141 — unchanged
+    by material      derivation missed 114 → 114, fp 211 → 211, extras 271 → 270, split 219 → 218, |onset| med 25 → 23; held-out (read once, after) split 70, extras 75, fp 66, missed 27 — identical on every take
+    eval             PASS; required 0 failures; informational the one pre-existing
+    consumer view    not retracting — the start moves before the Note is announced
+    tests            530 passing (528 + 2)
+- Read before building, at the current engine: the shape classification
+  of the 30 is unchanged from iteration 2, and the trace at each of C12's
+  "3 + 1 + 2" says two are reachable here. `e839`'s release is 91ms after
+  a fine-opened contact; `e835`'s and `a3`'s early Notes are the region
+  lane's; `e830`'s contact was delivered by the fine witness after the
+  release had passed. Recorded in the findings and the C12 row.
+- Why 29 and not 28: `e817`'s contact at 5893ms, refused at the ring-out
+  branch before, now reaches the rolling-baseline test because the Note
+  before it is 80ms younger (C15's coupling, this time in the rule's
+  favour), is accepted, and the unsettled release then moves it onto the
+  release; `e818`'s fine-opened contact (announced at 55ms, gated release
+  at +77ms) is then charged to `e817`. Three boundaries right instead of
+  one; the count credits one.
+- Verdict and why: kept. Every keep line holds with nothing against it,
+  the amped, mic and held-out takes are bit-identical, and the window
+  comparison was a defect in DECISION-046's own rule whatever the gate
+  does.
+- What a GOATerizer player would notice: **on a direct input**, two more
+  eighth notes on the E5 take begin when the string sounds rather than
+  when the pick lands, one of them a note that used to read as two.
+  **Through an amp**, nothing.
+- Findings section: "The release can land on a hop the amplitude gate
+  refuses, and the window it must land in is six hops, not
+  80.0000000000018 milliseconds"; DECISION-050; commit on
+  `claude/project-thread-46x8sd`.
+- Ledger changes: C12 spent, with its remaining sub-shapes named; C16
+  added (the announce bar for a fine-opened contact). Noted, not acted
+  on: `articulationMs` is compared in milliseconds at two other sites
+  (the burst `continues` test, the articulation-fragment length test),
+  which have the same edge.
+- Exit rule: continue. C15's first read next (the ring-out clock on
+  DECISION-046's own moves), then C16.
