@@ -6,6 +6,44 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-057]: The attack branch of the segmenter does not move its boundary to the transient that rose inside the window
+* **Date:** 2026-09-18
+* **Status:** Rejected
+* **Owner:** Detection architecture; DECISION-044's loop, iteration 13
+* **Context:** DECISION-056 found `a15`'s boundary to be the attack
+  branch's, placed on the band-only onset at the mute because
+  `attackSamples` carries band-only onsets, and named the rule it needs:
+  DECISION-055's envelope-branch rule applied in the attack branch
+  (`docs/DETECTION-FINDINGS.md`, "The attack branch on the transient that
+  rose").
+* **Decision:** Built as `deep.segmentAttackOnRisingTransient` and
+  reverted. The count first: 648 attack-branch windows on the derivation
+  takes, 335 on a band-only onset, 163 of those with a rising broadband
+  transient inside the window, 41 more on a contact with one; `a15`'s
+  window not among them, its release at 1.997 under the bar on the
+  one-hop reading, so the falsifier became the column. On derivation: slow
+  DI 21 → 22 of 327, amped and mic 149 → 148, false positives 203 → 201,
+  missed, split and extras unchanged; two takes changed. On the
+  held-then-picked DI take two boundaries moved onto their releases (80ms
+  and 107ms early → 27ms) and one 94ms false positive on a contact is
+  gone, and the count reads one worse because the next Note's refused
+  contact (C11, 88ms early) now ends a right Note short — the split
+  instrument's chain reading, a fourth time. Reverted on the keep rule's
+  letter; held-out not read; engine bit-identical to DECISION-055's.
+* **Alternatives Considered:** (a) **Keeping it on the mechanism's
+  reading** — rejected: the loop's rule is the score on the slow subset,
+  worse on no path, and the rule is not loosened to keep a candidate. (b)
+  **Changing the split instrument's forward reach first** — the owner's
+  call (DECISION-054, PR decision 3); not made. (c) **A lower bar for the
+  attack branch's transient** — rejected, as for DECISION-053 and -056.
+* **Consequences:** Positive — the rule is built, tested and recorded, and
+  reads right at every site it moved; the count of attack-branch
+  boundaries on the mute is on record (163 with a release in reach).
+  Negative — the engine did not move; the direct-input column now has no
+  open ledger row that is not blocked on the owner's instrument decision.
+
+---
+
 #### [DECISION-056]: A transient's rise is not read over two hops for the region lane, and the octave stub is not made to lend its start
 * **Date:** 2026-09-18
 * **Status:** Rejected

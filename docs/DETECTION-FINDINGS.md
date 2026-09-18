@@ -7343,3 +7343,89 @@ band-only onset, broadband 9000ms rise 1.997 (2.053 over two hops), label
 extras not up, amped and mic not worse; the count of attack-branch
 boundaries that stand on a band-only onset on the tuning takes, with how
 many have a rising broadband transient in the window.
+
+## The attack branch on the transient that rose: two boundaries right on the held-then-picked take, two false positives fewer, and the count reads one worse
+
+DECISION-044's loop, iteration 13; DECISION-057. Built, measured,
+reverted. Ledger row C25.
+
+### The falsifier, stated before the pipeline ran
+
+As the row had it: `a14`'s charge cleared at +0 derivation missed, false
+positives and extras not up, amped and mic not worse; first a count of the
+attack-branch boundaries standing on a band-only onset on the tuning
+takes. The count came first and changed the falsifier before the sweep
+ran: `a15`'s release reads 1.997 on the one-hop reading DECISION-056 left
+in place, under the bar of 2, so the rule cannot reach it, and the
+falsifier became the column — derivation slow DI 21 → 20 or fewer, missed,
+false positives and extras not up, amped and mic not worse.
+
+### What was built, and what the count said
+
+`deep.segmentAttackOnRisingTransient` (true; false is the attack branch as
+shipped): when the attack branch of `resegment.ts` places a boundary — on
+the transient in the hop before a window whose RMS clears
+`segmentAttackRiseRatio` over the trough — and a broadband transient
+whose rise clears `tracking.releaseRiseRatio` sits inside that window, the
+boundary is that transient. DECISION-055's envelope-branch rule, factored
+into `risingTransientIn` and applied in the second branch. Two
+segmentation tests: a window clearing 1.25 and not 2 over the trough,
+the band-only mute onset in the hop before it, the release inside it —
+the release with the rule, the mute without it or with no rising
+transient.
+
+The count, every window the attack branch fired on across the thirteen
+derivation takes, before the segment-length check: 648. 335 stood on a
+band-only onset, 163 of those with a rising broadband transient inside
+the window; 201 stood on a broadband transient that had itself risen
+(unchanged by the rule) and 41 on a broadband contact with a rising
+transient later in the window. The direct-input same-pitch takes hold
+most of them (E5 eighths 46 + 11, quarters 41 + 6, held-then-picked 43 +
+20, A3 eighths 16). `a15`'s window is not among the 163.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 21 → 22 of 327 (held-then-picked DI 8 → 9); amped + mic 149 → 148 (A3 eighths amped 35 → 34)
+    corpus (deriv)   split 206 → 206, extras 257 → 257, strays 9, missed 112 → 112, fp 203 → 201, det 1302 → 1300
+    held-out         not read; the derivation rule decided
+    tests            541 with the two tests; 539 after the revert
+
+Two takes change of the thirteen: of the 204 windows the rule moved a
+boundary in, all but two coincide with a boundary the fast lane already
+has or fail the segment-length check, and the reconciliation leaves them
+where they are.
+
+### The one DI change, read on the site
+
+Held-then-picked DI, 13300–14200ms: labels `p1c3q3` 13040–13540ms,
+`p1c3q4` 13560–14035ms, `p1c4h` from 14035ms.
+
+    before   n16 12960–13453   n17 13453–13947   n15 13947–14813
+    after    n16 13013–13533   n17 13533–13947   n15 13947–14813
+
+Two boundaries moved onto their releases: `p1c3q3`'s Note from 80ms early
+to 27ms, `p1c3q4`'s from 107ms early to 27ms. Nothing else on the take
+moved except one false positive gone: the 94ms Note the shipped attack
+branch had carved at 17413ms on a contact, now placed on the release at
+17507ms where the fast lane's own Note begins, and so not carved. The
+count reads 8 → 9 because `p1c4h`'s Note starts 88ms early on a refused
+contact (C11) and always did; with `p1c3q4`'s Note now inside its label,
+that early start ends it 88ms short and the charge lands on `p1c3q4`,
+where before the two early starts cancelled. The same chain reading as
+DECISION-049, -051, -054 and -055: two right boundaries, one more split
+on the count.
+
+The amped change is one false positive fewer on the A3 eighths amped take
+and one split fewer, no label moved.
+
+### Verdict
+
+Reverted, on the keep rule's letter: the slow subset is better on the
+amped path and worse on the direct-input path. The read says the rule is
+right where it reaches and the count cannot see it. No new mechanism row:
+what stands between this rule and a keep is the split instrument's
+forward reach, which is the owner-side item DECISION-054 raised
+(decision 3 on the PR), and it now has a fourth iteration's evidence.
+With C11 blocked on the same item, no open ledger row targets the
+direct-input column; C13, C22 (amped onsets) and C23 (a count first) are
+the amped column's and held-out sites'.

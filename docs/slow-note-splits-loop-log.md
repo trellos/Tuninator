@@ -198,7 +198,7 @@ is half a beat short at the median.
 | C22 | An unannounced stub the pitch tracker split off the first hops of an attack lends its start to the Note the pitch change then opened: `s161`, A3 eighths DI — attack at 20026.67ms read 885 then 553Hz on an A3, the pitch change opened the A3 Note at 20053.33ms, the 27ms stub died unannounced and lent nothing, the label is at 20011ms and the Note reads 42ms late. The region's carve had been crediting it from 20024ms as a wholly overlapping duplicate, which C21 removes | tracker | DECISION-055 (the carve it replaces); DECISION-046 (a stub the release split off is absorbed and lends its start) | on the tuning takes, the count of unannounced stubs ended by a pitch change onto the same pitch class or its octave within two hops of an attack; then `s161` regained at +0 derivation missed and fp not up; held-out read once after | **spent, iteration 12** (DECISION-056), falsified by its read: 101 such stubs on the tuning takes, 82 the successor's pitch or its octave; DI stubs 0–13ms with successors on time; `s161` cannot be regained, one Note stands for two picks there and the miss moves to `s162`. Restated for the amped column: nine amped successors 42–77ms late would read within 40ms of their labels with the stub's start lent (seven on the E5 eighths amped take); falsifier those nine within 40ms at +0 derivation missed, fp and extras not up, DI takes bit-identical |
 | C23 | A carved prefix of no pitch between a note's end and the next stroke's release — the string under the hand, level fallen to 1% — is offered to that stroke as its contact stub, the way the fast lane offers one, rather than declined as `prefix:unpitched`. Its two sites are HELD-OUT (the DI triplet take, 5693–5787ms and 6989–7080ms, where the shipped engine's window-start boundary produced the same Note and absorbed it), so the row reads on the tuning takes first | tracker | DECISION-055; `tryClaimPrefix` | on the tuning takes: every carved prefix declined `unpitched` under DECISION-055 listed with what sounds under it; a rule derived from those alone at +0 derivation missed and fp not up; held-out read once after, the two triplet Notes the prediction | open — derive, do not tune |
 | C24 | The rise a transient carries is read over the two hops after it, not one: `a15` (quarters DI, 9000ms) reads 0.91, 1.997, 2.05 against the release bar of 2, and stays in the mute. The bar is not the lever (a lower one reads the contact, DECISION-053) | tracker (the list) | DECISION-055 (one hop) | `a14`'s charge cleared with nothing else on the DI takes moving, fp and extras not up; the count of transients whose rise peaks on the second hop after them, on the tuning takes | **built and reverted, iteration 12** (DECISION-056): `deep.transientRiseHops` 2 and 3 leave the quarters DI take bit-identical — the deep lane reads 9000ms at 2.053 and the boundary is the ATTACK branch's on the band-only mute onset at 8960ms, which the envelope-branch rule never sees — and cost `t17` on the clean-lead take (an earlier transient outranks the release under a longer reading). Spent: the reachable rule is C25 |
-| C25 | The attack branch of `resegment.ts` places its boundary on the transient in the hop before a window's start, and `attackSamples` carries band-only onsets, so on a direct-input same-pitch stroke that transient is the mute's onset, 40–55ms before the release. Candidate: when that transient is band-only and a broadband transient whose rise clears `tracking.releaseRiseRatio` sits inside the window, the boundary is the latter — DECISION-055's envelope-branch rule applied to the branch that placed `a15`'s boundary. Reproduction: quarters DI, region 8507–9680ms, `attack@8960` on the band-only onset, broadband 9000ms rise 1.997, label 9015ms | deep | DECISION-055 (the envelope branch); DECISION-053 (the first transient, which read the mute) | on the tuning takes, the count of attack-branch boundaries standing on a band-only onset and how many have a rising broadband transient in their window; then `a14`'s charge cleared at +0 derivation missed, fp and extras not up, amped and mic not worse; held-out read once after | open |
+| C25 | The attack branch of `resegment.ts` places its boundary on the transient in the hop before a window's start, and `attackSamples` carries band-only onsets, so on a direct-input same-pitch stroke that transient is the mute's onset, 40–55ms before the release. Candidate: when that transient is band-only and a broadband transient whose rise clears `tracking.releaseRiseRatio` sits inside the window, the boundary is the latter — DECISION-055's envelope-branch rule applied to the branch that placed `a15`'s boundary. Reproduction: quarters DI, region 8507–9680ms, `attack@8960` on the band-only onset, broadband 9000ms rise 1.997, label 9015ms | deep | DECISION-055 (the envelope branch); DECISION-053 (the first transient, which read the mute) | on the tuning takes, the count of attack-branch boundaries standing on a band-only onset and how many have a rising broadband transient in their window; then `a14`'s charge cleared at +0 derivation missed, fp and extras not up, amped and mic not worse; held-out read once after | **built and reverted, iteration 13** (DECISION-057): `deep.segmentAttackOnRisingTransient`; count 648 attack-branch windows, 335 on a band-only onset, 163 with a rising transient in reach, 41 contacts; `a15` not reachable (1.997 under the bar on one hop). Slow DI 21 → 22, amped 149 → 148, fp 203 → 201, missed flat; the one DI change is two boundaries right (80 and 107ms early → 27ms) and the chain charge on `p1c3q4`. Spent: reads right, the count cannot see it; blocked on the instrument like C11 |
 
 ## Owner-side blockers (living)
 
@@ -210,7 +210,7 @@ is half a beat short at the median.
 | Does GOATerizer honour `structuralRevision` with `relation: "absorbed"`? | which form of C1 to build (retract vs never-announce) | 2026-09-18 | **Yes** (read from `trellos/goaterizer`, `src/input/tuninator-provider.ts`, its DECISION-105/110): an absorbed id becomes a `retract` that un-draws the bar, refunds a wrong-note charge and reopens an unjudged target. A verdict already shown is kept. Both forms of C1 therefore reach the game; see "What the consumer does with a split" below for why latency still matters. |
 | A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the recordings above being what the recognizer really hears, DI first | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. Briefed as `docs/goaterizer-capture-and-judgment-prompt.md`, to run in parallel in that repository. |
 | A tempo hint on `EngineTuning` (product decision; the record bounds its value at about twice the shipped gate's reach, and not free) | nothing in the loop; a consumer-side lever | 2026-09-18 | — |
-| The split instrument's forward reach: `measure-splits.ts` charges a Note that starts more than 40ms before its label to the label before it, so on a passage where every Note opens early (the DI same-pitch takes) fixing one boundary moves the charge to its neighbour and the column cannot fall one boundary at a time (iterations 5, 7, 10). Charge by nearest label start, or by most overlap? Every number in this journal moves with the answer | whether the DI slow-split column can read the boundary moves the loop is making | 2026-09-18 | — |
+| The split instrument's forward reach: `measure-splits.ts` charges a Note that starts more than 40ms before its label to the label before it, so on a passage where every Note opens early (the DI same-pitch takes) fixing one boundary moves the charge to its neighbour and the column cannot fall one boundary at a time (iterations 5, 7, 10). Charge by nearest label start, or by most overlap? Every number in this journal moves with the answer | whether the DI slow-split column can read the boundary moves the loop is making | 2026-09-18 | — Iteration 13 (DECISION-057) adds a fourth: two boundaries on the held-then-picked DI take moved from 80ms and 107ms early to 27ms, and the count read one worse. With C11 also blocked on it, no open row targets the direct-input column until this is decided |
 
 ---
 
@@ -1012,4 +1012,52 @@ refused before announcement by bars that already exist.
   in the window), with `a15`'s reproduction and a falsifier.
 - Exit rule: one built-and-reverted iteration after a kept one, with a
   new row carrying a stated falsifier; the rule does not fire. C25 next.
+
+### Iteration 13 — 2026-09-18 — REVERTED — the attack branch on the transient that rose: right on both boundaries it moved on the direct input, and the count reads one worse
+
+- Candidate: **C25**, the attack branch of `resegment.ts` preferring the
+  broadband transient whose rise clears the release bar inside its
+  window over the band-only onset (or contact) it read. Nearest closed
+  relative: DECISION-055 (the same rule in the envelope branch).
+- Falsifier, stated before measuring: the count first; then `a14`'s
+  charge cleared at +0 derivation missed, fp and extras not up, amped and
+  mic not worse. The count showed `a15` unreachable (release at 1.997
+  under the bar on DECISION-056's one-hop reading), so before the sweep
+  the falsifier became: slow DI 21 → 20 or fewer, missed, fp, extras not
+  up, amped and mic not worse; held-out read once after.
+- Count (`atkcount.ts`): 648 attack-branch windows on the tuning takes;
+  335 on a band-only onset, 163 with a rising broadband transient in the
+  window; 201 on a transient that rose; 41 on a contact with a rising
+  transient later.
+- Built: `risingTransientIn` factored out of the envelope branch and
+  applied in the attack branch under `deep.segmentAttackOnRisingTransient`
+  (true; false = as shipped); two tests in `resegment.test.ts`; 541 tests.
+- Sweep (derivation predicate: not 140bpm), rise and carve on:
+    off   slow DI 21/327, other 149/334, split 206, extras 257, missed 112, fp 203, det 1302
+    on    slow DI 22/327, other 148/334, split 206, extras 257, missed 112, fp 201, det 1300
+  Two takes change. Held-then-picked DI: `p1c3q3`'s Note 12960 → 13013ms
+  and `p1c3q4`'s 13453 → 13533ms (labels 13040, 13560), the 94ms Note at
+  17413ms gone (placed on the release at 17507ms where the fast lane's
+  Note begins); the charge lands on `p1c3q4` because `p1c4h`'s Note
+  starts 88ms early on a refused contact. A3 eighths amped: one fp fewer.
+- Numbers, before → after: none kept; `src/` bit-identical to
+  DECISION-055's (`git diff HEAD -- src/` empty). Held-out not read.
+- Verdict and why: reverted on the keep rule's letter (DI path worse by
+  one). The read: right where it reaches, unseen by the count — the split
+  instrument's chain reading for the fourth time.
+- What a GOATerizer player would notice: nothing changed this iteration.
+- Findings section: "The attack branch on the transient that rose: two
+  boundaries right on the held-then-picked take, two false positives
+  fewer, and the count reads one worse"; DECISION-057; commit on
+  `claude/project-thread-46x8sd`.
+- Ledger changes: C25 spent (built and reverted, blocked on the
+  instrument like C11). No new mechanism row. The owner-side blocker row
+  on the forward reach carries iteration 13's evidence.
+- Exit rule: not fired by its letter — iteration 12 added a row, and
+  C13, C22 (amped onsets) and C23 (a count first) still carry stated
+  falsifiers — but every row that targets the direct-input column (C11,
+  C25) is blocked on the owner's decision about the split instrument's
+  forward reach, and the loop's direct-input work stops here until it
+  lands. What continues without it is the amped column's (C22) and the
+  held-out sites' count (C23).
 
