@@ -41,11 +41,15 @@ running anything.
 ## 1. The defect, in the owner's words and in this repository's
 
 The owner's consumer is GOATerizer, a rhythm game that scores one target per
-pick and reads a Note's duration. It runs Tuninator on a phone microphone in
-front of an amped guitar, and on a direct input. During its tutorial, slow easy
-notes — quarters and eighths — split: a note played on time comes out as a
-short Note followed by another Note, so the game sees a short note where a long
-one was played, and the next target is often taken by the phantom.
+pick and judges a note at its release. **The setup on which its tutorial
+fails today is a direct input into a computer's browser.** A phone microphone
+in front of an amp is the intended second setup and has not been tried.
+During the tutorial, slow easy notes — quarters and eighths — come out wrong:
+a note played on time reads as a short Note followed by another Note at the
+same pitch, and the game marks it a Miss; the owner's word for it is "split".
+On a direct input the same symptom has a second possible cause, a re-pick
+refused at the amplitude gate, and the corpus shows both — read the DI column
+below with that in mind.
 
 In this repository that is the **same-pitch tail fragment**: one played event
 emitted as a correctly named Note plus a contiguous Note at the same pitch
@@ -73,9 +77,27 @@ Two things to take from that table before planning anything.
 
 - **Roughly one slow note in seven splits on a direct input, and one in two
   through an amp.** The signal path dominates, on the same performance: the
-  quarters take is 9 of 72 on DI and 50 of 72 amped. Whatever separates a real
-  re-pick from an invented boundary survives a direct input and collapses under
-  compression and distortion (DECISION-026's headline, still true).
+  quarters take is 9 of 72 on DI and 50 of 72 amped (DECISION-026's headline,
+  still true). **The direct input is the owner's path today and it is not
+  clean:** the E5 eighths split 22 of 64 on DI, every one of them `E5 + E5`;
+  the A3 quarters and eighths 9 of 72 and 6 of 71, all same-pitch; and on
+  `held-then-picked-di` the low strings are not split but MISSED — 14 of 120,
+  seven of them `rejected: gated`: a re-pick on F#2, C3 or C4, 413–1400ms
+  into the note, whose frame sat below `rmsGate` although the kernel fired
+  and sharpness read 1.9–6.9 (`measure-downstream-ledger.ts --all --detail`
+  names each). The three lead-line DI splits in the quarters and all four in
+  the eighths carry a neighbour's name (`A4 + A#4 + B4`, `C5 + B4`) — a
+  different shape from the same-pitch tail; keep them apart in any count.
+- **On the direct input the wrong boundary is accepted by a different test.**
+  `measure-split-cause.ts`, whole takes: across the five DI takes with slow
+  material (40 same-pitch fragments) `envelope-rise` accepted 20, `sharpness`
+  8, `fine-onset` 3, `ring-out-sharpness` 3, no re-articulation decision 4,
+  `new-pitch` 2. On the amped renders `sharpness` accepts 53 of 60, 46 of 51
+  and 18 of 30. So the DI defect lives at `frame.rms >= sustainedRms *
+  rearticulationRiseRatio` (1.2, `fast/rearticulation.ts`) — the envelope of
+  a note still sounding rising a fifth over its recent level — and the amped
+  defect at the sharpness fallback. A mechanism that helps one may not touch
+  the other; report both columns, DI first.
 - **These are slow notes.** A quarter at 120bpm is 500ms and the fragments are
   93ms at the corpus median. The rate-relative announce bar of DECISION-030
   already fires here (0.35 × 500ms = 175ms) and the split rate is still 69% on
@@ -91,12 +113,14 @@ restarting), 21 by `new-pitch`. At those wrong boundaries sharpness reads a
 median 3.85 and p90 10.06 against a bar of 1.6: the engine is reading a real
 spectral rise and calling it a pick.
 
-**The phone microphone is not in the corpus.** The "mic" takes are a room mic
-on a Les Paul. A phone adds its own compression, automatic gain, noise
-suppression and a band-limited capsule, all of which push the signal further
-toward the amped renders' behaviour. §10 says what to ask the owner to record;
-until it lands, the amped renders are the closest stand-in and every result is
-reported per signal path so the direction of transfer is visible.
+**The owner's rig is not in the corpus, and neither is a phone.** The DI
+takes are one Les Paul into one interface at one gain; the owner's direct
+input is a different guitar, interface and gain, into a browser at the
+device's sample rate and, after a calibration, at a gate the eval never runs
+(next paragraph). The "mic" takes are a room mic, not a phone, and the phone
+setup is untried. §10 says what to ask the owner to record; until it lands
+the DI takes are the closest stand-in for the failing setup and the amped
+renders for the intended one, and every result is reported per signal path.
 
 **GOATerizer's capture path is this library's, with two settings the eval
 never runs at.** Read from `trellos/goaterizer` on 2026-09-18 (the journal has
@@ -105,10 +129,15 @@ explicitly off and lets the library open the microphone; it does not record
 audio anywhere. But after a calibration it passes `engine.rmsGate` as low as
 0.00008, a hundredth of the shipped default, and its `AudioContext` runs at
 the device's sample rate where every fixture here is 48kHz (at 44.1kHz the
-hop is 11.6ms, not 13.3ms). The journal's ledger rows C7 and C8 are the cheap
-measurements that say whether either moves the slow subset; take them before
-any mechanism, because a fix measured at the eval's gate may not be the fix
-the player is running.
+hop is 11.6ms, not 13.3ms). On a direct input at a conservative interface
+gain that calibration is exactly what the game's own `game/input-gate.ts`
+says the player needs, so the tutorial may be running at a gate no fixture
+here has been scored at — and the gate cuts both ways: uncalibrated at 0.008,
+`held-then-picked-di` loses seven low-string re-picks as `gated`; calibrated
+a hundred times lower, hops the eval never sees reach every witness. The
+journal's ledger rows C7 and C8 are the cheap measurements that say whether
+either moves the slow subset; take them before any mechanism, because a fix
+measured at the eval's gate may not be the fix the player is running.
 
 ## 2. What "fixed" means, and how it is scored
 
@@ -341,8 +370,12 @@ measurement first, on the OUTCOME-shaped population (`measure-rate-relative-
 merge.ts`'s candidates: every Note opened by an accepted, settled, same-pitch
 re-articulation, labelled surplus or not by the matcher), with a bar of 0.80
 AUC before any engine work — the standard the DP entry set for a witness worth
-a pipeline run. Report DI and amped separately; a witness that only separates
-on DI is not the one the slow subset needs.
+a pipeline run. Report DI and amped separately: the owner's failing setup is
+the DI column, where the accepting site is `envelope-rise`, and a witness
+that only helps the amped renders does not fix the tutorial. Before any of
+the four below, take the DI-specific reading the journal lists as C9 — the
+rise ratio at DI phantoms against DI re-picks — since that test, not
+sharpness, is what accepts the DI fragments.
 
 - **Harmonic/percussive separation** (Fitzgerald 2010, median filtering
   across time and frequency on the fine-hop STFT the fine-onset kernel already
@@ -444,6 +477,18 @@ reach the re-articulation witnesses at all" as the more honest place to look
 and does not measure it. If an iteration touches the gate, the ledger's
 `rejected: gated` row is the number, and the both-axes bar applies in full. Log
 it as its own iteration; do not fold it into a split mechanism.
+
+On the direct input this may be the tutorial's failure rather than the
+split. Steps 1 and 2 ask for the low root and then the high root, picked on 1
+and 3 with a rest between, so the string rings through the rest and the second
+pick is a same-pitch re-articulation over a ringing string — the
+`held-then-picked` shape. On that take's DI render the seven `rejected:
+gated` refusals are exactly that pick, on F#2, C3 and C4, with the kernel
+fired and sharpness 1.9–6.9: the witnesses would have accepted a frame the
+gate never let them see. GOATerizer can lower the gate after a calibration
+and its `game/input-gate.ts` was written for this case; whether the owner has
+calibrated is unknown and is in the journal's blockers. Measure C7 before
+assuming the DI failure is a split.
 
 ## 6. The iteration, step by step
 
@@ -643,16 +688,16 @@ owner. It also gets a `DECISION_LOG.md` entry closing the loop.
 
 ## 10. Owner-side items — ask in the journal, do not do
 
-- **Phone-microphone material.** Nothing in the corpus was captured on a
-  phone. Request: the GOATerizer tutorial passage itself, played as the game
-  asks (quarters and eighths, at the tutorial's tempo, several repetitions of
-  the same pitch on the same string among them), captured (a) on the phone
-  through GOATerizer's own capture path — ideally the raw worklet input written
-  to a file, so the browser's constraints and the phone's processing are the
-  ones the recognizer really sees — and (b) as a direct input of the same
-  performance where possible, so the pair isolates the phone path the way the
-  DI/amped pairs isolate the amp. Name the phone, the browser and whether
-  `echoCancellation`, `noiseSuppression` and `autoGainControl` were off.
+- **Recordings from the owner's actual rig, through the game.** First the
+  setup that fails: the guitar, interface and gain he plays the tutorial on,
+  into the browser he uses, the tutorial passage itself (quarters and eighths,
+  the same pitch re-picked with a rest between, at 60 and 120bpm), captured
+  through GOATerizer's own capture path — the raw worklet input written to a
+  file — so the sample rate, the constraints the browser applied and the gate
+  in force travel with the audio, once with the gate calibration applied and
+  once without. Then, when he tries it, the phone in front of the amp the
+  same way. Name the device, the browser and whether `echoCancellation`,
+  `noiseSuppression` and `autoGainControl` were off.
   Labels follow the recipe the existing label files document in their
   `timingNotes` (a harmonic-sum f0 track for identity and boundaries, onsets
   refined on a high-passed 1ms envelope, no detector output used);
@@ -670,8 +715,8 @@ owner. It also gets a `DECISION_LOG.md` entry closing the loop.
 - **A raw-capture switch in GOATerizer.** The game has no way to record what
   the recognizer hears — no `MediaRecorder`, no file capture; its labels
   editor reads this repository's `fixtures/` and does not record. A dev-only
-  switch that writes the worklet's input to a WAV is what makes the phone-mic
-  request above a fixture rather than a studio recording, and it belongs in
+  switch that writes the worklet's input to a WAV is what makes the
+  recordings above fixtures rather than studio recordings, and it belongs in
   that repository. `docs/goaterizer-capture-and-judgment-prompt.md` is the
   companion brief for it, written to run in parallel with this loop; when its
   captures land here as `fixtures/audio/*.wav` plus grid-derived

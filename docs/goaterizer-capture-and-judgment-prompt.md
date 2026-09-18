@@ -3,9 +3,11 @@
 > **STATUS: OPEN — for a session on `trellos/goaterizer`.** Companion to
 > `docs/slow-note-splits-loop-prompt.md` in `trellos/Tuninator`, which works
 > the library side of the same defect. The two run in parallel and hand off
-> through files: this brief produces phone-microphone fixtures the library's
-> loop is waiting for, and makes the game stop turning one known library
-> defect into a Miss. It was written from a read of `trellos/goaterizer` at
+> through files: this brief produces fixtures from the owner's own rig — the
+> direct input on which the tutorial fails today, and later a phone — that
+> the library's loop is waiting for, tells the two DI failure modes apart on
+> that rig, and makes the game stop turning one known library defect into a
+> Miss. It was written from a read of `trellos/goaterizer` at
 > `d903ccc` (on `tuninator@0.2.0`) on 2026-09-18; re-verify anything below
 > against the code before building on it.
 
@@ -49,11 +51,24 @@ same-pitch tail fragment: one played note comes out as a correctly named Note
 plus a short contiguous Note at the same pitch. On the library's own corpus
 that splits roughly one slow note in seven on a direct input and one in two
 through an amp (`trellos/Tuninator`, `docs/slow-note-splits-loop-log.md`).
-Nothing in that corpus was captured on a phone. The game is the only thing
-that hears the owner's real rig through the real capture path, and it has no
-way to record it: there is no `MediaRecorder`, no file capture anywhere in
-`src/`, and the labels editor reads the library's fixtures rather than
-making any. Part A closes that.
+**The owner's tutorial fails on a direct input into a computer's browser;
+a phone has not been tried.** Nothing in that corpus was captured through
+the game on his rig — a different guitar, interface and gain from the
+library's DI takes, at the browser's sample rate and at whatever gate the
+game passed. The game is the only thing that hears that rig through the real
+capture path, and it has no way to record it: there is no `MediaRecorder`,
+no file capture anywhere in `src/`, and the labels editor reads the
+library's fixtures rather than making any. Part A closes that.
+
+**Two DI failure modes share the symptom, and only the game can tell them
+apart on his rig.** One is the split above. The other is the one
+`src/game/input-gate.ts`'s own header describes: a conservative interface
+gain leaves a re-pick's frame under Tuninator's default gate, the library
+refuses it as `gated`, and the target expires as a Miss with no attack at
+all. On the library's DI take of held-then-re-picked low strings, seven of
+its fourteen misses are exactly that — F#2, C3 and C4 re-picked over a
+ringing string, which is what the tutorial's first two steps ask for. Part
+B's counters separate the two.
 
 **What the game does with a split today.** `TargetJudge` claims a target at
 the attack and settles it at the release. `#settleOffTime` rules that a note
@@ -73,10 +88,11 @@ anything.
 ## 2. Part A — the capture tool
 
 **Where it lives.** Dev-only, under `src/dev/` beside `synthetic-guitar.ts`,
-reachable from the debug panel (`?dev=1`) as a record/stop control, and
-usable from the **built** site on a phone: the output is a browser download
-(`Blob` + `<a download>`), never a dev-server route. `AGENTS.md` §14 forbids a
-path that writes content from a built site, and a phone cannot reach the dev
+reachable from the debug panel (`?dev=1`) as a record/stop control, usable
+on the computer where the tutorial fails today and, later, from the
+**built** site on a phone: the output is a browser download (`Blob` +
+`<a download>`), never a dev-server route. `AGENTS.md` §14 forbids a path
+that writes content from a built site, and a phone cannot reach the dev
 server's file API anyway.
 
 **How it hears what Tuninator hears.** Tuninator opens the microphone itself
@@ -108,8 +124,8 @@ test against a fake `mediaDevices`.
    16 bits). Write the header yourself; it is forty-four bytes and a test.
 2. `<stem>.capture.json` — the sidecar. `userAgent`; the context's
    `sampleRate` and `baseLatency`; `track.getSettings()` in full (this is the
-   readout that says whether the phone applied `noiseSuppression` or
-   `autoGainControl` regardless of what was asked); the `rmsGate` in force
+   readout that says whether the browser or device applied `noiseSuppression`
+   or `autoGainControl` regardless of what was asked); the `rmsGate` in force
    and whether it came from a calibration; the latency trim; the tempo, key
    and which screen was running; the context time at the first captured
    sample; the tutorial step boundaries in context time; and the game's own
@@ -136,9 +152,9 @@ test against a fake `mediaDevices`.
 
 **Practicalities.** A running readout (`recording 0:42`, channels, sample
 rate) and a hard cap on duration so a forgotten recorder does not eat the
-phone's memory; the stem from the screen, tempo, key, device and time
-(`tutorial-120bpm-G-iphone-20260918-1432`); a note in `README.md`'s dev-tools
-section on how to get the three files off a phone and where they go in the
+device's memory; the stem from the screen, tempo, key, input and time
+(`tutorial-120bpm-G-di-20260918-1432`); a note in `README.md`'s dev-tools
+section on where the three files land and where they go in the
 library (`fixtures/audio/` and `fixtures/labels/`, then
 `npx tsx scripts/verify-fixtures.ts` there, then the labels editor here).
 
@@ -159,15 +175,25 @@ synthetic mic's patch.
   session without forgetting the calibration, so the owner can play the same
   passage at both and read the split counter below. Rebuilding the provider
   on change is what `game-app.ts` already does for a gate change; reuse it.
-- **A split counter.** Count, per session and per take, the game-visible
-  shape of the library's defect: an `attack` whose pitch equals a **pending**
-  target's pitch and whose beat lies inside that target's written span
-  (`startBeat` to `startBeat + durationBeats`), arriving after a `release` on
-  the attack that claimed it. Show it in the debug panel beside the timing
-  log's numbers and write it into the capture sidecar. Also count the
-  retractions that later cancel one, so the panel shows how many the library
-  took back itself. Keep the definition in one pure function with a test;
-  the library's loop will quote it.
+- **Three counters, one pure function.** Per session and per take, the
+  game-visible shapes of what goes wrong with a slow note:
+  1. **split** — an `attack` whose pitch equals a **pending** target's pitch
+     and whose beat lies inside that target's written span (`startBeat` to
+     `startBeat + durationBeats`), arriving after a `release` on the attack
+     that claimed it;
+  2. **early end** — a `release` inside the span with no such continuation
+     before the end window closes: the recognizer ended the note and heard
+     nothing after it (on a direct input, the shape of a decay that fell
+     under the gate);
+  3. **no attack** — a target that expired with nothing claiming it: the
+     pick was never heard at all (on a direct input, the shape of a re-pick
+     refused at the gate).
+  Also count the retractions that later cancel a split, so the panel shows
+  how many the library took back itself. Show all of it in the debug panel
+  beside the timing log's numbers and write it into the capture sidecar.
+  These are what tell the owner whether his rig's failure is the library
+  splitting, ending early, or never hearing the pick, and they are what the
+  library's loop will quote; keep the definitions in one place with a test.
 
 ## 4. Part C — the judge, behind a flag
 
@@ -273,17 +299,20 @@ adds to an honest Miss), and the telemetry definition.
 
 ## 7. What to hand back
 
-- The three-file capture working from a phone on the built site, with the
-  README paragraph on getting the files into `trellos/Tuninator`.
+- The three-file capture working on the computer with the direct input, and
+  from the built site on a phone, with the README paragraph on getting the
+  files into `trellos/Tuninator`.
 - The debug panel showing applied constraints, the gate A/B, and the split
   counter.
 - The judge flag with its tests, at the §0 default, and the tutorial
   behaving accordingly.
-- A short note to the owner listing: which phone and browser to record on,
-  the tutorial at two tempos (60 and 120), the same passage on the direct
-  input if the rig allows, and the reminder that the label file is a grid
-  and must be re-timed in the labels editor before the library's
-  `verify-fixtures.ts` is asked to believe it.
+- A short note to the owner listing the recording plan: first the setup
+  that fails — the direct input into the computer, the tutorial at 60 and
+  120bpm, once with the gate calibration applied and once forced to the
+  library default, with the three counters read off after each; then the
+  phone in front of the amp when it is tried; and the reminder that the
+  label file is a grid and must be re-timed in the labels editor before the
+  library's `verify-fixtures.ts` is asked to believe it.
 
 One standing instruction: where this brief's reading of the code is wrong,
 the code wins and the brief gets a correction in your first commit's body.

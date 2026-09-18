@@ -11,10 +11,13 @@ are what keep later work from repeating them.
 * **Date:** 2026-09-18
 * **Status:** Proposed
 * **Owner:** Project owner (the loop is his to run); brief and baseline by detection architecture
-* **Context:** The owner's consumer, a rhythm game, runs Tuninator on a phone
-  microphone in front of an amped guitar and reports that during its tutorial
-  slow notes — quarters and eighths — split, so a note played on time reads as
-  a short Note followed by another. In this repository that is the same-pitch
+* **Context:** The owner's consumer, a rhythm game, runs Tuninator on a
+  direct input into a computer's browser (a phone microphone in front of an
+  amp is intended and untried) and reports that during its tutorial slow
+  notes — quarters and eighths — split, so a note played on time reads as a
+  short Note followed by another. On the direct input the corpus shows two
+  shapes behind that symptom: same-pitch fragments accepted by the
+  envelope-rise test, and low-string re-picks refused at the amplitude gate. In this repository that is the same-pitch
   tail fragment DECISION-027 through DECISION-037 measured, but every ceiling
   study read it on the whole corpus or on the sixteenth-note takes, never on
   the slow material as a population of its own. Measured on `main` at
@@ -52,9 +55,10 @@ are what keep later work from repeating them.
   totals are dominated by 1,131 same-pitch events including sixteenths, and a
   change can move them without touching what the owner's players play; the
   subset is reported beside the totals, never instead of them. (c) **Waiting
-  for phone-microphone material before starting** — rejected: the corpus
-  already reproduces the complaint on the amped renders, and the material is
-  requested in the journal as a transfer check rather than a precondition.
+  for recordings from the owner's rig before starting** — rejected: the
+  corpus already reproduces the complaint on its own direct-input and amped
+  takes, and the material is requested in the journal as a transfer check
+  rather than a precondition.
   (d) **Building the tempo hint the consumer could supply** — deferred as a
   product decision; the record bounds what a true clock is worth and it is not
   the fix.
@@ -67,9 +71,10 @@ are what keep later work from repeating them.
   exactly where they did; the loop's value is entirely in what its iterations
   measure. The subset's amped column rests partly on PROVISIONAL labels
   (`docs/SAME-PITCH-MATERIAL.md`), so a gain there is a reading until the
-  label review lands; and the phone path remains unmeasured until the owner
-  records it, so transfer to the actual rig is an assumption the journal
-  states rather than a result.
+  label review lands; and the owner's own rig — his direct input today, a
+  phone later — remains unmeasured until he records it through the game, so
+  transfer to the actual rig is an assumption the journal states rather than
+  a result.
 
 ---
 

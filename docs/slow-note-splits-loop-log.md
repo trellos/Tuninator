@@ -97,6 +97,30 @@ held-then-picked amped 11 of 40, every DI take 0 or 1). The eval report's
 amped takes. About 15% against 4%. It is the brief's door 2, third bullet: one
 bench row on the outcome-shaped population, and not a gate on its own.
 
+### The direct input, specifically — the owner's failing setup
+
+**Correction, 2026-09-18, from the owner:** the tutorial fails on a direct
+input into a computer. The phone-microphone setup has not been tried. The DI
+column above is therefore the target, and it has two shapes:
+
+- **Same-pitch splits accepted by `envelope-rise`.** `measure-split-cause.ts`,
+  whole takes, the five DI takes with slow material (40 same-pitch
+  fragments): `envelope-rise` 20, `sharpness` 8, `fine-onset` 3,
+  `ring-out-sharpness` 3, no re-articulation decision 4, `new-pitch` 2. The
+  amped renders are `sharpness` 53 of 60, 46 of 51, 18 of 30. Different test,
+  different mechanism. The E5 eighths DI take is the worst slow DI cell, 22
+  of 64, every one `E5 + E5`.
+- **Low-string re-picks refused at the gate, not split.**
+  `held-then-picked-di` misses 14 of 120; the seven `rejected: gated` are
+  re-picks of F#2, C3 and C4 at 413–1400ms into the note with the kernel
+  fired and sharpness 1.9–6.9 (`measure-downstream-ledger.ts --all --detail`).
+  The tutorial's steps 1 and 2 are the low root and the high root picked on 1
+  and 3 with a rest between — a same-pitch re-pick over a string still
+  ringing, this take's shape. Whether the owner's rig is gated is unknown
+  (blockers).
+- The lead-line DI take's seven slow splits all carry a neighbour's name
+  (`A4 + A#4 + B4`, `C5 + B4`): the pitch-lag / prefix shape, not the tail.
+
 ### What the consumer does with a split — read from GOATerizer on 2026-09-18
 
 `trellos/goaterizer` at `d903ccc`, on `tuninator@0.2.0` (the engine measured
@@ -157,15 +181,17 @@ is half a beat short at the median.
 | C6 | Lower the amplitude gate so decayed slow strings reach the witnesses | fast | DECISION-035 names it, unmeasured | ledger `rejected: gated` falls at no extras cost | open (door 6, misses not splits) |
 | C7 | Instrument only: the slow subset re-measured with `analysis.rmsGate` overridden to the values GOATerizer can pass (0.002, 0.0005, 0.00008) — does lowering the gate raise splits, and by which accepting site? | measurement | none; the consumer runs the engine here and the corpus never has | a stated split count per gate value; if splits rise, the loop's target moves to the gate the player actually plays at | open, cheap, do first |
 | C8 | Instrument only: the slow subset at 44.1kHz (resample the decoded fixtures, run the same engine) — does the hop grid move the numbers? | measurement | none | bit-identical is the hope; a moved count is a finding about every ms-denominated constant | open, cheap |
+| C9 | DI: the `envelope-rise` acceptance. On the outcome-shaped population, DI takes only, read `riseRatio` and `rms / sustainedRms` at the phantoms against the real re-picks; then whether a note past `ringOutMs` with a trustworthy decay fit should reach the ring-out branch instead of the rolling-baseline test | fast | the sweep that set `rearticulationRiseRatio` 1.2 (swept DOWN on the five originals for sensitivity; raising it was not the question asked); "Hypotheses tested and rejected" rows on `restrumSharpness` | separation ≥ 0.80 AUC on DI rows, then a bar that removes DI fragments at +0 missed on derivation | open — first for the DI column |
 
 ## Owner-side blockers (living)
 
 | item | what it unblocks | asked | answered |
 |---|---|---|---|
-| Phone-microphone recordings of the GOATerizer tutorial passage, phone capture plus a DI of the same performance, constraints named (brief §10) | any claim that a fix transfers to the owner's rig; derivation material for slow same-pitch notes | 2026-09-18 (this file) | — |
+| Recordings of the tutorial passage from the owner's failing setup — his direct input into his computer's browser, through the game's capture path, with and without the gate calibration — then the phone when tried (brief §10) | any claim that a fix transfers to the owner's rig; derivation material for slow same-pitch notes on DI, which DECISION-033 also names as its precondition | 2026-09-18 (this file) | — |
+| Has the owner run GOATerizer's input-gate calibration on the DI rig, and what gate is in force during the tutorial? | whether the DI failure is gated misses (`held-then-picked-di`'s shape) or splits; which of C6/C7/C9 to run first | 2026-09-18 | — |
 | Label review of the eight 120bpm same-pitch takes: the 33 A3 grid placeholders; carrying the DI times to the amped files at +2.5ms | C4; reading the amped fast takes to better than ±65ms | earlier (`docs/SAME-PITCH-MATERIAL.md`) | — |
 | Does GOATerizer honour `structuralRevision` with `relation: "absorbed"`? | which form of C1 to build (retract vs never-announce) | 2026-09-18 | **Yes** (read from `trellos/goaterizer`, `src/input/tuninator-provider.ts`, its DECISION-105/110): an absorbed id becomes a `retract` that un-draws the bar, refunds a wrong-note charge and reopens an unjudged target. A verdict already shown is kept. Both forms of C1 therefore reach the game; see "What the consumer does with a split" below for why latency still matters. |
-| A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the phone-mic recordings above being what the recognizer really hears | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. Briefed as `docs/goaterizer-capture-and-judgment-prompt.md`, to run in parallel in that repository. |
+| A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the recordings above being what the recognizer really hears, DI first | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. Briefed as `docs/goaterizer-capture-and-judgment-prompt.md`, to run in parallel in that repository. |
 | A tempo hint on `EngineTuning` (product decision; the record bounds its value at about twice the shipped gate's reach, and not free) | nothing in the loop; a consumer-side lever | 2026-09-18 | — |
 
 ---
