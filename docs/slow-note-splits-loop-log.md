@@ -188,8 +188,9 @@ is half a beat short at the median.
 | C12 | The release arriving on a hop the amplitude gate refuses (`gated`): the muted string is under `analysis.rmsGate` when the release begins, `rearticulation.ts` never sees it, the Note keeps the contact. 3 of the 30; plus 1 at 80ms, the edge of the window DECISION-046 reuses from `transient.articulationMs`, and 2 inside the window and over the bar that did not move (`a3`, `e830`), unread | tracker | DECISION-046; C7 (lowering the gate turns gated misses into splits, so the gate is not the lever) | the 3 + 1 + 2 fall at +0 derivation missed | **spent, iteration 6** (DECISION-050): read on the trace, only 2 of the 6 are reachable at the release test — `e851` sits six hops after its contact, which is 80.0000000000018ms in doubles, and `e815`'s release hop is under the gate. Both fixed (`tracking.releaseOnGatedHop`, window in samples): slow DI 30 → 29, +0 missed, +0 fp, held-out identical; three boundaries right, one label's charge moved along the chain to `e818` (C16). The rest: `e839` release 91ms after a fine-opened contact (past the window); `e830` the fine witness delivering the contact after its release; `e835`, `a3` region-lane Notes at the contact |
 | C14 | The pace estimator's cliff: `localIoiMs` is the median of the last eight opening gaps, and on material whose gaps sit in two clusters (the E5 take: eighths ~227ms, sixteenths ~120ms) one gap shortened by a 67ms boundary move tips it 227 → 160ms, so every bar denominated in it — DECISION-030's 0.35, DECISION-045's 0.5 — moves by a third. Reproduction: E5 DI take, 15907ms, `announceBarMs` 113 → 80 under DECISION-047's build. Candidates: gaps read from ATTACK times (which a boundary move does not change) rather than Note openings; a percentile or trimmed median that one gap cannot tip; or the bar denominated in the predecessor's own length | tracker | DECISION-030 (the estimator as built), DECISION-037 (estimator / oracle ratio "not yet decidable") | under DECISION-047's build re-applied, the two E5 false positives do not appear and derivation is not worse; the estimator/oracle ratio per take does not fall | **spent, iteration 4** (DECISION-048): retracted openings struck out; derivation fp 223 → 211, extras 281 → 271, missed 114 → 114, amped slow 188 → 182; estimate / labels 0.85 → 0.96 at the median. The E5 stubs' bars read 133 and 140ms (were 113 and 100). C11 re-run next |
 | C13 | A sharpness ceiling on the CONTACT opening for DECISION-046: the two moves that cost something on held-out had a broadband transient of sharpness 9.9 and 12.8 at the "contact" (a mic sixteenth at 140bpm, a mic strum), the direct-input contacts read 0.5–6.6. A contact does not scrape. Read on held-out material, so not a constant this iteration | tracker | DECISION-046 (d) | derived on the DERIVATION predicate alone: an edge between the DI contacts and the loudest derivation openings the rule moves; then held-out read once — `lead-line-sixteenths` missed 10 → 8 is the prediction | open — derive, do not tune |
-| C15 | The ring-out clock runs from the Note's START: `rearticulation.ts` reaches the decay-fit branch at `soundedMs >= ringOutMs` (250), so a boundary moved 67ms later (DECISION-046 at two sites, C11 at a third) delays that branch by 67ms and a transient in the window is read by the rolling-baseline test instead. Reproduction: held-then-picked DI, 9213ms, `soundedMs` 280 → 213, `ring-out-not-sharp` → `sharpness`, a third Note on `p1c2q3`. Candidate: the clock the ring-out branch reads is the burst's first attack (the contact, where the string was excited and the decay the fit measures began), not the moved start | fast + tracker | DECISION-049; DECISION-046 (the moves it applies to first); the ring-out branch itself (`ringOutMs`) | first read, no build: on the derivation DI takes at the shipped engine, the `sharpness` acceptances 250–320ms after a moved start against those after an unmoved start, per take; then the anchored clock at +0 derivation missed, fp not up, and the E5 / held-then-picked DI phantom counts down by the number that read | open — read first |
-| C16 | The announce bar for a Note the fine witness opened on a CONTACT: it gets `minStableMs` (55ms) where an attack-opened same-pitch contact gets the rate-fragment bar (half the local interval, 121ms on the E5 take), so it is announced before its own release arrives and the release test, which never moves an announced start, cannot reach it. `e818` on the E5 eighths DI take: fine-opened at 6122.67ms, announced at 55ms, gated release at +77ms. Candidate: a fine-opened Note whose fine onset read as a contact (`contactTimes`) takes the same suspected-fragment bar as an attack-opened no-rise split | tracker | DECISION-046 (the release test), DECISION-045 (the fragment bar), `handleFineOnset` | the fine-opened contacts on the DI takes counted, with how many are announced before a release arrives inside the window; then the bar applied at +0 derivation missed and the E5 take's `e817` charge cleared | open |
+| C15 | The ring-out clock runs from the Note's START: `rearticulation.ts` reaches the decay-fit branch at `soundedMs >= ringOutMs` (250), so a boundary moved 67ms later (DECISION-046 at two sites, C11 at a third) delays that branch by 67ms and a transient in the window is read by the rolling-baseline test instead. Reproduction: held-then-picked DI, 9213ms, `soundedMs` 280 → 213, `ring-out-not-sharp` → `sharpness`, a third Note on `p1c2q3`. Candidate: the clock the ring-out branch reads is the burst's first attack (the contact, where the string was excited and the decay the fit measures began), not the moved start | fast + tracker | DECISION-049; DECISION-046 (the moves it applies to first); the ring-out branch itself (`ringOutMs`) | first read, no build: on the derivation DI takes at the shipped engine, the `sharpness` acceptances 250–320ms after a moved start against those after an unmoved start, per take; then the anchored clock at +0 derivation missed, fp not up, and the E5 / held-then-picked DI phantom counts down by the number that read | **spent, iteration 7** (DECISION-051): read on the four derivation DI takes at DECISION-050's engine, no build: 47 moved starts, 23 transients in the reopened window (all on the E5 take), 2 changed verdicts (`e817` at 5893ms, `e853` at 14893ms: a ring-out refusal → `sharpness`, then onto the release by the unsettled path, 10ms and 12ms from their labels), 0 phantoms. Nothing for an anchored clock to fix on derivation; the 9213ms case is C11's |
+| C16 | The announce bar for a Note the fine witness opened on a CONTACT: it gets `minStableMs` (55ms) where an attack-opened same-pitch contact gets the rate-fragment bar (half the local interval, 121ms on the E5 take), so it is announced before its own release arrives and the release test, which never moves an announced start, cannot reach it. `e818` on the E5 eighths DI take: fine-opened at 6122.67ms, announced at 55ms, gated release at +77ms. Candidate: a fine-opened Note whose fine onset read as a contact (`contactTimes`) takes the same suspected-fragment bar as an attack-opened no-rise split | tracker | DECISION-046 (the release test), DECISION-045 (the fragment bar), `handleFineOnset` | the fine-opened contacts on the DI takes counted, with how many are announced before a release arrives inside the window; then the bar applied at +0 derivation missed and the E5 take's `e817` charge cleared | **built and reverted, iteration 7** (DECISION-051): the premise was wrong — the fine witness delivers the contact 65ms late, so `e818`'s Note is born on the release's own hop, settled at 77ms and not yet announced, and DECISION-050's `!settled` refused it, not the announce bar. Built as the gated path without `!settled` (`isRelease` keeps `!announced`, so it reaches a fine-opened Note on its birth frame only): slow DI 29 → 27 (`e817`, `e35`), fp 211 → 210, missed 114 → 115 — `e36` on the quarters DI take, a stroke whose release re-excited the string to the gate's own level, has 13ms on its clock after the move and dies unannounced where it was announced with 75ms from the contact. Spent: the reachable rule is C17 |
+| C17 | The gated release on a Note the fine witness opened keeps the announce clock on the CONTACT: `handleFineOnset` opens a Note born settled on the contact, so the fine witness has already decided the stroke is a Note; the release (C16's path, reaching that Note on its birth frame) relocates its boundary and must not re-decide it, which it does today because `announceSoundedMs` reads from the moved `startTime`. Candidate: the clock reads from `ownStartTime` for a Note the gated release moved, as it already reads a different start than `startTime` for a Note that absorbed a stub. Reproduction: `e36`, quarters DI, 35445 → 35520ms, 13.33ms on the clock after the move | tracker | DECISION-051 (the path); DECISION-050 (the gated release); `announceSoundedMs` | derivation slow DI 29 → 27 with missed 114 → 114 (`e36` regained on overlap, its Note 35520–35547ms inside the label) and fp not up; every Note the rule announces that would otherwise die unannounced counted on the derivation takes, each matched to a label or charged as a false positive; held-out read once after | open |
 
 ## Owner-side blockers (living)
 
@@ -197,7 +198,7 @@ is half a beat short at the median.
 |---|---|---|---|
 | Recordings of the tutorial passage from the owner's failing setup — his direct input into his computer's browser, through the game's capture path, with and without the gate calibration — then the phone when tried (brief §10) | any claim that a fix transfers to the owner's rig; derivation material for slow same-pitch notes on DI, which DECISION-033 also names as its precondition | 2026-09-18 (this file) | — |
 | Has the owner run GOATerizer's input-gate calibration on the DI rig, and what gate is in force during the tutorial? | whether the DI failure is gated misses (`held-then-picked-di`'s shape) or splits; which of C6/C7/C9 to run first | 2026-09-18 | — |
-| Label review of the eight 120bpm same-pitch takes: the 33 A3 grid placeholders; carrying the DI times to the amped files at +2.5ms; and, from iteration 2, the held-then-picked DI labels, which the envelope shows sitting 20–90ms AHEAD of the pick's contact on the five strokes probed (every other DI label sits on the release) | C4; reading the amped fast takes to better than ±65ms; the held-then-picked DI onset error, which reads worse under DECISION-046 for that reason | earlier (`docs/SAME-PITCH-MATERIAL.md`) | — |
+| Label review of the eight 120bpm same-pitch takes: the 33 A3 grid placeholders; carrying the DI times to the amped files at +2.5ms; and, from iteration 2, the held-then-picked DI labels, which the envelope shows sitting 20–90ms AHEAD of the pick's contact on the five strokes probed (every other DI label sits on the release); and, from iteration 7, `e36` on the quarters DI take (35450ms), whose label sits on the pick's contact at 35445ms with the release at 35520ms, on a stroke whose release re-excited the string only to the gate's level — the one probed same-pitch DI label that sits on the contact | C4; reading the amped fast takes to better than ±65ms; the held-then-picked DI onset error, which reads worse under DECISION-046 for that reason | earlier (`docs/SAME-PITCH-MATERIAL.md`) | — |
 | Does GOATerizer honour `structuralRevision` with `relation: "absorbed"`? | which form of C1 to build (retract vs never-announce) | 2026-09-18 | **Yes** (read from `trellos/goaterizer`, `src/input/tuninator-provider.ts`, its DECISION-105/110): an absorbed id becomes a `retract` that un-draws the bar, refunds a wrong-note charge and reopens an unjudged target. A verdict already shown is kept. Both forms of C1 therefore reach the game; see "What the consumer does with a split" below for why latency still matters. |
 | A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the recordings above being what the recognizer really hears, DI first | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. Briefed as `docs/goaterizer-capture-and-judgment-prompt.md`, to run in parallel in that repository. |
 | A tempo hint on `EngineTuning` (product decision; the record bounds its value at about twice the shipped gate's reach, and not free) | nothing in the loop; a consumer-side lever | 2026-09-18 | — |
@@ -669,3 +670,70 @@ refused before announcement by bars that already exist.
   which have the same edge.
 - Exit rule: continue. C15's first read next (the ring-out clock on
   DECISION-046's own moves), then C16.
+
+### Iteration 7 — 2026-09-18 — REVERTED — the gated release on a fine-opened Note's birth frame: two boundaries right, one stroke whose release barely sounded lost; C15 closed by its read
+
+- Candidate: **C15** first, read only: on the four derivation DI takes at
+  the shipped engine, 47 starts moved by the release test, 23 transients
+  in the reopened window, 2 changed verdicts (`e817`, `e853`: ring-out
+  refusal → `sharpness`, then onto the release by the unsettled path), 0
+  phantoms. Closed without a build. Then **C16**, the fine-opened
+  contact's release. Nearest closed relative: DECISION-050 (d); the
+  difference is that the read corrected the row — `e818`'s Note is not
+  announced before its release arrives, it is BORN on the release's hop
+  (the fine witness delivers the contact 65ms late), settled at 77ms and
+  unannounced, and `!settled` refused it, not the announce bar.
+- Falsifier, stated before measuring: derivation slow DI split 29 → 28,
+  `e817`'s charge cleared; derivation missed and false positives not up;
+  amped and mic not worse; held-out read once after.
+- Built: `tracking.releaseOnGatedHopSettled` (true; false = DECISION-050
+  as shipped) in `config.ts`; step (a) of `note-tracker.ts` reads
+  `(!settled || releaseOnGatedHopSettled)`; `isRelease`'s `!announced`
+  guard kept, so the path reaches a fine-opened Note on its birth frame
+  only; a frame-driven `NoteTracker` test with a fine onset delivered on
+  a gated hop.
+- Sweep (derivation predicate: not 140bpm): off → on, slow DI 29 → 27 of
+  327; E5 eighths DI 8 → 7 (`e817`: 6122.67 → 6200ms, 10ms from
+  `e818`); quarters DI 8 → 7 (`e35`: the release's own fine onset no
+  longer splits a Note that now starts on the release; one false positive
+  gone) and missed 1 → 2 (`e36`); held-then-picked DI one boundary moved
+  67ms (`p6c4q2`), counts unchanged.
+- Numbers, before → after:
+    slow subset      DI 29/327 → 27/327     amped+mic 152/334 → 152/334 (bit-identical per take)
+    corpus (deriv)   split 218 → 216, extras 270 → 268, strays 9, missed 114 → 115, fp 211 → 210, det 1308 → 1306
+    tail fragments   not re-run: reverted on the derivation result
+    ledger MISSED    not re-run: reverted on the derivation result
+    by material      derivation missed 114 → 115, extras 270 → 268; held-out NOT read
+    eval             not re-run on the candidate; PASS on the reverted engine (DECISION-050's)
+    consumer view    not retracting — the start moves before the Note is announced
+    tests            533 with the candidate; 530 after the revert
+- The lost label: `e36`, quarters DI, 35450–35930ms. Contact at 35445ms
+  (fine dip −29dB) muted the string to 0.0019 RMS; the release at
+  35506–35520ms (rise 2.1, gated) re-excited it to 0.0080, which is the
+  gate, so the fast lane heard one voiced hop. Born at the contact the
+  Note had 75ms on its clock and was announced, matched by 5ms; started
+  at the release it had 13.33ms and died unannounced. The move re-decides
+  the Note because the announce clock reads from the moved start. A
+  mechanism, on every stroke this path reaches.
+- Verdict and why: reverted; missed up by one, and the keep rule has no
+  exception for the count that would be 27. `src/` is DECISION-050's,
+  bit-identical (`git diff HEAD -- src/` empty; splits 29/327, corpus
+  288 / 345 / 19, tests 530).
+- What a GOATerizer player would notice: nothing changed this iteration.
+  Had it been kept: on a direct input, two more notes begin when the
+  string sounds, and one very soft stroke on the quarters take would not
+  register at all.
+- Findings section: "The release test reaches a Note the fine witness
+  opened only on the frame that opens it, and moving that Note loses a
+  stroke whose release barely sounded"; DECISION-051; commit on
+  `claude/project-thread-46x8sd`.
+- Ledger changes: C15 spent (closed by the read, no derivation case reads
+  wrong); C16 spent (built and reverted, premise corrected); C17 added:
+  the gated release on a fine-opened Note keeps the announce clock on the
+  contact, so the move relocates the boundary and does not re-decide the
+  Note. New owner-side item, not a blocker: `e36`'s label sits on its
+  contact (35450ms) where the other probed same-pitch DI labels sit on the release;
+  the release on that stroke is the quietest thing in it.
+- Exit rule: continue. One built-and-reverted iteration since the last
+  kept one, and C17 is a new row with a stated falsifier. C17 next, as
+  one mechanism (the C16 path with the clock kept).

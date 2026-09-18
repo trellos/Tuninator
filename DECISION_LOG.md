@@ -6,6 +6,69 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-051]: The release test does not read a Note the fine witness opened on the frame that opens it
+* **Date:** 2026-09-18
+* **Status:** Rejected
+* **Owner:** Detection architecture; DECISION-044's loop, iteration 7
+* **Context:** DECISION-050 (d) deferred `e818`'s case on the E5 eighths
+  DI take — a Note the fine witness opened on a contact, with a gated
+  release 77ms later — to the announce bar, ledger row C16. Re-read on the
+  trace (`docs/DETECTION-FINDINGS.md`, "The release test reaches a Note
+  the fine witness opened only on the frame that opens it"), the announce
+  bar is not what refused it: the fine witness confirms 65ms after the
+  onset, so the contact was delivered on the same hop as the release, and
+  `handleFineOnset` opens the successor with `lastAudibleAt` on that frame.
+  At step (a) of that frame the Note is settled (77ms on its clock, over
+  `minStableMs`) and not yet announced (`publish` runs at the frame's
+  end); DECISION-050's `!settled` requirement refused the release, and a
+  higher announce bar would have changed nothing. In the same iteration,
+  ledger row C15 (the ring-out clock reads from the moved start) was read
+  on the four derivation DI takes without a build: 47 moved starts, 23
+  transients in the reopened window, 2 changed verdicts, both contacts
+  accepted `sharpness` in place of a ring-out refusal and then moved onto
+  their release by DECISION-046's unsettled path (`e817`, `e853`), and no
+  phantom. Nothing for an anchored clock to fix on derivation; closed.
+* **Decision:** Built as `tracking.releaseOnGatedHopSettled` — the gated
+  path of DECISION-050 read with `(!settled || releaseOnGatedHopSettled)`,
+  `isRelease`'s `!announced` guard unchanged, so it reaches a fine-opened
+  Note only on its birth frame — and reverted. On derivation: slow DI
+  split 29 → 27 of 327 (`e817` and `e35` cleared), split 218 → 216,
+  extras 270 → 268, false positives 211 → 210, amped and mic takes
+  bit-identical, and missed 114 → 115. The lost label is `e36` on the
+  quarters DI take: a stroke whose contact muted the string to 0.0019 RMS
+  and whose release re-excited it to 0.008, the gate's own level, so the
+  fast lane heard one voiced hop of a note that sounds through its whole
+  label. Born at the contact the Note had 75ms on its clock and was
+  announced; started at the release it had 13.33ms and was dropped
+  unannounced. The move re-decides whether the Note exists, because the
+  announce clock reads from the moved start — a mechanism, present on
+  every stroke this path reaches. The keep rule (missed not up) fails;
+  `src/` is DECISION-050's, bit-identical; held-out not read. The key and
+  its frame-driven test went with the revert.
+* **Alternatives Considered:** (a) **The announce bar for a fine-opened
+  contact, as C16 was written** — rejected by the read: the announce comes
+  after step (a) on the same frame, so no bar reaches the release test.
+  (b) **Deferring the move until the next hop is voiced** — rejected: on
+  `e36` the next hop is the only voiced one and the Note still dies, and
+  the fast lane would act a hop late on every other stroke. (c) **Refusing
+  the move when the Note would not be announced** — rejected: the fast lane
+  is causal and does not know at the frame what the next hops carry.
+  (d) **Keeping the announce clock on the contact when the gated release
+  moves a fine-opened Note** — not built this iteration (one mechanism per
+  iteration); it is ledger row C17, with the count of Notes it would
+  announce that otherwise die unannounced as its falsifier.
+* **Consequences:** Positive — C15 closed without a build; C16's premise
+  corrected on the trace; the one mechanism that can lose a label on this
+  path named exactly, with `e36`'s frames as the reproduction; `e35`'s
+  split identified as the release's own fine onset splitting a Note that
+  still started at the contact. Negative — `e817` and `e35` stay charged
+  (slow DI 29 on the tuning takes); the engine did not move this
+  iteration; `e36`'s label sits on its contact where the other probed same-pitch
+  direct-input labels sit on the release, noted for the owner's listening
+  list and not edited.
+
+---
+
 #### [DECISION-050]: The release test reads the hop the amplitude gate refuses, and measures its window in samples
 * **Date:** 2026-09-18
 * **Status:** Proposed

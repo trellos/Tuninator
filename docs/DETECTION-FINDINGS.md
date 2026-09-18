@@ -6647,3 +6647,153 @@ passed), `e835` and `a3` (region-lane Notes at the contact), and now
 `e818` (a fine-opened contact announced at 55ms, before its release
 arrives at 77ms). The last is the one with a mechanism in it: the
 announce bar for a Note the fine witness opened on a contact.
+
+## The release test reaches a Note the fine witness opened only on the frame that opens it, and moving that Note loses a stroke whose release barely sounded
+
+DECISION-044's loop, iteration 7; DECISION-051. Ledger row C15 read and
+closed without a build; ledger row C16 built, measured, reverted.
+
+### C15, read on the trace: the ring-out clock coupling reads in the rule's favour on every derivation case
+
+DECISION-049 named the coupling: `rearticulation.ts` reaches the decay-fit
+branch by the Note's age from its START (`soundedMs >= ringOutMs`, 250ms),
+so a start DECISION-046 moves 67–80ms later delays that branch by the
+same amount, and a transient arriving in that window is read by the
+rolling-baseline test instead. Row C15's first read asks how often that
+happens on the four derivation direct-input takes at the shipped engine
+(DECISION-050), before anything is built: every start the release test
+moved, every transient in the window the move reopened, and whether its
+verdict changed.
+
+    held-then-picked DI       5 moved starts    0 transients in the reopened window
+    A3 eighths DI             0                 0
+    E5 eighths DI            37                23, of which 2 changed verdict
+    quarters DI               5                 0
+
+Twenty-one of the twenty-three transients get the same verdict from the
+rolling-baseline test that the ring-out branch gave them. The two that
+change are both on the E5 take and both change the same way: a contact
+refused at the ring-out branch (`ring-out-not-sharp` at 5893ms,
+`ring-out-below-floor` at 14893ms) is accepted `sharpness` once the Note
+before it is 80ms younger, and the Note it opens is unsettled when its
+release arrives, so DECISION-046's unsettled path moves it onto the
+release. The first is `e817`, read in iteration 6; the second is `e853`'s
+stroke, 14893 → 14960ms, 12ms from its label. Neither made a phantom. The row's falsifier was
+the E5 and held-then-picked phantom counts falling by the number of
+transients that read wrong, and that number is zero, so there is nothing
+for an anchored clock to fix on derivation. Closed by the read; the
+held-then-picked case at 9213ms that DECISION-049 reproduced is C11's,
+reachable only if C11 is built again.
+
+### C16, re-read: the Note was not announced before its release arrived
+
+Row C16 said `e818`'s Note on the E5 take — opened by the fine witness on
+a contact at 6122.67ms, with a gated release at 6200ms — was announced at
+55ms, before the release arrived at 77ms, and that the announce bar for a
+fine-opened contact was therefore the mechanism. The trace says otherwise.
+The fine witness confirms an onset 65ms after it, so the contact at
+6122.67ms was delivered on the frame at 6200ms: the same hop as the
+release. `handleFineOnset` opens the successor backdated to the dip with
+`lastAudibleAt` set to the frame, so at step (a) of that frame the Note has
+77ms on its clock — settled, since `minStableMs` is 55 — and is not yet
+announced, because `publish` runs at the end of the frame. DECISION-050's
+gated path requires `!settled`; that condition, not the announce bar,
+refused the release. A higher announce bar would have changed nothing,
+since the announce comes after step (a) either way.
+
+So the reachable mechanism is the gated path without its unsettled
+requirement. `isRelease` keeps `!announced`, so in practice this reaches a
+fine-opened Note only on the frame that opens it, when its release arrives
+on that same hop.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation slow DI split 29 → 28, `e817`'s charge cleared; derivation
+missed and false positives not up; amped and mic takes not worse; held-out
+read once after. Nothing to sweep: a boolean.
+
+### What was built
+
+`tracking.releaseOnGatedHopSettled` (true; false is DECISION-050 as
+shipped): the condition in step (a) reads
+`(!settled || releaseOnGatedHopSettled)` in place of `!settled`. A
+frame-driven test constructs a `NoteTracker` on hand-made frames: 17
+voiced hops of A3 opened by an attack, three gated hops, then a gated hop
+carrying an attack with rise 3 and a fine onset placed 77ms back, and
+asserts that the second Note starts on that gated hop with the key on and
+on the fine onset's dip with it off.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 29 → 27 of 327 (E5 eighths DI 8 → 7, quarters DI 8 → 7); amped + mic 152 → 152 of 334, bit-identical per take
+    corpus (deriv)   split 218 → 216, extras 270 → 268, strays 9, missed 114 → 115, fp 211 → 210, det 1308 → 1306
+    held-out         not read; the derivation result decided the iteration
+    tests            533 with the frame-driven test; 530 after the revert
+
+The path touched four Notes on derivation: the three above and one on the
+held-then-picked DI take, a fine-opened contact at 96466.67ms moved 67ms
+onto its release at 96533.33ms (`p6c4q2`, a provisional label that sits
+100ms ahead of the contact, as iteration 2 found that take's labels do);
+counts unchanged there, onset error p90 158 → 160ms.
+
+Both labels the count credits fell for the reason predicted. `e817`: the
+Note at 6122.67ms moves to 6200ms, 10ms from `e818`'s label. `e35` on the
+quarters take: the contact at 34920ms (fine dip −38dB, rebound 18dB) had
+its release at 34986.67ms (rise 3.75, gated) on the same frame the fine
+witness delivered the contact; the release's own fine onset at 34989.3ms
+(−7dB dip, 29dB rebound) was delivered at 35066ms and, with the Note still
+starting at the contact, opened a second Note 69ms into the first — the
+"tail phantom" the classification charged to `e35` and the scorer counted
+a false positive. With the start on the release that onset is 2.7ms after
+it and opens nothing: `e35` is one Note, 47ms after its label's start,
+and the false positive is gone.
+
+### The label that was lost
+
+`e36` on the quarters DI take, 35450–35930ms, the stroke after `e35`.
+Frames at the shipped engine:
+
+    35440    gated   rms 0.0062   band onset; fine dip at 35445.3ms, −29dB, rebound 14dB
+    35480    gated   rms 0.0019   the string under the pick
+    35506.7  gated   rms 0.0053   rise 2.12
+    35520    gated   rms 0.0069   rise 2.11, attack; the fine onset delivered on this hop
+    35533.3  voiced  rms 0.0080   E5, the one hop over the gate
+    35546.7  gated   rms 0.0080
+    35560    gated   rms 0.0078
+
+The gate on this take is `analysis.rmsGate`, 0.008. `e35`'s stroke peaked
+at 0.017; this one's release re-excited the string to 0.008 and stayed
+there, so the string sounds through the whole label and the gate hears one
+hop of it. Before the change the Note was born at the contact with 75ms on
+its clock, announced, matched `e36` by 5ms, and ended at 35546.67ms. With
+the change the start moves to the release at 35520ms, the clock reads
+13.33ms at the end of the frame, and the Note is dropped unannounced: the
+release test re-decided whether the Note exists, because the announce clock
+reads from the moved start. That is a mechanism, not a coincidence, and it
+is the same mechanism on every stroke this path can reach: a fine-opened
+Note on its birth frame has exactly the frame's audible time after the
+move.
+
+One thing about the label, for the owner's listening list and not for
+editing here: `e36`'s label sits 5ms from the contact and 70ms before the
+release. Every other same-pitch direct-input label probed in this loop sat
+on the release within 6ms (the held-then-picked labels are the separate case
+iteration 2 named). On this stroke the release is the quietest thing in
+it.
+
+### Verdict
+
+Reverted: missed rose by one and the keep rule has no exception for a
+count that would be 27 on the release positions. The engine is
+DECISION-050's, bit-identical; the test went with the key it tested. The
+write-up is the product, and it names the next mechanism: the move must
+not re-decide the Note. The fine witness decided that when it delivered a
+contact and the tracker opened a Note born settled on it; the gated
+release relocates that Note's boundary, and its announce clock can keep
+reading from the contact (`ownStartTime`, the way `announceSoundedMs`
+already reads a different start than `startTime` for a Note that absorbed
+a stub). On derivation that is this change plus `e36` regained — the Note
+would start at 35520ms and end at 35546.67ms, inside the label, matched on
+overlap — and what it risks is a contact whose release is a gated hop with
+a rise and nothing sounding after it, announced where it now dies. Ledger
+row C17, with that count as its falsifier.
