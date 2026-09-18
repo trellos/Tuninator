@@ -672,7 +672,10 @@ owner. It also gets a `DECISION_LOG.md` entry closing the loop.
   editor reads this repository's `fixtures/` and does not record. A dev-only
   switch that writes the worklet's input to a WAV is what makes the phone-mic
   request above a fixture rather than a studio recording, and it belongs in
-  that repository.
+  that repository. `docs/goaterizer-capture-and-judgment-prompt.md` is the
+  companion brief for it, written to run in parallel with this loop; when its
+  captures land here as `fixtures/audio/*.wav` plus grid-derived
+  `fixtures/labels/*.json`, treat the labels as PROVISIONAL until re-timed.
 - **GOATerizer and `structuralRevision`** — answered, see §2: it honours
   `relation: "absorbed"` as a retraction. What remains the owner's is whether
   a judge that settles a Miss at an early release should wait for the
