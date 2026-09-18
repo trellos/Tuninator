@@ -6,6 +6,47 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-056]: A transient's rise is not read over two hops for the region lane, and the octave stub is not made to lend its start
+* **Date:** 2026-09-18
+* **Status:** Rejected
+* **Owner:** Detection architecture; DECISION-044's loop, iteration 12
+* **Context:** DECISION-055 left two rows: `s161` on the A3 eighths DI
+  take, credited before by a carve that wholly overlapped a Note the pitch
+  tracker opened 42ms late after an octave misread of its first two hops
+  (C22); and `a15` on the quarters DI take, whose release transient read
+  0.91 on its hop, 1.997 on the next and 2.05 on the one after, against
+  the release bar of 2 (C24) (`docs/DETECTION-FINDINGS.md`, "The octave
+  stub read and the rise read two hops out").
+* **Decision:** C22 falsified on the bench without a build: of 101 such
+  stubs on the tuning takes, 82 read the successor's pitch or its octave,
+  but on the direct-input takes the stubs are 0–13ms and the successors on
+  time, and `s161` cannot be regained by lending a start because the fast
+  lane opened one Note for two picks there and the miss only moves to
+  `s162`; the nine successors it would bring within 40ms of their labels
+  are all on amped takes. C24 built as `deep.transientRiseHops` (2; 1 as
+  DECISION-055) and reverted: at 2 and 3 hops the quarters DI take is
+  bit-identical — the deep lane read the transient at 2.053 and the
+  boundary stayed at 8960ms because it is the shipped ATTACK branch's,
+  placed on the band-only onset at the mute, which DECISION-055's
+  envelope-branch rule never sees — and the clean-lead take loses `t17`
+  (missed 112 → 113), because a longer reading also lets the transient
+  before the release outrank it. Held-out not read. Engine bit-identical
+  to DECISION-055's.
+* **Alternatives Considered:** (a) **The attack branch placing its
+  boundary on the broadband rising transient inside the window when the
+  transient it read is band-only** — the rule `a15` actually needs; not
+  built this iteration, ledger C25 with the falsifier stated. (b) **A rise
+  reading bounded by the next transient rather than a hop count** — not
+  built; C25 makes it moot for the direct input. (c) **Lending the stub's
+  start on amped takes** — a row for the amped column's onset error (C22
+  restated), not this loop's next step.
+* **Consequences:** Positive — three iterations' wrong premise about
+  `a15` corrected by the deep lane's own reading, and the rule it needs
+  named with its reproduction; the octave-stub count taken once and
+  recorded. Negative — the engine did not move; `a14` stays charged.
+
+---
+
 #### [DECISION-055]: The region lane's envelope boundary is placed on the transient that rose, with the rise read on its hop or the next, and a carve sees every Note the tracker holds
 * **Date:** 2026-09-18
 * **Status:** Proposed

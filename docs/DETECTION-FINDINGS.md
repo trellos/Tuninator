@@ -7252,3 +7252,94 @@ carved prefix of no pitch between a note's end and the next stroke's
 release is offered to that stroke as its contact stub, the way the fast
 lane offers one — read on the tuning takes first, since its sites are
 held-out), C24 (the rise read over the two hops after the transient).
+
+## The octave stub read and the rise read two hops out: nothing for the direct input in either, and `a15`'s boundary was never the envelope's
+
+DECISION-044's loop, iteration 12; DECISION-056. One candidate falsified
+on the bench without a build, a second built, measured and reverted.
+Ledger rows C22 and C24.
+
+### C22, the octave stub, read on the tuning takes
+
+The falsifier, stated first: on the tuning takes, the unannounced stubs an
+attack opened and a pitch change ended within three hops, counted with
+their pitch against the successor's; then `s161` regained at +0
+derivation missed with false positives not up.
+
+The count (`stubs.ts`, all thirteen derivation takes): 101 such stubs.
+82 read the successor's pitch or its octave on their first hops (21
+octave, 61 the same class) and 19 something else; 61 of the 101 are 27ms
+long, 29 are 0–13ms, the rest 40ms. Of the successors that matched a
+label, 21 start more than 40ms after it, and for 9 of those the stub's
+own start is within 40ms of the label — all nine on amped takes (seven on
+the E5 eighths amped take, one each on the A3 eighths amped and the
+held-then-picked amped). On the direct-input takes the stubs are 0–13ms
+and the successors on time, save two on the A3 take, and `s161` is not
+regained by lending the start: the Note at 20053ms is the only Note
+between 20027ms and 20267ms, and the labels there are `s161`
+(20011–20117ms) and `s162` (20117–20254ms), two picks. The fast lane
+opened nothing for the second, so one of the two is missed whichever the
+Note is credited to; the carve DECISION-055 removed had been filling that
+hole with a duplicate. Lending the stub's start would move the miss from
+`s161` to `s162`. The row as stated is falsified; what remains of it is
+nine amped onsets 42–77ms late that would read within 40ms, a row for the
+amped column's onset error, not the direct input's, restated as C22 for a
+later iteration.
+
+### C24, the rise read over the two hops after the transient
+
+The falsifier, stated first: `a14`'s charge cleared (`a15`'s Note within
+40ms of its label at 9015ms), derivation slow DI 21 → 20 or fewer, missed
+not up, false positives not up, extras not up, amped and mic not worse;
+held-out read once after.
+
+Built as `deep.transientRiseHops` (2; 1 is DECISION-055's reading):
+`pendingRise` keeps reading for that many hops, and a later transient
+still takes it over. One more tracker test read `a15`'s figures back —
+0.91, 1.997, 2.05 — as 1.997 under one hop and 2.05 under two. 540 tests.
+Swept at 1, 2 and 3 hops on the derivation takes:
+
+    hops 1   slow DI 21/327, other 149/334, split 206, extras 257, missed 112, fp 203, det 1302
+    hops 2   slow DI 21/327, other 149/334, split 206, extras 257, missed 113, fp 203, det 1301
+    hops 3   identical to 2
+
+The quarters DI take is bit-identical at every setting: `a15` did not
+move. The deep lane's own reading says why. The region 8507–9680ms
+carries the transient at 9000ms as broadband with rise 2.053 — the two-hop
+reading worked — and the segmentation still reads `attack@8960`, kind
+`attack`, not `energyRise`. That boundary was never the envelope
+branch's. It is the shipped attack branch's, which reads a transient in
+the hop before a window's start when the window's RMS clears
+`segmentAttackRiseRatio` (1.25) over the trough, and the transient it
+read is the band-only onset at 8960ms — the mute — because
+`attackSamples` carries band-only onsets. DECISION-055's rule runs in the
+envelope branch only and never sees this boundary. `a15` was on the
+falsifier of iterations 10, 11 and 12 under the wrong premise each time;
+the frames (0.91, 1.997, 2.05) were read correctly and were irrelevant.
+
+The one label the two-hop reading costs is `t17` on the clean-lead take
+(D5, 14527–14693ms): under one hop a region-lane Note 14517–14653ms
+credits it; under two hops the transient before it reads a larger rise,
+qualifies first, and the boundary lands where nothing survives, so the
+Note in front runs to 14653ms and the label is missed. A longer reading
+does not only reach the release: it also lets an earlier transient
+outrank it.
+
+Reverted; `src/` bit-identical to DECISION-055's (`git diff HEAD --
+src/` empty).
+
+### What the ledger gets
+
+C25: the attack branch of `resegment.ts` reads a band-only onset as the
+boundary's transient. On a direct-input same-pitch stroke that onset is
+the mute, 40–55ms before the release. The candidate: when the transient
+the attack branch reads is band-only and a broadband transient whose rise
+clears the release bar sits inside the window that noticed the rise, the
+boundary is the latter — the same rule DECISION-055 gave the envelope
+branch, applied to the branch that actually placed `a15`'s boundary.
+Reproduction: quarters DI, region 8507–9680ms, `attack@8960` on the
+band-only onset, broadband 9000ms rise 1.997 (2.053 over two hops), label
+9015ms. Falsifier: `a14`'s charge cleared at +0 derivation missed, fp and
+extras not up, amped and mic not worse; the count of attack-branch
+boundaries that stand on a band-only onset on the tuning takes, with how
+many have a rising broadband transient in the window.
