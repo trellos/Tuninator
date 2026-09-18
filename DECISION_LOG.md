@@ -6,6 +6,63 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-052]: The release test reads a Note the fine witness opened on the frame that opens it, and the move keeps the announce clock on the contact
+* **Date:** 2026-09-18
+* **Status:** Proposed
+* **Owner:** Detection architecture; the ship decision is the project owner's (DECISION-044's loop, iteration 8)
+* **Context:** DECISION-051 read the path and reverted it: the fine
+  witness delivers a contact 65ms late, so it can arrive on the release's
+  own hop in a Note born settled, and DECISION-050's `!settled` refused the
+  release; reading it there moved two direct-input boundaries right and
+  dropped one stroke, `e36` on the quarters DI take, whose release
+  re-excited the string only to the gate's level — 75ms on its announce
+  clock born at the contact, 13.33ms started at the release. The move
+  re-decided the Note because `announceSoundedMs` reads from the moved
+  `startTime`.
+* **Decision:** `tracking.releaseOnFineOpenedFrame` (true; false is
+  DECISION-050 as shipped). The gated release test in step (a) also reads
+  a settled, unannounced Note the fine witness opened — in practice on the
+  frame that opens it, since `isRelease` keeps `!announced` — and when it
+  moves such a Note it sets `releasedFromContact` on the record, for which
+  `announceSoundedMs` reads from `ownStartTime`, as it already does for a
+  Note that absorbed a step-shed stub. The witness that opened the Note
+  decided a stroke began; the release places its boundary and does not
+  re-decide it. Result on derivation: slow DI split 29 → 27 of 327
+  (`e817`, `e35`), split 218 → 216, extras 270 → 268, missed 114 → 114,
+  false positives 211 → 210 (the phantom the release's own fine onset
+  opened on `e35`), the amped and mic takes bit-identical; four Notes
+  moved on their birth frame, one of them (`e36`'s) newly announced and
+  matched, none a false positive; corpus 288 / 345 / 19 → 286 / 343 / 19;
+  held-out, read once: identical on every take. Eval PASS; 534 tests.
+* **Alternatives Considered:** (a) **Counting the contact-to-release
+  stretch toward `soundedMs` as well** — rejected: `soundedMs` feeds
+  `settled` and the ring-out clock (C15), and the Note is announced at the
+  end of its birth frame either way, so widening the change buys nothing
+  and touches the coupling DECISION-049 named. (b) **Keeping the clock for
+  the unsettled release paths too** (DECISION-046, DECISION-050) —
+  rejected: an attack-opened contact Note has not been decided by anyone
+  yet; earning its 55ms after the move is what those rules shipped, and
+  nothing on derivation asks for more. (c) **Reading the gated release on
+  any settled unannounced Note, not only a fine-opened one** (iteration 7's
+  build) — rejected as the looser statement: every case reached on
+  derivation is fine-opened, and the announce-clock argument only holds
+  for a Note a witness opened. (d) **Editing `e36`'s label onto the
+  release** — not this loop's to do, and it would not have rescued
+  iteration 7's build: the Note still had 13ms on its clock.
+* **Consequences:** Positive — the release test now reaches every
+  contact-opened Note whose release arrives inside the window, on any hop,
+  fine-opened or not; two more direct-input boundaries on the release and
+  one phantom fewer at no cost on either set; the record's two starts
+  (`ownStartTime`, `startTime`) now carry a stated meaning for a forward
+  move as well as a backward one. Negative — one more flag on
+  `NoteRecord`; a Note this path moves reports a start up to 80ms after the
+  contact a listener may have labelled (`e36`, on the owner's list); and
+  `soundedMs` and `announceSoundedMs` now disagree for such a Note by the
+  contact-to-release stretch, which the ring-out clock reads as DECISION-049
+  described.
+
+---
+
 #### [DECISION-051]: The release test does not read a Note the fine witness opened on the frame that opens it
 * **Date:** 2026-09-18
 * **Status:** Rejected

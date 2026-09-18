@@ -692,6 +692,27 @@ export type EngineConfig = {
      * See DECISION-050.
      */
     releaseOnGatedHop: boolean;
+    /**
+     * Whether the release test on a gated hop also reads a Note the fine
+     * witness opened, on the frame that opens it, and keeps that Note's
+     * announce clock on the contact when it moves the start. False is the
+     * test as DECISION-050 shipped it: an unsettled Note only.
+     *
+     * The fine witness confirms an onset 65ms after it, so a contact it
+     * delivers arrives on a frame that may already carry the release (the
+     * E5 eighths DI take: contact at 6122.67ms delivered at 6200ms, the
+     * release's own hop). `handleFineOnset` opens the Note born settled on
+     * that frame, so `!settled` refused the release and the Note kept the
+     * contact. Reading it there moves the start; what the move must not do
+     * is re-decide the Note. The witness that opened it already did that,
+     * and `announceSoundedMs` reads from `startTime`, so a stroke whose
+     * release re-excites the string only to the gate's level had 13ms on
+     * its clock after the move where it had 75ms before, and was dropped
+     * (the quarters DI take, 35445ms; DECISION-051). With this on, the
+     * clock keeps reading from the contact for the Note the release moved.
+     * See DECISION-052.
+     */
+    releaseOnFineOpenedFrame: boolean;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -1024,6 +1045,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     releaseRiseRatio: 2,
     paceIgnoresRetracted: true,
     releaseOnGatedHop: true,
+    releaseOnFineOpenedFrame: true,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

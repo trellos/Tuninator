@@ -190,7 +190,7 @@ is half a beat short at the median.
 | C13 | A sharpness ceiling on the CONTACT opening for DECISION-046: the two moves that cost something on held-out had a broadband transient of sharpness 9.9 and 12.8 at the "contact" (a mic sixteenth at 140bpm, a mic strum), the direct-input contacts read 0.5–6.6. A contact does not scrape. Read on held-out material, so not a constant this iteration | tracker | DECISION-046 (d) | derived on the DERIVATION predicate alone: an edge between the DI contacts and the loudest derivation openings the rule moves; then held-out read once — `lead-line-sixteenths` missed 10 → 8 is the prediction | open — derive, do not tune |
 | C15 | The ring-out clock runs from the Note's START: `rearticulation.ts` reaches the decay-fit branch at `soundedMs >= ringOutMs` (250), so a boundary moved 67ms later (DECISION-046 at two sites, C11 at a third) delays that branch by 67ms and a transient in the window is read by the rolling-baseline test instead. Reproduction: held-then-picked DI, 9213ms, `soundedMs` 280 → 213, `ring-out-not-sharp` → `sharpness`, a third Note on `p1c2q3`. Candidate: the clock the ring-out branch reads is the burst's first attack (the contact, where the string was excited and the decay the fit measures began), not the moved start | fast + tracker | DECISION-049; DECISION-046 (the moves it applies to first); the ring-out branch itself (`ringOutMs`) | first read, no build: on the derivation DI takes at the shipped engine, the `sharpness` acceptances 250–320ms after a moved start against those after an unmoved start, per take; then the anchored clock at +0 derivation missed, fp not up, and the E5 / held-then-picked DI phantom counts down by the number that read | **spent, iteration 7** (DECISION-051): read on the four derivation DI takes at DECISION-050's engine, no build: 47 moved starts, 23 transients in the reopened window (all on the E5 take), 2 changed verdicts (`e817` at 5893ms, `e853` at 14893ms: a ring-out refusal → `sharpness`, then onto the release by the unsettled path, 10ms and 12ms from their labels), 0 phantoms. Nothing for an anchored clock to fix on derivation; the 9213ms case is C11's |
 | C16 | The announce bar for a Note the fine witness opened on a CONTACT: it gets `minStableMs` (55ms) where an attack-opened same-pitch contact gets the rate-fragment bar (half the local interval, 121ms on the E5 take), so it is announced before its own release arrives and the release test, which never moves an announced start, cannot reach it. `e818` on the E5 eighths DI take: fine-opened at 6122.67ms, announced at 55ms, gated release at +77ms. Candidate: a fine-opened Note whose fine onset read as a contact (`contactTimes`) takes the same suspected-fragment bar as an attack-opened no-rise split | tracker | DECISION-046 (the release test), DECISION-045 (the fragment bar), `handleFineOnset` | the fine-opened contacts on the DI takes counted, with how many are announced before a release arrives inside the window; then the bar applied at +0 derivation missed and the E5 take's `e817` charge cleared | **built and reverted, iteration 7** (DECISION-051): the premise was wrong — the fine witness delivers the contact 65ms late, so `e818`'s Note is born on the release's own hop, settled at 77ms and not yet announced, and DECISION-050's `!settled` refused it, not the announce bar. Built as the gated path without `!settled` (`isRelease` keeps `!announced`, so it reaches a fine-opened Note on its birth frame only): slow DI 29 → 27 (`e817`, `e35`), fp 211 → 210, missed 114 → 115 — `e36` on the quarters DI take, a stroke whose release re-excited the string to the gate's own level, has 13ms on its clock after the move and dies unannounced where it was announced with 75ms from the contact. Spent: the reachable rule is C17 |
-| C17 | The gated release on a Note the fine witness opened keeps the announce clock on the CONTACT: `handleFineOnset` opens a Note born settled on the contact, so the fine witness has already decided the stroke is a Note; the release (C16's path, reaching that Note on its birth frame) relocates its boundary and must not re-decide it, which it does today because `announceSoundedMs` reads from the moved `startTime`. Candidate: the clock reads from `ownStartTime` for a Note the gated release moved, as it already reads a different start than `startTime` for a Note that absorbed a stub. Reproduction: `e36`, quarters DI, 35445 → 35520ms, 13.33ms on the clock after the move | tracker | DECISION-051 (the path); DECISION-050 (the gated release); `announceSoundedMs` | derivation slow DI 29 → 27 with missed 114 → 114 (`e36` regained on overlap, its Note 35520–35547ms inside the label) and fp not up; every Note the rule announces that would otherwise die unannounced counted on the derivation takes, each matched to a label or charged as a false positive; held-out read once after | open |
+| C17 | The gated release on a Note the fine witness opened keeps the announce clock on the CONTACT: `handleFineOnset` opens a Note born settled on the contact, so the fine witness has already decided the stroke is a Note; the release (C16's path, reaching that Note on its birth frame) relocates its boundary and must not re-decide it, which it does today because `announceSoundedMs` reads from the moved `startTime`. Candidate: the clock reads from `ownStartTime` for a Note the gated release moved, as it already reads a different start than `startTime` for a Note that absorbed a stub. Reproduction: `e36`, quarters DI, 35445 → 35520ms, 13.33ms on the clock after the move | tracker | DECISION-051 (the path); DECISION-050 (the gated release); `announceSoundedMs` | derivation slow DI 29 → 27 with missed 114 → 114 (`e36` regained on overlap, its Note 35520–35547ms inside the label) and fp not up; every Note the rule announces that would otherwise die unannounced counted on the derivation takes, each matched to a label or charged as a false positive; held-out read once after | **spent, iteration 8** (DECISION-052): built as `tracking.releaseOnFineOpenedFrame`; slow DI 29 → 27, missed 114 → 114, fp 211 → 210, extras 270 → 268, amped/mic and held-out bit-identical; four Notes moved on their birth frame, `e36`'s newly announced and matched, none a false positive |
 
 ## Owner-side blockers (living)
 
@@ -737,3 +737,56 @@ refused before announcement by bars that already exist.
 - Exit rule: continue. One built-and-reverted iteration since the last
   kept one, and C17 is a new row with a stated falsifier. C17 next, as
   one mechanism (the C16 path with the clock kept).
+
+### Iteration 8 — 2026-09-18 — KEPT — the release moves a fine-opened Note on its birth frame and keeps its announce clock on the contact
+
+- Candidate: **C17**, the gated release on a Note the fine witness
+  opened, with the announce clock kept on the contact. Nearest closed
+  relative: iteration 7's build (DECISION-051), the same move without the
+  clock; the difference is that `announceSoundedMs` reads from
+  `ownStartTime` for the moved Note, so the move places the boundary and
+  does not re-decide the Note.
+- Falsifier, stated before measuring: derivation slow DI split 29 → 27
+  (`e817`, `e35`) with missed 114 → 114 (`e36` regained on overlap);
+  false positives and extras not up; amped and mic not worse; every Note
+  the rule newly announces counted, each matched or charged; held-out
+  read once after. Nothing to sweep: a boolean.
+- Built: `tracking.releaseOnFineOpenedFrame` (true; false = DECISION-050
+  as shipped) in `config.ts`; step (a) of `note-tracker.ts` reads the
+  gated release on `(!settled || (fineOpened && key))` and sets
+  `releasedFromContact` on a settled move; `note-record.ts`
+  `announceSoundedMs` reads from `ownStartTime` for it; four frame-driven
+  tests in `release-clock.test.ts`, one of which fails with the clock
+  line removed.
+- Sweep (derivation predicate: not 140bpm): off → on, slow DI 29 → 27 of
+  327; E5 eighths DI 8 → 7 (`e817` → 6200ms); quarters DI 8 → 7 (`e35`,
+  and the phantom its release's own fine onset opened is gone: fp 4 → 3,
+  det 75 → 74); held-then-picked DI one boundary moved, counts unchanged.
+  Four Notes moved on their birth frame; `e36`'s is the one newly
+  announced, 35520–35546.67ms inside its label, matched on overlap.
+- Numbers, before → after:
+    slow subset      DI 29/327 → 27/327     amped+mic 152/334 → 152/334 (bit-identical per take)
+    corpus           288 / 345 / 19 → 286 / 343 / 19; slow subset 215 / 267 → 213 / 265
+    tail fragments   238 / 258 → 237 / 257, same pitch 235 → 234 (the phantom on `e35`)
+    ledger MISSED    141 — unchanged
+    by material      derivation missed 114 → 114, fp 211 → 210, extras 270 → 268, split 218 → 216; held-out (read once, after) split 70, extras 75, fp 66, missed 27 — identical on every take
+    eval             PASS; required 0 failures; informational the one pre-existing
+    consumer view    not retracting — the start moves before the Note is announced
+    tests            534 passing (530 + 4)
+- Verdict and why: kept. Every keep line holds with nothing against it,
+  and the one label iteration 7 lost is back where it was, with its Note
+  now starting on the release.
+- What a GOATerizer player would notice: **on a direct input**, two more
+  notes begin when the string sounds rather than when the pick lands, one
+  of them a note that used to read as two; a very soft stroke still
+  registers. **Through an amp**, nothing.
+- Findings section: "The release moves a Note the fine witness opened
+  without re-deciding it: the announce clock stays on the contact";
+  DECISION-052; commit on `claude/project-thread-46x8sd`.
+- Ledger changes: C17 spent (kept). No new rows: the 27 left on the DI
+  column are the shapes the C12 and C11 rows already name, 10 phantoms,
+  and 4 with no release-shaped onset in the window.
+- Exit rule: continue. Nothing built and reverted since iteration 7, and
+  the ledger still has rows with stated falsifiers (C13 to derive on the
+  tuning takes, C14). The C11 shape, 9 of the 27, needs the chain
+  reading in `measure-splits.ts` addressed before a third build.

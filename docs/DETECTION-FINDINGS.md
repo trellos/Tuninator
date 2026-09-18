@@ -6797,3 +6797,96 @@ would start at 35520ms and end at 35546.67ms, inside the label, matched on
 overlap — and what it risks is a contact whose release is a gated hop with
 a rise and nothing sounding after it, announced where it now dies. Ledger
 row C17, with that count as its falsifier.
+
+## The release moves a Note the fine witness opened without re-deciding it: the announce clock stays on the contact
+
+DECISION-044's loop, iteration 8; DECISION-052. Built, measured, kept.
+Ledger row C17: the gated release on a fine-opened Note keeps the
+announce clock on the contact.
+
+### The shape
+
+Iteration 7 (DECISION-051) read the path and named the loss. A contact
+the fine witness delivers arrives 65ms after the audio it describes, so it
+can land on the same hop as the pick's release; `handleFineOnset` opens
+the Note born settled on that frame, `publish` has not yet run, and
+DECISION-050's release test — unsettled Notes only — refused it. Reading
+the test on that Note moved two boundaries right (`e817` on the E5
+eighths DI take, `e35` on the quarters take) and lost `e36`: a stroke
+whose release re-excited the string only to the gate's own level, so that
+the Note had 75ms on its announce clock born at the contact and 13.33ms
+started at the release, and was dropped unannounced. The move re-decided
+the Note, because `announceSoundedMs` reads from `startTime`.
+
+The mechanism is the separation of two quantities the record already
+keeps apart for a different move. `ownStartTime` is where the Note was
+created; `startTime` is where it is reported to begin; `announceSoundedMs`
+reads from `ownStartTime` when the Note absorbed a stub a pitch step shed,
+so audio that belongs to the note before does not count toward this one's
+bar. Here the direction is the reverse and the argument is the same: the
+muted stretch between the contact and the release is this stroke's — the
+pick landed, the string sat under it, the pick let go — and the witness
+that opened the Note read the contact and decided a stroke had begun. The
+release relocates the boundary. It does not get to say whether the stroke
+happened.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation slow DI split 29 → 27 (`e817`, `e35`) with missed 114 → 114
+(`e36` regained on overlap, its Note inside the label); false positives
+and extras not up; amped and mic takes not worse; every Note the rule
+newly announces — moved on its birth frame and dead unannounced without
+the clock — counted on the derivation takes, each matched to a label or
+charged as a false positive; held-out read once after. Nothing to sweep:
+a boolean.
+
+### What was built
+
+`tracking.releaseOnFineOpenedFrame` (true; false is DECISION-050 as
+shipped). In step (a) the gated release test reads
+`(!settled || (fineOpened && releaseOnFineOpenedFrame))`; `isRelease`
+keeps `!announced`, so a fine-opened Note is reached on its birth frame
+only. When the move is on a settled Note the record's new
+`releasedFromContact` is set, and `announceSoundedMs` reads from
+`ownStartTime` for it, as it does for `absorbedRenaming`. `soundedMs`,
+which `settled` and the ring-out clock read, still reads from the moved
+start: the Note is unsettled for 55ms after the move, which changes
+nothing it can reach, since it is announced at the end of the frame.
+
+Four frame-driven tests on a `NoteTracker` fed by hand: a note, three
+gated hops for the pick landing, a gated hop carrying the release's rise
+and the fine witness's contact 77ms back, then the string. With nineteen
+voiced hops after the release the second Note starts on the release hop;
+with ONE voiced hop it still starts there and is still announced — the
+test that fails with the clock line removed; with the key off the second
+Note starts on the contact, as DECISION-050 shipped it.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 29 → 27 of 327 (E5 eighths DI 8 → 7, quarters DI 8 → 7); amped + mic 152 → 152 of 334, bit-identical per take
+    corpus (deriv)   split 218 → 216, extras 270 → 268, strays 9, missed 114 → 114, fp 211 → 210, det 1308 → 1307
+    moved Notes      4 on their birth frame (E5 1, quarters 2, held-then-picked 1); 1 newly announced (`e36`'s, matched); 0 false positives from them
+    held-out (once)  identical on every line: split 70, extras 75, strays 10, missed 27, fp 66, det 420
+    corpus (all)     288 / 345 / 19 → 286 / 343 / 19; slow subset 215 / 267 → 213 / 265
+    ledger MISSED    141, unchanged; tail fragments 238 / 258 → 237 / 257
+    eval             PASS; tests 530 → 534
+
+The three Notes iteration 7 moved move the same way: `e817`'s to 6200ms
+(10ms from `e818`), `e35`'s to 34986.67ms (the release's own fine onset
+at 34989.3ms then opens nothing, so the phantom charged to `e35` and
+counted a false positive is gone), and the held-then-picked contact at
+96466.67ms to its release. `e36`'s Note starts at 35520ms, is announced
+with 88ms on the clock from the contact, and ends at 35546.67ms, inside
+its label; the matcher credits it on overlap, 70ms after the label's
+start — the label sits on the contact, which DECISION-051 noted for the
+owner's listening list.
+
+### Verdict
+
+Kept. Every keep line holds with nothing against it: missed equal on both
+sets, false positives down one, splits and extras down two, amped, mic and
+held-out bit-identical. What the count still holds on the direct-input
+column, 27 of 327: 10 phantoms, 9 refused-contact bursts (C11, blocked on
+the chain reading), the region-lane contacts (`e835`, `a3`), `e839`
+(release 91ms after the contact), `e830` (contact delivered after its
+release), and the four with no release-shaped onset in the window.

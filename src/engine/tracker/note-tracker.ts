@@ -829,11 +829,16 @@ export class NoteTracker {
       // never read it. Nothing opens here — the Note is already open and
       // unannounced, and only its start moves. See
       // `tracking.releaseOnGatedHop`.
+      //
+      // A Note the fine witness opened is settled the moment it exists, and
+      // its contact can arrive on the release's own hop; it is read here too,
+      // still unannounced, and keeps its announce clock on the contact so the
+      // move does not re-decide it. See `tracking.releaseOnFineOpenedFrame`.
       if (
         !rearticulated &&
         verdict.reason === "gated" &&
         config.tracking.releaseOnGatedHop &&
-        !settled &&
+        (!settled || (active.fineOpened && config.tracking.releaseOnFineOpenedFrame)) &&
         this.isRelease(active, frame)
       ) {
         if (this.trace !== null) {
@@ -849,6 +854,7 @@ export class NoteTracker {
             via: "gated",
           });
         }
+        if (settled) active.releasedFromContact = true;
         active.startTime = frame.attack.at;
         active.startSample = frame.attack.atSample;
       }

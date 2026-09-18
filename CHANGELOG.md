@@ -31,6 +31,14 @@
   than 0.0000000000018ms past it. Two more direct-input boundaries sit on
   the release; nothing lost on either set. `tracking.releaseOnGatedHop`;
   DECISION-050.
+- That release test now also reads a Note the fine witness opened, on the
+  frame that opens it — the witness confirms a contact 65ms late, so the
+  contact can arrive on the release's own hop, in a Note born settled — and
+  the move keeps the Note's announce clock on the contact, so a stroke whose
+  release barely re-excites the string is still a Note where it was one
+  before. Two more direct-input boundaries sit on the release, one phantom
+  fewer, nothing lost on either set. `tracking.releaseOnFineOpenedFrame`;
+  DECISION-052.
 
 ## 0.2.0 — 2026-09-16
 

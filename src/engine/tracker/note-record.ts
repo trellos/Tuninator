@@ -72,6 +72,13 @@ export class NoteRecord {
   fineOpened = false;
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
   absorbedRenaming = false;
+  /**
+   * The release test moved this Note's start off the contact the fine witness
+   * opened it on. The announce clock keeps reading from that contact: the
+   * witness decided the stroke was a Note, and the move only places its
+   * boundary. See `announceSoundedMs` and `tracking.releaseOnFineOpenedFrame`.
+   */
+  releasedFromContact = false;
   /** The pre-pick prefix check has run for this Note. See `NoteTracker.claimPrefix`. */
   prefixClaimed = false;
   startSample: number;
@@ -356,9 +363,15 @@ export class NoteRecord {
    * note BEFORE this one still ringing while the estimator caught up — audio
    * that belongs to its predecessor. Counting it toward the bar lets a 40ms
    * stub and a 53ms tail add up to a Note where neither was one.
+   *
+   * Also from the Note's own start when the release test moved it off a
+   * contact the fine witness opened: the muted stretch between contact and
+   * release is this stroke's, and a release that barely re-excites the
+   * string is still the release of a Note the witness already decided on.
    */
   get announceSoundedMs(): number {
-    const from = this.absorbedRenaming ? this.ownStartTime : this.startTime;
+    const from =
+      this.absorbedRenaming || this.releasedFromContact ? this.ownStartTime : this.startTime;
     return Math.max(this.lastVoicedAt, this.lastAudibleAt) - from;
   }
 
