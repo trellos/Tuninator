@@ -6890,3 +6890,120 @@ column, 27 of 327: 10 phantoms, 9 refused-contact bursts (C11, blocked on
 the chain reading), the region-lane contacts (`e835`, `a3`), `e839`
 (release 91ms after the contact), `e830` (contact delivered after its
 release), and the four with no release-shaped onset in the window.
+
+## The region lane's envelope boundary sits at the start of the window that noticed the rise, and the transient inside that window is as often the mute as the release
+
+DECISION-044's loop, iteration 9; DECISION-053. Built, measured, reverted.
+Ledger row C18, added and spent in the same iteration: an envelope-rise
+boundary placed on the fast lane's transient inside the window that
+noticed the rise.
+
+### The shape, read at the seven direct-input sites the fast lane never placed
+
+After iteration 8 the direct-input column holds 27 slow splits on the
+tuning takes. Seven of them the classification files as "no
+release-shaped onset in the window", "release in window but unmoved" or
+"weak release"; at each the trace, the frames and the FINAL Notes were
+read around the NEXT label, since the split instrument charges a label
+with the Note of the label after it opening early.
+
+- `a2`, `a4`, `a15` (quarters DI) and `e825` (A3 eighths DI): the early
+  Note is the region lane's. The fast lane refused the contact at the
+  ring-out branch or never saw a transient at it (the mute begins as a
+  fall, not a flux), and the final Note starts 55–63ms before its label,
+  at the mute's onset — `a4`: Note 3427ms, mute from 3427ms, the fast
+  lane's transient at 3466.67ms (rise 2.00, ungated), label 3490ms.
+- `e831` (E5 DI): a fine-opened contact at 9397ms delivered at 9466.67ms,
+  one hop after the burst's first attack at 9453ms (rise 1.84, under the
+  bar); on the birth frame the rise is 3.96 and the attack is null, so
+  DECISION-052's path has nothing to read.
+- `e825` (E5 DI): a contact-opened Note whose release's rise is 1.98
+  against a bar of 2.
+- `p1c1q2` (held-then-picked DI): the label sits 48ms after the string
+  spoke; that take's labels are the review list's.
+
+The four region-lane cases share one mechanism, in `resegment.ts`. An
+envelope boundary is placed at `boundarySample(window)`, the START of the
+first 85ms window whose RMS clears `segmentRiseRatio` over the trough,
+which the file calls the earliest defensible estimate because a boundary
+placed late gives the new event its predecessor's frames. On a same-pitch
+stroke on a direct input that window begins in the mute, so the boundary
+lands 45–65ms before the string sounds. The fast lane's transient at the
+release sits inside that same window, and the file's own `attack` branch
+("the boundary is the transient, not the window that noticed it") never
+reaches it, because the envelope branch is tested first and the `attack`
+branch only reads a transient in the 21ms hop before the window's start.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation slow DI split 27 → 23 or fewer, naming `a2`, `a4`, `a15`,
+`e825`; derivation missed, false positives and extras not up; amped and
+mic takes not worse, since the deep lane runs on every take; held-out read
+once after. Nothing to sweep: a boolean.
+
+### What was built
+
+`deep.segmentRiseOnTransient` (true; false is the segmentation as
+shipped), carried into `SegmentOptions` as `riseOnTransient`. When the
+envelope branch fires, the boundary becomes the first transient the fast
+lane recorded inside the window — the `proposed` one in the hop before
+its start, else the first in `(start, end]` — with kind `attack`; with no
+transient there, the window's start as before. Two tests on a handwritten
+sequence: a decaying note, four windows in the trough, the rise, and a
+transient 25ms into the window that notices it; the boundary sits on the
+transient with the rule and at the window's start without it or without
+the transient.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 27 → 34 of 327; amped + mic 152 → 152 of 334, bit-identical per take
+    corpus (deriv)   split 216 → 224, extras 268 → 276, strays 9, missed 114 → 109, fp 210 → 220, det 1307 → 1322
+    per take         quarters DI split 7 → 8, fp 3 → 5; E5 eighths DI split 8 → 10, missed 8 → 5, fp 2 → 5; A3 eighths DI split 6 → 9, missed 63 → 61, fp 4 → 7; held-then-picked DI split 8 → 10, fp 5 → 7
+    held-out         not read; the derivation result decided the iteration
+    tests            536 with the two tests; 534 after the revert
+
+`a4` moved as designed, 3427 → 3466.67ms, 23ms from its label. Five
+labels came back: three sixteenths in the E5 take's runs (`s1673`,
+`s1683`, `s1696`), where boundaries on transients cut a run into Notes
+that match, and two on the A3 take. Ten Notes appeared that match nothing:
+four of 93–96ms (`n39` at 18920ms on the quarters take, `n60` at 10893ms
+and `n90` at 16144ms on the E5 take, `n49` at 40400ms on the
+held-then-picked take) and six of 227–386ms.
+
+### Why: the list the region lane reads has no rise on it, and half of it is the mute
+
+`NoteTracker.attackSamples`, which the deep lane receives as
+`attackSamples`, records every hop on which the fast lane saw energy
+arrive — a broadband attack OR the band-only witness (`FastFrame.bandOnset`),
+deliberately, so a quiet upstroke the fast lane may not act on is still a
+proposal. On a direct-input same-pitch stroke the band witness fires at
+the MUTE's onset: the frames at `a15` carry `band` at 8960ms, the
+mute's first hop, and at `e831` at 9400ms; and the burst's first
+broadband attack is often the contact (`e837` at 10983ms:
+`no-energy-not-sharp`, rise 0.56). The first transient inside a window
+that begins in the mute is therefore the mute or the contact as often as
+the release, and a boundary placed there leaves `minSegmentMs` (90ms) of
+muted string as a Note: the four 93–96ms extras, one of them at `e837`'s
+contact, the C11 shape seen from the region lane. The six longer extras
+are boundaries moved onto a transient that was not the rise's — inside an
+85ms window over a sixteenth run at 120ms a stroke, the window that
+notices one release can hold the next stroke's contact — and each
+regained sixteenth cost an extra somewhere else in the same run.
+
+The rule read the right witness and picked the wrong sample. The transient
+list carries samples only; the fast lane knows each transient's rise
+(`riseRatio` on the `onset` trace event, broadband or band-only) and does
+not pass it on.
+
+### Verdict
+
+Reverted: split, extras and false positives all up, the amped and mic
+takes untouched, five labels regained against ten extras. The engine is
+DECISION-052's, bit-identical. What the write-up names as the next
+mechanism (ledger C19): the transient list carries each transient's kind
+and rise, and an envelope boundary is placed on the first BROADBAND
+transient inside its window whose own rise clears the release bar
+(`tracking.releaseRiseRatio`), else the window's start. On the four sites
+that reads `a4`'s release (rise 2.00) and not the band-only mute onset at
+`a15`; on `e837` it reads past the contact (0.56) to the release (3.41).
+Its falsifier is this iteration's numbers with the ten extras absent.

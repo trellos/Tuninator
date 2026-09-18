@@ -191,6 +191,8 @@ is half a beat short at the median.
 | C15 | The ring-out clock runs from the Note's START: `rearticulation.ts` reaches the decay-fit branch at `soundedMs >= ringOutMs` (250), so a boundary moved 67ms later (DECISION-046 at two sites, C11 at a third) delays that branch by 67ms and a transient in the window is read by the rolling-baseline test instead. Reproduction: held-then-picked DI, 9213ms, `soundedMs` 280 → 213, `ring-out-not-sharp` → `sharpness`, a third Note on `p1c2q3`. Candidate: the clock the ring-out branch reads is the burst's first attack (the contact, where the string was excited and the decay the fit measures began), not the moved start | fast + tracker | DECISION-049; DECISION-046 (the moves it applies to first); the ring-out branch itself (`ringOutMs`) | first read, no build: on the derivation DI takes at the shipped engine, the `sharpness` acceptances 250–320ms after a moved start against those after an unmoved start, per take; then the anchored clock at +0 derivation missed, fp not up, and the E5 / held-then-picked DI phantom counts down by the number that read | **spent, iteration 7** (DECISION-051): read on the four derivation DI takes at DECISION-050's engine, no build: 47 moved starts, 23 transients in the reopened window (all on the E5 take), 2 changed verdicts (`e817` at 5893ms, `e853` at 14893ms: a ring-out refusal → `sharpness`, then onto the release by the unsettled path, 10ms and 12ms from their labels), 0 phantoms. Nothing for an anchored clock to fix on derivation; the 9213ms case is C11's |
 | C16 | The announce bar for a Note the fine witness opened on a CONTACT: it gets `minStableMs` (55ms) where an attack-opened same-pitch contact gets the rate-fragment bar (half the local interval, 121ms on the E5 take), so it is announced before its own release arrives and the release test, which never moves an announced start, cannot reach it. `e818` on the E5 eighths DI take: fine-opened at 6122.67ms, announced at 55ms, gated release at +77ms. Candidate: a fine-opened Note whose fine onset read as a contact (`contactTimes`) takes the same suspected-fragment bar as an attack-opened no-rise split | tracker | DECISION-046 (the release test), DECISION-045 (the fragment bar), `handleFineOnset` | the fine-opened contacts on the DI takes counted, with how many are announced before a release arrives inside the window; then the bar applied at +0 derivation missed and the E5 take's `e817` charge cleared | **built and reverted, iteration 7** (DECISION-051): the premise was wrong — the fine witness delivers the contact 65ms late, so `e818`'s Note is born on the release's own hop, settled at 77ms and not yet announced, and DECISION-050's `!settled` refused it, not the announce bar. Built as the gated path without `!settled` (`isRelease` keeps `!announced`, so it reaches a fine-opened Note on its birth frame only): slow DI 29 → 27 (`e817`, `e35`), fp 211 → 210, missed 114 → 115 — `e36` on the quarters DI take, a stroke whose release re-excited the string to the gate's own level, has 13ms on its clock after the move and dies unannounced where it was announced with 75ms from the contact. Spent: the reachable rule is C17 |
 | C17 | The gated release on a Note the fine witness opened keeps the announce clock on the CONTACT: `handleFineOnset` opens a Note born settled on the contact, so the fine witness has already decided the stroke is a Note; the release (C16's path, reaching that Note on its birth frame) relocates its boundary and must not re-decide it, which it does today because `announceSoundedMs` reads from the moved `startTime`. Candidate: the clock reads from `ownStartTime` for a Note the gated release moved, as it already reads a different start than `startTime` for a Note that absorbed a stub. Reproduction: `e36`, quarters DI, 35445 → 35520ms, 13.33ms on the clock after the move | tracker | DECISION-051 (the path); DECISION-050 (the gated release); `announceSoundedMs` | derivation slow DI 29 → 27 with missed 114 → 114 (`e36` regained on overlap, its Note 35520–35547ms inside the label) and fp not up; every Note the rule announces that would otherwise die unannounced counted on the derivation takes, each matched to a label or charged as a false positive; held-out read once after | **spent, iteration 8** (DECISION-052): built as `tracking.releaseOnFineOpenedFrame`; slow DI 29 → 27, missed 114 → 114, fp 211 → 210, extras 270 → 268, amped/mic and held-out bit-identical; four Notes moved on their birth frame, `e36`'s newly announced and matched, none a false positive |
+| C18 | The region lane's envelope-rise boundary sits at the START of the first 85ms window whose RMS clears `segmentRiseRatio` (`resegment.ts`, `boundarySample`), which on a DI same-pitch stroke is in the mute; the fast lane's release transient inside that window is unread because the `attack` branch only reads the hop before the window's start. 4 of the 27: `a2`, `a4`, `a15` (quarters DI), `e825` (A3 eighths DI), Notes 55–63ms early | deep | the `attack` branch of `resegment.ts`; DECISION-046 (the same shape in the fast lane) | slow DI 27 → 23 or fewer at +0 missed and fp; amped and mic not worse | **built and reverted, iteration 9** (DECISION-053): the first transient inside the window — slow DI 27 → 34, fp 210 → 220, missed 114 → 109, amped/mic bit-identical. `attackSamples` carries band-only onsets (which fire at the mute's onset) and no rise, so the boundary lands on the mute or the contact as often as the release and leaves `minSegmentMs` of muted string as a Note. Spent: the reachable rule is C19 |
+| C19 | The transient list the deep lane reads carries each transient's kind (broadband or band-only) and the fast lane's rise on that hop, and an envelope-rise boundary is placed on the first BROADBAND transient inside its window whose rise clears `tracking.releaseRiseRatio`, else at the window's start as today. Reproduction: `a4`, quarters DI — window start 3427ms, band-only mute onset none, release transient 3466.67ms rise 2.00, label 3490ms; `e837`, E5 DI — contact 10983ms rise 0.56, release +67ms rise 3.41 | deep + tracker (the list) | DECISION-053 (the first transient); the `attack` branch of `resegment.ts` | derivation slow DI 27 → 23 or fewer, missed 114 → 109 or fewer kept, fp 210 not up, the ten extras of iteration 9 named and absent; amped and mic not worse; held-out read once after | open |
 
 ## Owner-side blockers (living)
 
@@ -790,3 +792,52 @@ refused before announcement by bars that already exist.
   the ledger still has rows with stated falsifiers (C13 to derive on the
   tuning takes, C14). The C11 shape, 9 of the 27, needs the chain
   reading in `measure-splits.ts` addressed before a third build.
+
+### Iteration 9 — 2026-09-18 — REVERTED — the region lane's envelope boundary moved onto the transient inside its window: the transient is the mute as often as the release
+
+- Candidate: **C18**, added this iteration from a read of the seven sites
+  the fast lane never placed: four are region-lane Notes whose
+  envelope-rise boundary sits at the START of the 85ms window that
+  noticed the rise, in the mute, with the fast lane's release transient
+  inside that window unread. Nearest closed relative: the `attack` branch
+  of `resegment.ts` (its own rule that the boundary is the
+  transient), which reads only the hop before the window's start.
+- Falsifier, stated before measuring: derivation slow DI split 27 → 23
+  or fewer (`a2`, `a4`, `a15`, `e825`); missed, false positives and
+  extras not up; amped and mic not worse; held-out read once after.
+- Built: `deep.segmentRiseOnTransient` (true; false = as shipped) in
+  `config.ts`, `riseOnTransient` on `SegmentOptions`; the envelope branch
+  of `segmentRegion` takes the first transient inside its window as the
+  boundary; two tests on a handwritten sequence in `resegment.test.ts`.
+- Sweep (derivation predicate: not 140bpm): off → on, slow DI 27 → 34;
+  `a4` moved 3427 → 3467ms as designed; five labels regained (three E5
+  sixteenths, two A3); ten extras, four of 93–96ms at mute onsets and
+  contacts, six of 227–386ms in sixteenth runs.
+- Numbers, before → after:
+    slow subset      DI 27/327 → 34/327     amped+mic 152/334 → 152/334 (bit-identical per take)
+    corpus (deriv)   split 216 → 224, extras 268 → 276, strays 9, missed 114 → 109, fp 210 → 220, det 1307 → 1322
+    tail fragments   not re-run: reverted on the derivation result
+    ledger MISSED    not re-run: reverted on the derivation result
+    by material      derivation missed 114 → 109, extras 268 → 276; held-out NOT read
+    eval             not re-run on the candidate; the reverted engine is DECISION-052's
+    consumer view    region-lane Notes, announced ended; not retracting
+    tests            536 with the candidate; 534 after the revert
+- Why: `NoteTracker.attackSamples` records every hop energy arrived on,
+  band-only onsets included, with no rise attached; on a DI same-pitch
+  stroke the band witness fires at the mute's onset and the burst's first
+  broadband attack is often the contact, so the first transient in a
+  window that begins in the mute is the mute or the contact as often as
+  the release, and `minSegmentMs` of muted string becomes a Note.
+- Verdict and why: reverted; every count but missed went the wrong way.
+  `src/` bit-identical (`git diff HEAD -- src/` empty; splits 286 / 343
+  / 19 re-measured).
+- What a GOATerizer player would notice: nothing changed this iteration.
+- Findings section: "The region lane's envelope boundary sits at the
+  start of the window that noticed the rise, and the transient inside
+  that window is as often the mute as the release"; DECISION-053; commit
+  on `claude/project-thread-46x8sd`.
+- Ledger changes: C18 added and spent; C19 added — the transient list
+  carries kind and rise, and the envelope boundary goes on the first
+  broadband transient in its window whose rise clears the release bar.
+- Exit rule: continue. One built-and-reverted iteration since the last
+  kept one, and C19 is a new row with a stated falsifier.

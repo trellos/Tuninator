@@ -6,6 +6,61 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-053]: The region lane's envelope boundary is not placed on the first transient inside the window that noticed the rise
+* **Date:** 2026-09-18
+* **Status:** Rejected
+* **Owner:** Detection architecture; DECISION-044's loop, iteration 9
+* **Context:** Four of the 27 slow direct-input splits left after
+  DECISION-052 are region-lane Notes starting 55–63ms before their labels
+  (`a2`, `a4`, `a15` on the quarters DI take, `e825` on the A3 eighths DI
+  take). `resegment.ts` places an envelope-rise boundary at the START of
+  the first 85ms window whose RMS clears `segmentRiseRatio`, the earliest
+  defensible estimate; on a same-pitch stroke that window begins in the
+  mute between the pick landing and letting go, and the fast lane's
+  transient at the release sits inside it, unread, because the envelope
+  branch is tested before the `attack` branch and the `attack` branch
+  reads only the hop before the window's start
+  (`docs/DETECTION-FINDINGS.md`, "The region lane's envelope boundary sits
+  at the start of the window that noticed the rise").
+* **Decision:** Built as `deep.segmentRiseOnTransient` — the envelope
+  boundary moves to the first transient the fast lane recorded inside the
+  window, kind `attack` — and reverted. On derivation: slow DI split
+  27 → 34 of 327, split 216 → 224, extras 268 → 276, false positives
+  210 → 220, missed 114 → 109, the amped and mic takes bit-identical.
+  `a4` moved as designed (3427 → 3466.67ms, 23ms from its label) and five
+  labels came back, three of them sixteenths in the E5 take's runs; ten
+  Notes appeared that match nothing, four of 93–96ms and six of 227–386ms.
+  The list the region lane reads (`NoteTracker.attackSamples`) records
+  every hop on which energy arrived, band-only onsets included and with no
+  rise attached, and on a direct-input same-pitch stroke the band witness
+  fires at the mute's onset and the burst's first broadband attack is often
+  the contact; so the first transient in a window that begins in the mute
+  is the mute or the contact as often as the release, and a boundary there
+  leaves `minSegmentMs` of muted string as a Note. Held-out not read. The
+  key and its tests went with the revert.
+* **Alternatives Considered:** (a) **The last transient in the window** —
+  rejected without a build: over a sixteenth run at 120ms a stroke, an
+  85ms window can hold the next stroke's contact, which is what the six
+  longer extras look like. (b) **Testing the `attack` branch before the
+  envelope branch** — rejected: it reads only the hop before the window's
+  start, so it reaches none of the four sites, and reordering changes
+  every boundary the two branches already agree on. (c) **The transient
+  carrying its rise, and the boundary on the first broadband transient
+  whose rise clears `tracking.releaseRiseRatio`** — not built this
+  iteration (one mechanism per iteration); ledger row C19, with this
+  iteration's ten extras named as its falsifier. (d) **A shorter region
+  window** — rejected: the window is `harmony.fftSize`, and the deep lane's
+  pitch reading is denominated in it.
+* **Consequences:** Positive — the region-lane placement of same-pitch
+  boundaries is named as a shape with four derivation labels in it, its
+  cause located to one line of `resegment.ts`, and the transient list's
+  two defects for this purpose (band-only onsets, no rise) stated; the E5
+  sixteenth runs are shown to respond to transient-placed boundaries.
+  Negative — the four labels stay charged; the engine did not move; and
+  the list the deep lane reads still cannot tell a mute from a release.
+
+---
+
 #### [DECISION-052]: The release test reads a Note the fine witness opened on the frame that opens it, and the move keeps the announce clock on the contact
 * **Date:** 2026-09-18
 * **Status:** Proposed
