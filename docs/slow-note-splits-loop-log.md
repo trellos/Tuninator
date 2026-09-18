@@ -97,6 +97,41 @@ held-then-picked amped 11 of 40, every DI take 0 or 1). The eval report's
 amped takes. About 15% against 4%. It is the brief's door 2, third bullet: one
 bench row on the outcome-shaped population, and not a gate on its own.
 
+### What the consumer does with a split — read from GOATerizer on 2026-09-18
+
+`trellos/goaterizer` at `d903ccc`, on `tuninator@0.2.0` (the engine measured
+above). Its capture path IS this library's: `createRecognizer()` opens the
+microphone itself, with `echoCancellation`, `noiseSuppression` and
+`autoGainControl` all explicitly `false`, `channels: "auto"`, on an
+`AudioContext` the game creates with `latencyHint: "interactive"` and no
+sample rate. Three things about that path are NOT what the eval runs:
+
+- **The gate.** After a calibration the game passes `engine.rmsGate` as low
+  as 0.00008, a hundredth of the shipped 0.008 (`src/game/input-gate.ts`,
+  `persistence/input-gate.ts`). Every re-articulation witness then sees hops
+  of sustain tail and noise the eval never lets through. Nothing in this
+  corpus has been measured at a lowered gate. Ledger row C7.
+- **The sample rate.** The context runs at the device's rate; every fixture
+  here is 48kHz. At 44.1kHz `snapHop(12ms)` is 512 samples = 11.6ms (13.3ms
+  at 48kHz), the 2048-sample YIN window is 46.4ms and the deep window 92.9ms;
+  every millisecond-denominated constant is honoured but the hop grid, the
+  17-hop flux median and the 128-sample fine-onset kernel all read audio on a
+  different grid. Ledger row C8.
+- **Diagnostics on** (`pitchFrames`, `contour`), which changes nothing in the
+  tracker but does mean the game reads `rms` on every hop.
+
+What a split costs the player (`src/game/judgment.ts`): a target is claimed at
+the attack and **judged at the release**. A release inside the target's Good
+window of its end keeps the attack's verdict; a note held for less than half
+its written length settles as a **Miss**; held longer but let go outside the
+window, a Good. So a quarter split 130ms in at 120bpm (0.26 beat against a
+1-beat target) is a Miss for a note played on time, and the same-pitch
+fragment that follows either claims the next target early or is charged as a
+wrong note. Absorption would refund all of that, but the engine never absorbs
+a same-pitch tail today, so the refund never comes. The tutorial asks for
+exactly this material: quarters, then eighths, then eighth triplets, at the
+player's chosen tempo (60, 90, 106, 120 or 140bpm), on one lane per step.
+
 ### Eval end-time error, for the consumer's duration question
 
 Signed median end error on the slow takes: amped quarters **-237ms** (the
@@ -120,6 +155,8 @@ is half a beat short at the median.
 | C4 | Pace absorb at 0.40 — the named measurement only (estimator / oracle ratio per take) | — | DECISION-037: "not yet decidable" | ratio ≈ 0.82 ⇒ 0.50 is derived | blocked on the label review (owner) |
 | C5 | Rate gate restricted by the PREDECESSOR's `harmonyBloomed` | tracker | DECISION-030 amendment (room-context flag regressed) | chord-take extras fall, nothing else moves | open (door 5) |
 | C6 | Lower the amplitude gate so decayed slow strings reach the witnesses | fast | DECISION-035 names it, unmeasured | ledger `rejected: gated` falls at no extras cost | open (door 6, misses not splits) |
+| C7 | Instrument only: the slow subset re-measured with `analysis.rmsGate` overridden to the values GOATerizer can pass (0.002, 0.0005, 0.00008) — does lowering the gate raise splits, and by which accepting site? | measurement | none; the consumer runs the engine here and the corpus never has | a stated split count per gate value; if splits rise, the loop's target moves to the gate the player actually plays at | open, cheap, do first |
+| C8 | Instrument only: the slow subset at 44.1kHz (resample the decoded fixtures, run the same engine) — does the hop grid move the numbers? | measurement | none | bit-identical is the hope; a moved count is a finding about every ms-denominated constant | open, cheap |
 
 ## Owner-side blockers (living)
 
@@ -127,7 +164,8 @@ is half a beat short at the median.
 |---|---|---|---|
 | Phone-microphone recordings of the GOATerizer tutorial passage, phone capture plus a DI of the same performance, constraints named (brief §10) | any claim that a fix transfers to the owner's rig; derivation material for slow same-pitch notes | 2026-09-18 (this file) | — |
 | Label review of the eight 120bpm same-pitch takes: the 33 A3 grid placeholders; carrying the DI times to the amped files at +2.5ms | C4; reading the amped fast takes to better than ±65ms | earlier (`docs/SAME-PITCH-MATERIAL.md`) | — |
-| Does GOATerizer honour `structuralRevision` with `relation: "absorbed"`? | which form of C1 to build (retract vs never-announce) | 2026-09-18 | — |
+| Does GOATerizer honour `structuralRevision` with `relation: "absorbed"`? | which form of C1 to build (retract vs never-announce) | 2026-09-18 | **Yes** (read from `trellos/goaterizer`, `src/input/tuninator-provider.ts`, its DECISION-105/110): an absorbed id becomes a `retract` that un-draws the bar, refunds a wrong-note charge and reopens an unjudged target. A verdict already shown is kept. Both forms of C1 therefore reach the game; see "What the consumer does with a split" below for why latency still matters. |
+| A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the phone-mic recordings above being what the recognizer really hears | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. A GOATerizer-side task. |
 | A tempo hint on `EngineTuning` (product decision; the record bounds its value at about twice the shipped gate's reach, and not free) | nothing in the loop; a consumer-side lever | 2026-09-18 | — |
 
 ---

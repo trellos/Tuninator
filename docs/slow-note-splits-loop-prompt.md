@@ -98,6 +98,18 @@ toward the amped renders' behaviour. §10 says what to ask the owner to record;
 until it lands, the amped renders are the closest stand-in and every result is
 reported per signal path so the direction of transfer is visible.
 
+**GOATerizer's capture path is this library's, with two settings the eval
+never runs at.** Read from `trellos/goaterizer` on 2026-09-18 (the journal has
+the detail): it calls `createRecognizer()` with the speech processors
+explicitly off and lets the library open the microphone; it does not record
+audio anywhere. But after a calibration it passes `engine.rmsGate` as low as
+0.00008, a hundredth of the shipped default, and its `AudioContext` runs at
+the device's sample rate where every fixture here is 48kHz (at 44.1kHz the
+hop is 11.6ms, not 13.3ms). The journal's ledger rows C7 and C8 are the cheap
+measurements that say whether either moves the slow subset; take them before
+any mechanism, because a fix measured at the eval's gate may not be the fix
+the player is running.
+
 ## 2. What "fixed" means, and how it is scored
 
 The standing bar (`AGENTS.md` §4): **every played note reads as one Note**, on
@@ -135,16 +147,23 @@ npx tsx scripts/measure-tail-fragments.ts                  # shape: same pitch /
 npm run eval                                               # PASS, zero required failures
 ```
 
-**Fourth — the consumer's view.** GOATerizer may or may not act on a
-`structuralRevision` with `relation: "absorbed"`; the owner has not said.
-`src/offline/eval-adapter.ts` scores the FINAL Note stream, absorbed Notes
-removed, which is what a consumer that honours revisions sees. A consumer that
-only reads `noteStarted`/`noteEnded` sees every announced Note. So for any
-mechanism that announces and then retracts, report separately: how many
-fragments were announced then absorbed, and the latency from the fragment's
-`noteStarted` to its absorption (median and p90). DECISION-036 makes retraction
-admissible; DECISION-030's precedent is that where never-announcing measures
-the same as announce-then-retract, the simpler one ships. Prefer that order.
+**Fourth — the consumer's view.** GOATerizer DOES act on a
+`structuralRevision` with `relation: "absorbed"`: the absorbed id becomes a
+retraction that un-draws the bar, refunds a wrong-note charge and reopens a
+target not yet judged (its DECISION-110). What it does not undo is a verdict
+already shown, and its judge settles a target at the note's RELEASE: a Note
+held for under half the written length is a Miss on the spot. So the first
+half of a split quarter is already a Miss before any absorption can arrive,
+and the same-pitch fragment behind it is charged as a wrong note or steals the
+next target. `src/offline/eval-adapter.ts` scores the FINAL Note stream,
+absorbed Notes removed, which is what the game sees once a retraction lands.
+For any mechanism that announces and then retracts, report separately: how
+many fragments were announced then absorbed, and the latency from the
+fragment's `noteStarted` to its absorption (median and p90) — a retraction
+that arrives after the survivor's release has already settled a Miss helps the
+score sheet and not the player. DECISION-036 makes retraction admissible;
+DECISION-030's precedent is that where never-announcing measures the same as
+announce-then-retract, the simpler one ships. Prefer that order.
 
 **Fifth — derivation discipline**, which is the only reason any number means
 anything. Derivation is the five 120bpm originals plus the eight 120bpm
@@ -648,10 +667,17 @@ owner. It also gets a `DECISION_LOG.md` entry closing the loop.
   and whether to carry the re-timed DI times to the amped files at +2.5ms. It
   is the blocker on door 4 and on believing any number read off the amped fast
   takes to better than ±65ms.
-- **GOATerizer and `structuralRevision`.** Does the game honour
-  `relation: "absorbed"`? If not, every announce-then-retract mechanism is
-  invisible to it, and never-announce (with its latency) is the only form that
-  helps. The answer changes which door 1 form to build.
+- **A raw-capture switch in GOATerizer.** The game has no way to record what
+  the recognizer hears — no `MediaRecorder`, no file capture; its labels
+  editor reads this repository's `fixtures/` and does not record. A dev-only
+  switch that writes the worklet's input to a WAV is what makes the phone-mic
+  request above a fixture rather than a studio recording, and it belongs in
+  that repository.
+- **GOATerizer and `structuralRevision`** — answered, see §2: it honours
+  `relation: "absorbed"` as a retraction. What remains the owner's is whether
+  a judge that settles a Miss at an early release should wait for the
+  library's absorption window on same-pitch material; that is a game-design
+  question, not this loop's.
 - **A tempo hint.** GOATerizer knows the tutorial's tempo and target grid;
   Tuninator's `localIoiMs` is the binding constraint on the shipped gate and
   the record bounds what a true clock is worth (about twice the reach, and no
