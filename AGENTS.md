@@ -280,6 +280,20 @@ proposing anything on this decision, read that entry: the ceiling results above
 are about single numbers at single boundaries, and they do not bound a claim
 about a sequence.
 
+### `docs/slow-note-splits-loop-prompt.md` — the open line of work, run as a loop
+
+The one brief that is NOT closed. It targets the same-pitch tail fragment on
+the quarter- and eighth-note material specifically (`measure-splits.ts
+--subset=slow`, 754 labels: 52 of 365 split on the direct input, 189 of 389
+through an amp or a room mic, as of 2026-09-18), because that is what the
+owner's consumer plays and it is not where the sixteenth-note ceiling studies
+looked. It is designed to be run one iteration per session; the hand-off
+between sessions is `docs/slow-note-splits-loop-log.md`, which carries the
+baseline, every iteration's verdict, the living candidate ledger and the
+owner-side blockers. Read the journal before the brief's numbers — they go
+stale. The brief's §4 is a table of every closed direction above with its
+number, and its §5 ranks what the record itself names as untested.
+
 ### `docs/archive/` — closed lines of work
 
 Records from the retired pre-rewrite `src/core/` lineage, kept for the
