@@ -9,6 +9,14 @@
   boundary with no dip. Fourteen fewer phantom Notes on the DI same-pitch
   takes; the amped renders are unchanged. `tracking.rateFragmentNoRiseRatio`
   and its two companions in `src/engine/config.ts`; DECISION-045.
+- A Note that opened on a pick's contact — the fine witness's transient, or an
+  attack with no rise over the 80ms before it — now moves its boundary to the
+  pick's release: the first attack inside one articulation window whose rise
+  over the muted string clears `tracking.releaseRiseRatio`. On the direct
+  input a slow stroke's Note used to start 45–70ms before the note sounded,
+  and the note before it ended as early; on the E5 eighths DI take 22
+  boundaries move to within 25ms of their labels and five fewer slow events
+  split. A stub the release split off is still absorbed. DECISION-046.
 
 ## 0.2.0 — 2026-09-16
 

@@ -619,6 +619,41 @@ export type EngineConfig = {
      * largest value that costs nothing on derivation; 0.55 costs one label.
      */
     rateFragmentNoRiseSpanFraction: number;
+    /**
+     * How much the audio must rise over the 80ms before an attack for that
+     * attack to be a pick's RELEASE, when the Note it lands in opened on the
+     * pick's CONTACT. 0 turns the rule off.
+     *
+     * A slow pick stroke on a direct input is two events: the pick lands on
+     * the string and mutes it — 25 to 40dB down within a few milliseconds —
+     * and 45 to 70ms later lets go, which is when the note sounds. Both
+     * kernels fire on the contact, so the Note opens there, and the release
+     * then lands inside the articulation window: either the Note is still
+     * too young to be re-articulated and the attack is folded in, or the
+     * fine witness opened a stub on the contact and the release's split
+     * absorbs that stub and inherits its start. Either way the boundary
+     * stays on the contact. Every label the corpus has puts the note at the
+     * release, to within 6ms on every stroke probed, and so does a player.
+     * On the slow direct-input material that shape was 27 of the 35 split
+     * events remaining after DECISION-045, none of them a phantom: one Note
+     * per pick, each starting 45–70ms early, and the note before it ending
+     * as early.
+     *
+     * The release is recognised by its rise — `FastFrame.riseRatio`, the
+     * short envelope over the 80ms before it, which here spans the muted
+     * string — landing in a Note whose own opening had no rise or was the
+     * fine witness's (`CONTACT_RISE` in the tracker), within
+     * `transient.articulationMs` of that opening. The boundary moves to the
+     * release; a stub the release split is still absorbed, so the consumer
+     * never sees it, but no longer lends its start. Level was tried first
+     * and cannot work: a stub backdated onto the contact carries the
+     * release's own level, because the frames under it were folded before
+     * it existed. Swept 1.5 / 2 / 2.5 / 3 / 4 on the derivation predicate:
+     * slow DI split 30 / 30 / 31 / 31 / 32 of 327 against 35 off, missed
+     * unchanged at every bar, the amped column untouched; 2 is the middle of
+     * the plateau. See DECISION-046 and the findings entry.
+     */
+    releaseRiseRatio: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -948,6 +983,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rateFragmentNoRiseRatio: 0.8,
     rateFragmentNoRiseDipRatio: 0.4,
     rateFragmentNoRiseSpanFraction: 0.5,
+    releaseRiseRatio: 2,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

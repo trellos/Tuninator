@@ -59,6 +59,17 @@ export class NoteRecord {
    * was one.
    */
   readonly ownStartTime: SourceTimeMs;
+  /**
+   * `FastFrame.riseRatio` on the hop that opened this Note: how much louder
+   * the audio was than the 80ms before it. A pick's contact opens a Note with
+   * no rise; its release, 45–70ms later, arrives with one. See
+   * `tracking.releaseRiseRatio`.
+   */
+  readonly openingRise: number;
+  /** `FastFrame.dipRatio` on the hop that opened this Note. */
+  readonly openingDip: number;
+  /** Opened by the fine-hop witness, which fires on a pick's contact. */
+  fineOpened = false;
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
   absorbedRenaming = false;
   /** The pre-pick prefix check has run for this Note. See `NoteTracker.claimPrefix`. */
@@ -298,6 +309,8 @@ export class NoteRecord {
     confidence: number;
     rms: number;
     peak: number;
+    openingRise?: number;
+    openingDip?: number;
   }) {
     this.id = options.id;
     this.config = options.config;
@@ -306,6 +319,8 @@ export class NoteRecord {
     this.ownStartTime = options.startTime;
     this.startSample = options.startSample;
     this.trigger = options.trigger;
+    this.openingRise = options.openingRise ?? 1;
+    this.openingDip = options.openingDip ?? 1;
     this.originPitch = options.originPitch;
     this.initialConfidence = options.confidence;
     this.refFrequencyHz = options.frequencyHz;

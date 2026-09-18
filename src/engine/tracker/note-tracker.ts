@@ -104,11 +104,32 @@ export type TrackerTraceEvent =
       dipRatio: number;
       /** `frame.rms / sustainedRms`: the envelope against the Note's own baseline. */
       envelopeOverBaseline: number;
+      /** `frame.rms / maxRms`: this hop against the loudest the Note has yet been. */
+      levelOverPeak?: number;
       /** The onset kernel itself fired on this hop, as against the envelope witness. */
       kernelOnset: boolean;
       bloomed: boolean;
     }
   | { kind: "opened"; at: SourceTimeMs; noteId: string; trigger: NoteOriginTrigger }
+  | {
+      /**
+       * The Note opened on a pick's contact and this attack is its release:
+       * the boundary moved forward onto it. See `tracking.releaseRiseRatio`.
+       */
+      kind: "released";
+      at: SourceTimeMs;
+      noteId: string;
+      /** Where the Note stood before, and the release's rise over its baseline. */
+      from: SourceTimeMs;
+      riseRatio: number;
+      dipRatio: number;
+      /** The pace being played when the boundary moved, or null with none read. */
+      localIoiMs: number | null;
+      /** What said the Note opened on a contact: the fine hop, or no rise. */
+      contact: "fine" | "no-rise";
+      /** `stub` when a split stub was absorbed without lending its start. */
+      via: "unsettled" | "stub";
+    }
   | {
       kind: "absorbed";
       at: SourceTimeMs;
@@ -119,6 +140,8 @@ export type TrackerTraceEvent =
       intoStartTime: SourceTimeMs;
       burstAt: number | null;
       intoBurstAt: number | null;
+      /** The survivor's level at its start over the loudest the stub reached. */
+      levelRatio?: number;
     }
   | {
       /**
@@ -385,6 +408,21 @@ export function rateFragmentSpanFraction(
     fraction = Math.max(fraction ?? 0, bars.rateFragmentNoRiseSpanFraction);
   }
   return fraction;
+}
+
+/**
+ * A Note opened with less rise than this was opened on a pick's CONTACT, or
+ * on nothing at all — not on energy arriving. The no-rise witness reads the
+ * same population from the other side (`tracking.rateFragmentNoRiseRatio`):
+ * DI contacts and phantoms rise 0.94 at their third quartile, real re-picks
+ * 1.01 at their tenth percentile. 1.2 sits above every contact read and
+ * under every release, and is not a tuned edge.
+ */
+const CONTACT_RISE = 1.2;
+
+/** Opened by the fine witness, which fires on contacts, or with no rise. */
+function isContactOpening(record: NoteRecord): boolean {
+  return record.fineOpened || record.openingRise < CONTACT_RISE;
 }
 
 export class NoteTracker {
@@ -741,6 +779,7 @@ export class NoteTracker {
           riseRatio: frame.riseRatio,
           dipRatio: frame.attack.dipRatio,
           envelopeOverBaseline: frame.rms / Math.max(active.sustainedRms, 1e-9),
+          levelOverPeak: frame.rms / Math.max(active.maxRms, 1e-9),
           kernelOnset: frame.attack.flux,
           bloomed: active.harmonyBloomed,
         });
@@ -754,6 +793,26 @@ export class NoteTracker {
           excess: active.decay.excess(frame.at, frame.rms),
           rms: frame.rms,
         };
+      }
+      // The Note opened on the pick's contact, and this is the pick letting
+      // go: the boundary belongs here. Nothing has been announced yet, so the
+      // start simply moves. See `tracking.releaseRiseRatio`.
+      if (rearticulated && !settled && !pitchDiffers && this.isRelease(active, frame)) {
+        if (this.trace !== null) {
+          this.trace({
+            kind: "released",
+            at: frame.attack.at,
+            noteId: active.id,
+            from: active.startTime,
+            riseRatio: frame.riseRatio,
+            dipRatio: frame.attack.dipRatio,
+            localIoiMs: this.localIoiMs(frame.attack.at),
+            contact: active.fineOpened ? "fine" : "no-rise",
+            via: "unsettled",
+          });
+        }
+        active.startTime = frame.attack.at;
+        active.startSample = frame.attack.atSample;
       }
       if (rearticulated && settled) {
         // The boundary is the FIRST attack of this burst, not the one that
@@ -1475,6 +1534,7 @@ export class NoteTracker {
         false
       );
       opened.lastAudibleAt = frame.at;
+      opened.fineOpened = true;
       return;
     }
 
@@ -1532,6 +1592,7 @@ export class NoteTracker {
     // the dip, where the frames are gated, and the next stroke 100ms later
     // finds it too young to be ended.
     successor.lastAudibleAt = frame.at;
+    successor.fineOpened = true;
   }
 
   /**
@@ -1653,12 +1714,49 @@ export class NoteTracker {
         intoStartTime: survivor.startTime,
         burstAt: predecessor.burstAt,
         intoBurstAt: survivor.burstAt,
+        levelRatio: survivor.rms / Math.max(predecessor.maxRms, 1e-9),
       });
     }
     predecessor.merged = true;
+    survivor.pendingAbsorbed.push(predecessor.id, ...predecessor.pendingAbsorbed);
+    // A stub the pick's own release split off was the pick's contact: it is
+    // absorbed like any stub, but the boundary stays on the release. See
+    // `tracking.releaseRiseRatio`.
+    const bar = this.config.tracking.releaseRiseRatio;
+    if (bar > 0 && isContactOpening(predecessor) && survivor.openingRise >= bar) {
+      if (this.trace !== null) {
+        this.trace({
+          kind: "released",
+          at: survivor.startTime,
+          noteId: survivor.id,
+          from: predecessor.startTime,
+          riseRatio: survivor.openingRise,
+          dipRatio: survivor.openingDip,
+          localIoiMs: this.localIoiMs(survivor.startTime),
+          contact: predecessor.fineOpened ? "fine" : "no-rise",
+          via: "stub",
+        });
+      }
+      return;
+    }
     survivor.startTime = predecessor.startTime;
     survivor.startSample = predecessor.startSample;
-    survivor.pendingAbsorbed.push(predecessor.id, ...predecessor.pendingAbsorbed);
+  }
+
+  /**
+   * Whether `frame.attack`, landing in a Note too young to be re-articulated,
+   * is the release of the pick whose contact opened it: the Note opened on a
+   * contact, this hop is inside one articulation of its start, and the audio
+   * rose over the 80ms before it — which spans the contact — by the bar. See
+   * `tracking.releaseRiseRatio`.
+   */
+  private isRelease(active: NoteRecord, frame: FastFrame): boolean {
+    const bar = this.config.tracking.releaseRiseRatio;
+    if (bar <= 0 || frame.attack === null) return false;
+    if (active.announced || active.harmonyBloomed) return false;
+    if (!isContactOpening(active)) return false;
+    if (frame.attack.at - active.startTime > this.config.transient.articulationMs) return false;
+    return frame.riseRatio >= bar;
   }
 
   /**
@@ -2496,6 +2594,8 @@ export class NoteTracker {
       confidence: frame.pitch.confidence,
       rms: frame.rms,
       peak: frame.peak,
+      openingRise: frame.riseRatio,
+      openingDip: frame.attack?.dipRatio ?? 1,
     });
     record.polyphonic = this.contextHarmonic >= HARMONIC_CONTEXT_THRESHOLD;
     record.burstAt = this.attackBurstStart?.at ?? null;
