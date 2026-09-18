@@ -109,6 +109,8 @@ export type TrackerTraceEvent =
       /** The onset kernel itself fired on this hop, as against the envelope witness. */
       kernelOnset: boolean;
       bloomed: boolean;
+      /** The pace being played as the tracker read it here, or null with none. */
+      localIoiMs?: number | null;
     }
   | { kind: "opened"; at: SourceTimeMs; noteId: string; trigger: NoteOriginTrigger }
   | {
@@ -509,9 +511,12 @@ export class NoteTracker {
    * When each Note opened, oldest first, for the local-rate estimate.
    *
    * Every opening goes in, phantoms included: that is what a causal estimator
-   * has. See the constants above for why that is safe here.
+   * has. See the constants above for why that is safe here. With
+   * `tracking.paceIgnoresRetracted`, an opening is struck out again once its
+   * Note is absorbed or dropped unannounced — a fate decided in the past, so
+   * the estimate stays causal — and the gap it cut in two is whole again.
    */
-  private readonly openTimes: number[] = [];
+  private readonly openings: Array<{ at: number; id: string }> = [];
 
   /**
    * Where segmentation decisions go when anybody is listening. Null in every
@@ -528,7 +533,7 @@ export class NoteTracker {
   }
 
   reset(): void {
-    this.openTimes.length = 0;
+    this.openings.length = 0;
     this.notes.clear();
     this.closing.length = 0;
     this.ended.length = 0;
@@ -782,6 +787,7 @@ export class NoteTracker {
           levelOverPeak: frame.rms / Math.max(active.maxRms, 1e-9),
           kernelOnset: frame.attack.flux,
           bloomed: active.harmonyBloomed,
+          localIoiMs: this.localIoiMs(frame.attack.at),
         });
       }
       // A muted restrum refused for a weak transient is the one rejection in
@@ -1403,6 +1409,7 @@ export class NoteTracker {
     if (!claim) return decline("pitch");
 
     prefix.merged = true;
+    this.retractOpening(prefix);
     if (this.trace !== null) {
       this.trace({
         kind: "absorbed",
@@ -1718,6 +1725,7 @@ export class NoteTracker {
       });
     }
     predecessor.merged = true;
+    this.retractOpening(predecessor);
     survivor.pendingAbsorbed.push(predecessor.id, ...predecessor.pendingAbsorbed);
     // A stub the pick's own release split off was the pick's contact: it is
     // absorbed like any stub, but the boundary stays on the release. See
@@ -1816,6 +1824,7 @@ export class NoteTracker {
       }
       if (previous === null) break;
       previous.merged = true;
+      this.retractOpening(previous);
       if (this.trace !== null) {
         this.trace({
           kind: "absorbed",
@@ -2147,6 +2156,7 @@ export class NoteTracker {
       // And about the same thing the region says was sounding.
       if (target !== null && pitchClassIndex(record.dominantMidi()) !== target) break;
       record.merged = true;
+      this.retractOpening(record);
       absorbed.push(record.id);
       end = Math.max(end, record.endTime ?? end) as SourceTimeMs;
     }
@@ -2607,8 +2617,8 @@ export class NoteTracker {
       this.absorbArticulationFragment(record, predecessor);
     }
     this.notes.set(record.id, record);
-    this.openTimes.push(at);
-    if (this.openTimes.length > RATE_GAPS * 4) this.openTimes.shift();
+    this.openings.push({ at, id: record.id });
+    if (this.openings.length > RATE_GAPS * 4) this.openings.shift();
     if (this.trace !== null) {
       this.trace({ kind: "opened", at, noteId: record.id, trigger });
     }
@@ -2829,6 +2839,16 @@ export class NoteTracker {
   }
 
   /**
+   * An opening that never became a Note is not an event the pace is measured
+   * on. See `tracking.paceIgnoresRetracted`.
+   */
+  private retractOpening(record: NoteRecord): void {
+    if (!this.config.tracking.paceIgnoresRetracted) return;
+    const index = this.openings.findIndex((opening) => opening.id === record.id);
+    if (index >= 0) this.openings.splice(index, 1);
+  }
+
+  /**
    * The interval between notes the player is currently producing, in ms.
    *
    * Median of the recent gaps between Note openings. Strictly causal — only
@@ -2837,11 +2857,11 @@ export class NoteTracker {
    */
   private localIoiMs(at: SourceTimeMs): number | null {
     const gaps: number[] = [];
-    for (let i = this.openTimes.length - 1; i > 0 && gaps.length < RATE_GAPS; i--) {
-      const later = this.openTimes[i] as number;
+    for (let i = this.openings.length - 1; i > 0 && gaps.length < RATE_GAPS; i--) {
+      const later = (this.openings[i] as { at: number }).at;
       // Strictly before: the opening being judged must not enter its own estimate.
       if (later >= at) continue;
-      const gap = later - (this.openTimes[i - 1] as number);
+      const gap = later - (this.openings[i - 1] as { at: number }).at;
       if (gap > RATE_RESET_MS) break;
       if (gap < RATE_MIN_INTERVAL_MS) continue;
       gaps.push(gap);
@@ -2874,7 +2894,10 @@ export class NoteTracker {
       // emit an end with no matching start. Measured over how long it SOUNDED,
       // the same bar `publish` uses — a blip that spent its whole life in
       // release grace must not qualify just because the grace is long.
-      if (record.announceSoundedMs < record.announceThresholdMs) return;
+      if (record.announceSoundedMs < record.announceThresholdMs) {
+        this.retractOpening(record);
+        return;
+      }
       record.announced = true;
       record.lastEmitted = {
         label: record.currentLabel(),

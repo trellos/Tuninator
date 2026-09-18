@@ -654,6 +654,25 @@ export type EngineConfig = {
      * the plateau. See DECISION-046 and the findings entry.
      */
     releaseRiseRatio: number;
+    /**
+     * Whether an opening that never became a Note — absorbed as a stub, or
+     * dropped before it was announced — is struck from the local-rate
+     * estimate (`localIoiMs` in the tracker) once that is known. False keeps
+     * every opening in, which is the estimator DECISION-030 shipped.
+     *
+     * On the E5 eighths DI take the estimator's window before a 250ms
+     * eighth reads gaps of 67, 91, 149, 152, 200, 227, 267 and 280ms: the
+     * true interval is cut into pieces by contact stubs and phantoms that
+     * were opened and then dropped, and the median of eight such gaps sits
+     * on a cliff between the pieces (200ms) and the whole (227–280ms). One
+     * boundary moved 67ms tipped it 227 → 160ms and lowered the bar a
+     * suspected fragment must outlast from 113 to 80ms, which two 80ms
+     * contact stubs then cleared (DECISION-047). Striking the retracted
+     * openings is causal — only a fate already decided is read — and leaves
+     * the estimate reading the notes that were actually announced. See
+     * DECISION-048.
+     */
+    paceIgnoresRetracted: boolean;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -984,6 +1003,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rateFragmentNoRiseDipRatio: 0.4,
     rateFragmentNoRiseSpanFraction: 0.5,
     releaseRiseRatio: 2,
+    paceIgnoresRetracted: true,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

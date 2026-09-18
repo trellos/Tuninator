@@ -17,6 +17,13 @@
   and the note before it ended as early; on the E5 eighths DI take 22
   boundaries move to within 25ms of their labels and five fewer slow events
   split. A stub the release split off is still absorbed. DECISION-046.
+- The local note-rate estimate, which sets how long a suspected tail
+  fragment must outlast before it is announced, no longer counts an opening
+  that never became a Note: a stub absorbed into its successor or a
+  fragment dropped before announcement is struck out once that is known.
+  The estimate read 0.85 of the true interval before and 0.96 after; eight
+  fewer phantom Notes on the amped quarters take and none lost.
+  `tracking.paceIgnoresRetracted`; DECISION-048.
 
 ## 0.2.0 — 2026-09-16
 

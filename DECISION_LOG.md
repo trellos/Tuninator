@@ -7,6 +7,61 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-048]: The local-rate estimate strikes out an opening once its Note is absorbed or dropped unannounced
+* **Date:** 2026-09-18
+* **Status:** Proposed
+* **Owner:** Detection architecture; the ship decision is the project owner's (DECISION-044's loop, iteration 4)
+* **Context:** DECISION-030's estimator, `localIoiMs`, is the median of the
+  last eight gaps between Note openings, every opening counted, on the
+  argument that a phantom can only shorten a gap and a short reading is the
+  safe direction. Read on the E5 eighths DI take
+  (`docs/DETECTION-FINDINGS.md`, "The pace estimate reads the openings that
+  never became Notes"), half the gaps in the window are pieces of a 250ms
+  eighth cut by an opening that was later absorbed or dropped — contact
+  stubs, fragments the rate gate held back — and the median sits on a cliff
+  between the pieces and the wholes; DECISION-047 showed one 67ms boundary
+  move tipping it 227 → 160ms and two 80ms stubs clearing the bar that fell
+  with it. Across the derivation takes the estimate reads 0.85 of the
+  labels' own interval at the median, 0.37 at the tenth percentile.
+* **Decision:** `tracking.paceIgnoresRetracted` (true; false is the
+  estimator as shipped). Openings are kept with their Note ids, and when a
+  Note is absorbed (articulation fragment, attack fragment, prefix claim,
+  region merge) or ends before it was announced, its opening is struck out
+  and the gap it cut is whole again. Causal: only a fate already decided is
+  read. Result on derivation: split 225 → 219, extras 281 → 271, false
+  positives 223 → 211, missed 114 → 114; slow subset amped+mic 188/243 →
+  182/232 with the DI column unchanged at 34/36; corpus 295 / 357 / 18 →
+  289 / 346 / 19; tail fragments 246 → 235. Held out, read once: false
+  positives 67 → 66, missed 27 → 27. The estimate against the labels'
+  interval: 0.85 → 0.96 at the median, 0.37 → 0.48 at the tenth percentile.
+  Eval PASS; 528 tests.
+* **Alternatives Considered:** (a) **A lower or trimmed percentile** — the
+  alternative DECISION-030 (e) already tried "each fixed the bias without
+  improving the end-to-end trade"; and a percentile does not remove the
+  pieces, it chooses among them. (b) **Gaps read from attack times rather
+  than openings** — rejected on reading: the attack history holds every
+  contact, release and band-only onset, so its gaps are shorter and more
+  numerous than the openings', not cleaner. (c) **A bar denominated in the
+  predecessor's own length rather than the local pace** — a different
+  mechanism; not this iteration. (d) **Striking only absorbed stubs, not
+  unannounced drops** — not measured separately: a fragment the rate gate
+  dropped is exactly the opening the estimate should not have counted, and
+  the gate feeding on its own drops is the circularity DECISION-030 named.
+* **Consequences:** Positive — the first change since DECISION-030 to move
+  the amped column at all (eight phantoms fewer on the quarters amped
+  take, 46 of 72 split instead of 50), at no missed label on derivation or
+  held-out; the estimate's ratio to the truth is now measured on this
+  estimator, 0.96, and the row DECISION-037 left "not yet decidable" has a
+  number; and DECISION-047's rule can be re-run on an estimate a boundary
+  move cannot tip. Negative — one more stray, a 93ms Note at the start of
+  the A3 eighths amped take where no pace exists yet; the span bars
+  (0.35, 0.5) now act on an estimate 13% longer than the one they were
+  tuned on, unswept here; and on the quarters amped take the estimate still
+  reads under half the true interval because that take's phantoms are
+  announced and stay in.
+
+---
+
 #### [DECISION-047]: A same-pitch split whose burst began on a refused contact is NOT moved to the release yet — the moves are right on 22 of 23 boundaries and the derivation score is worse through the pace estimator
 * **Date:** 2026-09-18
 * **Status:** Rejected (built, measured, reverted — DECISION-044's loop, iteration 3)

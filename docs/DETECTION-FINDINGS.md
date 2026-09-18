@@ -6287,3 +6287,115 @@ names something real — a pace estimate that a 67ms boundary move can tip by
 67ms is a fragility this rule exposes rather than causes, and it will bite
 DECISION-046's moves too on any take whose gaps are bimodal. That is ledger
 row C14; C11 waits on it.
+
+## The pace estimate reads the openings that never became Notes, and striking them out is the first move on the amped column since DECISION-030
+
+DECISION-044's loop, iteration 4; DECISION-048. Ledger row C14, opened by
+iteration 3's failure.
+
+### What is in the estimator's window
+
+`localIoiMs` is the median of the last eight gaps between Note openings,
+every opening counted — the comment on it argues that a phantom can only
+shorten a gap, which is the safe direction. On the E5 eighths DI take the
+window before the eighth at 15907ms (labels 250ms apart) holds these
+openings and their fates:
+
+```
+  n72 @14147  gap 213   absorbed (13ms stub)
+  n73 @14227  gap  80   announced
+  n74 @14475  gap 248   announced
+  n75 @14627  gap 152   announced
+  n76 @14893  gap 267   announced
+  n77 @15120  gap 227   dropped unannounced (0ms)
+  n78 @15187  gap  67   announced
+  n79 @15467  gap 280   announced
+  n80 @15616  gap 149   dropped unannounced (91ms)
+  n81 @15707  gap  91   announced
+  n82 @15907  gap 200   dropped unannounced (80ms)
+  sorted: 67 91 149 152 200 227 267 280   median 200
+```
+
+Half the gaps are pieces of a 250ms eighth cut by an opening that was later
+absorbed or dropped — a contact stub, a phantom the rate gate held back. The
+"safe direction" holds for one such gap; eight of them put the median on a
+cliff between the pieces (149–200) and the wholes (227–280), and DECISION-047
+showed one 67ms boundary move tipping it 227 → 160ms.
+
+### The falsifier, stated before the pipeline ran
+
+Derivation missed, false positives and extras not up; the slow subset not
+worse on either path; held-out read once; and, for the row's own claim, the
+two E5 stubs at 15907 and 16147ms keep a bar they cannot clear under a 67ms
+move.
+
+### What was built
+
+`tracking.paceIgnoresRetracted` (boolean; false is the estimator as
+shipped). The tracker keeps its openings with their Note ids; when a Note is
+absorbed — `absorbArticulationFragment`, `absorbAttackFragments`, a prefix
+claim, a region merge — or ends before it was announced, its opening is
+struck from the list, and the gap it cut in two is whole again. Causal: only
+a fate already decided is read, and the opening being judged never enters
+its own estimate. Unit-tested on synthesized eighths with sharp blips
+between them, some of which the tracker opens and drops: the pace reading
+at the last re-pick is under 170ms with every opening counted and over
+220ms with the retracted ones struck out.
+
+### Numbers, before → after (derivation predicate "not 140bpm"; on/off, no constant to sweep)
+
+```
+  slow subset (--subset=slow)  DI 34/36 → 34/36 split/extra    amped+mic 188/243 → 182/232
+  corpus (measure-splits)      295 / 357 / 18  →  289 / 346 / 19   split / extra / strays
+  tail fragments               246 same pitch / 0 detached / 23 other → 235 / 0 / 23   (extras 269 → 258)
+  derivation                   missed 114 → 114, fp 223 → 211, extras 281 → 271, split 225 → 219
+  held-out (read once)         missed 27 → 27, fp 67 → 66, extras 76 → 75, split 70 → 70
+  ledger MISSED                141 → 141, no fixture moved
+  eval                         PASS, 0 required failures, the one pre-existing informational
+  tests                        525 → 528
+```
+
+Per take: `same-pitch-quarters-a3-e5-120bpm-amped` 50 → 46 of 72 slow
+labels split, false positives 77 → 69 (eight phantoms that used to clear a
+bar read off cut gaps now do not); `held-then-picked-amped` 47 → 46, fp 52
+→ 50; E5 amped and DI one phantom fewer each; `same-pitch-eighths-a3-amped`
+56 → 55 split with one more stray, a 93ms Note at 2133ms at the very start
+of the take, where the estimator has no gap yet and abstains by design. The
+direct-input column does not move: its remaining splits are timing shapes
+(C11, C12), not fragments the bar could hold.
+
+### The estimator against the labels
+
+With the tracker's pace reading added to the `rearticulation` trace event,
+each accepted same-pitch re-articulation on the derivation takes was read
+against the labels' own local interval (median gap of the eight labels
+around it):
+
+```
+  ratio estimate / labels          off: p10 0.37  med 0.85  p90 1.09   (n 1247)
+                                   on : p10 0.48  med 0.96  p90 1.17   (n 1235)
+  same-pitch-eighths-sixteenths-e5-di   0.66 / 0.96 / 1.18  →  0.94 / 1.04 / 1.22
+  same-pitch-eighths-a3-amped           0.48 / 0.75 / 1.07  →  0.59 / 0.85 / 1.17
+  same-pitch-quarters-a3-e5-amped       0.26 / 0.35 / 0.63  →  0.32 / 0.47 / 0.85
+  held-then-picked-amped                0.27 / 0.77 / 1.02  →  0.49 / 0.90 / 1.04
+```
+
+DECISION-037 recorded a different estimator at 0.82 of the oracle and
+called the ratio "not yet decidable" for this one; it is 0.85 → 0.96 at the
+median. The quarters amped take stays low because its phantoms are
+ANNOUNCED — they clear the bar and stay in the estimate — which is the
+self-limiting corruption the constants' comment describes, now measured:
+the estimate there reads under half the true interval.
+
+### Two observations, not acted on
+
+`RATE_PERCENTILE` is 0.5 and its comment explains at length why it is NOT
+the median. The comment describes the low percentile an earlier build
+used; the value is the median. Nothing here depends on which is meant, but
+the next person to read the constant should know the comment is stale.
+
+The bars this estimate feeds (0.35 and 0.5 of the interval) were chosen
+with the estimate reading 0.85 of the truth. At 0.96 they are effectively
+13% longer, and derivation missed did not move, so they hold; but a sweep
+of `rateFragmentSpanFraction` under the corrected estimate is the tuning
+pass §6.6 allows on a kept mechanism, and it was not run here.

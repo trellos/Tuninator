@@ -186,7 +186,7 @@ is half a beat short at the median.
 | C10 | The DI slow splits the no-rise witness stops at: the E5 take's 13 survivors read rise 0.8–1.0 against real re-picks from 1.01, the quarters DI take's 9 are `fine-onset` and near-unity rise. A witness other than the envelope's level (C2a/C2b band-limited, or the owner's own recordings) | fast | DECISION-045 (rise bar at 0.9 costs three real re-picks whose predecessor was still loud) | DI slow split below 42 of 365 at +0 missed; amped not worse | **spent, iteration 2**: the survivors were a TIMING error, not phantoms — 27 of 35 open on the pick's contact, 45–70ms before the release the labels sit on. DECISION-046 moves the boundary; slow DI 35 → 30 on derivation at +0 missed, amped one extra better. What is left is C11–C13 |
 | C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | **built and reverted, iteration 3** (DECISION-047): 22 of 23 boundaries land within 33ms of their labels, score worse (slow DI 30 → 33, missed +2, fp +2) through C14 and two overlap credits. Re-run after C14 |
 | C12 | The release arriving on a hop the amplitude gate refuses (`gated`): the muted string is under `analysis.rmsGate` when the release begins, `rearticulation.ts` never sees it, the Note keeps the contact. 3 of the 30; plus 1 at 80ms, the edge of the window DECISION-046 reuses from `transient.articulationMs`, and 2 inside the window and over the bar that did not move (`a3`, `e830`), unread | tracker | DECISION-046; C7 (lowering the gate turns gated misses into splits, so the gate is not the lever) | the 3 + 1 + 2 fall at +0 derivation missed | open |
-| C14 | The pace estimator's cliff: `localIoiMs` is the median of the last eight opening gaps, and on material whose gaps sit in two clusters (the E5 take: eighths ~227ms, sixteenths ~120ms) one gap shortened by a 67ms boundary move tips it 227 → 160ms, so every bar denominated in it — DECISION-030's 0.35, DECISION-045's 0.5 — moves by a third. Reproduction: E5 DI take, 15907ms, `announceBarMs` 113 → 80 under DECISION-047's build. Candidates: gaps read from ATTACK times (which a boundary move does not change) rather than Note openings; a percentile or trimmed median that one gap cannot tip; or the bar denominated in the predecessor's own length | tracker | DECISION-030 (the estimator as built), DECISION-037 (estimator / oracle ratio "not yet decidable") | under DECISION-047's build re-applied, the two E5 false positives do not appear and derivation is not worse; the estimator/oracle ratio per take does not fall | open — next; unblocks C11 |
+| C14 | The pace estimator's cliff: `localIoiMs` is the median of the last eight opening gaps, and on material whose gaps sit in two clusters (the E5 take: eighths ~227ms, sixteenths ~120ms) one gap shortened by a 67ms boundary move tips it 227 → 160ms, so every bar denominated in it — DECISION-030's 0.35, DECISION-045's 0.5 — moves by a third. Reproduction: E5 DI take, 15907ms, `announceBarMs` 113 → 80 under DECISION-047's build. Candidates: gaps read from ATTACK times (which a boundary move does not change) rather than Note openings; a percentile or trimmed median that one gap cannot tip; or the bar denominated in the predecessor's own length | tracker | DECISION-030 (the estimator as built), DECISION-037 (estimator / oracle ratio "not yet decidable") | under DECISION-047's build re-applied, the two E5 false positives do not appear and derivation is not worse; the estimator/oracle ratio per take does not fall | **spent, iteration 4** (DECISION-048): retracted openings struck out; derivation fp 223 → 211, extras 281 → 271, missed 114 → 114, amped slow 188 → 182; estimate / labels 0.85 → 0.96 at the median. The E5 stubs' bars read 133 and 140ms (were 113 and 100). C11 re-run next |
 | C13 | A sharpness ceiling on the CONTACT opening for DECISION-046: the two moves that cost something on held-out had a broadband transient of sharpness 9.9 and 12.8 at the "contact" (a mic sixteenth at 140bpm, a mic strum), the direct-input contacts read 0.5–6.6. A contact does not scrape. Read on held-out material, so not a constant this iteration | tracker | DECISION-046 (d) | derived on the DERIVATION predicate alone: an edge between the DI contacts and the loudest derivation openings the rule moves; then held-out read once — `lead-line-sixteenths` missed 10 → 8 is the prediction | open — derive, do not tune |
 
 ## Owner-side blockers (living)
@@ -478,3 +478,61 @@ refused before announcement by bars that already exist.
   pace estimator's cliff on bimodal gaps, with a reproduction). No new
   blockers.
 - Exit rule: continue. C14 next, then C11 again, then C12.
+
+### Iteration 4 — 2026-09-18 — KEPT — the pace estimate strikes out openings that never became Notes
+
+- Candidate: **C14**, opened by iteration 3: `localIoiMs` counts every
+  opening, and on the E5 take half the gaps in its window are pieces of a
+  250ms eighth cut by a contact stub or a dropped fragment, so the median
+  sits on a cliff. Nearest closed relative: DECISION-030 (e), a lower
+  percentile and a two-pass re-estimate, which "fixed the bias without
+  improving the end-to-end trade". The difference: not choosing among the
+  pieces, but removing them once the tracker knows they were pieces.
+- Falsifier, stated before measuring: derivation missed, false positives
+  and extras not up; slow subset not worse on either path; held-out read
+  once; the two E5 stubs at 15907 and 16147ms keep a bar a 67ms move cannot
+  bring under them.
+- Built: `tracking.paceIgnoresRetracted` (true) in `config.ts`; openings
+  kept with ids and `retractOpening()` at the four absorption sites and the
+  unannounced drop in `end()`, `note-tracker.ts`; the tracker's pace reading
+  added to the `rearticulation` trace event; `tests/engine/pace-retracted.test.ts`
+  (3 tests). Gate false is bit-identical to iteration 2's commit.
+- Sweep (derivation predicate: not 140bpm): a boolean, off / on → fp 223 /
+  211, extras 281 / 271, split 225 / 219, missed 114 / 114, slow DI 30 / 30,
+  amped+mic 158 / 152.
+- Numbers, before → after:
+    slow subset      DI 34/36 → 34/36     amped+mic 188/243 → 182/232     total 222/279 → 216/268
+    corpus           295 / 357 / 18 → 289 / 346 / 19
+    tail fragments   246 / 0 / 23 → 235 / 0 / 23 (extras 269 → 258)
+    ledger MISSED    141 → 141, no fixture moved
+    by material      derivation missed 114 → 114, fp 223 → 211, extras 281 → 271; held-out missed 27 → 27, fp 67 → 66, extras 76 → 75 (read once, after)
+    eval             PASS; required 0 failures; informational the one pre-existing
+    consumer view    not retracting — fragments the longer bar holds are never announced
+    tests            528 passing (525 + 3)
+- Per take: quarters amped 50 → 46 of 72, fp 77 → 69; held-then-picked
+  amped 47 → 46, fp 52 → 50; E5 amped and DI one phantom fewer each; A3
+  eighths amped 56 → 55 with one more stray (a 93ms Note at 2133ms, the
+  take's first gap, where the estimator abstains by design). DI column
+  unchanged.
+- The estimate against the labels' local interval (new instrument, the
+  `localIoiMs` on the trace): off p10 0.37 / med 0.85 / p90 1.09, on 0.48 /
+  0.96 / 1.17 over 1,235 same-pitch re-articulations on derivation. The
+  quarters amped take stays at 0.47 because its phantoms are announced and
+  stay in the estimate.
+- Verdict and why: kept. Every falsifier line passes with margin, it is the
+  first move on the amped column since DECISION-030, and the E5 stubs' bars
+  read 133 and 140ms against their 80 and 93ms, which a 67ms move cannot
+  reach.
+- What a GOATerizer player would notice: **through an amp**, on quarter
+  notes at 120bpm, four fewer of 72 events split and eight fewer phantom
+  Notes reach the game; on the held-then-picked passage one fewer. **On a
+  direct input**, nothing changes; the remaining DI splits are timing
+  shapes this bar does not act on.
+- Findings section: "The pace estimate reads the openings that never became
+  Notes, and striking them out is the first move on the amped column since
+  DECISION-030"; DECISION-048; commit on `claude/project-thread-46x8sd`.
+- Ledger changes: C14 spent. Two observations recorded in the findings and
+  not acted on: `RATE_PERCENTILE`'s comment describes a low percentile and
+  the value is the median; the span bars now act on an estimate 13% longer
+  than the one they were tuned on, a §6.6 sweep not run.
+- Exit rule: continue. C11 re-run on the corrected estimate next, then C12.

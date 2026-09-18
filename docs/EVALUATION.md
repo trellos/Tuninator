@@ -40,7 +40,7 @@ any number below means anything.
 | `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 39 | 12 | 72.9% | 72.9% | 18ms |
 | `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 62 | 1 | — | — | — |
 | `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 64 | 2 | — | — | — |
-| `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 80 | 0 | — | — | — |
+| `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 79 | 0 | — | — | — |
 
 The three triplet takes score no accuracy because every section of them is marked informational in
 `fixtures/eval.config.json`; the gated subset is empty by configuration, so the check is reported
@@ -59,7 +59,7 @@ inside its gates — of the 22 takes that score it, nine have a median absolute 
   losses are downstream of the evidence, not in it: the onset kernel covers 44, 44 and 47 of the
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.
-- **Fast single-note lines also produce extra Notes.** The triplet takes emit 62–80 Notes for 55
+- **Fast single-note lines also produce extra Notes.** The triplet takes emit 62–79 Notes for 55
   labels. `npx tsx scripts/measure-splits.ts` puts the 17 scored takes at 86 of 459 events split
   with 94 extra Notes, and 49 of those 86 are the three triplet takes. The shape is one thing: a
   correctly-named Note followed by a short SAME-PITCH tail fragment, so a single played event
