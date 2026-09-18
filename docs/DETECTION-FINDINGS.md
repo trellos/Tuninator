@@ -6399,3 +6399,113 @@ with the estimate reading 0.85 of the truth. At 0.96 they are effectively
 13% longer, and derivation missed did not move, so they hold; but a sweep
 of `rateFragmentSpanFraction` under the corrected estimate is the tuning
 pass §6.6 allows on a kept mechanism, and it was not run here.
+
+## The refused-contact burst rule, re-run on the corrected pace estimate: the estimator holds, and the score still cannot see the moves
+
+DECISION-044's loop, iteration 5; DECISION-049. Built again, measured,
+reverted again. DECISION-048 removed the reason DECISION-047 gave for the
+score reading worse, and the score reads the same rule the same way for
+two other reasons, both now named.
+
+### The falsifier, stated before the pipeline ran
+
+The same as iteration 3's, since the mechanism is the same: derivation
+slow DI split down by at least 6 of the 9 refused-contact events; derivation
+missed and false positives not up; chord takes bit-identical; held-out read
+once after the bar was chosen. The bar was 1.2 and only 1.2, because
+iteration 3's sweep at 1.0 / 1.1 / 1.2 / 1.3 was flat — every refused
+contact reads under 1.0 — and a second sweep would have answered a question
+the record already answers.
+
+### What was built
+
+DECISION-047's build, character for character: `tracking.burstContactRiseRatio`
+(0 = off) and the branch at the split's backdate site in step (a) of the
+tracker, with the two soft-click tests. Reverted to bit-identical; the
+tests went with the code.
+
+### Numbers, before → after (derivation predicate "not 140bpm", bar 1.2)
+
+    slow subset      DI 30 → 30 of 327; quarters DI 8 → 7, E5 eighths DI 9 → 8, held-then-picked DI 8 → 10
+    corpus (deriv)   split 219 → 218, extras 271 → 271, strays 9 → 9, missed 114 → 116, fp 211 → 211, |onset| p90 95 → 93
+    chord takes      cowboy-chords derivation take split 3 → 2, fp 4 → 3 (not bit-identical; better)
+    held-out (once)  split 70 → 69, extras 75 → 73, fp 66 → 64, missed 27 → 27, |onset| p90 67 → 63
+
+Against iteration 3 at the same bar: slow DI was 33, missed 116, fp 225,
+E5 DI 11. The two E5 false positives DECISION-047 traced to the tipped
+estimate (`announceBarMs` 113 → 80) are gone — the E5 DI take reads 2
+false positives on and off, its stubs' bars now 133 and 140ms — so
+DECISION-048 did what it was kept for. What is left is the two overlap
+credits from iteration 3 (`e843`, `p2c3q4`, missed 114 → 116, unchanged in
+mechanism) and a held-then-picked DI take that reads 8 → 10 split events
+while the rule moved its boundaries right. That take is the whole of the
+falsifier's first line, and it was read label by label.
+
+### The split instrument reads a chain of early boundaries as a split on whichever label ends up holding two Notes
+
+`measure-splits.ts` charges to a label every Note that starts inside the
+label's span, reaching 40ms ahead of it so a Note a little early is still
+its own. A Note 67ms early — the contact-opened shape — is past the reach,
+so it is charged to the label BEFORE it. On the held-then-picked DI take
+the re-picks are all of that shape, so before the rule each label held
+its successor's early Note and not its own, one Note each, and the split
+count was the four places where two early Notes met. The rule moved the
+boundaries the refused-contact shape produces onto the release; those
+labels now hold their own Note — and still the next pick's early Note,
+where the next pick's contact is a shape the rule does not reach (a
+release on a gated hop, or past the 80ms window: ledger C12). Every one of
+the six labels that became "split" is a label whose own boundary is now
+right and whose successor's is still wrong: `p1c1q3`, `p1c2q2`, `p1c2q3`,
+`p1c3q2`, `p1c4q3`, `p2c2q4`. Four labels stopped reading as split for the
+mirror reason: `p1c2q1`, `p1c3q1`, `p2c3q2`, `p2c4q1`, each of which had
+held two early Notes and now holds one. Net, 8 → 10: the count on this take is the number of chain
+positions still wrong, and fixing a boundary in the middle of a chain moves
+the charge to its neighbour without removing it. The count is not wrong —
+the consumer does see two Notes inside that label's span — but it cannot
+credit a rule that fixes one shape while the neighbouring shape stands, and
+the falsifier was written as if it could.
+
+### One moved start opens a 67ms window in which a transient is read against the rolling baseline instead of the decay fit
+
+`p1c2q3` reads three Notes, and the third is new. At 9213ms a transient
+inside the held note is accepted as a `sharpness` re-articulation; with the
+rule off, the same transient at the same moment was refused
+`ring-out-not-sharp`. Nothing about the transient changed. What changed is
+the Note's age: `rearticulation.ts` sends a transient to the ring-out
+branch — the decay-fit test, with the stricter `restrumSharpness` and
+`ringOutFluxRatio` bar — only once `soundedMs >= ringOutMs` (250). With the
+Note opened at the contact (8920) the transient arrived at 280ms of age and
+went to the ring-out branch; with the Note opened at the release (8987) it
+arrived at 213ms and went to the rolling-baseline sharpness test, which
+accepted it. The ring-out clock runs from the Note's start, so every
+boundary this rule moves later by 67ms also delays the ring-out branch by
+67ms, and a transient in that window that the decay fit would have refused
+is read by the test that shed "a run of new Notes after the phrase had
+ended" before the ring-out branch existed. The same holds for every
+boundary DECISION-046 moves at the unsettled-Note and absorbed-stub sites;
+whether it cost anything there was not read, and is the first thing ledger
+row C15's falsifier asks. The physical string was excited at the contact,
+so the decay the ring-out test fits began there; the clock the branch reads
+should probably be the burst's first attack, not the Note's start.
+
+Beside those three Notes the region lane emitted its own, 8920–9181, opened
+at the contact, its prefix claim on the fast-lane Note declined
+`prefix:region-attack`. With the boundary on the contact the two lanes
+agreed on one Note; with the fast-lane Note starting 67ms later they do
+not. It is the fold DECISION-046 met on the held-out mic sixteenths take,
+read on a derivation take for the first time.
+
+### Verdict
+
+Reverted, for the second time. The falsifier's first line fails at 30 → 30,
+its second at missed +2, and the chord takes are not bit-identical (better,
+by one phantom on the cowboy take, but the line said identical). The
+mechanism is unchanged from iteration 3 and its moves are iteration 3's;
+what this iteration adds is that the estimator was not the only thing in
+the way. The score cannot credit the rule until the neighbouring shape
+(C12) is fixed, because the split instrument charges chains, and the rule
+should not ship until the ring-out clock is anchored to something a
+boundary move does not shift (C15), because the moved start reopened the
+rolling-baseline test on a held note. C11 is spent; it is not the next
+mechanism to build, it is the one that will read clean once C12 and C15
+have.

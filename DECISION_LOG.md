@@ -6,6 +6,67 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-049]: The refused-contact burst rule is NOT shipped on the corrected pace estimate either — the estimator now holds, and the score cannot see the moves through the split instrument's chain reading and a ring-out clock that runs from the moved start
+* **Date:** 2026-09-18
+* **Status:** Rejected (built, measured, reverted — DECISION-044's loop, iteration 5; second build of DECISION-047's rule)
+* **Owner:** Detection architecture
+* **Context:** DECISION-047 reverted the rule because one 67ms boundary
+  move tipped the pace estimate 227 → 160ms and announced two 80ms stubs.
+  DECISION-048 struck retracted openings from that estimate and left the
+  rule to be re-run. `docs/DETECTION-FINDINGS.md`, "The refused-contact
+  burst rule, re-run on the corrected pace estimate".
+* **Decision:** Not shipped. DECISION-047's build, character for character
+  (`tracking.burstContactRiseRatio` at the split's backdate site in step
+  (a)), measured at 1.2 only — iteration 3's sweep was flat from 1.0 to
+  1.3 — and reverted to bit-identical. Derivation: slow DI split 30 → 30 of
+  327 (quarters 8 → 7, E5 9 → 8, held-then-picked 8 → 10), missed
+  114 → 116, false positives 211 → 211, extras 271 → 271, the cowboy chord
+  take one phantom better; held-out, read once: split 70 → 69, false
+  positives 66 → 64, missed 27 → 27. Against the same falsifier as
+  iteration 3 ("down by at least 6 of the 9, neither up, chord takes
+  bit-identical") the first line fails, the second fails on the same two
+  overlap credits as before (`e843`, `p2c3q4`), the third on the letter.
+  The estimator held: the E5 take's two DECISION-047 false positives do not
+  return (stubs' bars 133 and 140ms). Two other things stand between the
+  moves and the score. (1) `measure-splits.ts` charges a Note 67ms early to
+  the label before it, so on the held-then-picked DI take, where every
+  re-pick opens early, a label reads split when two early Notes meet; the
+  rule fixes the refused-contact positions in that chain and the charge
+  moves to the six neighbours whose own boundary is a shape the rule does
+  not reach (C12), 8 → 10 with every moved boundary right. (2) The ring-out
+  branch of `rearticulation.ts` is reached at `soundedMs >= ringOutMs`
+  (250), and `soundedMs` runs from the Note's start: on `p1c2q3` a transient
+  at 9213ms that reached the ring-out branch at 280ms of age (refused
+  `ring-out-not-sharp`) reaches the rolling-baseline test at 213ms once the
+  start is on the release, and is accepted as a third Note. Every boundary
+  moved 67ms later delays the ring-out branch by 67ms; DECISION-046's moves
+  do the same and were not read for it.
+* **Alternatives Considered:** (a) **Keeping it, since the moves are right
+  and the score's failure is the instrument's** — rejected: the third Note
+  on `p1c2q3` is a real phantom the move created, not an instrument
+  artefact, and the loop's bar is the score. (b) **Rewriting the split
+  instrument to charge chains fairly** — rejected here: the count is not
+  wrong (the consumer does see two Notes in that span); the falsifier was
+  wrong to expect it to move before the neighbouring shape is fixed. (c)
+  **Anchoring the ring-out clock to the burst's first attack in the same
+  iteration** — rejected: a second mechanism in one iteration, with its own
+  falsifier (ledger C15), and it applies to DECISION-046's moves first.
+  (d) **A third build of this rule after C12 and C15** — the record's
+  position: not the next mechanism, the one that reads clean once those
+  two have; re-running it a third time before then answers nothing new.
+* **Consequences:** Positive — the pace estimator is confirmed fixed for
+  the case it was fixed for; the split instrument's chain reading is
+  named, so the held-then-picked count is now read as "chain positions
+  still wrong" rather than as a verdict on any one rule; and the ring-out
+  clock's dependence on the Note's start is a measured coupling with a
+  reproduction (held-then-picked DI, 9213ms, `soundedMs` 280 → 213) that
+  any boundary-moving rule, DECISION-046 included, must answer. Negative —
+  the engine is unchanged for a second iteration on this shape; the
+  held-then-picked DI passage still starts its refused-contact re-picks on
+  the pick's landing.
+
+---
+
 
 #### [DECISION-048]: The local-rate estimate strikes out an opening once its Note is absorbed or dropped unannounced
 * **Date:** 2026-09-18

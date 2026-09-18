@@ -184,10 +184,11 @@ is half a beat short at the median.
 | C9 | DI: the `envelope-rise` acceptance. On the outcome-shaped population, DI takes only, read `riseRatio` and `rms / sustainedRms` at the phantoms against the real re-picks; then whether a note past `ringOutMs` with a trustworthy decay fit should reach the ring-out branch instead of the rolling-baseline test | fast | the sweep that set `rearticulationRiseRatio` 1.2 (swept DOWN on the five originals for sensitivity; raising it was not the question asked); "Hypotheses tested and rejected" rows on `restrumSharpness` | separation ≥ 0.80 AUC on DI rows, then a bar that removes DI fragments at +0 missed on derivation | **spent, iteration 1**: `riseRatio` 0.909 on emitted DI rows (0.502 amped); shipped as the rate gate's second witness, DECISION-045, at +1 on an overlap credit; the emitted DI phantoms are `sharpness`-accepted, not `envelope-rise` |
 | C9b | A PROSPECTIVE bar on the predecessor's age over the local interval, so the fragment is refused rather than opened | tracker | DECISION-030 (announce bar on the fragment's own span) | 0.80 AUC on the outcome-shaped population | **closed, iteration 1**: 0.45–0.55 AUC on every population; the predecessor is a normal-length note |
 | C10 | The DI slow splits the no-rise witness stops at: the E5 take's 13 survivors read rise 0.8–1.0 against real re-picks from 1.01, the quarters DI take's 9 are `fine-onset` and near-unity rise. A witness other than the envelope's level (C2a/C2b band-limited, or the owner's own recordings) | fast | DECISION-045 (rise bar at 0.9 costs three real re-picks whose predecessor was still loud) | DI slow split below 42 of 365 at +0 missed; amped not worse | **spent, iteration 2**: the survivors were a TIMING error, not phantoms — 27 of 35 open on the pick's contact, 45–70ms before the release the labels sit on. DECISION-046 moves the boundary; slow DI 35 → 30 on derivation at +0 missed, amped one extra better. What is left is C11–C13 |
-| C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | **built and reverted, iteration 3** (DECISION-047): 22 of 23 boundaries land within 33ms of their labels, score worse (slow DI 30 → 33, missed +2, fp +2) through C14 and two overlap credits. Re-run after C14 |
+| C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | **built and reverted, iteration 3** (DECISION-047): 22 of 23 boundaries land within 33ms of their labels, score worse (slow DI 30 → 33, missed +2, fp +2) through C14 and two overlap credits. **Re-run and reverted, iteration 5** (DECISION-049): the estimator holds (E5 fp 2 → 2), slow DI 30 → 30, missed +2 on the same two overlap credits, held-out fp 66 → 64; the held-then-picked take reads 8 → 10 because `measure-splits.ts` charges a Note 67ms early to the label before it and the rule moves the charge along the chain to the C12 shapes; and one moved start reopened the rolling-baseline test on a held note (C15). Spent: reads clean only after C12 and C15 |
 | C12 | The release arriving on a hop the amplitude gate refuses (`gated`): the muted string is under `analysis.rmsGate` when the release begins, `rearticulation.ts` never sees it, the Note keeps the contact. 3 of the 30; plus 1 at 80ms, the edge of the window DECISION-046 reuses from `transient.articulationMs`, and 2 inside the window and over the bar that did not move (`a3`, `e830`), unread | tracker | DECISION-046; C7 (lowering the gate turns gated misses into splits, so the gate is not the lever) | the 3 + 1 + 2 fall at +0 derivation missed | open |
 | C14 | The pace estimator's cliff: `localIoiMs` is the median of the last eight opening gaps, and on material whose gaps sit in two clusters (the E5 take: eighths ~227ms, sixteenths ~120ms) one gap shortened by a 67ms boundary move tips it 227 → 160ms, so every bar denominated in it — DECISION-030's 0.35, DECISION-045's 0.5 — moves by a third. Reproduction: E5 DI take, 15907ms, `announceBarMs` 113 → 80 under DECISION-047's build. Candidates: gaps read from ATTACK times (which a boundary move does not change) rather than Note openings; a percentile or trimmed median that one gap cannot tip; or the bar denominated in the predecessor's own length | tracker | DECISION-030 (the estimator as built), DECISION-037 (estimator / oracle ratio "not yet decidable") | under DECISION-047's build re-applied, the two E5 false positives do not appear and derivation is not worse; the estimator/oracle ratio per take does not fall | **spent, iteration 4** (DECISION-048): retracted openings struck out; derivation fp 223 → 211, extras 281 → 271, missed 114 → 114, amped slow 188 → 182; estimate / labels 0.85 → 0.96 at the median. The E5 stubs' bars read 133 and 140ms (were 113 and 100). C11 re-run next |
 | C13 | A sharpness ceiling on the CONTACT opening for DECISION-046: the two moves that cost something on held-out had a broadband transient of sharpness 9.9 and 12.8 at the "contact" (a mic sixteenth at 140bpm, a mic strum), the direct-input contacts read 0.5–6.6. A contact does not scrape. Read on held-out material, so not a constant this iteration | tracker | DECISION-046 (d) | derived on the DERIVATION predicate alone: an edge between the DI contacts and the loudest derivation openings the rule moves; then held-out read once — `lead-line-sixteenths` missed 10 → 8 is the prediction | open — derive, do not tune |
+| C15 | The ring-out clock runs from the Note's START: `rearticulation.ts` reaches the decay-fit branch at `soundedMs >= ringOutMs` (250), so a boundary moved 67ms later (DECISION-046 at two sites, C11 at a third) delays that branch by 67ms and a transient in the window is read by the rolling-baseline test instead. Reproduction: held-then-picked DI, 9213ms, `soundedMs` 280 → 213, `ring-out-not-sharp` → `sharpness`, a third Note on `p1c2q3`. Candidate: the clock the ring-out branch reads is the burst's first attack (the contact, where the string was excited and the decay the fit measures began), not the moved start | fast + tracker | DECISION-049; DECISION-046 (the moves it applies to first); the ring-out branch itself (`ringOutMs`) | first read, no build: on the derivation DI takes at the shipped engine, the `sharpness` acceptances 250–320ms after a moved start against those after an unmoved start, per take; then the anchored clock at +0 derivation missed, fp not up, and the E5 / held-then-picked DI phantom counts down by the number that read | open — read first |
 
 ## Owner-side blockers (living)
 
@@ -536,3 +537,71 @@ refused before announcement by bars that already exist.
   the value is the median; the span bars now act on an estimate 13% longer
   than the one they were tuned on, a §6.6 sweep not run.
 - Exit rule: continue. C11 re-run on the corrected estimate next, then C12.
+
+### Iteration 5 — 2026-09-18 — REVERTED — the refused-contact burst rule re-run on the corrected pace estimate: the estimator holds, the score still cannot see the moves
+
+- Candidate: **C11** again, as DECISION-048 left it ("re-run after C14").
+  Nearest closed relative: DECISION-047, the same build; the difference is
+  the estimator under it, which a 67ms boundary move can no longer tip.
+- Falsifier, stated before measuring: iteration 3's, unchanged —
+  derivation slow DI split down by at least 6 of the 9; derivation missed
+  and false positives not up; chord takes bit-identical; held-out read
+  once after the bar was chosen. Bar 1.2 only, since iteration 3's sweep
+  was flat from 1.0 to 1.3.
+- Built: DECISION-047's build character for character —
+  `tracking.burstContactRiseRatio` (0 = off) in `config.ts`, the branch at
+  the split's backdate site in step (a) of `note-tracker.ts`, the two
+  soft-click tests. Reverted to bit-identical (`git diff -- src/` empty
+  against the iteration 4 commit); the tests went with the code.
+- Sweep (derivation predicate: not 140bpm): 1.2 only → slow DI 30 of 327
+  (off: 30), missed 116 (114), fp 211 (211), extras 271 (271), split 218
+  (219), |onset| p90 93 (95).
+- Numbers, before → after: unchanged (reverted). At 1.2 for the record:
+    slow subset      DI 30 → 30 of 327 on derivation; quarters DI 8 → 7, E5 eighths DI 9 → 8, held-then-picked DI 8 → 10; amped+mic unchanged
+    chord takes      cowboy-chords derivation take split 3 → 2, fp 4 → 3; the rest bit-identical
+    by material      derivation missed 114 → 116 (`e843`, `p2c3q4`, the same overlap credits as iteration 3), fp 211 → 211; held-out (read once) split 70 → 69, extras 75 → 73, fp 66 → 64, missed 27 → 27, |onset| p90 67 → 63
+    eval             not run at 1.2 (reverted before verification); PASS at the head, unchanged from iteration 4
+    tests            528 (the two added tests removed with the build)
+- What DECISION-048 bought: the two E5 false positives DECISION-047 traced
+  to the tipped estimate do not return; the E5 DI take reads 2 on and
+  off, its stubs' bars 133 and 140ms. Against iteration 3 at the same
+  bar: slow DI 33 → 30, fp 225 → 211, E5 DI 11 → 8.
+- Why the held-then-picked take reads 8 → 10 with every boundary the rule
+  touched moved right: `measure-splits.ts` reaches 40ms ahead of a label,
+  so a Note 67ms early is charged to the label before it; on this take
+  every re-pick opens early, a label reads split where two early Notes
+  meet, and fixing the refused-contact positions moves the charge along
+  the chain to the six neighbours whose own boundary is a C12 shape
+  (`p1c1q3`, `p1c2q2`, `p1c2q3`, `p1c3q2`, `p1c4q3`, `p2c2q4` gained;
+  `p1c2q1`, `p1c3q1`, `p2c3q2`, `p2c4q1` cleared). The count is the number
+  of chain positions still wrong, not a verdict on the rule.
+- Why one of those is a real phantom: `p1c2q3` reads three Notes, the
+  third accepted `sharpness` at 9213ms where the same transient was refused
+  `ring-out-not-sharp` before. The ring-out branch is reached at
+  `soundedMs >= ringOutMs` (250) and `soundedMs` runs from the Note's
+  start: 280ms with the start on the contact, 213ms with it on the
+  release. Every moved boundary delays the ring-out branch by the move;
+  DECISION-046's moves do the same and were not read for it. The region
+  lane also emits its own contact-opened Note beside the moved one there
+  (`prefix:region-attack` declined), the fold seen on held-out in
+  iteration 2, now on a derivation take.
+- Verdict and why: reverted. The falsifier fails on its first line
+  (30 → 30), its second (missed +2) and, on the letter, its third; the
+  moves are right and the score has two things in front of it besides the
+  estimator, both now named and one of them (the ring-out clock) a real
+  phantom the move creates.
+- What a GOATerizer player would notice: nothing changed. On a direct
+  input the held-then-picked passage still begins its refused-contact
+  re-picks on the pick's landing. Through an amp, nothing.
+- Findings section: "The refused-contact burst rule, re-run on the
+  corrected pace estimate: the estimator holds, and the score still cannot
+  see the moves"; DECISION-049 (rejected); commit on
+  `claude/project-thread-46x8sd`.
+- Ledger changes: C11 spent (reads clean only after C12 and C15); C15
+  added (the ring-out clock runs from the Note's start; read first on
+  DECISION-046's moves, then anchor it to the burst's first attack). No
+  new blockers.
+- Exit rule: continue. One built-and-reverted iteration since a kept one,
+  and C12 and C15 are open with stated falsifiers. C12 next (the release
+  on a gated hop; its shapes are the chain positions C11 cannot reach),
+  then C15's first read.
