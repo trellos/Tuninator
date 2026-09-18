@@ -26,6 +26,15 @@
  * Usage:
  *   npx tsx scripts/measure-splits.ts
  *   npx tsx scripts/measure-splits.ts --detail      per-label breakdown
+ *   npx tsx scripts/measure-splits.ts --subset=slow  quarters and eighths only (see SUBSETS)
+ *   npx tsx scripts/measure-splits.ts --fixtures=<regex> --ids=<regex>
+ *                                                   any other slice: fixture stems and
+ *                                                   label ids matching both regexes
+ *
+ * A filter narrows which LABELS are reported. Ownership is assigned over the
+ * whole take first, so a Note is still charged to the event it began under
+ * even when that event is outside the slice; the slice only decides which
+ * events are counted and printed. Strays are per take and are not sliced.
  */
 
 import { readFileSync } from "node:fs";
@@ -54,6 +63,64 @@ import { decodeFixtures } from "./decode-fixtures.js";
 export const ONSET_TOLERANCE_MS = 40;
 /** How long after a label ends a Note may begin and still be counted against it. */
 export const ORPHAN_GAP_MS = 400;
+
+/**
+ * Named slices of the corpus, as `--subset=<name>`.
+ *
+ * `slow` is the quarter- and eighth-note material — the notes a rhythm game's
+ * tutorial asks for, and the ones the owner reports splitting in play. The
+ * rule is per fixture because the takes mix subdivisions in one file and the
+ * label ids carry the section: on the three lead-line takes `q*` and `e*` are
+ * the 13 quarters and 18 eighths and `t*` the triplets; on the two same-pitch
+ * eighths takes `e*` is the eighth section and `s16*` the sixteenths;
+ * `clean-lead`'s `q*` is its quarter section. The quarters and
+ * held-then-picked takes are slow throughout. Chord takes are strummed at
+ * quarter spacing too but are a different phenomenon and are left out. A
+ * fixture not listed contributes nothing to the slice. 754 labels as of
+ * 2026-09-18; `docs/slow-note-splits-loop-log.md` carries the baseline.
+ */
+const SUBSETS: Record<string, ReadonlyArray<{ fixtures: RegExp; ids: RegExp }>> = {
+  slow: [
+    { fixtures: /^lead-line-.*quarter-eighth-triplet/, ids: /^(q|e)/ },
+    { fixtures: /^clean-lead-120bpm$/, ids: /^q/ },
+    { fixtures: /^same-pitch-quarters-a3-e5-120bpm/, ids: /./ },
+    { fixtures: /^same-pitch-eighths-a3-120bpm/, ids: /^e/ },
+    { fixtures: /^same-pitch-eighths-sixteenths-e5-120bpm/, ids: /^e/ },
+    { fixtures: /^held-then-picked-six-strings-120bpm/, ids: /./ },
+  ],
+};
+
+type LabelFilter = (stem: string, id: string) => boolean;
+
+/** The `--subset`, `--fixtures` and `--ids` arguments as one predicate. */
+function labelFilter(argv: readonly string[]): LabelFilter | null {
+  const value = (flag: string): string | undefined =>
+    argv.find((a) => a.startsWith(`${flag}=`))?.slice(flag.length + 1);
+  const subsetName = value("--subset");
+  const fixtures = value("--fixtures");
+  const ids = value("--ids");
+  if (subsetName === undefined && fixtures === undefined && ids === undefined) return null;
+
+  let subset: ReadonlyArray<{ fixtures: RegExp; ids: RegExp }> | null = null;
+  if (subsetName !== undefined) {
+    subset = SUBSETS[subsetName] ?? null;
+    if (subset === null) {
+      throw new Error(`unknown --subset "${subsetName}"; known: ${Object.keys(SUBSETS).join(", ")}`);
+    }
+  }
+  const fixtureRe = fixtures === undefined ? null : new RegExp(fixtures);
+  const idRe = ids === undefined ? null : new RegExp(ids);
+
+  return (stem, id) => {
+    if (fixtureRe !== null && !fixtureRe.test(stem)) return false;
+    if (idRe !== null && !idRe.test(id)) return false;
+    if (subset !== null) {
+      const rule = subset.find((r) => r.fixtures.test(stem));
+      if (rule === undefined || !rule.ids.test(id)) return false;
+    }
+    return true;
+  };
+}
 
 /**
  * The ownership rule, extracted so `build-relabel-kit.ts` charges extra Notes
@@ -86,6 +153,8 @@ type LabelRow = {
 type FixtureRow = {
   stem: string;
   labels: LabelRow[];
+  /** Labels in the whole take, before any `--subset`/`--ids` slice. */
+  wholeTakeLabels: number;
   strays: number;
   /**
    * The same question asked the other way: how many Notes were sounding at any
@@ -144,7 +213,14 @@ function measure(): FixtureRow[] {
       }
     }
 
-    rows.push({ stem: fixture.stem, labels, strays, overlapSplit, overlapExtras });
+    rows.push({
+      stem: fixture.stem,
+      labels,
+      wholeTakeLabels: labels.length,
+      strays,
+      overlapSplit,
+      overlapExtras,
+    });
   }
 
   return rows;
@@ -152,9 +228,24 @@ function measure(): FixtureRow[] {
 
 function main(): void {
   const detail = process.argv.includes("--detail");
-  const rows = measure();
+  const filter = labelFilter(process.argv);
+  let rows = measure();
+
+  if (filter !== null) {
+    // Slice AFTER ownership: every Note has already been charged to the event
+    // it began under, so narrowing the labels reported cannot move a Note onto
+    // a different event. Takes with no label in the slice drop out entirely.
+    rows = rows
+      .map((row) => ({ ...row, labels: row.labels.filter((l) => filter(row.stem, l.id)) }))
+      .filter((row) => row.labels.length > 0);
+    process.stdout.write(
+      `  slice: ${process.argv.filter((a) => /^--(subset|fixtures|ids)=/.test(a)).join(" ")}\n` +
+        `  (strays and the overlap-rule line are per whole take, not sliced)\n\n`
+    );
+  }
 
   let totalLabels = 0;
+  let totalWholeTakeLabels = 0;
   let totalSplit = 0;
   let totalExtras = 0;
   let totalStrays = 0;
@@ -175,6 +266,7 @@ function main(): void {
     const extras = row.labels.reduce((sum, l) => sum + Math.max(0, l.notes.length - 1), 0);
     const fixtureWorst = Math.max(0, ...row.labels.map((l) => l.notes.length));
     totalLabels += row.labels.length;
+    totalWholeTakeLabels += row.wholeTakeLabels;
     totalSplit += split;
     totalExtras += extras;
     totalStrays += row.strays;
@@ -209,7 +301,8 @@ function main(): void {
     `TOTAL: ${totalSplit} of ${totalLabels} events split, ${totalExtras} extra Notes ` +
       `(worst single event ${worst} Notes, ${totalStrays} strays)\n` +
       `       counting every Note that overlaps a label instead: ` +
-      `${totalOverlapSplit} of ${totalLabels} split, ${totalOverlapExtras} extra Notes\n`
+      `${totalOverlapSplit} of ${totalWholeTakeLabels} split, ${totalOverlapExtras} extra Notes` +
+      `${filter === null ? "" : " (whole takes)"}\n`
   );
 }
 

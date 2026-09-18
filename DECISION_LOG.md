@@ -7,6 +7,72 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-044]: The same-pitch split is worked as a loop, judged on a quarters-and-eighths subset per signal path, with a journal as the hand-off between sessions
+* **Date:** 2026-09-18
+* **Status:** Proposed
+* **Owner:** Project owner (the loop is his to run); brief and baseline by detection architecture
+* **Context:** The owner's consumer, a rhythm game, runs Tuninator on a phone
+  microphone in front of an amped guitar and reports that during its tutorial
+  slow notes — quarters and eighths — split, so a note played on time reads as
+  a short Note followed by another. In this repository that is the same-pitch
+  tail fragment DECISION-027 through DECISION-037 measured, but every ceiling
+  study read it on the whole corpus or on the sixteenth-note takes, never on
+  the slow material as a population of its own. Measured on `main` at
+  `1c5e632`, the slow material splits 52 of 365 events on the direct input
+  and 189 of 389 through an amp sim or a room mic; on the amped quarters take
+  the first Note of a split pair ends 237ms early at the median, which is the
+  duration the game reads. The record's per-boundary threshold family is
+  exhausted (DECISION-028), one phrase-level gate shipped at zero cost
+  (DECISION-030), and the record itself names what is untested: a sequence
+  decoder over EVENTS in the deep lane, a re-pick witness that survives
+  compression, a classifier judged on the outcome-shaped target
+  (DECISION-032), and two small named measurements. No phone-microphone
+  material exists in the corpus.
+* **Decision:** Work the defect as a **loop of single-mechanism iterations**,
+  each a fresh session running `docs/slow-note-splits-loop-prompt.md`, with
+  `docs/slow-note-splits-loop-log.md` as the only state carried between
+  sessions: the baseline, every iteration's verdict in a fixed template, a
+  living candidate ledger and the owner-side blockers. The primary target is
+  the **slow subset** — `scripts/measure-splits.ts --subset=slow`, 754
+  quarter- and eighth-note labels defined per fixture by label-id in the
+  script header — scored per signal path, with the standing both-axes bar
+  unchanged: missed labels may not rise, corpus extras may not rise, eval must
+  pass, every constant swept on the derivation predicate. The loop's exit
+  rule is stated in the brief (§9): it ends when the subset no longer splits,
+  or when no candidate remains whose mechanism differs from a closed
+  direction and whose falsifier the record does not already answer, or when
+  everything left is blocked on the owner. The brief carries a table of every
+  closed direction with its number so an iteration cannot re-drive one
+  without saying in writing what is different.
+* **Alternatives Considered:** (a) **One long session** that researches,
+  builds and tunes until done — rejected: the record shows this decision is
+  where hypotheses are argued around rather than falsified, and a per-iteration
+  write-up with a stated falsifier is the discipline that produced the only
+  zero-cost gain. (b) **Judging on the corpus totals as before** — rejected: the
+  totals are dominated by 1,131 same-pitch events including sixteenths, and a
+  change can move them without touching what the owner's players play; the
+  subset is reported beside the totals, never instead of them. (c) **Waiting
+  for phone-microphone material before starting** — rejected: the corpus
+  already reproduces the complaint on the amped renders, and the material is
+  requested in the journal as a transfer check rather than a precondition.
+  (d) **Building the tempo hint the consumer could supply** — deferred as a
+  product decision; the record bounds what a true clock is worth and it is not
+  the fix.
+* **Consequences:** Positive — the defect has a target that matches its
+  consumer, a reproducible baseline (`--subset=slow`, an instrument-only
+  change to `scripts/measure-splits.ts` that slices labels after ownership is
+  assigned and touches nothing under `src/`), a ranked list of what to try
+  with the falsifier shape for each, and a hand-off format that lets sessions
+  be short. Negative — nothing in the engine changed and the numbers stand
+  exactly where they did; the loop's value is entirely in what its iterations
+  measure. The subset's amped column rests partly on PROVISIONAL labels
+  (`docs/SAME-PITCH-MATERIAL.md`), so a gain there is a reading until the
+  label review lands; and the phone path remains unmeasured until the owner
+  records it, so transfer to the actual rig is an assumption the journal
+  states rather than a result.
+
+---
+
 #### [DECISION-043]: Publish from GitHub Actions on a release tag, with provenance; OIDC trusted publishing after a token-authenticated bootstrap
 * **Date:** 2026-09-16
 * **Status:** Accepted
