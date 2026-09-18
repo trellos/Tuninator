@@ -467,3 +467,78 @@ describe("a boundary the fast lane already has", () => {
     expect(out.filter((e) => e.type === "started")).toHaveLength(1);
   });
 });
+
+describe("the string under the hand", () => {
+  /**
+   * A note, then nine hops of the string half-stopped under the fretting
+   * hand — the level at a fifth of the note's, falling under the gate, the
+   * pitch gone on five of them — then
+   * the stroke that follows. The region's attack branch puts its boundary
+   * on the pick's contact at the start of the muted stretch and carves it
+   * as a Note of its own; see `tracking.prefixUnderHand`.
+   */
+  function underTheHand(prefixUnderHand: boolean): {
+    out: TrackerEmission[];
+    carvedFrom: number;
+    strokeStart: number;
+  } {
+    const engineConfig: EngineConfig = {
+      ...DEFAULT_ENGINE_CONFIG,
+      tracking: { ...DEFAULT_ENGINE_CONFIG.tracking, prefixUnderHand },
+    };
+    const tracker = new NoteTracker(new SampleClock(SAMPLE_RATE), engineConfig);
+    const emissions: TrackerEmission[] = [];
+    let index = 0;
+    const feed = (o: Parameters<typeof frame>[1], count: number): void => {
+      for (let i = 0; i < count; i++) {
+        for (const emission of tracker.process(frame(index++, o))) emissions.push(emission);
+      }
+    };
+    feed({ midi: 57, attack: true }, 1);
+    feed({ midi: 57 }, 19);
+    const carvedFrom = index * HOP_MS;
+    feed({ midi: 57, rms: 0.01 }, 4);
+    feed({ midi: null, rms: 0.004 }, 5);
+    const strokeStart = index * HOP_MS;
+    feed({ midi: 64, attack: true }, 1);
+    feed({ midi: 64 }, 19);
+    feed({ midi: null, rms: 0 }, 16);
+    const end = index * HOP_MS;
+    // The region reaches past the stroke, so both Notes are its candidates.
+    const out = tracker.applySegmentation(
+      segmentation([
+        segment(0, carvedFrom, 57, "regionStart"),
+        segment(carvedFrom, strokeStart, 57, "attack"),
+        segment(strokeStart, end, 64, "attack"),
+      ])
+    );
+    return { out, carvedFrom, strokeStart };
+  }
+
+  it("is the next stroke's preparation, whatever the region called its boundary", () => {
+    const { out, strokeStart } = underTheHand(true);
+    const absorbed = out.find(
+      (e) =>
+        e.type === "changed" &&
+        e.change.type === "structuralRevision" &&
+        e.change.relation === "absorbed"
+    );
+    expect(absorbed).toBeDefined();
+    if (absorbed?.type !== "changed") throw new Error("unreachable");
+    expect(absorbed.note.startTime).toBeCloseTo(strokeStart, 3);
+  });
+
+  it("stands as a Note of its own with the rule off", () => {
+    const { out, carvedFrom } = underTheHand(false);
+    expect(
+      out.filter(
+        (e) =>
+          e.type === "changed" &&
+          e.change.type === "structuralRevision" &&
+          e.change.relation === "absorbed"
+      )
+    ).toHaveLength(0);
+    const carved = out.filter((e) => e.type === "started").map((e) => e.note);
+    expect(carved.some((n) => Math.abs(n.startTime - carvedFrom) < 1)).toBe(true);
+  });
+});

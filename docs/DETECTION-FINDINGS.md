@@ -7429,3 +7429,100 @@ forward reach, which is the owner-side item DECISION-054 raised
 With C11 blocked on the same item, no open ledger row targets the
 direct-input column; C13, C22 (amped onsets) and C23 (a count first) are
 the amped column's and held-out sites'.
+
+## The string under the hand as the next stroke's preparation: the row's count found no site as written, and the shape it named stood twice under another refusal
+
+DECISION-044's loop, iteration 14; DECISION-058. Built, measured, kept.
+Ledger row C23 (spent, restated on the way), C26 (new).
+
+### The count, and what it did to the row
+
+C23 as the ledger had it: on the tuning takes, every carved prefix
+declined `prefix:unpitched` under DECISION-055, listed with what sounds
+under it, and a rule derived from those alone. The count is zero. Every
+prefix offer declined on the thirteen derivation takes, by reason:
+`trigger` 838, `stroke` 134, `too-long` 77, `region-attack` 35, `decided`
+13, `pitch` 1, `unpitched` 0. The row as written cannot be derived on the
+tuning takes; falsified by its count, cheaply, so the iteration went on
+to what the count did show.
+
+The shape the row named — a short Note between a note's end and the next
+stroke's release, the string half-stopped under the fretting hand, level
+fallen to the gate and the pitch gone on half the hops — stands twice on
+the tuning takes, both on the held-then-picked DI take: 17413–17507ms and
+41893–41987ms, 93ms each, declined `prefix:region-attack`. The region's
+attack branch had put the boundary at their start on the pick's contact
+(a broadband transient with a rise of 0.94 and 0.84 against the release
+bar of 2), and `offerPrefix` treats any attack boundary as a stroke by
+the region's account and does not offer the Note behind it.
+
+Of the 35 `region-attack` declines, 21 are matched real notes: five
+opened by DECISION-055's rising branch (rises 2.75–4.35), sixteen by the
+shipped attack branch, nine of those on a band-only onset at the mute
+(`a15`'s shape). 14 are false positives: the two under the hand; three on
+the E5 eighths amped take, 99–139ms, fully voiced at 0.13–0.22 RMS, the
+sustained string, not the hand; nine on the amped held-then-picked take,
+213–373ms of D5 or G4 at full level beginning 135–247ms before their
+labels, a region boundary inside a held amped note and another row's.
+The transient's rise does not separate the two from the twenty-one: real
+notes open on non-rising transients too (the band-only mute onset, the
+contact). What does is the fast lane's own hops under the Note, counted
+in `[start, end)`: no pitch on 0.57 and 0.83 of them for the two under
+the hand, on 0 to 0.33 for the twenty-one real notes (6 of 19, 7 of 21 at
+most). One more Note on the tuning takes reads over the bar: 17912–18013ms
+on the A3 eighths amped take, 0.71, 882 then 551Hz then nothing while the
+level falls from 0.20 to 0.012 RMS; it held the match for `e864`, which
+its successor at 18013ms takes over.
+
+### What was built
+
+`tracking.prefixUnderHand` (true; false is the offer as shipped) with
+`tracking.underHandUnvoicedFraction` 0.5. The tracker keeps a four-second
+log of whether each hop carried a pitch (`voicedLog`,
+`unvoicedFractionIn`). A carved Note whose hops read no pitch at least
+that fraction of the time is under the hand, and three things follow
+from the one witness: it is offered past the region's attack boundary;
+the transient at its start counts as a stroke only when its rise cleared
+`tracking.releaseRiseRatio` (`strokeNear` with `sounded`), the contact's
+did not; and it is claimed whatever pitch it read, the string
+half-stopped reading what it reads, provided the survivor is pitched.
+The `declined` and `absorbed` trace events carry the fraction. Two tests
+in `region-reconcile.test.ts`: a note, nine hops of the string under the
+hand (a fifth of the note's level falling under the gate, the pitch gone
+on five of them), the stroke, and the region's attack boundary on the
+contact — absorbed with the rule, a Note of its own without it.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 21 → 20 of 327 (held-then-picked DI 8 → 7); amped + mic 149 → 148 (A3 eighths amped 35 → 34)
+    corpus (deriv)   split 206 → 204, extras 257 → 255, strays 9, missed 112 → 112, fp 203 → 200, det 1302 → 1299
+    corpus (all)     split 277 → 273, extras 333 → 329, strays 20; ledger MISSED 139 → 140
+    held-out (once)  missed 27 → 28, fp 69 → 67, split 71 → 69, extras 76 → 74, slow 36 → 34, det 423 → 420
+    eval             PASS, the same informational failure as before
+    tests            541
+
+Three absorptions on the tuning takes, the three the count named; no
+other Note moved. Held-out, read once: on the DI triplet take the two
+Notes the row was written for (5693–5787ms, no pitch on 0.71 of its hops;
+6989–7080ms, 0.83) are absorbed into the Notes of `q4` and `q7`, the
+prediction — false positives 10 → 8, split 10 → 8. On the mic triplet
+take one Note, 24973–25120ms, 147ms, D5 on three hops and then no pitch
+on nine, reads 0.73 and is absorbed into the C5 Note at 25133ms; it had
+held the match for `t5` (24981ms), the C5 Note then holds `t5` by overlap,
+and `t6` (25106–25262ms), the C5 Note's own label, goes unmatched. Under
+that Note the level holds at 0.02–0.04 RMS across all twelve hops: the
+string was still sounding through the mic and the detector lost its
+pitch. The witness read "no pitch" for "under the hand", and on the mic
+the two are not the same thing.
+
+### Verdict
+
+Kept, on the keep rule: the slow subset better on both paths, extras
+down, missed unchanged on derivation, eval PASS; the held-out label is the
+owner's to weigh (the PR's decision 5). The mic loss names the witness's
+gap and the next row, C26: the level's fall read alongside the pitch's
+absence. On the tuning takes the two Notes under the hand sit under
+`analysis.rmsGate` on 4 of 8 and 5 of 8 hops and the amped one falls to
+6% of its own peak; the mic Note that should not have moved holds its
+level. Derived on the tuning takes first, the prediction is `t6` back
+with the four direct-input absorptions kept.

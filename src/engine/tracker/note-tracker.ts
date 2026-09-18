@@ -149,6 +149,8 @@ export type TrackerTraceEvent =
       intoBurstAt: number | null;
       /** The survivor's level at its start over the loudest the stub reached. */
       levelRatio?: number;
+      /** How much of it the fast lane heard no pitch on; null when it has no hops there. */
+      unvoiced?: number | null;
     }
   | {
       /**
@@ -168,6 +170,8 @@ export type TrackerTraceEvent =
       durationMs: number;
       /** `rms / maxRms` at its death: 1 means it was still rising. */
       fellTo: number;
+      /** How much of it the fast lane heard no pitch on; null when it has no hops there. Prefix offers only. */
+      unvoiced?: number | null;
     }
   | {
       kind: "ended";
@@ -227,6 +231,8 @@ const HARMONIC_CONTEXT_THRESHOLD = 0.5;
  * can reach anyway — the ring is four seconds long.
  */
 const ATTACK_HISTORY = 256;
+/** How far back the tracker remembers whether each hop was voiced, for a carved span the region lane delivers late. */
+const VOICED_LOG_MS = 4000;
 
 /**
  * How close to its own peak a Note must still be for the transient that ends it
@@ -476,6 +482,8 @@ export class NoteTracker {
   private readonly attackSamples: number[] = [];
   /** The same moments with their witness and rise, for `transientsIn`. */
   private readonly attackRises: RegionTransient[] = [];
+  /** Whether the fast lane heard a pitch on each recent hop, oldest first. See `unvoicedFractionIn`. */
+  private readonly voicedLog: { at: SourceTimeMs; voiced: boolean }[] = [];
   /** The newest entry of `attackRises` still owed the next hop's rise, or null. */
   private pendingRise: RegionTransient | null = null;
   /**
@@ -555,6 +563,7 @@ export class NoteTracker {
     this.attackTimes.length = 0;
     this.attackSamples.length = 0;
     this.attackRises.length = 0;
+    this.voicedLog.length = 0;
     this.pendingRise = null;
     this.actedAttackTimes.length = 0;
     this.contactTimes.length = 0;
@@ -607,6 +616,11 @@ export class NoteTracker {
 
     const pitchChange = this.pitchChange.observe(frame);
     const gliding = this.pitchChange.isGliding();
+
+    this.voicedLog.push({ at: t, voiced: frame.pitch.frequencyHz !== null });
+    while (this.voicedLog.length > 0 && (this.voicedLog[0] as { at: SourceTimeMs }).at < t - VOICED_LOG_MS) {
+      this.voicedLog.shift();
+    }
 
     // Every transient, gated or not. The amplitude gate exists to stop the fast
     // lane opening a Note on room tone, and it is right to be conservative
@@ -1416,8 +1430,36 @@ export class NoteTracker {
     for (const record of this.closing) consider(record);
     for (const record of this.ended) consider(record);
     if (successor === null || !this.isPicked(successor)) return;
-    const refused = segment.boundary === "attack" ? "region-attack" : null;
-    this.tryClaimPrefix(prefix, successor, out, refused);
+    // The string under the hand is not a stroke, whatever the region called
+    // the boundary that opened it: the attack branch places one on the
+    // pick's contact. See `tracking.prefixUnderHand`.
+    const underHand = this.underHand(prefix);
+    const refused = segment.boundary === "attack" && !underHand ? "region-attack" : null;
+    this.tryClaimPrefix(prefix, successor, out, refused, underHand);
+  }
+
+  /**
+   * A carved Note the fast lane heard no pitch on for most of its hops: the
+   * string half-stopped under the fretting hand between a note's end and
+   * the next stroke's release. See `tracking.prefixUnderHand`.
+   */
+  private underHand(record: NoteRecord): boolean {
+    if (!this.config.tracking.prefixUnderHand || record.endTime === null) return false;
+    const fraction = this.unvoicedFractionIn(record.startTime, record.endTime);
+    return fraction !== null && fraction >= this.config.tracking.underHandUnvoicedFraction;
+  }
+
+  /** How much of `[from, to)` the fast lane heard no pitch on, or null when it has no hops there. */
+  private unvoicedFractionIn(from: SourceTimeMs, to: SourceTimeMs): number | null {
+    let hops = 0;
+    let unvoiced = 0;
+    for (const entry of this.voicedLog) {
+      if (entry.at < from) continue;
+      if (entry.at >= to) break;
+      hops++;
+      if (!entry.voiced) unvoiced++;
+    }
+    return hops === 0 ? null : unvoiced / hops;
   }
 
   private tryClaimPrefix(
@@ -1425,9 +1467,12 @@ export class NoteTracker {
     survivor: NoteRecord,
     out: TrackerEmission[],
     /** A reason the offer already failed, traced here so every candidate is accounted for. */
-    refused: string | null = null
+    refused: string | null = null,
+    /** The prefix is the string under the hand. See `underHand`. */
+    underHand = false
   ): void {
     const duration = (prefix.endTime as number) - prefix.startTime;
+    const unvoiced = this.unvoicedFractionIn(prefix.startTime, prefix.endTime as SourceTimeMs);
     const decline = (reason: string): void => {
       if (this.trace === null) return;
       this.trace({
@@ -1438,6 +1483,7 @@ export class NoteTracker {
         reason: `prefix:${reason}`,
         durationMs: duration,
         fellTo: prefix.maxRms === 0 ? 1 : prefix.rms / prefix.maxRms,
+        unvoiced,
       });
     };
 
@@ -1450,14 +1496,18 @@ export class NoteTracker {
     if (duration > PREFIX_MAX_MS) return decline("too-long");
     // Fretted, not picked: no stroke at its own start, nor in the window
     // before it where a refused pick opens a Note late on the pitch settling.
-    if (this.strokeNear(prefix.startTime, PREFIX_LOOKBACK_MS, PREFIX_TRANSIENT_MS)) {
+    // Under the hand, the transient at its start is the pick's contact: a
+    // stroke there is one whose rise cleared the release bar.
+    if (this.strokeNear(prefix.startTime, PREFIX_LOOKBACK_MS, PREFIX_TRANSIENT_MS, underHand)) {
       return decline("stroke");
     }
 
     const prefixClass = pitchClassIndex(prefix.dominantMidi());
     const survivorClass = pitchClassIndex(survivor.dominantMidi());
-    if (prefixClass === null || survivorClass === null) return decline("unpitched");
-    let claim = prefixClass === survivorClass;
+    if (survivorClass === null) return decline("unpitched");
+    // The string half-stopped under the hand reads whatever pitch it reads.
+    if (prefixClass === null && !underHand) return decline("unpitched");
+    let claim = underHand || prefixClass === survivorClass;
     if (!claim && this.contactLed(prefix)) {
       // A stub at a pitch nobody played: the string half-stopped between
       // the note before it and the one the pick then plays. Only when the
@@ -1483,6 +1533,7 @@ export class NoteTracker {
         intoStartTime: survivor.startTime,
         burstAt: prefix.burstAt,
         intoBurstAt: survivor.burstAt,
+        unvoiced,
       });
     }
     const revisionNumber = survivor.bump("structuralRevision");
@@ -1512,10 +1563,17 @@ export class NoteTracker {
     return this.strokeNear(record.startTime, PREFIX_TRANSIENT_MS, PREFIX_TRANSIENT_MS);
   }
 
-  /** An onset in `[at - before, at + after]` that the fine witness did not read as a contact. */
-  private strokeNear(at: SourceTimeMs, before: number, after: number): boolean {
-    for (const onset of this.attackTimes) {
+  /**
+   * An onset in `[at - before, at + after]` that the fine witness did not
+   * read as a contact. With `sounded`, only one whose rise cleared
+   * `tracking.releaseRiseRatio`: the release, not the pick's contact.
+   */
+  private strokeNear(at: SourceTimeMs, before: number, after: number, sounded = false): boolean {
+    const bar = this.config.tracking.releaseRiseRatio;
+    for (let i = 0; i < this.attackTimes.length; i++) {
+      const onset = this.attackTimes[i] as SourceTimeMs;
       if (onset < at - before || onset > at + after) continue;
+      if (sounded && (this.attackRises[i]?.riseRatio ?? 0) < bar) continue;
       if (!this.contactNear(onset)) return true;
     }
     return false;

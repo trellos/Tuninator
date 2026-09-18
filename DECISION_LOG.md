@@ -6,6 +6,59 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-058]: A carved Note the fast lane heard no pitch on is the string under the hand, and the next stroke's preparation
+* **Date:** 2026-09-18
+* **Status:** Proposed
+* **Owner:** Detection architecture; the ship decision is the project owner's (DECISION-044's loop, iteration 14)
+* **Context:** DECISION-055 left a row (C23) for two 91–94ms Notes of no
+  pitch the rise rule produced on the held-out DI triplet take, between a
+  note's end and the next stroke's release, which the shipped engine had
+  absorbed as contact stubs; its sites being held-out, the row read on the
+  tuning takes first (`docs/DETECTION-FINDINGS.md`, "The string under the
+  hand as the next stroke's preparation").
+* **Decision:** The count found no prefix declined `unpitched` on the
+  tuning takes, so the row as written was falsified cheaply; the shape it
+  named stands twice there, on the held-then-picked DI take, declined
+  `region-attack` because the region's attack branch had put its boundary
+  on the pick's contact and `offerPrefix` reads any attack boundary as a
+  stroke. What separates those two from the twenty-one real notes under
+  the same decline is the fast lane's own hops: no pitch on 0.57 and 0.83
+  of them against 0 to 0.33. Built as `tracking.prefixUnderHand` (true)
+  with `tracking.underHandUnvoicedFraction` 0.5, bit-identical to
+  DECISION-055's engine when off: a carved Note over the bar is offered
+  past the attack boundary, the transient at its start counts as a stroke
+  only when its rise cleared `tracking.releaseRiseRatio`, and it is
+  claimed whatever pitch it read. Derivation: slow DI 21 → 20 of 327,
+  amped and mic 149 → 148, split 206 → 204, extras 257 → 255, missed 112
+  → 112, false positives 203 → 200; corpus 277 / 333 / 20 → 273 / 329 /
+  20; ledger MISSED 139 → 140; eval PASS; 541 tests. Held-out, read once:
+  the two triplet Notes absorbed as predicted (false positives 69 → 67,
+  split 71 → 69), and one label lost on the mic triplet take, `t6`, whose
+  neighbour's Note read no pitch on nine of twelve hops while its level
+  held at 0.02–0.04 RMS — the mic's sustain, not the hand — and was
+  absorbed. `docs/EVALUATION.md` refreshed from the report.
+* **Alternatives Considered:** (a) **The transient's rise as the witness**
+  (offer past a non-rising attack boundary) — rejected on the count: real
+  notes open on band-only and contact transients too, nine of the
+  twenty-one. (b) **The offer lifted for every attack boundary** —
+  rejected: the twenty-one real notes would be offered and claimed at
+  their own pitch class. (c) **The level's fall alongside the pitch's
+  absence**, which would have kept the mic Note — not built this
+  iteration: its motivating site is held-out, and the tuning takes carry
+  the evidence to derive it (the two under the hand sit under the gate on
+  half their hops; the amped one falls to 6% of its peak). Ledger C26.
+  (d) **A higher unvoiced bar** — rejected: the mic Note reads 0.73, above
+  the held-out DI sites' 0.71, so no bar separates them.
+* **Consequences:** Positive — the two direct-input Notes of muted string
+  gone from the tuning takes and the two from the held-out triplet take,
+  one amped duplicate gone, no label lost on derivation; the first row
+  derived from a count of the tracker's own declines. Negative — one
+  held-out mic label lost to a witness that cannot tell a lost pitch from
+  a damped string, the owner's to weigh; the witness's second half (C26)
+  is the next iteration's.
+
+---
+
 #### [DECISION-057]: The attack branch of the segmenter does not move its boundary to the transient that rose inside the window
 * **Date:** 2026-09-18
 * **Status:** Rejected

@@ -713,6 +713,30 @@ export type EngineConfig = {
      * See DECISION-052.
      */
     releaseOnFineOpenedFrame: boolean;
+    /**
+     * The string under the fretting hand, carved by the region lane as a
+     * Note of its own, is the next stroke's preparation.
+     *
+     * Between a note's end and the release of the stroke that follows, the
+     * string sits half-stopped under the hand: on the direct input its level
+     * has fallen to a few percent and the pitch detector loses it on half
+     * the hops. The region lane's attack branch puts a boundary on the
+     * pick's contact and carves that stretch as a Note, and `offerPrefix`
+     * refused it as a stroke by the region's account, so 93ms of muted
+     * string stood as a Note (the held-then-picked DI take, 17413ms and
+     * 41893ms). With this on, a carved Note whose fast-lane hops were
+     * unvoiced at least `underHandUnvoicedFraction` of the time is offered
+     * past that boundary; the transient at its start counts as a stroke only
+     * when its rise clears `releaseRiseRatio`, the contact's does not; and
+     * it is claimed whatever pitch it read, the reading being the string
+     * half-stopped. On the tuning takes the twenty real notes the same
+     * refusal keeps read unvoiced 0 to 0.33 of their hops, the two under
+     * the hand 0.5 and 0.75. `false` is the offer as shipped. See
+     * DECISION-058.
+     */
+    prefixUnderHand: boolean;
+    /** The unvoiced fraction of a carved Note's hops at which it is the string under the hand. */
+    underHandUnvoicedFraction: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -1081,6 +1105,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     paceIgnoresRetracted: true,
     releaseOnGatedHop: true,
     releaseOnFineOpenedFrame: true,
+    prefixUnderHand: true,
+    underHandUnvoicedFraction: 0.5,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

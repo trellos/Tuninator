@@ -54,6 +54,18 @@
   positives fewer; on the held-out takes three short Notes appear and one
   label trades for another. `deep.segmentRiseOnRisingTransient`,
   `deep.regionCarveSeesEveryNote`; DECISION-055.
+- A Note the region lane carved out of the stretch between a note's end and
+  the next stroke's release, on which the fast lane heard no pitch for at
+  least half its hops — the string half-stopped under the fretting hand —
+  is now that stroke's preparation, absorbed into it, whatever boundary the
+  region put at its start and whatever pitch it read. Before, the region's
+  attack boundary on the pick's contact kept the offer from being made and
+  93ms of muted string stood as a Note. Two such Notes gone on the
+  direct-input held-then-picked take and two on the held-out DI triplet
+  take, one amped duplicate gone; one label on the held-out mic triplet
+  take is lost to a Note whose pitch the detector dropped while the string
+  still sounded. `tracking.prefixUnderHand`,
+  `tracking.underHandUnvoicedFraction`; DECISION-058.
 
 ## 0.2.0 — 2026-09-16
 

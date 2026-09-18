@@ -196,9 +196,10 @@ is half a beat short at the median.
 | C20 | The rise the region lane reads for a transient is the larger of its own hop's and the next hop's: the rise witness reads the long window, which lags the flux by one hop, so the hop carrying the transient reads the rise of the hop before it. `a2` 2520ms: 1.03 then 2.67; `a15` 9000ms: 0.91 then 2.00; `e825` 7973ms: 1.68 then 4.35; `a4` 3467ms read 2.0041 on its own hop and moved | tracker (the list) + deep | DECISION-054 (the rise on the transient's hop only) | derivation slow DI 27 → 24 or fewer with `a2`, `a15`, `e825` moved to within 40ms of their labels, missed 114 → 111 or fewer kept, fp not up, extras not up once C21 holds; amped and mic not worse; held-out read once after | **spent, iteration 11** (DECISION-055): `pendingRise` folds the next hop's rise into the newest transient; alone, slow DI 27 → 24, missed 114 → 110, fp 210 → 210, extras 268 → 266, amped/mic bit-identical; `a2`, `a4`, `e825`, `e836` onto their releases, `a15` unmoved at 1.997 against the bar of 2 (C24); the duplicate reproduced and C21 was built with it |
 | C21 | A segment the region lane carves whose start coincides with a Note that already begins there (within one hop) is that Note, not a new one: `splitAtSegments` takes `from = max(segment.from, record.startTime)` and never asks whether another Note starts at `from`. Before C19 an envelope boundary was a window start and never met a fast-lane boundary. Reproduction: A3 eighths DI, region 32040–32533ms, `attack@32293` beside `n135` starting 32293.33ms, duplicate `n137` 32293–32531ms | tracker | DECISION-054; DECISION-008 (structural revision) | under C19 or C20, the A3 duplicate absent and derivation extras not up; no label that a fast-lane Note already matched lost | **spent, iteration 11** (DECISION-055): the cause was `carveAfter`, not `splitAtSegments` — a Note that began inside the region and ended past its edge is not a candidate and was out of the neighbour scan's sight. `deep.regionCarveSeesEveryNote`: the scan reads every Note the tracker holds and carves nothing within a hop of an existing start. Alone on derivation fp 210 → 203, split 216 → 209, seven duplicates on four takes (three amped), missed 114 → 115 (`s161`, C22); with C20 slow DI 27 → 21, missed 114 → 112. Held-out: `s44` on the amped sixteenths take lost, its credit a wrong-pitch carve |
 | C22 | An unannounced stub the pitch tracker split off the first hops of an attack lends its start to the Note the pitch change then opened: `s161`, A3 eighths DI — attack at 20026.67ms read 885 then 553Hz on an A3, the pitch change opened the A3 Note at 20053.33ms, the 27ms stub died unannounced and lent nothing, the label is at 20011ms and the Note reads 42ms late. The region's carve had been crediting it from 20024ms as a wholly overlapping duplicate, which C21 removes | tracker | DECISION-055 (the carve it replaces); DECISION-046 (a stub the release split off is absorbed and lends its start) | on the tuning takes, the count of unannounced stubs ended by a pitch change onto the same pitch class or its octave within two hops of an attack; then `s161` regained at +0 derivation missed and fp not up; held-out read once after | **spent, iteration 12** (DECISION-056), falsified by its read: 101 such stubs on the tuning takes, 82 the successor's pitch or its octave; DI stubs 0–13ms with successors on time; `s161` cannot be regained, one Note stands for two picks there and the miss moves to `s162`. Restated for the amped column: nine amped successors 42–77ms late would read within 40ms of their labels with the stub's start lent (seven on the E5 eighths amped take); falsifier those nine within 40ms at +0 derivation missed, fp and extras not up, DI takes bit-identical |
-| C23 | A carved prefix of no pitch between a note's end and the next stroke's release — the string under the hand, level fallen to 1% — is offered to that stroke as its contact stub, the way the fast lane offers one, rather than declined as `prefix:unpitched`. Its two sites are HELD-OUT (the DI triplet take, 5693–5787ms and 6989–7080ms, where the shipped engine's window-start boundary produced the same Note and absorbed it), so the row reads on the tuning takes first | tracker | DECISION-055; `tryClaimPrefix` | on the tuning takes: every carved prefix declined `unpitched` under DECISION-055 listed with what sounds under it; a rule derived from those alone at +0 derivation missed and fp not up; held-out read once after, the two triplet Notes the prediction | open — derive, do not tune |
+| C23 | A carved prefix of no pitch between a note's end and the next stroke's release — the string under the hand, level fallen to 1% — is offered to that stroke as its contact stub, the way the fast lane offers one, rather than declined as `prefix:unpitched`. Its two sites are HELD-OUT (the DI triplet take, 5693–5787ms and 6989–7080ms, where the shipped engine's window-start boundary produced the same Note and absorbed it), so the row reads on the tuning takes first | tracker | DECISION-055; `tryClaimPrefix` | on the tuning takes: every carved prefix declined `unpitched` under DECISION-055 listed with what sounds under it; a rule derived from those alone at +0 derivation missed and fp not up; held-out read once after, the two triplet Notes the prediction | **spent, iteration 14** (DECISION-058): the count found no `unpitched` decline on the tuning takes — the row as written falsified — and the shape standing twice there under `region-attack` (the held-then-picked DI take, 17413 and 41893ms, the attack branch's boundary on the contact). Rebuilt on the witness that separates them from the twenty-one real notes under the same decline, the fast lane's unvoiced hops (0.57 and 0.83 against 0 to 0.33): `tracking.prefixUnderHand`. Kept: slow DI 21 → 20, amped 149 → 148, fp 203 → 200, missed flat; held-out the two triplet Notes absorbed as predicted, and `t6` lost on the mic triplet take to a Note the detector lost the pitch of while its level held (C26) |
 | C24 | The rise a transient carries is read over the two hops after it, not one: `a15` (quarters DI, 9000ms) reads 0.91, 1.997, 2.05 against the release bar of 2, and stays in the mute. The bar is not the lever (a lower one reads the contact, DECISION-053) | tracker (the list) | DECISION-055 (one hop) | `a14`'s charge cleared with nothing else on the DI takes moving, fp and extras not up; the count of transients whose rise peaks on the second hop after them, on the tuning takes | **built and reverted, iteration 12** (DECISION-056): `deep.transientRiseHops` 2 and 3 leave the quarters DI take bit-identical — the deep lane reads 9000ms at 2.053 and the boundary is the ATTACK branch's on the band-only mute onset at 8960ms, which the envelope-branch rule never sees — and cost `t17` on the clean-lead take (an earlier transient outranks the release under a longer reading). Spent: the reachable rule is C25 |
 | C25 | The attack branch of `resegment.ts` places its boundary on the transient in the hop before a window's start, and `attackSamples` carries band-only onsets, so on a direct-input same-pitch stroke that transient is the mute's onset, 40–55ms before the release. Candidate: when that transient is band-only and a broadband transient whose rise clears `tracking.releaseRiseRatio` sits inside the window, the boundary is the latter — DECISION-055's envelope-branch rule applied to the branch that placed `a15`'s boundary. Reproduction: quarters DI, region 8507–9680ms, `attack@8960` on the band-only onset, broadband 9000ms rise 1.997, label 9015ms | deep | DECISION-055 (the envelope branch); DECISION-053 (the first transient, which read the mute) | on the tuning takes, the count of attack-branch boundaries standing on a band-only onset and how many have a rising broadband transient in their window; then `a14`'s charge cleared at +0 derivation missed, fp and extras not up, amped and mic not worse; held-out read once after | **built and reverted, iteration 13** (DECISION-057): `deep.segmentAttackOnRisingTransient`; count 648 attack-branch windows, 335 on a band-only onset, 163 with a rising transient in reach, 41 contacts; `a15` not reachable (1.997 under the bar on one hop). Slow DI 21 → 22, amped 149 → 148, fp 203 → 201, missed flat; the one DI change is two boundaries right (80 and 107ms early → 27ms) and the chain charge on `p1c3q4`. Spent: reads right, the count cannot see it; blocked on the instrument like C11 |
+| C26 | The under-the-hand witness (DECISION-058) reads only the pitch's absence, and on the mic a sustained note the detector loses reads the same as a damped string: the mic triplet take's Note at 24973ms, no pitch on 9 of 12 hops with its level holding at 0.02–0.04 RMS, was absorbed and cost `t6`. Candidate: the level's fall read alongside — the fraction of the Note's hops under `analysis.rmsGate` (the two direct-input Notes under the hand on the tuning takes sit there on 4 of 8 and 5 of 8 hops), or its RMS at its end over its own peak (the amped one on the A3 eighths take falls to 6%; the mic Note holds) | tracker | DECISION-058 (the witness it completes); DECISION-046 (`CONTACT_RISE`, a level witness on the fast lane's own opening) | derived on the tuning takes alone: an edge with the three absorptions kept and every one of the twenty-one real notes under `region-attack` still refused; then held-out read once — `t6` regained with the two DI triplet absorptions kept is the prediction | open — derive, do not tune |
 
 ## Owner-side blockers (living)
 
@@ -1061,3 +1062,63 @@ refused before announcement by bars that already exist.
   lands. What continues without it is the amped column's (C22) and the
   held-out sites' count (C23).
 
+### Iteration 14 — 2026-09-18 — KEPT — the string under the hand as the next stroke's preparation: C23's count found no site as written, the shape stood twice under another refusal, and the witness that separates it from real notes is the fast lane's own unvoiced hops
+
+- Candidate: **C23**, first as written (a carved prefix of no pitch offered
+  as the stroke's contact stub rather than declined `unpitched`), then
+  restated on the count. Nearest closed relative: DECISION-055 (the carve
+  that produces the Note), DECISION-046 (a stub the release split off is
+  absorbed and lends nothing).
+- Falsifier, stated before measuring: the count first — every carved
+  prefix declined `unpitched` on the tuning takes, with what sounds under
+  it. Zero such declines, so the row as written fell to its count. The
+  restated candidate's falsifier, stated before the sweep: the two
+  direct-input Notes under the hand absorbed (fp 203 → 201 or better),
+  derivation missed +0, extras and fp not up, amped and mic not worse;
+  held-out read once after, the two triplet Notes the prediction.
+- Count (`prefix-unpitched.ts`, `prefix-kind.ts`): declines on the tuning
+  takes by reason — `trigger` 838, `stroke` 134, `too-long` 77,
+  `region-attack` 35, `decided` 13, `pitch` 1, `unpitched` 0. Of the 35
+  `region-attack`: 21 matched real notes (5 opened by the rising branch,
+  16 by the shipped attack branch, 9 of those band-only), 14 false
+  positives: two under the hand (held-then-picked DI, 17413 and 41893ms,
+  93ms each, the boundary at their start a broadband contact at rise
+  0.94 and 0.84), three sustained amped E5 Notes, nine held amped D5/G4
+  Notes another row's. The fast lane's unvoiced hops under the Note: 0.57
+  and 0.83 for the two; 0 to 0.33 for the twenty-one; 0.71 for one amped
+  Note holding `e864`'s credit.
+- Built: `tracking.prefixUnderHand` (true; false = as shipped),
+  `tracking.underHandUnvoicedFraction` 0.5; `voicedLog` and
+  `unvoicedFractionIn` on the tracker; the offer made past the region's
+  attack boundary, `strokeNear` reading only transients whose rise cleared
+  the release bar for a Note under the hand, the claim regardless of
+  pitch class; two tests in `region-reconcile.test.ts`; 541 tests.
+- Sweep (derivation predicate: not 140bpm):
+    off   slow DI 21/327, other 149/334, split 206, extras 257, strays 9, missed 112, fp 203, det 1302
+    on    slow DI 20/327, other 148/334, split 204, extras 255, strays 9, missed 112, fp 200, det 1299
+  Three Notes absorbed, the three the count named; nothing else moved.
+  Held-out, read once: missed 27 → 28, fp 69 → 67, split 71 → 69, extras
+  76 → 74, slow 36 → 34. DI triplet: the two Notes absorbed as predicted
+  (fp 10 → 8). Mic triplet: the Note at 24973ms (147ms, no pitch on 9 of
+  12 hops, level holding at 0.02–0.04 RMS) absorbed into the C5 Note at
+  25133ms, which then holds `t5` by overlap; `t6` unmatched.
+- Numbers, before → after: derivation as above; corpus 277 / 333 / 20 →
+  273 / 329 / 20; ledger MISSED 139 → 140; eval PASS, the same
+  informational failure; `docs/EVALUATION.md` refreshed.
+- Verdict and why: kept on the keep rule (slow subset better on both
+  paths, extras down, derivation missed flat, eval PASS). The held-out
+  label is the owner's item (PR decision 5); its cause, the witness
+  reading a lost pitch as a damped string, is ledger row C26.
+- What a GOATerizer player would notice: on the direct input, a note
+  damped and re-picked no longer shows a ghost note of the muted string
+  between the two; through the mic, one sustained note in the triplet
+  passage now reads as the preparation of the one after it.
+- Findings section: "The string under the hand as the next stroke's
+  preparation: the row's count found no site as written, and the shape it
+  named stood twice under another refusal"; DECISION-058; commit on
+  `claude/project-thread-46x8sd`.
+- Ledger changes: C23 spent (kept, restated). C26 new: the level's fall
+  alongside the pitch's absence, derived on the tuning takes first.
+- Exit rule: not fired — this iteration added a row with a falsifier
+  (C26), and C13 and C22 (amped onsets) still stand. The direct-input
+  rows C11 and C25 remain blocked on the owner's instrument decision.
