@@ -381,6 +381,22 @@ export type RegionWindowReading = {
  * it decides how many events there were, which it cannot do while it is being
  * told in advance whose window it is looking at.
  */
+/**
+ * One moment the fast lane saw energy arrive, for the region lane: where, on
+ * which witness, and how far the short envelope rose over its baseline. The
+ * band-only witness fires at a mute's onset as readily as at a release; the
+ * rise is what tells them apart. The rise witness reads the long window,
+ * which lags the flux by one hop, so the rise recorded here is the larger of
+ * the transient's own hop and the hop after it. See `resegment.ts`.
+ */
+export type RegionTransient = {
+  sample: number;
+  /** A broadband attack, as against the band-only witness. */
+  broadband: boolean;
+  /** The larger of `FastFrame.riseRatio` on the transient's hop and the next; zero when unknown. */
+  riseRatio: number;
+};
+
 export type RegionSegment = {
   fromSample: number;
   toSample: number;

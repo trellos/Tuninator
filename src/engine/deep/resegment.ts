@@ -35,6 +35,7 @@ import type {
   PitchActivation,
   RegionSegment,
   RegionWindowReading,
+  RegionTransient,
 } from "../contracts.js";
 
 export type SegmentOptions = {
@@ -64,6 +65,31 @@ export type SegmentOptions = {
    * downstroke that came 107ms before it.
    */
   attackRiseRatio: number;
+  /**
+   * The transients of `attackSamples` with their witness and rise, ascending.
+   * Read only under `riseOnRisingTransient`.
+   */
+  transients?: readonly RegionTransient[];
+  /**
+   * Whether a boundary the envelope found is placed on the first BROADBAND
+   * transient inside the window that noticed the rise whose own rise clears
+   * `transientRiseRatio`, when there is one.
+   *
+   * An envelope boundary sits at the START of the first window whose RMS
+   * clears the bar: the earliest defensible estimate, and up to one window
+   * early. On a same-pitch stroke on a direct input that window begins in
+   * the mute — the pick landed, the string sat under it, the pick let go —
+   * so the boundary lands 45–65ms before the note sounds, while the fast
+   * lane's transient at the release is inside the window that noticed it.
+   * Not any transient: the band-only witness fires at the mute's onset and
+   * the burst's first broadband attack is often the contact (DECISION-053),
+   * and a boundary on either leaves `minSegmentMs` of muted string as a
+   * Note. The release is the transient whose hop, or the hop after it, rose
+   * over the muted string (DECISION-054). See DECISION-055.
+   */
+  riseOnRisingTransient?: boolean;
+  /** The rise a transient needs to be the release; `tracking.releaseRiseRatio`. */
+  transientRiseRatio?: number;
   /** Samples in one analysis window, for placing a boundary in time. */
   windowSize: number;
   /** Samples per millisecond, so this file never touches a clock. */
@@ -249,6 +275,22 @@ export function segmentRegion(
       kind = "pitchChange";
     } else if (trough > 0 && window.rms >= trough * riseRatio) {
       kind = "energyRise";
+      if (options.riseOnRisingTransient === true) {
+        // The rise is the witness; the transient that rose, when the fast lane
+        // saw one from the hop before this window's start to its end, is the
+        // place.
+        const bar = options.transientRiseRatio ?? Number.POSITIVE_INFINITY;
+        const after = boundarySample(windows[i - 1] as RegionWindowReading, windowSize);
+        for (const t of options.transients ?? []) {
+          if (t.sample <= after) continue;
+          if (t.sample > window.toSample) break;
+          if (t.broadband && t.riseRatio >= bar) {
+            kind = "attack";
+            at = t.sample;
+            break;
+          }
+        }
+      }
     } else if (
       proposed !== null &&
       trough > 0 &&

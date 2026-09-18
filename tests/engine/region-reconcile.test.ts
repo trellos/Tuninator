@@ -401,3 +401,69 @@ describe("determinism", () => {
     expect(engine.droppedDeepRegionCount).toBe(0);
   });
 });
+
+describe("a boundary the fast lane already has", () => {
+  /**
+   * Two Notes back to back, the second opened by the fast lane on the hop the
+   * first ended. Fed directly: the helper's silent gap would put the second
+   * start a hundred milliseconds after the first end, and the case is the two
+   * coinciding. Neither `ended` has been delivered — a Note waits for its
+   * region's verdict — so the first Note's end is read as the second's start,
+   * which is where a pitch change puts it.
+   */
+  function backToBack(
+    options: Partial<EngineConfig["deep"]> = {}
+  ): { tracker: NoteTracker; secondStart: number } {
+    const tracker = new NoteTracker(new SampleClock(SAMPLE_RATE), config(options));
+    const emissions: TrackerEmission[] = [];
+    let index = 0;
+    const feed = (o: Parameters<typeof frame>[1], count: number): void => {
+      for (let i = 0; i < count; i++) {
+        for (const emission of tracker.process(frame(index++, o))) emissions.push(emission);
+      }
+    };
+    feed({ midi: 74, attack: true }, 1);
+    feed({ midi: 74 }, 19);
+    feed({ midi: 69, attack: true }, 1);
+    feed({ midi: 69 }, 19);
+    feed({ midi: null, rms: 0 }, 16);
+    const started = emissions.filter((e) => e.type === "started").map((e) => e.note);
+    expect(started).toHaveLength(2);
+    const second = started.find((n) => n.id !== "n1");
+    if (second === undefined) throw new Error("expected a second Note");
+    expect(second.startTime).toBeCloseTo(20 * HOP_MS, 3);
+    return { tracker, secondStart: second.startTime };
+  }
+
+  it("does not carve a second Note where the successor already begins", () => {
+    const { tracker, secondStart } = backToBack();
+    // The region ends before the second Note does, so the second Note is not
+    // one of the region's own; and its boundary lands a hair before the first
+    // Note's end, which is what converting a sample to milliseconds does.
+    const boundary = secondStart - 0.005;
+    const out = tracker.applySegmentation(
+      segmentation([
+        segment(0, boundary, 74, "regionStart"),
+        segment(boundary, boundary + 150, 69, "attack"),
+      ])
+    );
+    expect(out.filter((e) => e.type === "started")).toHaveLength(0);
+    expect(
+      out.filter((e) => e.type === "changed" && e.change.type === "structuralRevision")
+    ).toHaveLength(0);
+  });
+
+  it("carves the duplicate when the carve sees only the region's own Notes", () => {
+    // The shipped carve, kept behind the key: the second Note is out of its
+    // sight, so the same stroke is carved a second time beside it.
+    const { tracker, secondStart } = backToBack({ regionCarveSeesEveryNote: false });
+    const boundary = secondStart - 0.005;
+    const out = tracker.applySegmentation(
+      segmentation([
+        segment(0, boundary, 74, "regionStart"),
+        segment(boundary, boundary + 150, 69, "attack"),
+      ])
+    );
+    expect(out.filter((e) => e.type === "started")).toHaveLength(1);
+  });
+});

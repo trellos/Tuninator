@@ -31,7 +31,7 @@ import type {
   PitchClass,
   SourceTimeMs,
 } from "../../types.js";
-import type { EngineConfig } from "../config.js";
+import { snapHop, type EngineConfig } from "../config.js";
 import type {
   AttackEvidence,
   DeepSegmentation,
@@ -39,6 +39,7 @@ import type {
   HarmonicReading,
   PitchActivation,
   RegionSegment,
+  RegionTransient,
 } from "../contracts.js";
 import type { FineOnset } from "../kernels/fine-onset.js";
 import { SampleClock } from "../clock.js";
@@ -434,6 +435,8 @@ function isContactOpening(record: NoteRecord): boolean {
 export class NoteTracker {
   private readonly config: EngineConfig;
   private readonly clock: SampleClock;
+  /** One fast hop in ms, as the engine snaps it: the resolution of a fast-lane boundary. */
+  private readonly hopMs: number;
   private readonly pitchChange: PitchChangeDetector;
   private readonly rearticulation: RearticulationDetector;
 
@@ -471,6 +474,10 @@ export class NoteTracker {
   private readonly attackTimes: SourceTimeMs[] = [];
   /** The same transients as sample indices, so the deep lane can address them. */
   private readonly attackSamples: number[] = [];
+  /** The same moments with their witness and rise, for `transientsIn`. */
+  private readonly attackRises: RegionTransient[] = [];
+  /** The newest entry of `attackRises` still owed the next hop's rise, or null. */
+  private pendingRise: RegionTransient | null = null;
   /**
    * The attacks the fast lane ACTED on, oldest first: the broadband kernel's
    * firings above the gate. A fine onset landing within
@@ -532,6 +539,7 @@ export class NoteTracker {
   constructor(clock: SampleClock, config: EngineConfig) {
     this.clock = clock;
     this.config = config;
+    this.hopMs = clock.toMs(snapHop(config.analysis.hopMs, clock.sampleRate));
     this.pitchChange = new PitchChangeDetector(config);
     this.rearticulation = new RearticulationDetector(config);
   }
@@ -546,6 +554,8 @@ export class NoteTracker {
     this.attackBurstStart = null;
     this.attackTimes.length = 0;
     this.attackSamples.length = 0;
+    this.attackRises.length = 0;
+    this.pendingRise = null;
     this.actedAttackTimes.length = 0;
     this.contactTimes.length = 0;
     this.lastEndedAt = null;
@@ -609,6 +619,13 @@ export class NoteTracker {
     // arrived at exactly here" is the half of the answer the region lane cannot
     // produce for itself, and a quiet upstroke 107ms after the downstroke it
     // answers is visible to the band and to nothing else.
+    // The rise witness lags the flux by one hop: the hop that carries a
+    // transient reads the rise of the hop before it. The transient recorded on
+    // the previous hop takes this hop's rise when it is the larger.
+    if (this.pendingRise !== null) {
+      this.pendingRise.riseRatio = Math.max(this.pendingRise.riseRatio, frame.riseRatio);
+      this.pendingRise = null;
+    }
     if (frame.attack !== null || frame.bandOnset) {
       const at = frame.attack?.at ?? frame.at;
       if (this.trace !== null) {
@@ -629,10 +646,18 @@ export class NoteTracker {
       if (last === undefined || at > last) {
         this.attackTimes.push(at);
         this.attackSamples.push(frame.attack?.atSample ?? frame.sampleIndex);
+        const rise: RegionTransient = {
+          sample: frame.attack?.atSample ?? frame.sampleIndex,
+          broadband: frame.attack !== null,
+          riseRatio: frame.riseRatio,
+        };
+        this.attackRises.push(rise);
+        this.pendingRise = rise;
       }
       if (this.attackTimes.length > ATTACK_HISTORY) {
         this.attackTimes.shift();
         this.attackSamples.shift();
+        this.attackRises.shift();
       }
     }
 
@@ -1544,9 +1569,11 @@ export class NoteTracker {
     if (index === 0 || (this.attackTimes[index - 1] as number) !== at) {
       this.attackTimes.splice(index, 0, at);
       this.attackSamples.splice(index, 0, onset.atSample);
+      this.attackRises.splice(index, 0, { sample: onset.atSample, broadband: false, riseRatio: 0 });
       if (this.attackTimes.length > ATTACK_HISTORY) {
         this.attackTimes.shift();
         this.attackSamples.shift();
+        this.attackRises.shift();
       }
     }
     // A contact: the string was damped hard and nothing followed. See
@@ -1935,6 +1962,13 @@ export class NoteTracker {
       if (sample >= fromSample && sample < toSample) out.push(sample);
     }
     return out;
+  }
+
+  /** `transientSamplesIn`, with each moment's witness and rise, copied. */
+  transientsIn(fromSample: number, toSample: number): RegionTransient[] {
+    return this.attackRises
+      .filter((t) => t.sample >= fromSample && t.sample < toSample)
+      .map((t) => ({ ...t }));
   }
 
   /**
@@ -2426,8 +2460,25 @@ export class NoteTracker {
     if (from - record.startTime < min) return;
 
     let to = segment.to;
-    for (const neighbour of [...neighbours, ...this.notes.values()]) {
+    // Every Note the tracker still holds, not only the region's candidates. A
+    // Note that began inside the region and is still sounding past its edge is
+    // not a candidate — the region reaches only as far as the last Note that
+    // ended inside it — yet it is exactly the Note a boundary here coincides
+    // with. Since DECISION-055 an envelope rise is placed on the transient
+    // that rose, which is the sample the fast lane opened its own Note on; a
+    // carve there would be that Note a second time (the A3 eighths take,
+    // 32293ms: the region's owner ended 4e-12ms after the boundary, so it
+    // owned it, and the successor already standing there was out of sight).
+    const everyNote = this.config.deep.regionCarveSeesEveryNote;
+    const known = everyNote
+      ? [...neighbours, ...this.notes.values(), ...this.closing, ...this.ended]
+      : [...neighbours, ...this.notes.values()];
+    for (const neighbour of known) {
       if (neighbour === record || neighbour.merged) continue;
+      // A Note already begins here: the fast lane put this boundary in, and
+      // the region agrees with it. Within one hop, which is the fast lane's
+      // own resolution.
+      if (everyNote && Math.abs(neighbour.startTime - from) <= this.hopMs) return;
       if (neighbour.startTime > from) to = Math.min(to, neighbour.startTime) as SourceTimeMs;
     }
     if (to - from < min) return;

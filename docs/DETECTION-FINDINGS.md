@@ -7108,3 +7108,147 @@ Charging a Note to the label whose start it is nearest to, or to the label
 it overlaps most, would read each right boundary as one fewer split. That
 is a change to the instrument, so every number in the journal moves with
 it, and it is the owner's call, not this loop's.
+
+## The region lane's boundary on the transient that rose, read one hop late, and a carve that sees every Note: six boundaries right, seven duplicates gone, one site short by 0.003
+
+DECISION-044's loop, iteration 11; DECISION-055. Built, measured, kept.
+Ledger rows C20 and C21, built together as iteration 10's write-up said
+they would be if C20 alone reproduced the duplicate. It did.
+
+### The falsifier, stated before the pipeline ran
+
+C20: derivation slow DI split 27 → 24 or fewer with `a2`, `a15`, `e825`
+and `a4` each within 40ms of their labels; missed 114 → 111 or fewer
+kept; false positives not up; extras not up; amped and mic not worse;
+the A3 duplicate at 32293ms named. C21, if built: the duplicate absent,
+derivation extras not up, no label a fast-lane Note already matched
+lost. Held-out read once after, for the pair.
+
+### What was built
+
+The rise. `RegionTransient.riseRatio` is now the larger of the rise on
+the transient's own hop and the rise on the hop after it: the tracker
+keeps the newest entry as `pendingRise` and folds the next frame's
+`riseRatio` into it before that frame's onset block runs, so the region
+request placed on the transient's own hop still carries the lagged
+reading when the deep lane comes to segment. Everything else is
+DECISION-054's build under the same key,
+`deep.segmentRiseOnRisingTransient` (true; false is the segmentation as
+shipped). One frame-driven test on the tracker
+(`region-transients.test.ts`) reads three transients back with their
+witness and rise, the band-only one at 0.4 and the broadband one at
+2.67 from the hop after it; the two segmentation tests of iteration 10
+stand.
+
+The carve. When the region lane would carve a successor out of the last
+few tens of milliseconds of a Note (`carveAfter`), it now looks at every
+Note the tracker still holds — the region's own candidates, the open
+Notes, the closing Notes and the ended ones — and if one already begins
+within a hop of the boundary it carves nothing, because the fast lane put
+that boundary in and the region agrees with it. Before, the scan saw the
+candidates and the open Notes only, and a Note that began inside the
+region and was still sounding past its edge was out of sight: the
+region reaches only as far as the last Note that ended inside it.
+`deep.regionCarveSeesEveryNote` (true; false is the carve as shipped).
+Two reconciliation tests: two Notes back to back, the second opened by
+the fast lane on the hop the first ended, a region ending before the
+second does, and its boundary a hair before the first Note's end, which
+is what converting a sample to milliseconds does — nothing carved with
+the key on, the duplicate carved with it off.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 27 → 21 of 327 (A3 eighths DI 5 → 1, E5 eighths DI 7 → 6, quarters DI 7 → 6, held-then-picked DI 8 → 8); amped + mic 152 → 149 of 334 (A3 eighths amped 36 → 35, E5 eighths amped 24 → 22)
+    corpus (deriv)   split 216 → 206, extras 268 → 257, strays 9, missed 114 → 112, fp 210 → 203, det 1307 → 1302
+    by key           rise alone 24 / 152, split 214, extras 266, missed 110, fp 210; carve alone 24 / 149, split 209, extras 260, missed 115, fp 203; both off bit-identical to DECISION-052's engine
+    held-out         split 70 → 71, extras 75 → 76, strays 10 → 11, missed 27 → 27, fp 66 → 69, det 420 → 423 (read once, after)
+    corpus (all)     split 286 → 277, extras 343 → 333, strays 19 → 20; ledger MISSED 141 → 139
+    eval             PASS; required 0 failures; informational the one pre-existing
+
+### What moved under the rise, read on the segments and the final Notes
+
+Four region-lane boundaries moved onto their releases, and the charges
+on `a1`, `a3`, `e824` and `e835` cleared: `a2` (2520ms, rise 1.03 on its
+hop and 2.67 on the next), `a4`, `e825` (7973ms, 1.68 then 4.35) and
+`e836`. One charge moved along the chain, as DECISION-054 said it would:
+`a4` is now charged, because `a5`'s Note starts 78ms early on a refused
+contact (C11) and always did, and `a4`'s own Note, now inside its label,
+ends where `a5`'s begins. Missed 114 → 110 under the rise alone: `e856`
+and `s1699` on the A3 take, `s1673` and `s1683` on the E5 take, each a
+Note where the region's boundary now stands.
+
+`a15` did not move. Its transient at 9000ms reads 0.91 on its own hop and
+1.997 on the next, against a bar of 2 (`tracking.releaseRiseRatio`, the
+release bar, reused unchanged); the hop after that reads 2.05. The
+falsifier named four sites and three moved. The site is on the ledger
+(C24, the rise read over the two hops after the transient) rather than
+answered by a lower bar: a bar under the release bar reads the contact
+before it reads the lagged rise (DECISION-053's stubs).
+
+The duplicate reproduced, and its cause is not what DECISION-054 said.
+`n134` (32040–32293.333333333336ms) owns the boundary at
+32293.333333333332ms by four picoseconds, so the reconciliation takes the
+carve branch; `carveAfter` scans the region's candidates and the open
+Notes for a neighbour, and `n135`, which the fast lane opened at
+32293.33ms and which ends at 32547ms, past the region's edge at
+32533ms, is neither. The successor already standing there was out of
+sight, and a second one was carved beside it. Not `splitAtSegments`,
+which the ledger row named.
+
+### What the carve rule removed, on the shipped path too
+
+The carve's blindness predates this loop. With the rise off, letting the
+carve see every Note changes four derivation takes, all for the better,
+and every change is a Note that began within a hop of another:
+
+    A3 eighths DI     three pairs (2291|2293, 4315|4320, 5773|5787ms): fp 4 → 1, split 6 → 2; the three "tail phantom" splits on `e82`, `e810`, `e816` were these
+    E5 eighths amped  two pairs (12917|12920, 15672|15680ms): fp 27 → 25, split 29 → 27
+    quarters amped    one pair (30197|30200ms): fp 69 → 68
+    A3 eighths amped  one carve (5480–5707ms) beside a Note that ended past the region's edge: fp 42 → 41, split 55 → 54
+
+No label on those takes is lost by it except one, and that one is the
+rule working. `s161` on the A3 DI take, 20011ms: the fast lane opened a
+Note on the attack at 20026.67ms that read A5 for two hops (885 then
+553Hz on an A3), a pitch change opened the A3 Note at 20053.33ms and the
+27ms stub died unannounced without lending its start; the region then
+carved an A3 Note from 20024ms to 20253ms, wholly overlapping the one at
+20053ms, and that duplicate credited the label. The carve now sees the
+Note 29ms after its boundary and carves nothing, and the A3 Note starts
+42ms after its label. The right fix is the stub's start, not the carve:
+ledger C22.
+
+### Held-out, read once
+
+    lead-line-di-quarter-eighth-triplet   split 8 → 10, extras 9 → 11, fp 8 → 10 — the rise
+    power-chords (mic)                    strays 3 → 4, fp 7 → 8 — the rise
+    lead-line-di-sixteenths               missed 2 → 1 — the rise
+    lead-line-amped-sixteenths            split 5 → 4, extras 7 → 6, missed 12 → 13 — the carve
+
+Attributed on the four-way listing of the final Notes at each site, not
+on a second read of the totals. The rise's three new Notes: on the DI
+triplet take, two 91–94ms Notes of no pitch between a note's end and the
+next stroke's release (5693–5787ms before the D5 at 5787ms, 6989–7080ms
+before the A4 at 7080ms), the level under them fallen to 1% — the string
+under the hand, which the shipped engine carved just the same and then
+absorbed into the following Note as its contact stub, and which the
+candidate declines as a prefix of no pitch (`prefix:unpitched`); and one
+A#4 Note, 25427–25541ms, in the noise after the power-chord mic take's
+last chord. The rise's one label regained, `s6` on the DI sixteenths
+take, is a Note at the right time (4293ms against 4269ms) that the
+recognizer names B3 where the label says F#5. The carve's one label lost,
+`s44` on the amped sixteenths take, was credited by an E5 Note carved at
+8464ms beside the fast lane's F#5 at 8467ms — 150ms after the label
+began and 8ms after it ended — and the labels there say F#5 from 8456ms.
+
+### Verdict
+
+Kept, on the derivation rule: the slow subset better on both paths and
+worse on neither, extras down, missed down, eval PASS. The held-out cost
+is three false positives and one label, against one label regained, and
+is the owner's to weigh at review as iteration 2's was. Three rows for
+the ledger: C22 (a stub the pitch tracker split off the first hops of an
+attack lends its start to the Note the pitch change opened), C23 (a
+carved prefix of no pitch between a note's end and the next stroke's
+release is offered to that stroke as its contact stub, the way the fast
+lane offers one — read on the tuning takes first, since its sites are
+held-out), C24 (the rise read over the two hops after the transient).

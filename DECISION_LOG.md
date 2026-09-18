@@ -6,6 +6,69 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-055]: The region lane's envelope boundary is placed on the transient that rose, with the rise read on its hop or the next, and a carve sees every Note the tracker holds
+* **Date:** 2026-09-18
+* **Status:** Proposed
+* **Owner:** Detection architecture; the ship decision is the project owner's (DECISION-044's loop, iteration 11)
+* **Context:** DECISION-054 placed an envelope-rise boundary on the first
+  broadband transient inside the window that noticed the rise whose rise
+  clears `tracking.releaseRiseRatio`, and reverted it: the rise witness
+  reads the long window, which lags the flux by one hop, so three of the
+  four sites read the rise of the hop before their transient and did not
+  move, and one moved boundary coincided with a fast-lane Note's start and
+  was carved beside it as a duplicate (`docs/DETECTION-FINDINGS.md`, "The
+  region lane's boundary on the transient that rose, read one hop late,
+  and a carve that sees every Note").
+* **Decision:** Two rules, each behind its own constant, each bit-identical
+  to DECISION-052's engine when off. `deep.segmentRiseOnRisingTransient`
+  (true): DECISION-054's rule with each transient's rise read as the larger
+  of its own hop's and the next hop's (`NoteTracker.pendingRise`). Alone
+  on derivation: slow DI split 27 → 24 of 327, missed 114 → 110, false
+  positives 210 → 210, extras 268 → 266, amped and mic bit-identical; `a2`,
+  `a4`, `e825`, `e836` onto their releases, `a15` unmoved at a rise of
+  1.997 against the bar of 2. `deep.regionCarveSeesEveryNote` (true):
+  `carveAfter` scans every Note the tracker holds, not only the region's
+  candidates and the open Notes, and carves nothing where a Note already
+  begins within a hop; the duplicate's cause was a Note that began inside
+  the region and ended past its edge, out of the scan's sight. Alone on
+  derivation: false positives 210 → 203 and split 216 → 209, seven Notes
+  each beginning within a hop of another, on four takes, three of them
+  amped; missed 114 → 115 (`s161`, credited before by a carve wholly
+  overlapping a Note that opened 42ms late on an octave misread). Together:
+  slow DI 27 → 21, amped and mic 152 → 149, split 216 → 206, extras 268 →
+  257, missed 114 → 112, false positives 210 → 203; corpus 286 / 343 / 19
+  → 277 / 333 / 20; ledger MISSED 141 → 139; eval PASS. Held-out, read
+  once: missed 27 → 27, false positives 66 → 69, split 70 → 71, extras 75
+  → 76 — two 91–94ms unpitched Notes on the DI triplet take that the
+  shipped engine absorbed as contact stubs, one Note in the mic
+  power-chord take's tail, one label lost on the amped sixteenths take
+  whose credit was a wrong-pitch carve, one label regained on the DI
+  sixteenths take. `docs/EVALUATION.md` refreshed from the report.
+* **Alternatives Considered:** (a) **A lower rise bar for the transient's
+  own hop** — rejected: reads the contact before the lagged rise
+  (DECISION-053). (b) **The carve rule gated under the rise key** —
+  rejected: the carve's blindness predates the loop and the seven
+  duplicates it removes are on the shipped path; a rule that changes the
+  shipped path gets its own constant. (c) **Merging the carved segment into
+  the coinciding Note by moving that Note's start** — not built: the one
+  label the carve rule costs (`s161`) wants the stub's start lent to the
+  Note the pitch change opened, which is a tracker rule (ledger C22), not a
+  carve rule. (d) **The rise read over the two hops after the transient**,
+  for `a15` — not built this iteration (ledger C24). (e) **Offering a
+  carved prefix of no pitch as the successor's contact stub**, for the
+  triplet take's two new Notes — not built; its sites are held-out, so the
+  row (C23) reads on the tuning takes first.
+* **Consequences:** Positive — six direct-input boundaries on the release
+  where they were in the mute; seven duplicate Notes gone, three of them
+  on amped takes, the first amped gain since DECISION-048; missed down on
+  derivation with the amped and mic slow subset better. Negative — three
+  more false positives and one label traded for one on held-out, the
+  owner's to weigh; `a15` still charged; the split scorer's chain reading
+  (DECISION-054's owner-side item) still hides one right boundary behind
+  `a4`.
+
+---
+
 #### [DECISION-054]: The region lane's envelope boundary is not placed on the transient whose own hop rose over the muted string
 * **Date:** 2026-09-18
 * **Status:** Rejected

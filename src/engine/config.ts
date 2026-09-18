@@ -913,6 +913,41 @@ export type EngineConfig = {
      */
     segmentAttackRiseRatio: number;
     /**
+     * Whether an envelope-rise boundary is placed on the first broadband
+     * transient inside the window that noticed the rise whose rise — on its
+     * own hop or the next, since the rise witness lags the flux by one hop —
+     * clears `tracking.releaseRiseRatio`, when there is one. False is the
+     * segmentation as shipped: the boundary at that window's start.
+     *
+     * The window's start is the earliest defensible estimate and up to 85ms
+     * early. On the direct-input same-pitch takes the window that first
+     * clears `segmentRiseRatio` begins in the mute between the pick landing
+     * and letting go, so the region lane's Note starts 45–65ms before the
+     * string sounds, and the transient the fast lane saw at the release sits
+     * inside that same window (the quarters DI take, `a4`: boundary at
+     * 3427ms, release transient at 3467ms, label at 3490ms). The first
+     * transient in the window is not it (DECISION-053: the band-only witness
+     * at the mute's onset, the burst's first attack at the contact), and the
+     * transient's own hop is not where its rise reads (DECISION-054: `a2` at
+     * 2520ms reads 1.03 on its hop and 2.67 on the next). See DECISION-055.
+     */
+    segmentRiseOnRisingTransient: boolean;
+    /**
+     * A region boundary that lands where a Note already begins is that Note.
+     *
+     * `true` (default): when the region lane would carve a successor out of
+     * the last few tens of milliseconds of a Note, it looks at every Note the
+     * tracker still holds, and if one already begins within a hop of the
+     * boundary it carves nothing — the fast lane put that boundary in, and
+     * the region agrees with it. `false` is the carve as shipped: it sees
+     * only the region's own Notes and the ones still open, and a Note that
+     * began inside the region but ended past its edge is out of sight, so
+     * the carve duplicates it (the A3 eighths DI take, 32293ms: the region's
+     * owner ended 4e-12ms after the boundary and a second Note was carved
+     * beside the one already standing there). See DECISION-055.
+     */
+    regionCarveSeesEveryNote: boolean;
+    /**
      * Let the deep lane absorb Notes the fast lane over-segmented.
      *
      * Splitting is additive — it can only turn one detection into two — while
@@ -1081,6 +1116,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     segmentHoldWindows: 2,
     segmentRiseRatio: 2.0,
     segmentAttackRiseRatio: 1.25,
+    segmentRiseOnRisingTransient: true,
+    regionCarveSeesEveryNote: true,
     regionMerge: false,
     regionCorrectPitch: false,
   },

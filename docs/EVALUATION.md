@@ -32,13 +32,13 @@ any number below means anything.
 | `cowboy-chords-mic-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 88ms |
 | `cowboy-chords-amped-...-140bpm` | no | 8 | 11 | 0 | 62.5% | 100.0% | 92ms |
 | `power-chords-di-...-140bpm` | no | 16 | 16 | 0 | 93.8% | 100.0% | 19ms |
-| `power-chords-...-140bpm` (mic) | no | 16 | 23 | 0 | 72.7% | 100.0% | 23ms |
+| `power-chords-...-140bpm` (mic) | no | 16 | 24 | 0 | 72.7% | 100.0% | 23ms |
 | `power-chords-amped-...-140bpm` | no | 16 | 18 | 0 | 92.3% | 100.0% | 13ms |
 | `spicy-chords-cmaj9-g-am11` | no | 3 | 5 | 0 | 33.3% | 100.0% | 37ms |
-| `lead-line-di-sixteenths-...-140bpm` | no | 48 | 46 | 2 | 95.8% | 95.8% | 14ms |
+| `lead-line-di-sixteenths-...-140bpm` | no | 48 | 47 | 1 | 95.8% | 95.8% | 14ms |
 | `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 38 | 10 | 68.1% | 70.2% | 16ms |
-| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 39 | 12 | 72.9% | 72.9% | 18ms |
-| `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 62 | 1 | — | — | — |
+| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 38 | 13 | 70.8% | 70.8% | 16ms |
+| `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 64 | 1 | — | — | — |
 | `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 64 | 2 | — | — | — |
 | `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 79 | 0 | — | — | — |
 
@@ -55,11 +55,11 @@ inside its gates — of the 22 takes that score it, nine have a median absolute 
 
 **Not good, and both are the same defect seen from two sides.**
 
-- **Fast single-note lines lose strokes.** The sixteenth-note takes find 36–46 of 48 strokes. The
+- **Fast single-note lines lose strokes.** The sixteenth-note takes find 35–47 of 48 strokes. The
   losses are downstream of the evidence, not in it: the onset kernel covers 44, 44 and 47 of the
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.
-- **Fast single-note lines also produce extra Notes.** The triplet takes emit 62–79 Notes for 55
+- **Fast single-note lines also produce extra Notes.** The triplet takes emit 64–79 Notes for 55
   labels. `npx tsx scripts/measure-splits.ts` puts the 17 scored takes at 86 of 459 events split
   with 94 extra Notes, and 49 of those 86 are the three triplet takes. The shape is one thing: a
   correctly-named Note followed by a short SAME-PITCH tail fragment, so a single played event

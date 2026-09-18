@@ -39,6 +39,21 @@
   before. Two more direct-input boundaries sit on the release, one phantom
   fewer, nothing lost on either set. `tracking.releaseOnFineOpenedFrame`;
   DECISION-052.
+- The region lane's envelope-rise boundary, which sat at the start of the
+  85ms window that noticed the rise — in the mute on a slow direct-input
+  stroke, 45–65ms before the string sounds — now sits on the first
+  broadband transient inside that window whose rise over the muted string
+  clears `tracking.releaseRiseRatio`, with the rise read on the
+  transient's hop or the one after it, since the rise witness lags the
+  flux by a hop. And when the region lane carves a successor out of the
+  end of a Note, it now sees every Note the tracker still holds, so a
+  boundary that coincides with a Note the fast lane already opened carves
+  nothing instead of a second Note beside it — seven such duplicates on
+  the 120bpm same-pitch takes, three of them through the amp. Six more
+  direct-input boundaries on the release, two labels regained, seven false
+  positives fewer; on the held-out takes three short Notes appear and one
+  label trades for another. `deep.segmentRiseOnRisingTransient`,
+  `deep.regionCarveSeesEveryNote`; DECISION-055.
 
 ## 0.2.0 — 2026-09-16
 

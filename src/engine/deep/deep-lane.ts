@@ -32,6 +32,7 @@ import type {
   PitchActivation,
   RegionWindowReading,
   SpectralEvidence,
+  RegionTransient,
 } from "../contracts.js";
 import { AudioRing } from "../ring-buffer.js";
 import { SampleClock } from "../clock.js";
@@ -86,6 +87,13 @@ export type DeepRegionRequest = {
    * establish for itself.
    */
   attackSamples: readonly number[];
+  /**
+   * The same moments with their witness and rise, ascending. Optional so a
+   * caller that has only the samples still gets a segmentation; without it
+   * the rising-transient placement (`deep.segmentRiseOnRisingTransient`) has
+   * nothing to read and the envelope boundary stays at the window's start.
+   */
+  transients?: readonly RegionTransient[];
 };
 
 /** A region the deep lane could not analyse, so its Notes can be let go. */
@@ -195,12 +203,18 @@ export class DeepLane {
     }
     const held = new Set<string>([...previous.holdNoteIds, ...request.holdNoteIds]);
     const attacks = new Set<number>([...previous.attackSamples, ...request.attackSamples]);
+    // The later request carries the later rise reading for a shared sample.
+    const transients = new Map<number, RegionTransient>();
+    for (const t of [...(previous.transients ?? []), ...(request.transients ?? [])]) {
+      transients.set(t.sample, t);
+    }
     this.pendingRegion = {
       fromSample: Math.min(previous.fromSample, request.fromSample),
       toSample: Math.max(previous.toSample, request.toSample),
       notBefore: Math.min(previous.notBefore, request.notBefore),
       holdNoteIds: [...held],
       attackSamples: [...attacks].sort((a, b) => a - b),
+      transients: [...transients.values()].sort((a, b) => a.sample - b.sample),
     };
   }
 
@@ -353,6 +367,9 @@ export class DeepLane {
       riseRatio: deep.segmentRiseRatio,
       attackSamples: request.attackSamples,
       attackRiseRatio: deep.segmentAttackRiseRatio,
+      transients: request.transients ?? [],
+      riseOnRisingTransient: deep.segmentRiseOnRisingTransient,
+      transientRiseRatio: this.config.tracking.releaseRiseRatio,
       windowSize,
       samplesPerMs,
     });
