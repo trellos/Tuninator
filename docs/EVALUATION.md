@@ -39,7 +39,7 @@ any number below means anything.
 | `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 38 | 10 | 68.1% | 70.2% | 16ms |
 | `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 38 | 13 | 70.8% | 70.8% | 16ms |
 | `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 62 | 1 | — | — | — |
-| `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 63 | 3 | — | — | — |
+| `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 64 | 2 | — | — | — |
 | `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 79 | 0 | — | — | — |
 
 The three triplet takes score no accuracy because every section of them is marked informational in

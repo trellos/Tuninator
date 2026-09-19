@@ -6,6 +6,54 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-062]: The under-the-hand witness reads the level's fall alongside the pitch's absence, kept on the owner's decision
+* **Date:** 2026-09-19
+* **Status:** Accepted
+* **Owner:** The project owner (the PR's decision 5, option 2, 2026-09-19); detection architecture carries it
+* **Context:** DECISION-060 built `tracking.underHandLevelFall` and
+  reverted it on the loop's letter: the tuning takes are bit-identical
+  with it, so its constant is one only a held-out take can see, and
+  DECISION-044's keep rule holds no change on a held-out gain. The trade
+  it decides, mic label `t6` on the held-out triplet take, was put to
+  the owner with three options (keep DECISION-058 and lose `t6`; turn
+  `tracking.prefixUnderHand` off and keep the four ghost Notes; keep
+  both halves outside the rule).
+* **Decision:** The owner chose the third. Rebuilt as DECISION-060 had
+  it: the tracker's voiced log carries each hop's RMS, `levelFallIn`
+  reads the quietest hop over the loudest under the carved Note, and
+  `underHand` requires both the unvoiced fraction at or over
+  `tracking.underHandUnvoicedFraction` and the fall at or under
+  `tracking.underHandLevelFall` (0.5; 1 is the pitch half alone). A
+  third test in `region-reconcile.test.ts` holds the muted stretch at
+  the note's own level and expects no absorption. Derivation
+  bit-identical to DECISION-058's engine on every take (missed 112,
+  false positives 200; slow DI 20 of 327 and amped and mic 148, as the
+  journal reads them); held-out, read once, missed 28 → 27 with
+  `t6` back and nothing else moved, false positives 67; ledger MISSED
+  140 → 139; eval PASS with the same one informational failure as at
+  baseline; 542 tests. Kept outside the keep rule on the owner's word,
+  and logged as that: §6.5 and §6.6 of the loop's brief are unchanged,
+  and this is the one constant in the engine set on a held-out reading.
+* **Alternatives Considered:** (a) **Keep DECISION-058 alone and lose
+  `t6`** (option 1) — the owner's to take; not taken. (b) **Turn
+  `tracking.prefixUnderHand` off** (option 3) — the four ghost Notes
+  return (two on the DI held-then-picked take, two on the held-out DI
+  triplet take) and an amped duplicate with them. (c) **A derivation
+  site for the level half** — none exists in the corpus (DECISION-060
+  (c)); a tuning take carrying a sustained note the detector loses the
+  pitch of between a note's end and a stroke would make this a loop
+  iteration rather than an owner's exception.
+* **Consequences:** Positive — the witness reads both halves of what
+  "under the hand" means (no pitch, and the level fallen), which is the
+  reading both sets agree with as far as either can say; the held-out
+  mic label is matched again. Negative — the held-out set is no longer
+  independent of this constant on the mic triplet take, so a later read
+  of that take cannot count `t6` as evidence for a different rule; and
+  the loop's report now carries one kept change its rule did not keep,
+  marked as such here and in the journal.
+
+---
+
 #### [DECISION-061]: The slow-note-splits loop's tuning-only run pauses on the owner's decisions, with its last two ledger rows closed by their counts
 * **Date:** 2026-09-19
 * **Status:** Proposed

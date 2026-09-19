@@ -482,8 +482,11 @@ export class NoteTracker {
   private readonly attackSamples: number[] = [];
   /** The same moments with their witness and rise, for `transientsIn`. */
   private readonly attackRises: RegionTransient[] = [];
-  /** Whether the fast lane heard a pitch on each recent hop, oldest first. See `unvoicedFractionIn`. */
-  private readonly voicedLog: { at: SourceTimeMs; voiced: boolean }[] = [];
+  /**
+   * Whether the fast lane heard a pitch on each recent hop, and the hop's
+   * level, oldest first. See `unvoicedFractionIn` and `levelFallIn`.
+   */
+  private readonly voicedLog: { at: SourceTimeMs; voiced: boolean; rms: number }[] = [];
   /** The newest entry of `attackRises` still owed the next hop's rise, or null. */
   private pendingRise: RegionTransient | null = null;
   /**
@@ -617,7 +620,7 @@ export class NoteTracker {
     const pitchChange = this.pitchChange.observe(frame);
     const gliding = this.pitchChange.isGliding();
 
-    this.voicedLog.push({ at: t, voiced: frame.pitch.frequencyHz !== null });
+    this.voicedLog.push({ at: t, voiced: frame.pitch.frequencyHz !== null, rms: frame.rms });
     while (this.voicedLog.length > 0 && (this.voicedLog[0] as { at: SourceTimeMs }).at < t - VOICED_LOG_MS) {
       this.voicedLog.shift();
     }
@@ -1439,14 +1442,32 @@ export class NoteTracker {
   }
 
   /**
-   * A carved Note the fast lane heard no pitch on for most of its hops: the
-   * string half-stopped under the fretting hand between a note's end and
-   * the next stroke's release. See `tracking.prefixUnderHand`.
+   * A carved Note the fast lane heard no pitch on for most of its hops, and
+   * whose level fell: the string half-stopped under the fretting hand
+   * between a note's end and the next stroke's release. A sustained note
+   * the detector merely lost the pitch of holds its level, and is not. See
+   * `tracking.prefixUnderHand` and `tracking.underHandLevelFall`.
    */
   private underHand(record: NoteRecord): boolean {
     if (!this.config.tracking.prefixUnderHand || record.endTime === null) return false;
     const fraction = this.unvoicedFractionIn(record.startTime, record.endTime);
-    return fraction !== null && fraction >= this.config.tracking.underHandUnvoicedFraction;
+    if (fraction === null || fraction < this.config.tracking.underHandUnvoicedFraction) return false;
+    const fall = this.levelFallIn(record.startTime, record.endTime);
+    return fall !== null && fall <= this.config.tracking.underHandLevelFall;
+  }
+
+  /** The quietest hop in `[from, to)` over the loudest, or null when the fast lane has no hops there. */
+  private levelFallIn(from: SourceTimeMs, to: SourceTimeMs): number | null {
+    let loudest = 0;
+    let quietest = Infinity;
+    for (const entry of this.voicedLog) {
+      if (entry.at < from) continue;
+      if (entry.at >= to) break;
+      loudest = Math.max(loudest, entry.rms);
+      quietest = Math.min(quietest, entry.rms);
+    }
+    if (quietest === Infinity) return null;
+    return loudest > 0 ? quietest / loudest : 0;
   }
 
   /** How much of `[from, to)` the fast lane heard no pitch on, or null when it has no hops there. */

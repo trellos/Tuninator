@@ -66,6 +66,13 @@
   take is lost to a Note whose pitch the detector dropped while the string
   still sounded. `tracking.prefixUnderHand`,
   `tracking.underHandUnvoicedFraction`; DECISION-058.
+- The string-under-the-hand witness now reads the level as well as the
+  pitch: a carved Note is absorbed into the next stroke only when it also
+  fell to at most half its own peak. Through a microphone a sustained note
+  whose pitch the detector lost while it still rang had read as muted
+  string and taken a real note with it; it no longer does. The direct-input
+  and amped tuning takes are unchanged. `tracking.underHandLevelFall`;
+  DECISION-062.
 
 ## 0.2.0 — 2026-09-16
 

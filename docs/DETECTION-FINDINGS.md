@@ -7699,3 +7699,41 @@ rows outside the slow subset (C5, C6). Those are new mechanisms, not
 tuning, and the owner's instruction on 2026-09-18 bounded this run to
 what tuning can do. The exit rule of §9 has not fired by its letter;
 the tuning-only run is paused here, with the report in the journal.
+
+## The level half of the under-the-hand witness, kept on the owner's decision
+
+DECISION-062; the PR's decision 5, option 2. Not a loop iteration: the
+build is DECISION-060's, rebuilt unchanged, and the keep is the owner's
+exception to DECISION-044's rule rather than a reading of it.
+
+### What was built
+
+`tracking.underHandLevelFall` (0.5; 1 is the pitch half alone). The
+tracker's four-second voiced log (`voicedLog`) carries each hop's RMS
+beside whether it read a pitch; `levelFallIn` returns the quietest hop
+over the loudest in `[start, end)` of the carved Note; `underHand` now
+requires both readings, the unvoiced fraction at or over
+`tracking.underHandUnvoicedFraction` and the fall at or under this. The
+three Notes DECISION-058 absorbs on the tuning takes fall to 0.09, 0.37
+and 0.06 of their own peak; the mic triplet Note that cost `t6` holds
+at about 0.7. A third test in `region-reconcile.test.ts` holds the
+muted stretch at the note's own level (0.03 RMS on every hop, the pitch
+still gone on five of nine) and expects the carved Note to stand.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 20 → 20 of 327; amped + mic 148 → 148 (bit-identical)
+    corpus (deriv)   missed 112 → 112, fp 200 → 200, pairs 1099 → 1099; every take bit-identical
+    corpus (all)     split 273 → 273, extras 329 → 329, strays 20; ledger MISSED 140 → 139
+    held-out (once)  missed 28 → 27 (`t6` back), fp 67 → 67, pairs 353 → 354; nothing else moved
+    eval             PASS, the same one informational failure; 542 tests
+
+### What it means for the loop's report
+
+The engine at this commit is DECISION-060's build, which the loop
+measured and reverted. Every number the report carries for the tuning
+takes is unchanged; the held-out row reads missed 27 where the report's
+"now" column read 28. The keep rule's letter is not amended: a constant
+only a held-out take can see is still one the loop does not keep, and
+this one is held on the owner's word, recorded as such in DECISION-062
+and the journal so a later reader does not take it for a reading.

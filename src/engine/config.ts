@@ -737,6 +737,19 @@ export type EngineConfig = {
     prefixUnderHand: boolean;
     /** The unvoiced fraction of a carved Note's hops at which it is the string under the hand. */
     underHandUnvoicedFraction: number;
+    /**
+     * The other half of that witness: the carved Note's quietest hop over
+     * its loudest must be at most this. Muted string falls; a sustained note
+     * the pitch detector lost while it still sounded holds its level, and
+     * through a microphone one such note read no pitch on nine of twelve
+     * hops at 0.7 of its peak and was absorbed as under the hand, costing a
+     * real note. The three Notes the pitch half absorbs on the tuning takes
+     * fall to 0.09, 0.37 and 0.06 of their own peak, so the tuning takes
+     * are bit-identical with this at 0.5; only the held-out mic take sees
+     * it. 1 is the pitch half alone. Kept on the owner's decision rather
+     * than the loop's rule; see DECISION-062.
+     */
+    underHandLevelFall: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -1107,6 +1120,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     releaseOnFineOpenedFrame: true,
     prefixUnderHand: true,
     underHandUnvoicedFraction: 0.5,
+    underHandLevelFall: 0.5,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,

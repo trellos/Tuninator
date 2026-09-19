@@ -477,7 +477,13 @@ describe("the string under the hand", () => {
    * on the pick's contact at the start of the muted stretch and carves it
    * as a Note of its own; see `tracking.prefixUnderHand`.
    */
-  function underTheHand(prefixUnderHand: boolean): {
+  function underTheHand(
+    prefixUnderHand: boolean,
+    options: {
+      /** The level holds through the muted stretch: a sustained note whose pitch the detector lost. */
+      levelHolds?: boolean;
+    } = {}
+  ): {
     out: TrackerEmission[];
     carvedFrom: number;
     strokeStart: number;
@@ -486,6 +492,7 @@ describe("the string under the hand", () => {
       ...DEFAULT_ENGINE_CONFIG,
       tracking: { ...DEFAULT_ENGINE_CONFIG.tracking, prefixUnderHand },
     };
+    const level = options.levelHolds === true ? { high: 0.03, low: 0.03 } : { high: 0.01, low: 0.004 };
     const tracker = new NoteTracker(new SampleClock(SAMPLE_RATE), engineConfig);
     const emissions: TrackerEmission[] = [];
     let index = 0;
@@ -497,8 +504,8 @@ describe("the string under the hand", () => {
     feed({ midi: 57, attack: true }, 1);
     feed({ midi: 57 }, 19);
     const carvedFrom = index * HOP_MS;
-    feed({ midi: 57, rms: 0.01 }, 4);
-    feed({ midi: null, rms: 0.004 }, 5);
+    feed({ midi: 57, rms: level.high }, 4);
+    feed({ midi: null, rms: level.low }, 5);
     const strokeStart = index * HOP_MS;
     feed({ midi: 64, attack: true }, 1);
     feed({ midi: 64 }, 19);
@@ -526,6 +533,20 @@ describe("the string under the hand", () => {
     expect(absorbed).toBeDefined();
     if (absorbed?.type !== "changed") throw new Error("unreachable");
     expect(absorbed.note.startTime).toBeCloseTo(strokeStart, 3);
+  });
+
+  it("is not a sustained note whose pitch the detector lost while its level held", () => {
+    const { out, carvedFrom } = underTheHand(true, { levelHolds: true });
+    expect(
+      out.filter(
+        (e) =>
+          e.type === "changed" &&
+          e.change.type === "structuralRevision" &&
+          e.change.relation === "absorbed"
+      )
+    ).toHaveLength(0);
+    const carved = out.filter((e) => e.type === "started").map((e) => e.note);
+    expect(carved.some((n) => Math.abs(n.startTime - carvedFrom) < 1)).toBe(true);
   });
 
   it("stands as a Note of its own with the rule off", () => {
