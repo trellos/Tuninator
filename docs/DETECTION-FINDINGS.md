@@ -7526,3 +7526,65 @@ absence. On the tuning takes the two Notes under the hand sit under
 6% of its own peak; the mic Note that should not have moved holds its
 level. Derived on the tuning takes first, the prediction is `t6` back
 with the four direct-input absorptions kept.
+
+## The under-the-hand witness read on the gate: the mic label back, the amped duplicate let go, and the letter of the keep rule
+
+DECISION-044's loop, iteration 15; DECISION-059. Built, measured,
+reverted. Ledger row C26 (spent), C27 (new).
+
+### The derivation, on the count already in hand
+
+The 35 Notes under the `region-attack` decline on the tuning takes and
+the three DECISION-058 absorbs, read three ways on the fast lane's hops
+under them: no pitch (DECISION-058's witness), RMS under
+`analysis.rmsGate` (0.008), and the Note's lowest hop over its loudest.
+
+    under the hand, DI     n52 0.75 / 0.62 / 0.09     n21 0.50 / 0.50 / 0.37
+    amped duplicate        n107 0.75 / 0.00 / 0.06    (A3 eighths amped, 17912ms; level 0.20 → 0.012)
+    real notes (21)        no pitch ≤ 0.33; under the gate ≤ 0.33; lowest/loudest 0.03 – 0.72
+    other strays (12)      no pitch ≤ 0.12; under the gate 0; lowest/loudest 0.30 – 0.90
+
+The gate separates the two direct-input Notes under the hand from every
+real note with the same margin the pitch reading has (0.50 against 0.33),
+and reads 0 on the amped duplicate, whose level fell to six percent of
+its peak and stopped five times above the gate: an amped render's floor
+sits above it. The mic Note that cost `t6` holds at 0.02–0.04 across its
+twelve hops, above the gate throughout. So the gate was expected to keep
+the two, let the amped one go, and give `t6` back; the falsifier was
+restated to that before the sweep, and the sweep read exactly that.
+
+### What was built
+
+`tracking.underHandReadsGate` (true; false is DECISION-058's pitch
+reading): `voicedLog` records each hop's `gated` flag beside its pitch,
+and `unvoicedFractionIn` counts gated hops instead of unvoiced ones. One
+more test: a sustained note whose pitch the detector lost while its level
+held is not absorbed on the gate reading and is on the pitch reading;
+the string under the hand is absorbed on either.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 20 → 20 of 327; amped + mic 148 → 149 (A3 eighths amped 34 → 35)
+    corpus (deriv)   split 204 → 205, extras 255 → 256, strays 9, missed 112 → 112, fp 200 → 201, det 1299 → 1300
+    held-out (once)  missed 28 → 27 (`t6` back), fp 67 → 67, split 69 → 69, extras 74 → 74
+    tests            542 with the test; 541 after the revert
+
+One take changes on the derivation set: the A3 eighths amped take keeps
+its duplicate at 17912ms. One take changes on held-out: the mic triplet
+take keeps its sustained D5 and `t6` is matched again. Every
+direct-input take is bit-identical on both sets.
+
+### Verdict
+
+Reverted, on the keep rule's letter: the slow subset is worse on the
+amped path. The read is that neither reading alone is the witness. The
+pitch's absence catches the amped duplicate and the mic's lost pitch
+alike; the gate catches the direct-input Notes and nothing an amp's
+floor sits over. What the three absorbed Notes share and the mic Note
+does not is the level's fall relative to the Note itself: lowest over
+loudest 0.09, 0.37 and 0.06 against about 0.7 on the mic. Read alongside
+the pitch's absence — no pitch on half the hops and the level fallen to
+half — the three tuning-take absorptions stand (the twenty-one real
+notes fail the pitch reading whatever their fall) and the mic Note fails
+the fall. That is row C27, the prediction on held-out `t6` back at the
+tuning takes bit-identical to DECISION-058's.

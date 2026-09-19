@@ -6,6 +6,43 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-059]: The under-the-hand witness does not read the amplitude gate in place of the pitch detector
+* **Date:** 2026-09-19
+* **Status:** Rejected
+* **Owner:** Detection architecture; DECISION-044's loop, iteration 15
+* **Context:** DECISION-058's witness, a carved Note with no pitch on
+  half its hops, absorbed a sustained note on the held-out mic triplet
+  take whose pitch the detector had lost while its level held, and cost
+  `t6`; ledger row C26 named the level as the missing half
+  (`docs/DETECTION-FINDINGS.md`, "The under-the-hand witness read on the
+  gate").
+* **Decision:** Built as `tracking.underHandReadsGate` — hops under
+  `analysis.rmsGate` counted in place of hops without a pitch — after the
+  tuning takes showed the gate separating the two direct-input Notes
+  under the hand (0.62, 0.50) from the twenty-one real notes under the
+  same decline (at most 0.33), and reading 0 on the amped duplicate
+  DECISION-058 had absorbed, whose level stopped five times above the
+  gate. Derivation: slow DI 20 → 20, amped and mic 148 → 149, false
+  positives 200 → 201, missed unchanged, the one change being that
+  duplicate kept. Held-out, read once: missed 28 → 27, `t6` back, nothing
+  else moved. Reverted on the keep rule's letter (the amped path worse);
+  engine bit-identical to DECISION-058's.
+* **Alternatives Considered:** (a) **Keeping it for the held-out label**
+  — rejected: the loop's rule reads the derivation set, and a rule that
+  loses on it is not kept for a gain elsewhere. (b) **A gate relative to
+  the render's floor** — not built: it is the same reading as the level's
+  fall relative to the Note (c), with an extra estimate. (c) **The pitch's
+  absence and the level's fall read together** — the three absorbed Notes
+  fall to 0.06–0.37 of their own peak and the mic Note holds at about
+  0.7; not built this iteration (a built-and-reverted candidate ends it),
+  recorded as ledger row C27 with its derivation on the tuning takes.
+* **Consequences:** Positive — the gate's reading of every candidate is
+  on record, and the witness's two halves are now named with their
+  numbers. Negative — the engine did not move and `t6` stays lost until
+  C27 is built.
+
+---
+
 #### [DECISION-058]: A carved Note the fast lane heard no pitch on is the string under the hand, and the next stroke's preparation
 * **Date:** 2026-09-18
 * **Status:** Proposed
