@@ -329,4 +329,43 @@ describe("transients the fast lane recorded and could not act on", () => {
     const segments = segmentRegion(windows(entries), { ...OPTIONS, attackSamples: attacks });
     expect(segments.every((segment) => segment.boundary !== "attack")).toBe(true);
   });
+
+  describe("an envelope rise with transients inside the window that noticed it", () => {
+    // A note decaying, the pick landing (the trough), the pick letting go: the
+    // first window over the bar begins in the mute. Inside it the fast lane
+    // saw three things: the band-only witness at the mute's onset, the
+    // contact (no rise), and the release (a rise over the muted string).
+    const entries = [];
+    for (let i = 0; i < 10; i++) entries.push({ pitches: [57], rms: 1 - i * 0.04 });
+    for (let i = 0; i < 4; i++) entries.push({ pitches: [57], rms: 0.25 });
+    for (let i = 0; i < 8; i++) entries.push({ pitches: [57], rms: 0.55 + i * 0.04 });
+    const sequence = windows(entries);
+    const riseWindowStart = 14 * HOP;
+    const mute = riseWindowStart + 200;
+    const contact = riseWindowStart + 700;
+    const release = riseWindowStart + 1900;
+    const transients = [
+      { sample: mute, broadband: false, riseRatio: 0.4 },
+      { sample: contact, broadband: true, riseRatio: 0.7 },
+      { sample: release, broadband: true, riseRatio: 2.4 },
+    ];
+    const attackSamples = transients.map((t) => t.sample);
+    const on = { ...OPTIONS, attackSamples, transients, riseOnRisingTransient: true, transientRiseRatio: 2 };
+
+    it("places the boundary on the transient that rose, not the first one", () => {
+      const segments = segmentRegion(sequence, on);
+      expect(segments).toHaveLength(2);
+      expect(segments[1]?.boundary).toBe("attack");
+      expect(segments[1]?.fromSample).toBe(release);
+    });
+
+    it("keeps the window's start without the rule, and when no transient rose", () => {
+      const off = segmentRegion(sequence, { ...OPTIONS, attackSamples, transients });
+      expect(off[1]?.boundary).toBe("energyRise");
+      expect(off[1]?.fromSample).toBe(riseWindowStart);
+      const none = segmentRegion(sequence, { ...on, transients: transients.slice(0, 2) });
+      expect(none[1]?.boundary).toBe("energyRise");
+      expect(none[1]?.fromSample).toBe(riseWindowStart);
+    });
+  });
 });

@@ -59,8 +59,26 @@ export class NoteRecord {
    * was one.
    */
   readonly ownStartTime: SourceTimeMs;
+  /**
+   * `FastFrame.riseRatio` on the hop that opened this Note: how much louder
+   * the audio was than the 80ms before it. A pick's contact opens a Note with
+   * no rise; its release, 45–70ms later, arrives with one. See
+   * `tracking.releaseRiseRatio`.
+   */
+  readonly openingRise: number;
+  /** `FastFrame.dipRatio` on the hop that opened this Note. */
+  readonly openingDip: number;
+  /** Opened by the fine-hop witness, which fires on a pick's contact. */
+  fineOpened = false;
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
   absorbedRenaming = false;
+  /**
+   * The release test moved this Note's start off the contact the fine witness
+   * opened it on. The announce clock keeps reading from that contact: the
+   * witness decided the stroke was a Note, and the move only places its
+   * boundary. See `announceSoundedMs` and `tracking.releaseOnFineOpenedFrame`.
+   */
+  releasedFromContact = false;
   /** The pre-pick prefix check has run for this Note. See `NoteTracker.claimPrefix`. */
   prefixClaimed = false;
   startSample: number;
@@ -298,6 +316,8 @@ export class NoteRecord {
     confidence: number;
     rms: number;
     peak: number;
+    openingRise?: number;
+    openingDip?: number;
   }) {
     this.id = options.id;
     this.config = options.config;
@@ -306,6 +326,8 @@ export class NoteRecord {
     this.ownStartTime = options.startTime;
     this.startSample = options.startSample;
     this.trigger = options.trigger;
+    this.openingRise = options.openingRise ?? 1;
+    this.openingDip = options.openingDip ?? 1;
     this.originPitch = options.originPitch;
     this.initialConfidence = options.confidence;
     this.refFrequencyHz = options.frequencyHz;
@@ -341,9 +363,15 @@ export class NoteRecord {
    * note BEFORE this one still ringing while the estimator caught up — audio
    * that belongs to its predecessor. Counting it toward the bar lets a 40ms
    * stub and a 53ms tail add up to a Note where neither was one.
+   *
+   * Also from the Note's own start when the release test moved it off a
+   * contact the fine witness opened: the muted stretch between contact and
+   * release is this stroke's, and a release that barely re-excites the
+   * string is still the release of a Note the witness already decided on.
    */
   get announceSoundedMs(): number {
-    const from = this.absorbedRenaming ? this.ownStartTime : this.startTime;
+    const from =
+      this.absorbedRenaming || this.releasedFromContact ? this.ownStartTime : this.startTime;
     return Math.max(this.lastVoicedAt, this.lastAudibleAt) - from;
   }
 

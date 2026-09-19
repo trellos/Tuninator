@@ -401,3 +401,165 @@ describe("determinism", () => {
     expect(engine.droppedDeepRegionCount).toBe(0);
   });
 });
+
+describe("a boundary the fast lane already has", () => {
+  /**
+   * Two Notes back to back, the second opened by the fast lane on the hop the
+   * first ended. Fed directly: the helper's silent gap would put the second
+   * start a hundred milliseconds after the first end, and the case is the two
+   * coinciding. Neither `ended` has been delivered — a Note waits for its
+   * region's verdict — so the first Note's end is read as the second's start,
+   * which is where a pitch change puts it.
+   */
+  function backToBack(
+    options: Partial<EngineConfig["deep"]> = {}
+  ): { tracker: NoteTracker; secondStart: number } {
+    const tracker = new NoteTracker(new SampleClock(SAMPLE_RATE), config(options));
+    const emissions: TrackerEmission[] = [];
+    let index = 0;
+    const feed = (o: Parameters<typeof frame>[1], count: number): void => {
+      for (let i = 0; i < count; i++) {
+        for (const emission of tracker.process(frame(index++, o))) emissions.push(emission);
+      }
+    };
+    feed({ midi: 74, attack: true }, 1);
+    feed({ midi: 74 }, 19);
+    feed({ midi: 69, attack: true }, 1);
+    feed({ midi: 69 }, 19);
+    feed({ midi: null, rms: 0 }, 16);
+    const started = emissions.filter((e) => e.type === "started").map((e) => e.note);
+    expect(started).toHaveLength(2);
+    const second = started.find((n) => n.id !== "n1");
+    if (second === undefined) throw new Error("expected a second Note");
+    expect(second.startTime).toBeCloseTo(20 * HOP_MS, 3);
+    return { tracker, secondStart: second.startTime };
+  }
+
+  it("does not carve a second Note where the successor already begins", () => {
+    const { tracker, secondStart } = backToBack();
+    // The region ends before the second Note does, so the second Note is not
+    // one of the region's own; and its boundary lands a hair before the first
+    // Note's end, which is what converting a sample to milliseconds does.
+    const boundary = secondStart - 0.005;
+    const out = tracker.applySegmentation(
+      segmentation([
+        segment(0, boundary, 74, "regionStart"),
+        segment(boundary, boundary + 150, 69, "attack"),
+      ])
+    );
+    expect(out.filter((e) => e.type === "started")).toHaveLength(0);
+    expect(
+      out.filter((e) => e.type === "changed" && e.change.type === "structuralRevision")
+    ).toHaveLength(0);
+  });
+
+  it("carves the duplicate when the carve sees only the region's own Notes", () => {
+    // The shipped carve, kept behind the key: the second Note is out of its
+    // sight, so the same stroke is carved a second time beside it.
+    const { tracker, secondStart } = backToBack({ regionCarveSeesEveryNote: false });
+    const boundary = secondStart - 0.005;
+    const out = tracker.applySegmentation(
+      segmentation([
+        segment(0, boundary, 74, "regionStart"),
+        segment(boundary, boundary + 150, 69, "attack"),
+      ])
+    );
+    expect(out.filter((e) => e.type === "started")).toHaveLength(1);
+  });
+});
+
+describe("the string under the hand", () => {
+  /**
+   * A note, then nine hops of the string half-stopped under the fretting
+   * hand — the level at a fifth of the note's, falling under the gate, the
+   * pitch gone on five of them — then
+   * the stroke that follows. The region's attack branch puts its boundary
+   * on the pick's contact at the start of the muted stretch and carves it
+   * as a Note of its own; see `tracking.prefixUnderHand`.
+   */
+  function underTheHand(
+    prefixUnderHand: boolean,
+    options: {
+      /** The level holds through the muted stretch: a sustained note whose pitch the detector lost. */
+      levelHolds?: boolean;
+    } = {}
+  ): {
+    out: TrackerEmission[];
+    carvedFrom: number;
+    strokeStart: number;
+  } {
+    const engineConfig: EngineConfig = {
+      ...DEFAULT_ENGINE_CONFIG,
+      tracking: { ...DEFAULT_ENGINE_CONFIG.tracking, prefixUnderHand },
+    };
+    const level = options.levelHolds === true ? { high: 0.03, low: 0.03 } : { high: 0.01, low: 0.004 };
+    const tracker = new NoteTracker(new SampleClock(SAMPLE_RATE), engineConfig);
+    const emissions: TrackerEmission[] = [];
+    let index = 0;
+    const feed = (o: Parameters<typeof frame>[1], count: number): void => {
+      for (let i = 0; i < count; i++) {
+        for (const emission of tracker.process(frame(index++, o))) emissions.push(emission);
+      }
+    };
+    feed({ midi: 57, attack: true }, 1);
+    feed({ midi: 57 }, 19);
+    const carvedFrom = index * HOP_MS;
+    feed({ midi: 57, rms: level.high }, 4);
+    feed({ midi: null, rms: level.low }, 5);
+    const strokeStart = index * HOP_MS;
+    feed({ midi: 64, attack: true }, 1);
+    feed({ midi: 64 }, 19);
+    feed({ midi: null, rms: 0 }, 16);
+    const end = index * HOP_MS;
+    // The region reaches past the stroke, so both Notes are its candidates.
+    const out = tracker.applySegmentation(
+      segmentation([
+        segment(0, carvedFrom, 57, "regionStart"),
+        segment(carvedFrom, strokeStart, 57, "attack"),
+        segment(strokeStart, end, 64, "attack"),
+      ])
+    );
+    return { out, carvedFrom, strokeStart };
+  }
+
+  it("is the next stroke's preparation, whatever the region called its boundary", () => {
+    const { out, strokeStart } = underTheHand(true);
+    const absorbed = out.find(
+      (e) =>
+        e.type === "changed" &&
+        e.change.type === "structuralRevision" &&
+        e.change.relation === "absorbed"
+    );
+    expect(absorbed).toBeDefined();
+    if (absorbed?.type !== "changed") throw new Error("unreachable");
+    expect(absorbed.note.startTime).toBeCloseTo(strokeStart, 3);
+  });
+
+  it("is not a sustained note whose pitch the detector lost while its level held", () => {
+    const { out, carvedFrom } = underTheHand(true, { levelHolds: true });
+    expect(
+      out.filter(
+        (e) =>
+          e.type === "changed" &&
+          e.change.type === "structuralRevision" &&
+          e.change.relation === "absorbed"
+      )
+    ).toHaveLength(0);
+    const carved = out.filter((e) => e.type === "started").map((e) => e.note);
+    expect(carved.some((n) => Math.abs(n.startTime - carvedFrom) < 1)).toBe(true);
+  });
+
+  it("stands as a Note of its own with the rule off", () => {
+    const { out, carvedFrom } = underTheHand(false);
+    expect(
+      out.filter(
+        (e) =>
+          e.type === "changed" &&
+          e.change.type === "structuralRevision" &&
+          e.change.relation === "absorbed"
+      )
+    ).toHaveLength(0);
+    const carved = out.filter((e) => e.type === "started").map((e) => e.note);
+    expect(carved.some((n) => Math.abs(n.startTime - carvedFrom) < 1)).toBe(true);
+  });
+});
