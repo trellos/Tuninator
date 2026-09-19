@@ -6,6 +6,65 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-063]: The split instrument charges a Note to the label it overlaps most, each bar widened by the matcher's 40ms
+* **Date:** 2026-09-19
+* **Status:** Accepted
+* **Owner:** The project owner (the PR's decision 3, 2026-09-19); detection architecture carries it
+* **Context:** `scripts/measure-splits.ts` charged a Note to the last
+  label that had started when it did, reaching 40ms forward. On the
+  direct-input same-pitch takes every Note in a passage opens early, so
+  a boundary moved onto the right event moved the charge onto its
+  neighbour and the column read flat or one worse with every touched
+  boundary right (DECISION-049, DECISION-051, DECISION-054,
+  DECISION-057). Put to the owner as the PR's decision 3 with three
+  readings of DECISION-058's engine, nothing in the repository changed
+  (`docs/DETECTION-FINDINGS.md`, "The split instrument's ownership rule,
+  read three ways").
+* **Decision:** The owner chose most overlap. `ownerIndexOf(labels,
+  startedAt, endedAt)` charges a Note to the label whose bar, widened
+  by `OWNERSHIP_LEEWAY_MS` (40, the matcher's own onset tolerance) at
+  both ends, it overlaps most; a tie goes to the earlier bar; a Note
+  overlapping no widened bar is a stray, and `ORPHAN_GAP_MS` is gone.
+  `build-relabel-kit.ts` shares the rule. Leeway 0 and 40 count
+  identically everywhere; at 80 the count starts to fall by neighbouring
+  bars sharing a Note (amped and mic 144 → 142 on the tuning takes,
+  held-out 30 → 28) rather than by any boundary reading better. On
+  DECISION-058's engine, tuning takes: slow DI 20 → 8 of 327, amped and
+  mic 148 → 144; held-out DI 4 → 4, amped and mic 30 → 30; corpus 273 /
+  329 / 20 → 237 / 276 / 13. The baseline at `1c5e632` re-read: slow DI
+  52 → 37 of 365, amped and mic 189 → 185; corpus 316 / 379 / 20 → 277 /
+  323 / 13. So the seven kept iterations read DI 37 → 12 and amped and
+  mic 185 → 174 under the instrument that can see them, against 52 → 24
+  and 189 → 178 under the old one; the journal carries the baseline and
+  each kept iteration re-read. Of 33 Notes starting between two labels,
+  the old rule charged 25 to the next label, 6 as strays and 2 to the
+  previous; nearest start charges all 33 to the next; most overlap
+  charges 30 to the next, 2 as strays and 1 to a neighbour. Every
+  number in journal entries before this date stands as read under the
+  old rule and is not comparable to a later one without the re-read
+  table; ledger rows C11 and C25 reopen on the new count.
+* **Alternatives Considered:** (a) **Nearest label start** — the
+  thread's first recommendation; reads DI 9 and amped 146 on the tuning
+  takes, one and two worse than overlap, and charges a stray in a rest
+  to the note after it. (b) **Leave the count and judge by the
+  per-label trace** — the keep rule reads the count, so a rule the
+  count cannot see cannot be kept. (c) **Broad leeway** (80ms) — merges
+  neighbours, above. (d) **The overlap axis already printed as a second
+  line** — it counts a Note against every bar it touches, so it
+  brackets the truth from above and decides nothing.
+* **Consequences:** Positive — a boundary moved onto the right event
+  reads as one fewer split; the direct-input column on the tuning takes
+  reads 8, and those are Notes that both fill one bar, not chain
+  charges. Negative — two ledger rows need their falsifiers restated on
+  the new count (C11's "below 30" is met by the instrument alone, so
+  its bar is the current head's 8 at +0 missed); every earlier table is
+  a historical reading; the two other scripts that keep their own copy
+  of the old rule (`measure-articulation-stubs.ts`,
+  `measure-rig-ceiling.ts`) still read the old way and say so in their
+  headers, and were left alone because nothing in the loop reads them.
+
+---
+
 #### [DECISION-062]: The under-the-hand witness reads the level's fall alongside the pitch's absence, kept on the owner's decision
 * **Date:** 2026-09-19
 * **Status:** Accepted

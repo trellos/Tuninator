@@ -73,6 +73,12 @@ project's sixteenth-note ceiling studies looked.
 | `clean-lead-120bpm` quarters (7) | 0 / 0 | — |
 | **slow subset total (754)** | **52 / 54 on 365 DI labels** | **189 / 245 on 389 amped or mic labels** |
 
+> Read under the script's ownership rule as it stood on 2026-09-18. DECISION-063
+> (2026-09-19) changed that rule to most overlap with 40ms leeway; the same
+> baseline reads 37 / 38 on DI and 185 / 226 on amped or mic under it, and the
+> journal's "The instrument re-read" section carries every kept iteration
+> under the new rule. The keep rule (§6.5) is unchanged.
+
 Two things to take from that table before planning anything.
 
 - **Roughly one slow note in seven splits on a direct input, and one in two

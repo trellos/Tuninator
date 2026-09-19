@@ -9,19 +9,22 @@
  * the number that has to come down.
  *
  * Assignment is deliberately crude and independent of the matcher: a detection
- * belongs to the label whose annotated onset it began NEAREST to. Detections
- * before the first label, or more than `ORPHAN_GAP_MS` after the label they
- * would attach to has ended, are counted separately as strays rather than
- * blamed on a label.
+ * belongs to the label whose bar it OVERLAPS MOST, each bar widened by
+ * `OWNERSHIP_LEEWAY_MS` at both ends. A detection that overlaps no widened bar
+ * is counted separately as a stray rather than blamed on a label.
  *
- * Nearest, rather than "the most recent label that had already started, within
- * a tolerance". That rule was written for the 120bpm fixtures, where a fixed
- * 120ms tolerance is comfortably narrower than the gap between events, and it
- * silently inverted on the 140bpm takes, where a triplet is 140ms: a Note
- * beginning 118ms BEFORE a label was handed to that label rather than to the
- * one 22ms before it, and the event it really belonged to was then charged with
- * a split it had not committed. Nearest cannot invert, because it never reaches
- * past the midpoint between two labels.
+ * Most overlap, rather than "the last label that had started when the Note
+ * did, within a 40ms reach forward" (the rule until 2026-09-19, DECISION-063).
+ * That rule was right for a Note that began under its own label and wrong for
+ * one that began early: a Note starting 67ms before its label was charged to
+ * the label BEFORE it, so on the same-pitch takes, where a slow pick's release
+ * sounds 45-70ms after its contact, a boundary moved onto the right event
+ * moved the charge onto its neighbour and the count read flat (DECISION-049,
+ * DECISION-051, DECISION-054). Overlap cannot do that: a Note that mostly
+ * covers one bar is that bar's, whatever the tolerance at its start; a Note
+ * that starts in a rest and runs into the next bar is the next bar's, which
+ * is where the owner's ear puts it; and a Note that fills no bar at all is a
+ * stray, not a charge against the note it happened to follow.
  *
  * Usage:
  *   npx tsx scripts/measure-splits.ts
@@ -45,24 +48,16 @@ import { downmixToMono, readWav } from "../src/offline/wav.js";
 import { decodeFixtures } from "./decode-fixtures.js";
 
 /**
- * How far BEFORE a label's annotated onset a Note may begin and still be its.
- *
- * Not a search radius — a reach forward. A Note belongs to the last event that
- * had started when it did, and this only covers the case where it begins
- * slightly early: it is backdated onto its own attack, and the hand annotation
- * is not sample-exact. Matched detections sit at a median of +12ms from their
- * label over 266 pairs, with a tenth percentile near -35ms, so 40 covers every
- * genuine early start.
- *
- * It must stay well under the tightest subdivision in the corpus — a sixteenth
- * at 140bpm is 107ms — or it reaches past the next onset and charges a Note to
- * an event that had not begun. At 120 it did exactly that, and the resulting
- * "previous note's pitch, then the right one" pattern was read twice as a
- * naming defect. It is a tail fragment of the event BEFORE, charged forward.
+ * How far past a label's annotated start and end its bar reaches when a Note
+ * is charged to it. The matcher's own onset tolerance: matched detections sit
+ * at a median of +12ms from their label over 266 pairs, with a tenth
+ * percentile near -35ms, so 40 covers every genuine early start. It must stay
+ * well under the tightest subdivision in the corpus (a sixteenth at 140bpm is
+ * 107ms). Read on 2026-09-19 against 0 and 80: 0 and 40 count identically
+ * everywhere, and at 80 the count starts to fall by neighbouring bars sharing
+ * a Note rather than by any boundary moving (DECISION-063).
  */
-export const ONSET_TOLERANCE_MS = 40;
-/** How long after a label ends a Note may begin and still be counted against it. */
-export const ORPHAN_GAP_MS = 400;
+export const OWNERSHIP_LEEWAY_MS = 40;
 
 /**
  * Named slices of the corpus, as `--subset=<name>`.
@@ -130,15 +125,25 @@ function labelFilter(argv: readonly string[]): LabelFilter | null {
  */
 export function ownerIndexOf(
   labels: ReadonlyArray<{ startMs: number; endMs: number }>,
-  startedAt: number
+  startedAt: number,
+  endedAt: number | null
 ): number {
+  // A Note the engine never ended, or ended on its own start, still stood
+  // somewhere: a millisecond is enough to overlap the bar it began in.
+  const end = endedAt === null || endedAt <= startedAt ? startedAt + 1 : endedAt;
   let owner = -1;
+  let most = 0;
   for (let i = 0; i < labels.length; i++) {
-    if (startedAt + ONSET_TOLERANCE_MS < (labels[i] as { startMs: number }).startMs) break;
-    owner = i;
+    const label = labels[i] as { startMs: number; endMs: number };
+    const overlap =
+      Math.min(end, label.endMs + OWNERSHIP_LEEWAY_MS) -
+      Math.max(startedAt, label.startMs - OWNERSHIP_LEEWAY_MS);
+    // Strictly more, so a tie goes to the earlier bar.
+    if (overlap > most) {
+      most = overlap;
+      owner = i;
+    }
   }
-  if (owner === -1) return -1;
-  if (startedAt > (labels[owner] as { endMs: number }).endMs + ORPHAN_GAP_MS) return -1;
   return owner;
 }
 
@@ -158,9 +163,10 @@ type FixtureRow = {
   strays: number;
   /**
    * The same question asked the other way: how many Notes were sounding at any
-   * point inside the label's span. A Note that rings across a boundary is
-   * counted against both labels, so this over-counts where the ownership rule
-   * under-counts, and the truth is bracketed between them.
+   * point inside the label's own span, with no leeway. A Note that rings
+   * across a boundary is counted against both labels where the ownership rule
+   * charges it to one, so this over-counts where that under-counts, and the
+   * truth is bracketed between them.
    */
   overlapSplit: number;
   overlapExtras: number;
@@ -187,12 +193,10 @@ function measure(): FixtureRow[] {
 
     let strays = 0;
     for (const detection of detections) {
-      // The last event that had started when this Note did. A Note may begin
-      // slightly BEFORE its label, because it is backdated onto its attack and
-      // the annotation is not sample-exact, so the tolerance lets it reach one
-      // event forward — but no further than the tightest subdivision in the
-      // corpus, or it reaches the wrong event entirely. See `ownerIndexOf`.
-      const owner = ownerIndexOf(labels, detection.startedAt);
+      // The bar this Note fills most of, each bar widened by the matcher's
+      // onset tolerance at both ends; a Note filling no bar is a stray. See
+      // `ownerIndexOf`.
+      const owner = ownerIndexOf(labels, detection.startedAt, detection.endedAt);
       if (owner === -1) {
         strays++;
         continue;

@@ -7737,3 +7737,133 @@ takes is unchanged; the held-out row reads missed 27 where the report's
 only a held-out take can see is still one the loop does not keep, and
 this one is held on the owner's word, recorded as such in DECISION-062
 and the journal so a later reader does not take it for a reading.
+
+## The split instrument's ownership rule, read three ways, and the corpus re-read under most overlap
+
+DECISION-063; the PR's decision 3. Not a loop iteration: the engine is
+unchanged and only the count changed.
+
+### The question
+
+`measure-splits.ts` charged a Note to the last label that had started
+when it did, reaching 40ms forward. It was written for the 120bpm
+fixtures, where a Note begins under its own label or slightly early. On
+the direct-input same-pitch takes a slow pick's release sounds 45–70ms
+after its contact, the labels sit on the release, and before
+DECISION-046 every Note opened at the contact, so every Note in a
+passage began early and was charged to the label before it; a boundary
+moved onto the release moved that charge to the next label without
+removing it. Five iterations placed boundaries right and read flat or
+one worse for it (DECISION-049, DECISION-051, DECISION-054,
+DECISION-055's chain, DECISION-057), and the two rows that reach the
+remaining direct-input splits were blocked on the count.
+
+### Three rules on DECISION-058's engine, nothing in the repository changed
+
+Scored from one analysis pass: the shipped rule; nearest label start
+(the label whose annotated onset the Note began nearest, stray if it
+begins more than 400ms after that label ends); and most overlap, each
+bar widened by 0, 40 or 80ms at both ends, stray if it overlaps no
+widened bar. Slow subset split / extras, then whole-take split / extras
+/ strays:
+
+```
+totals (slowSplit/slowExtras | split/extras/strays):
+  tuning    DI         shipped     20/21 | 21/22/1
+  tuning    DI         nearest     9/10 | 10/11/0
+  tuning    DI         overlap+0   8/9 | 9/10/0
+  tuning    DI         overlap+40  8/9 | 9/10/0
+  tuning    DI         overlap+80  9/9 | 10/10/0
+  tuning    amped+mic  shipped     148/196 | 183/233/8
+  tuning    amped+mic  nearest     146/181 | 179/216/1
+  tuning    amped+mic  overlap+0   144/178 | 167/203/5
+  tuning    amped+mic  overlap+40  144/178 | 166/202/5
+  tuning    amped+mic  overlap+80  142/181 | 176/217/3
+  tuning    all        shipped     168/217 | 204/255/9
+  tuning    all        nearest     155/191 | 189/227/1
+  tuning    all        overlap+0   152/187 | 176/213/5
+  tuning    all        overlap+40  152/187 | 175/212/5
+  tuning    all        overlap+80  151/190 | 186/227/3
+  held-out  DI         shipped     4/5 | 13/15/1
+  held-out  DI         nearest     4/4 | 12/12/0
+  held-out  DI         overlap+0   4/4 | 11/12/0
+  held-out  DI         overlap+40  4/4 | 11/12/0
+  held-out  DI         overlap+80  4/4 | 13/14/0
+  held-out  amped+mic  shipped     30/31 | 56/59/10
+  held-out  amped+mic  nearest     30/31 | 55/58/5
+  held-out  amped+mic  overlap+0   30/30 | 52/53/8
+  held-out  amped+mic  overlap+40  30/30 | 51/52/8
+  held-out  amped+mic  overlap+80  28/29 | 54/56/8
+  held-out  all        shipped     34/36 | 69/74/11
+  held-out  all        nearest     34/35 | 67/70/5
+  held-out  all        overlap+0   34/34 | 63/65/8
+  held-out  all        overlap+40  34/34 | 62/64/8
+  held-out  all        overlap+80  32/33 | 67/70/8
+```
+
+```
+Notes starting between two labels (corpus): 33
+  shipped     {"next":25,"stray":6,"previous":2}
+  nearest     {"next":33}
+  overlap+0   {"next":30,"other":1,"stray":2}
+  overlap+40  {"next":30,"other":1,"stray":2}
+  overlap+80  {"next":29,"other":1,"stray":2,"previous":1}
+```
+
+Leeway 0 and 40 count identically on every take. At 80 the amped column
+falls by two on the tuning takes and by two held-out, not because any
+boundary reads better but because a Note that starts late in one bar
+now outscores its own bar on the next. Nearest start charges every Note
+that begins between two labels to the label after it, a stray in a rest
+included; most overlap charges the ones that run into the next bar to
+that bar, which is where a listener puts them, and leaves the two that
+fill nothing as strays.
+
+### What was changed
+
+`ownerIndexOf(labels, startedAt, endedAt)` in `scripts/measure-splits.ts`:
+the label whose bar, widened by `OWNERSHIP_LEEWAY_MS` (40) at both ends,
+the Note overlaps most; ties to the earlier bar; a Note the engine never
+ended is given one millisecond so it overlaps the bar it began in; no
+overlap is a stray. `ORPHAN_GAP_MS` is gone. `build-relabel-kit.ts`
+passes the Note's end. The second axis the script prints, every Note
+sounding inside a label's own span, is unchanged.
+
+### The corpus re-read: the baseline and every kept iteration under the new rule
+
+Each row is that commit's engine, scored by the new script (the script
+copied into a checkout of the commit; fixtures and the offline adapter
+are unchanged across the branch). Split / extras.
+
+| | DI, tuning takes (327) | DI, held-out (38) | DI (365) | amped + mic, tuning (245) | amped + mic, held-out (144) | amped + mic (389) | slow subset (754) | corpus split / extras / strays (1592) |
+|---|---|---|---|---|---|---|---|---|
+| main (`1c5e632`) | 32 / 33 | 5 / 5 | 37 / 38 | 153 / 194 | 32 / 32 | 185 / 226 | 222 / 264 | 277 / 323 / 13 |
+| after 1 | 18 / 19 | 5 / 5 | 23 / 24 | 153 / 194 | 31 / 31 | 184 / 225 | 207 / 249 | 262 / 308 / 13 |
+| after 2 | 15 / 16 | 4 / 4 | 19 / 20 | 153 / 194 | 31 / 31 | 184 / 225 | 203 / 245 | 256 / 302 / 12 |
+| after 4 | 14 / 15 | 4 / 4 | 18 / 19 | 148 / 183 | 30 / 30 | 178 / 213 | 196 / 232 | 249 / 289 / 12 |
+| after 6 | 14 / 15 | 4 / 4 | 18 / 19 | 148 / 183 | 30 / 30 | 178 / 213 | 196 / 232 | 249 / 289 / 12 |
+| after 8 | 13 / 14 | 4 / 4 | 17 / 18 | 148 / 183 | 30 / 30 | 178 / 213 | 195 / 231 | 248 / 288 / 12 |
+| after 11 | 10 / 11 | 6 / 6 | 16 / 17 | 145 / 179 | 30 / 30 | 175 / 209 | 191 / 226 | 242 / 281 / 13 |
+| after 14 | 8 / 9 | 4 / 4 | 12 / 13 | 144 / 178 | 30 / 30 | 174 / 208 | 186 / 221 | 237 / 276 / 13 |
+
+Under the old rule the same commits read DI 52 → 42 → 34 → 34 → 33 → 31
+→ 27 → 24 and amped and mic 189 → 188 → 188 → 182 → 182 → 182 → 179 →
+178. The difference is the chain: iteration 1 alone reads 32 → 18 on the
+tuning DI takes here against 52 → 42 there, because the fourteen phantoms
+the rate gate held back had each been charged to the label before the
+one they sat in, and iteration 2's boundary moves, which the old rule
+read as 42 → 34, read here as what they were, boundaries that were
+already the right label's.
+
+### What is left on the direct input, tuning takes
+
+Eight labels, each with two or more Notes filling its own bar: the
+held-then-picked DI take's `p1c1h`, `p2c3q2`, `p2c4q3` and `p3c4q1` (the
+last a G3 with a G5 beside it); the A3 eighths take's `e865`; the E5
+eighths take's `e821`; the quarters take's `e5` and `e26` (three Notes).
+Held-out, four on the DI triplet take, `q7`, `q9`, `e6` and `e12`, each
+a Note at another pitch (A#4, B4, G5, A4) beside the right one, not a
+same-pitch fragment. Which of the ceiling's categories each of the eight
+belongs to (a refused-contact burst whose release Note starts inside
+its own bar, or a phantom the witnesses cannot separate) is for C11's
+rerun on this count to say.
