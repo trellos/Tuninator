@@ -7588,3 +7588,52 @@ half — the three tuning-take absorptions stand (the twenty-one real
 notes fail the pitch reading whatever their fall) and the mic Note fails
 the fall. That is row C27, the prediction on held-out `t6` back at the
 tuning takes bit-identical to DECISION-058's.
+
+## The under-the-hand witness as pitch and level together: the mic label back, the tuning takes bit-identical, and a constant only a held-out take can see
+
+DECISION-044's loop, iteration 16; DECISION-060. Built, measured,
+reverted. Ledger row C27 (spent).
+
+### The falsifier, stated before the pipeline ran
+
+As the row had it: on the tuning takes, bit-identical to DECISION-058's
+engine — the three absorptions kept, the twenty-one real notes under
+`region-attack` refused — and then held-out read once, `t6` back with the
+two DI triplet absorptions kept.
+
+### What was built
+
+`tracking.underHandLevelFall` (0.5; 1 is DECISION-058's reading): the
+tracker's hop log carries each hop's RMS beside its pitch, and a carved
+Note is under the hand only when, besides reading no pitch on half its
+hops, its quietest hop is at most that fraction of its loudest
+(`levelFallIn`). One more test: a sustained note whose pitch the detector
+lost while its level held is not absorbed, and is at a fall of 1.
+
+### Numbers, before → after (derivation predicate "not 140bpm")
+
+    slow subset      DI 20 → 20 of 327; amped + mic 148 → 148 — every take line identical
+    corpus (deriv)   split 204, extras 255, strays 9, missed 112, fp 200, det 1299 — unchanged
+    held-out (once)  missed 28 → 27 (`t6` back), fp 67 → 67, split 69 → 69, extras 74 → 74, det 420 → 421
+    tests            542 with the test; 541 after the revert
+
+Exactly the prediction, on both sets: the three tuning-take absorptions
+fall to 0.09, 0.37 and 0.06 of their own peak and stand; the mic triplet
+Note holds at about 0.7 and stands as its own Note, so `t6` is matched
+again and the take's onset p90 falls from 98ms to 89ms.
+
+### Verdict
+
+Reverted, on the keep rule's letter: the slow subset is better on no
+derivation path, because nothing on the thirteen tuning takes is refused
+by the level half. The constant separates the three absorbed Notes
+(0.06–0.37) from one Note that holds its level, and that Note is
+held-out; any value between 0.37 and 0.7 reads the same on derivation,
+and 0.5 was chosen with the mic Note's level in view. That is a constant
+only a held-out take can see, which §6.6 of the loop's brief says is
+not a result, and the iteration 2 precedent (three guards read on the
+moved boundaries, none with an edge not tuned to held-out events, none
+added) is the same shape. The mechanism is right as far as either set
+can say, and it is one constant; whether `t6` is worth keeping it
+outside the loop's rule is the owner's call, put as a third option on
+the PR's decision 5.

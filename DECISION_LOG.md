@@ -6,6 +6,44 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-060]: The under-the-hand witness does not read the level's fall alongside the pitch's absence
+* **Date:** 2026-09-19
+* **Status:** Rejected
+* **Owner:** Detection architecture; DECISION-044's loop, iteration 16
+* **Context:** DECISION-059 found the gate the wrong absolute for an
+  amped render and named the level relative to the Note as the missing
+  half of DECISION-058's witness: the three absorbed Notes on the tuning
+  takes fall to 0.06–0.37 of their own peak, the mic triplet Note that
+  cost `t6` holds at about 0.7 (`docs/DETECTION-FINDINGS.md`, "The
+  under-the-hand witness as pitch and level together").
+* **Decision:** Built as `tracking.underHandLevelFall` (0.5; 1 is the
+  pitch alone), the quietest hop over the loudest under the carved Note.
+  Derivation bit-identical to DECISION-058's engine on every take;
+  held-out, read once, missed 28 → 27 with `t6` back and nothing else
+  moved. Reverted on the keep rule's letter: the slow subset is better on
+  no derivation path, since nothing on the tuning takes is refused by the
+  level half, so the constant is one only a held-out take can see (§6.6
+  of the loop's brief; the DECISION-046 precedent of guards not added
+  because their edge was read on held-out events). Engine bit-identical
+  to DECISION-058's.
+* **Alternatives Considered:** (a) **Keeping it on the held-out gain** —
+  rejected by the loop's rule; put to the owner as an option on the PR's
+  decision 5, since the mechanism is right as far as either set can say
+  and it is one constant. (b) **The RMS at the Note's end over its peak**
+  instead of the quietest hop — not built: the same reading on every
+  candidate in the derivation table. (c) **A derivation site for the
+  level half** — none exists in the corpus: no tuning take carries a
+  sustained note the detector loses the pitch of between a note's end
+  and a stroke.
+* **Consequences:** Positive — the witness's second half is built,
+  tested and measured, with its reading on every candidate on record.
+  Negative — the engine did not move; `t6` stays lost under
+  DECISION-058 unless the owner keeps this outside the rule; the loop
+  has now built and reverted two candidates in a row, the first with a
+  new ledger row and this one without.
+
+---
+
 #### [DECISION-059]: The under-the-hand witness does not read the amplitude gate in place of the pitch detector
 * **Date:** 2026-09-19
 * **Status:** Rejected
