@@ -569,6 +569,187 @@ export type EngineConfig = {
      * it would at 0.5, and takes no labels with it at any span bar tried.
      */
     rateFragmentDipRatio: number;
+    /**
+     * The second shape a suspected same-pitch fragment can take: a boundary
+     * where nothing ARRIVED, read on the direct input.
+     *
+     * `rateFragmentDipRatio` asks whether the envelope fell before the
+     * transient. On the direct input it never fell far enough to answer: the
+     * emitted same-pitch fragments in the slow subset on DI carry a median
+     * dip of 0.64, so the shipped gate has nothing to say to them and every
+     * one of them was announced. What they do share is that no energy came
+     * in. `AttackEvidence.riseRatio` — the short envelope over its 80ms
+     * baseline — sits at a median 0.77 on those fragments, while a real
+     * re-pick on the same recordings rises to 1.01 at its tenth percentile.
+     * A pick that lands is louder than what it lands on; an invented boundary
+     * is not.
+     *
+     * A same-pitch boundary with `riseRatio` under this bar, and a dip no
+     * deeper than `rateFragmentNoRiseDipRatio`, gets the announce bar of
+     * `rateFragmentNoRiseSpanFraction` × the local interval, exactly as the
+     * dip form does. The two forms are independent witnesses of the same
+     * absence: one says the string was never damped by a pick, the other
+     * that no pick's energy arrived. Either alone is a suspected fragment; a
+     * real re-pick shows both.
+     *
+     * 0.8 is the largest value that costs no played note on the derivation
+     * material; at 0.9 it takes three, each a real re-pick whose rise the
+     * 80ms baseline under-reads (0.82-0.89) because the note before it was
+     * still loud. The bench put the nearest real note 0.02 away, which is
+     * why this does not sit higher.
+     */
+    rateFragmentNoRiseRatio: number;
+    /**
+     * How little the envelope may have fallen for the no-rise form to apply.
+     *
+     * A boundary with a deep dip under it is a pick making contact, whatever
+     * the rise reads: the fragments the no-rise form is for have dips of
+     * 0.44-0.85, the real re-picks on the direct input 0.38 at their ninetieth
+     * percentile. Read against the same rows it costs nothing between 0.3
+     * and 0.5 on the derivation material and one fewer held-out label at 0.4
+     * than at 0.3; it is here as a floor, not a tuned edge.
+     */
+    rateFragmentNoRiseDipRatio: number;
+    /**
+     * The announce bar for the no-rise form, as a fraction of the local
+     * interval. Higher than `rateFragmentSpanFraction` because the population
+     * it separates sits further from the real notes: the DI fragments close
+     * at a median 0.42 of the causal interval (0.51 at the third quartile),
+     * the real re-picks last 0.68 at their tenth percentile. 0.5 is the
+     * largest value that costs nothing on derivation; 0.55 costs one label.
+     */
+    rateFragmentNoRiseSpanFraction: number;
+    /**
+     * How much the audio must rise over the 80ms before an attack for that
+     * attack to be a pick's RELEASE, when the Note it lands in opened on the
+     * pick's CONTACT. 0 turns the rule off.
+     *
+     * A slow pick stroke on a direct input is two events: the pick lands on
+     * the string and mutes it — 25 to 40dB down within a few milliseconds —
+     * and 45 to 70ms later lets go, which is when the note sounds. Both
+     * kernels fire on the contact, so the Note opens there, and the release
+     * then lands inside the articulation window: either the Note is still
+     * too young to be re-articulated and the attack is folded in, or the
+     * fine witness opened a stub on the contact and the release's split
+     * absorbs that stub and inherits its start. Either way the boundary
+     * stays on the contact. Every label the corpus has puts the note at the
+     * release, to within 6ms on every stroke probed, and so does a player.
+     * On the slow direct-input material that shape was 27 of the 35 split
+     * events remaining after DECISION-045, none of them a phantom: one Note
+     * per pick, each starting 45–70ms early, and the note before it ending
+     * as early.
+     *
+     * The release is recognised by its rise — `FastFrame.riseRatio`, the
+     * short envelope over the 80ms before it, which here spans the muted
+     * string — landing in a Note whose own opening had no rise or was the
+     * fine witness's (`CONTACT_RISE` in the tracker), within
+     * `transient.articulationMs` of that opening. The boundary moves to the
+     * release; a stub the release split is still absorbed, so the consumer
+     * never sees it, but no longer lends its start. Level was tried first
+     * and cannot work: a stub backdated onto the contact carries the
+     * release's own level, because the frames under it were folded before
+     * it existed. Swept 1.5 / 2 / 2.5 / 3 / 4 on the derivation predicate:
+     * slow DI split 30 / 30 / 31 / 31 / 32 of 327 against 35 off, missed
+     * unchanged at every bar, the amped column untouched; 2 is the middle of
+     * the plateau. See DECISION-046 and the findings entry.
+     */
+    releaseRiseRatio: number;
+    /**
+     * Whether an opening that never became a Note — absorbed as a stub, or
+     * dropped before it was announced — is struck from the local-rate
+     * estimate (`localIoiMs` in the tracker) once that is known. False keeps
+     * every opening in, which is the estimator DECISION-030 shipped.
+     *
+     * On the E5 eighths DI take the estimator's window before a 250ms
+     * eighth reads gaps of 67, 91, 149, 152, 200, 227, 267 and 280ms: the
+     * true interval is cut into pieces by contact stubs and phantoms that
+     * were opened and then dropped, and the median of eight such gaps sits
+     * on a cliff between the pieces (200ms) and the whole (227–280ms). One
+     * boundary moved 67ms tipped it 227 → 160ms and lowered the bar a
+     * suspected fragment must outlast from 113 to 80ms, which two 80ms
+     * contact stubs then cleared (DECISION-047). Striking the retracted
+     * openings is causal — only a fate already decided is read — and leaves
+     * the estimate reading the notes that were actually announced. See
+     * DECISION-048.
+     */
+    paceIgnoresRetracted: boolean;
+    /**
+     * Whether the release test behind `releaseRiseRatio` reads a hop the
+     * amplitude gate refused. False is the test as DECISION-046 shipped it:
+     * a gated hop is refused before any witness is read.
+     *
+     * The gate exists to stop the fast lane opening a Note on room tone,
+     * and this opens nothing. On a direct input the string under the pick
+     * sits at a thirtieth of its level, under `analysis.rmsGate`, and the
+     * release begins there: the transient detector fires on the flux
+     * window, which leads the long RMS window the gate reads, so the hop
+     * that carries the release's rise is still gated and the Note keeps
+     * the contact. The E5 eighths DI take: contact accepted at 5626ms on
+     * the sharpness fallback, release at 5706ms with rise 3.66 refused
+     * `gated`, Note 76ms early. Reading the rise on that hop moves a start
+     * that has not been announced, in a Note that is already open, on a
+     * witness that is a ratio over the muted string rather than a level.
+     * See DECISION-050.
+     */
+    releaseOnGatedHop: boolean;
+    /**
+     * Whether the release test on a gated hop also reads a Note the fine
+     * witness opened, on the frame that opens it, and keeps that Note's
+     * announce clock on the contact when it moves the start. False is the
+     * test as DECISION-050 shipped it: an unsettled Note only.
+     *
+     * The fine witness confirms an onset 65ms after it, so a contact it
+     * delivers arrives on a frame that may already carry the release (the
+     * E5 eighths DI take: contact at 6122.67ms delivered at 6200ms, the
+     * release's own hop). `handleFineOnset` opens the Note born settled on
+     * that frame, so `!settled` refused the release and the Note kept the
+     * contact. Reading it there moves the start; what the move must not do
+     * is re-decide the Note. The witness that opened it already did that,
+     * and `announceSoundedMs` reads from `startTime`, so a stroke whose
+     * release re-excites the string only to the gate's level had 13ms on
+     * its clock after the move where it had 75ms before, and was dropped
+     * (the quarters DI take, 35445ms; DECISION-051). With this on, the
+     * clock keeps reading from the contact for the Note the release moved.
+     * See DECISION-052.
+     */
+    releaseOnFineOpenedFrame: boolean;
+    /**
+     * The string under the fretting hand, carved by the region lane as a
+     * Note of its own, is the next stroke's preparation.
+     *
+     * Between a note's end and the release of the stroke that follows, the
+     * string sits half-stopped under the hand: on the direct input its level
+     * has fallen to a few percent and the pitch detector loses it on half
+     * the hops. The region lane's attack branch puts a boundary on the
+     * pick's contact and carves that stretch as a Note, and `offerPrefix`
+     * refused it as a stroke by the region's account, so 93ms of muted
+     * string stood as a Note (the held-then-picked DI take, 17413ms and
+     * 41893ms). With this on, a carved Note whose fast-lane hops were
+     * unvoiced at least `underHandUnvoicedFraction` of the time is offered
+     * past that boundary; the transient at its start counts as a stroke only
+     * when its rise clears `releaseRiseRatio`, the contact's does not; and
+     * it is claimed whatever pitch it read, the reading being the string
+     * half-stopped. On the tuning takes the twenty real notes the same
+     * refusal keeps read unvoiced 0 to 0.33 of their hops, the two under
+     * the hand 0.5 and 0.75. `false` is the offer as shipped. See
+     * DECISION-058.
+     */
+    prefixUnderHand: boolean;
+    /** The unvoiced fraction of a carved Note's hops at which it is the string under the hand. */
+    underHandUnvoicedFraction: number;
+    /**
+     * The other half of that witness: the carved Note's quietest hop over
+     * its loudest must be at most this. Muted string falls; a sustained note
+     * the pitch detector lost while it still sounded holds its level, and
+     * through a microphone one such note read no pitch on nine of twelve
+     * hops at 0.7 of its peak and was absorbed as under the hand, costing a
+     * real note. The three Notes the pitch half absorbs on the tuning takes
+     * fall to 0.09, 0.37 and 0.06 of their own peak, so the tuning takes
+     * are bit-identical with this at 0.5; only the held-out mic take sees
+     * it. 1 is the pitch half alone. Kept on the owner's decision rather
+     * than the loop's rule; see DECISION-062.
+     */
+    underHandLevelFall: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -769,6 +950,41 @@ export type EngineConfig = {
      */
     segmentAttackRiseRatio: number;
     /**
+     * Whether an envelope-rise boundary is placed on the first broadband
+     * transient inside the window that noticed the rise whose rise — on its
+     * own hop or the next, since the rise witness lags the flux by one hop —
+     * clears `tracking.releaseRiseRatio`, when there is one. False is the
+     * segmentation as shipped: the boundary at that window's start.
+     *
+     * The window's start is the earliest defensible estimate and up to 85ms
+     * early. On the direct-input same-pitch takes the window that first
+     * clears `segmentRiseRatio` begins in the mute between the pick landing
+     * and letting go, so the region lane's Note starts 45–65ms before the
+     * string sounds, and the transient the fast lane saw at the release sits
+     * inside that same window (the quarters DI take, `a4`: boundary at
+     * 3427ms, release transient at 3467ms, label at 3490ms). The first
+     * transient in the window is not it (DECISION-053: the band-only witness
+     * at the mute's onset, the burst's first attack at the contact), and the
+     * transient's own hop is not where its rise reads (DECISION-054: `a2` at
+     * 2520ms reads 1.03 on its hop and 2.67 on the next). See DECISION-055.
+     */
+    segmentRiseOnRisingTransient: boolean;
+    /**
+     * A region boundary that lands where a Note already begins is that Note.
+     *
+     * `true` (default): when the region lane would carve a successor out of
+     * the last few tens of milliseconds of a Note, it looks at every Note the
+     * tracker still holds, and if one already begins within a hop of the
+     * boundary it carves nothing — the fast lane put that boundary in, and
+     * the region agrees with it. `false` is the carve as shipped: it sees
+     * only the region's own Notes and the ones still open, and a Note that
+     * began inside the region but ended past its edge is out of sight, so
+     * the carve duplicates it (the A3 eighths DI take, 32293ms: the region's
+     * owner ended 4e-12ms after the boundary and a second Note was carved
+     * beside the one already standing there). See DECISION-055.
+     */
+    regionCarveSeesEveryNote: boolean;
+    /**
      * Let the deep lane absorb Notes the fast lane over-segmented.
      *
      * Splitting is additive — it can only turn one detection into two — while
@@ -895,6 +1111,16 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minUnpitchedStableMs: 90,
     rateFragmentSpanFraction: 0.35,
     rateFragmentDipRatio: 0.85,
+    rateFragmentNoRiseRatio: 0.8,
+    rateFragmentNoRiseDipRatio: 0.4,
+    rateFragmentNoRiseSpanFraction: 0.5,
+    releaseRiseRatio: 2,
+    paceIgnoresRetracted: true,
+    releaseOnGatedHop: true,
+    releaseOnFineOpenedFrame: true,
+    prefixUnderHand: true,
+    underHandUnvoicedFraction: 0.5,
+    underHandLevelFall: 0.5,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,
@@ -930,6 +1156,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     segmentHoldWindows: 2,
     segmentRiseRatio: 2.0,
     segmentAttackRiseRatio: 1.25,
+    segmentRiseOnRisingTransient: true,
+    regionCarveSeesEveryNote: true,
     regionMerge: false,
     regionCorrectPitch: false,
   },
