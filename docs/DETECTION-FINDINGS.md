@@ -7637,3 +7637,65 @@ added) is the same shape. The mechanism is right as far as either set
 can say, and it is one constant; whether `t6` is worth keeping it
 outside the loop's rule is the owner's call, put as a third option on
 the PR's decision 5.
+
+## Two rows read without a build, and where the loop stands: the octave stub's start lent to amped onsets, and a sharpness ceiling on the contact
+
+DECISION-044's loop, iteration 17; DECISION-061. Two counts, no build;
+the loop paused on the owner's decisions.
+
+### C22 for the amped column: lending the stub's start
+
+DECISION-056 restated C22 for the amped column: nine amped successors
+42–77ms late would read within 40ms of their labels with the start of
+the unannounced octave stub lent to them. Read without a build by
+lending every such start on the tuning takes in the detections and
+re-scoring (`c22-count.ts`): 77 starts lent across nine takes, and the
+counts the loop reads move the wrong way — slow subset 168 → 170, split
+204 → 206, extras 255 → 259, missed 112 → 112, false positives 200 →
+200; matched onsets more than 40ms off 390 → 389. The E5 eighths DI take
+lends 29 starts and reads 6 → 7 on the slow subset, the E5 eighths amped
+take 22 → 24, the quarters amped 46 → 45; the held-then-picked amped
+take lends nine and no count moves. The mechanism is not a same-pitch
+split rule: it moves onsets by a hop or two, which the split instrument
+sees only where a start crosses a label's 40ms reach, and there it
+crosses the wrong way as often as the right one. The direct-input takes
+are not bit-identical under it, which was the row's own condition.
+Falsified by its count; the nine late amped onsets remain a row for the
+amped onset column, outside this loop's scoring.
+
+### C13: a sharpness ceiling on the contact
+
+DECISION-046's release rule moves a contact-opened Note's start to its
+release; the two held-out labels it cost (`s7`, `s16`, the room-mic
+sixteenths take) had broadband transients of sharpness 9.9 and 12.8 at
+the "contact", and the row said the DI contacts read 0.5–6.6, so a
+ceiling between them was to be derived on the tuning takes. The count
+(`c13-count.ts`): 54 release moves on the tuning takes, 51 on the direct
+input and 3 through the amp or mic. Of the DI moves with a broadband
+transient at the contact, five read sharper than 6.6 and four sharper
+than 9.9, up to 10.5 — all on the E5 eighths DI take, all via the stub
+path, all moves of 0–14ms whose Notes hold their labels. The three
+amped and mic moves have one broadband transient at the contact between
+them, of sharpness 0.9; the other two contacts are the fine witness's,
+which carries no sharpness. So the row's premise does not hold on the
+tuning takes (DI contacts read up to 10.5, not 6.6), and no ceiling at
+6.6, 8, 9.9 or 12 changes any count on the derivation set, because every
+move it would refuse is a move of at most 14ms. The constant is one only
+a held-out take can see, the same shape DECISION-060 reverted on.
+Falsified by its count.
+
+### Where the loop stands
+
+Every ledger row that targets the direct-input split column (C11, C25)
+is blocked on the owner's split-instrument decision (DECISION-054's
+item, PR decision 3); the level half of the under-the-hand witness
+(C27) is a held-out-only gain the owner may keep outside the rule (PR
+decision 5); C22 and C13 are closed by their counts; C8 is an
+instrument question (the slow subset at 44.1kHz) and the repository has
+no resampler to run it with. What remains open with a stated falsifier
+is doors 1 and 3 of the brief (C1, a joint decode over a region's
+boundaries; C3, a learned classifier on the outcome target) and two
+rows outside the slow subset (C5, C6). Those are new mechanisms, not
+tuning, and the owner's instruction on 2026-09-18 bounded this run to
+what tuning can do. The exit rule of §9 has not fired by its letter;
+the tuning-only run is paused here, with the report in the journal.

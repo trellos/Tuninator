@@ -6,6 +6,48 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+#### [DECISION-061]: The slow-note-splits loop's tuning-only run pauses on the owner's decisions, with its last two ledger rows closed by their counts
+* **Date:** 2026-09-19
+* **Status:** Proposed
+* **Owner:** Detection architecture; the project owner decides what reopens it (DECISION-044's loop, iteration 17)
+* **Context:** After DECISION-060 the ledger held two rows the loop could
+  still measure without the owner: C22 restated for nine late amped
+  onsets (DECISION-056) and C13, a sharpness ceiling on the contact for
+  DECISION-046's release rule (`docs/DETECTION-FINDINGS.md`, "Two rows
+  read without a build, and where the loop stands").
+* **Decision:** Both read without a build and both falsified by their
+  counts. C22: lending every unannounced octave stub's start to its
+  successor on the tuning takes moves the slow subset 168 → 170, extras
+  255 → 259, missed and false positives unchanged, and the direct-input
+  takes are not bit-identical; it is an onset rule for the amped column,
+  not a same-pitch split rule. C13: of 54 release moves on the tuning
+  takes, the contacts sharper than 6.6 are all direct-input moves of at
+  most 14ms on the E5 eighths take (up to 10.5), and the amped and mic
+  moves have no broadband transient at the contact, so no ceiling
+  between 6.6 and 12 changes a derivation count and the constant is one
+  only a held-out take can see (as DECISION-060). With C11 and C25
+  blocked on the split instrument's forward reach (PR decision 3), C27
+  on the owner accepting a held-out-only gain (PR decision 5), and the
+  remaining rows with stated falsifiers being doors 1 and 3 (new
+  mechanisms the owner's instruction on 2026-09-18 did not cover) and
+  two rows outside the slow subset (C5, C6), the tuning-only run pauses.
+  §9's exit rule has not fired by its letter; the journal carries the
+  report §9 asks for at exit, so the owner reads the same page either
+  way. Engine unchanged, bit-identical to DECISION-058's.
+* **Alternatives Considered:** (a) **Building C22 or C13 anyway** —
+  rejected: a count that already answers the falsifier makes the build a
+  third consecutive revert. (b) **Starting door 1 or door 3** — not the
+  owner's ask; put to him as what reopens the loop. (c) **Running C8 (the
+  slow subset at 44.1kHz)** — the repository has no resampler
+  (`decode-fixtures.ts` refuses any rate but 48kHz by design); left open.
+* **Consequences:** Positive — every row the loop could measure alone
+  has a measured verdict; the state is in one place for the owner.
+  Negative — the direct-input column stops at 24 of 365 slow labels
+  split (20 of 327 on the tuning takes) until the scorer decision lands;
+  nothing on the amped column moves without a new mechanism.
+
+---
+
 #### [DECISION-060]: The under-the-hand witness does not read the level's fall alongside the pitch's absence
 * **Date:** 2026-09-19
 * **Status:** Rejected
