@@ -7867,3 +7867,77 @@ same-pitch fragment. Which of the ceiling's categories each of the eight
 belongs to (a refused-contact burst whose release Note starts inside
 its own bar, or a phantom the witnesses cannot separate) is for C11's
 rerun on this count to say.
+
+## Door 1 on the bench: the phrase's own spacing, read after the rate gate, is worth 13 extras at no cost
+
+DECISION-065; journal iteration 18; ledger C1. Nothing in the engine
+changed. Labels as of DECISION-064.
+
+### The question
+
+Door 2 closed because every witness read at a boundary tops out near
+0.70 AUC. Door 1 moves the reading from the boundary to the sequence: in
+a phrase of same-pitch Notes, a phantom boundary cuts one interval into
+two pieces off the phrase's grid, and dropping it restores an interval
+on the grid; a real note is on the grid either way. The bench
+(`scripts/measure-phrase-regularity-decode.ts`) scores a phrase (Notes
+opened within 1.2s of each other, at least four) by the summed distance,
+in octaves, of each interval from the nearest allowed multiple of the
+phrase's median interval, and drops same-pitch boundaries greedily, best
+first, while a drop lowers that cost by more than a margin. The drop is
+simulated on the final detection list and the matcher re-run. No decay
+term (DECISION-011) and no rate estimate from earlier onsets
+(DECISION-037).
+
+### The bar
+
+```
+DERIVATION (5 originals + 8 same-pitch takes), final Notes, matcher:
+  shipped engine          missed 113  fp 199
+  rate gate off           missed 112  fp 243
+  => the shipped gate removes 44 fp at +1 missed.
+```
+
+### 126 settings
+
+Grids: halves (0.5 to 4 times the unit), quarters (0.25 to 4), integers
+(1 to 4). Margins 0.2 to 1.5. Variants: every same-pitch boundary or
+only the ones the fast lane opened by an accepted re-articulation
+(`+acc`); a penalty of 1 or 3 times one minus the boundary's dip ratio
+(`+dip1`, `+dip3`); abstaining on phrases whose median interval is under
+200ms (`+slow`). The frontier on top of the shipped engine, the best
+extras removed at each price in missed labels:
+
+```
+Δmissed  Δfp   setting
+   0     -13   halves+acc+dip1+slow  0.50
+   1     -16   integers+acc+dip1+slow 1.50
+   3     -22   halves+acc+dip1+slow  0.20
+   6     -37   integers+acc+dip1+slow 0.35
+   8     -42   integers+acc+dip1+slow 0.20
+  14     -47   integers+acc+slow     0.35
+  21     -56   integers+slow         0.35
+```
+
+In place of the gate (engine run with both span fractions at 0), no
+setting gets back to the shipped engine's 199 at +1 missed or less; the
+best at -1 missed is 232.
+
+The chosen setting, per take: `held-then-picked-six-strings-120bpm-amped`
+2 / 50 → 2 / 43, `same-pitch-quarters-a3-e5-120bpm-amped` 2 / 68 → 2 /
+64, `same-pitch-quarters-a3-e5-120bpm-di` 1 / 3 → 1 / 1 (missed / fp).
+Held-out, read once: missed 27 → 27, fp 67 → 65, all on
+`lead-line-amped-quarter-eighth-triplet-140bpm` (24 → 22).
+
+### Reading
+
+The falsifier asked for more than 44 at +0. The best is 13, and the
+cheapest way to 42 costs eight real notes, so door 1 is closed. Without
+`+slow` the decode's first losses are real notes in the sixteenth
+sections, where a played interval wanders as far off the grid as a
+phantom's; abstaining there keeps every real note and gives up most of
+the gain. The gate already reads the phrase's pace at the boundary
+(span over the local interval), and what it leaves behind is not
+separated by the phrase's regularity either. The 13 are real and cost
+nothing measured; they are listed as an addition the owner may choose,
+not a door.

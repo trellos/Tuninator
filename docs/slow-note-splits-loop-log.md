@@ -173,7 +173,7 @@ is half a beat short at the median.
 
 | id | mechanism | lane | nearest closed relative and the difference | falsifier | status |
 |---|---|---|---|---|---|
-| C1 | Joint decode over the fast lane's accepted boundaries in a region, scored by IOI regularity across the phrase with the boundary witnesses as a prior; a dropped boundary is an absorption | deep | DECISION-011 (DP over windows, decay-residual cost at chance — no such term here); DECISION-037 (one fragment vs one scalar rate — no rate estimate here); the gap shape (0.779, +7 missed — must beat its exchange rate) | more derivation extras removed than the shipped rate gate at +0 missed; held-out not worse; slow subset per path | open (brief §5 door 1) |
+| C1 | Joint decode over the fast lane's accepted boundaries in a region, scored by IOI regularity across the phrase with the boundary witnesses as a prior; a dropped boundary is an absorption | deep | DECISION-011 (DP over windows, decay-residual cost at chance — no such term here); DECISION-037 (one fragment vs one scalar rate — no rate estimate here); the gap shape (0.779, +7 missed — must beat its exchange rate) | more derivation extras removed than the shipped rate gate at +0 missed; held-out not worse; slow subset per path | **closed, iteration 18** (DECISION-065): best -13 fp at +0 missed against the gate's -44; frontier -16 at +1, -42 at +8; held-out 27 / 67 → 27 / 65 at the chosen setting |
 | C2a | HPSS percussive-component flux at fine hop as a re-pick witness | fast/deep | 1–6kHz attack band; click witness (DECISION-018) | 0.80 AUC on the outcome-shaped population, amped takes, derivation | **closed, iteration 2**: percussive flux 0.58 (1kHz+, 11 and 15 hop medians), percussive fraction 0.65–0.68 on the amped column; 0.81 on DI, where the envelope rise already reads 0.91 |
 | C2b | Band-limited (1–6kHz) envelope dip | fast | DECISION-028 (d) varied window length, not band | 0.80 AUC as above | **closed, iteration 2**: 0.507 on the amped slow subset, 0.511 on all emitted amped; 0.506 on DI |
 | C2c | Octave displacement of the fragment as a retrospective witness | deep | none; observation above | 0.80 AUC as above, or usable as the rate gate's second witness | **closed, iteration 2**: 0.49–0.51 everywhere; no fragment is octave-displaced on this material |
@@ -1359,3 +1359,52 @@ ceiling paragraph of the report below now reads eight on the tuning DI
 takes (`p1c1h`, `p2c3q2`, `p2c4q3`, `p3c4q1`, `e865`, `e821`, `e5`,
 `e26`), each two or more Notes filling one bar, and four held-out on
 the DI triplet take, each a Note at another pitch beside the right one.
+
+## The owner's third listening pass — 2026-09-23 — labels only (DECISION-064)
+
+The owner answered the label review list and chose to copy the E5 DI
+labels to the amped file. Applied on his word; the engine did not move.
+Slow subset 186 / 221 → 187 / 220, corpus 237 / 276 / 13 → 240 / 277 /
+13 (1592 → 1594 labels), ledger MISSED 139 → 140, all on the E5 amped
+take. The numbers in iteration 18 are read against these labels.
+
+### Iteration 18 — 2026-09-23 — CLOSED ON THE BENCH — door 1, the phrase-regularity decode
+
+- Candidate: **C1** (brief §5 door 1). The owner said go on 2026-09-23.
+- Falsifier, stated before measuring (and in the bench's header): on the
+  derivation takes, more extra Notes removed than the shipped rate gate
+  removes on the current engine, at +0 missed; then held-out once, not
+  worse on either axis.
+- Bar: shipped missed 113, fp 199; gate off missed 112, fp 243. The gate
+  removes 44 at +1.
+- Bench (`scripts/measure-phrase-regularity-decode.ts`): 126 settings,
+  three grids by six margins by seven variants, on top of the shipped
+  engine and in place of the gate. Best at +0 missed: halves, accepted
+  boundaries only, dip weight 1, abstain under a 200ms median interval,
+  margin 0.5: fp 199 → 186 (-13) on three takes. Frontier -16 at +1,
+  -22 at +3, -42 at +8. In place of the gate nothing reaches 199 at +1
+  or less. Held-out, read once: missed 27 → 27, fp 67 → 65.
+- Built: nothing. Engine bit-identical to DECISION-062's.
+- Verdict and why: falsified. 13 is well under 44, and the settings that
+  approach 44 each lose six to eight real notes, first in the sixteenth
+  sections.
+- What a GOATerizer player would notice: nothing changed this iteration.
+- Findings section: "Door 1 on the bench"; DECISION-065; commit on
+  `claude/project-thread-wqhzta`.
+- Ledger changes: C1 closed.
+- Exit rule: not fired by its letter. C3 (door 3, a small learned
+  classifier) remains with a stated falsifier and is the brief's next
+  door for the amped column; it is a training pipeline and shipped
+  weights, not tuning, so it goes to the owner first. C5 and C6 remain
+  open outside the same-pitch splits.
+
+**In plain words, for the owner.** The idea was to catch ghost notes by
+rhythm: if cutting out one short note makes a run of notes evenly
+spaced again, that note was probably a ghost. It does work a little. On
+the practice recordings it removes 13 ghost notes without losing a real
+one, and on the test recordings it removes 2. But the check the engine
+already has removes 44, and every attempt to get more than 13 from the
+rhythm idea started deleting real notes, mostly in fast sixteenth-note
+runs where real playing is not perfectly even. So the rhythm idea is
+not the big fix for the amp and microphone recordings. The 13 can still
+be added on top if you want them.

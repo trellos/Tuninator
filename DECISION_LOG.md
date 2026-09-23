@@ -7,6 +7,62 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-065]: Door 1, the phrase-regularity decode, is closed on the bench: at no cost it removes 13 derivation extras where the shipped rate gate removes 44
+* **Date:** 2026-09-23
+* **Status:** Rejected
+* **Owner:** The agent, under the slow-note-splits loop brief (§5 door 1), which the owner said go on 2026-09-23
+* **Context:** Door 2 closed on 2026-09-18 (every witness read at a
+  boundary tops out near 0.70 AUC, and through an amp a phantom and a
+  re-pick read the same). Door 1 asks whether the information is in the
+  SEQUENCE instead: judge a phrase's same-pitch boundaries together and
+  drop the one whose removal makes the phrase's note spacing most
+  regular. Ledger row C1. Its falsifier, stated in the brief and in the
+  bench's header before running: on the derivation takes, more extra
+  Notes removed than the shipped rate gate removes on the current
+  engine, at zero added missed labels; then held-out once, not worse.
+  Measured on the labels after DECISION-064.
+* **Decision:** Closed. `scripts/measure-phrase-regularity-decode.ts`
+  simulates the drop on the final detection list (survivor's end
+  extended, matcher re-run), nothing in the engine changed. The gate's
+  share, measured by running the engine with both span fractions at 0:
+  missed 113 → 112, fp 199 → 243, so the gate removes 44 extras at +1
+  missed. 126 settings of the decode (three grids of allowed interval
+  multiples, six margins, seven variants: candidates restricted to
+  accepted same-pitch re-articulations, a dip penalty, abstaining on
+  phrases whose median interval is under 200ms) were read on top of the
+  shipped engine and in place of the gate. Best at +0 missed: halves
+  grid, accepted boundaries only, dip weight 1, abstain under 200ms,
+  margin 0.5: fp 199 → 186 (-13), on three takes
+  (`held-then-picked-amped` 50 → 43, `quarters-a3-e5-amped` 68 → 64,
+  `quarters-a3-e5-di` 3 → 1). Held-out, read once at that setting:
+  missed 27 → 27, fp 67 → 65. In place of the gate, no setting reaches
+  the gate's count at +1 missed or less (best fp 232 at -1). The
+  frontier across all 126 settings: -16 at +1 missed, -22 at +3, -37 at
+  +6, -42 at +8. Below the falsifier's bar at every price; the door
+  closes with its numbers.
+* **Alternatives Considered:** (a) **Build the -13 as an addition on top
+  of the gate.** It costs nothing on the tuning takes and nothing
+  held-out, but it is a new deep-lane mechanism (a joint decode and an
+  absorption) for 13 of 199 extras, and the falsifier the owner agreed
+  measured it against the gate, not against zero. Offered to the owner
+  instead of taken. (b) **Enumerate subsets (the brief's DP) instead of
+  greedy best-first.** The greedy path's losses are real notes whose
+  removal also improves regularity, which an exact search over the same
+  cost finds too; the cost, not the search, is what separates poorly.
+  (c) **Thirds in the grid** (triplet takes). The derivation set holds
+  no triplet take and the held-out triplets would then set the grid.
+* **Consequences:** Negative result: the phrase's own spacing carries
+  less than the local-interval span the gate already reads (0.905 AUC
+  in DECISION-030's measurement) once the gate has taken its share,
+  and the real notes it drops first sit in the sixteenth sections,
+  where a real note's interval jitters as much as a phantom's (read
+  with `--detail`; abstaining under 200ms removes those losses and most
+  of the gain with them).
+  Ledger C1 closed. The amped column now needs door 3 (a learned
+  classifier) or new material; the owner's rest-repick DI take is a
+  transfer check, not a fix.
+
+---
 #### [DECISION-064]: The owner's third listening pass is applied to the labels, and the E5 amped labels become the DI set
 * **Date:** 2026-09-23
 * **Status:** Accepted
