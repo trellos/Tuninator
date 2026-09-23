@@ -12,12 +12,12 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.970s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +80ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.970s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +80ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): p1c1q1-p1c1q4 move to 4.036, 4.533, 5.039 and 5.523s (from 4.085, 4.595, 5.080, 5.575), onto the note sounding. The rest of this take is unchanged; its labels' offsets to the sound vary stroke by stroke and are left for a per-stroke pass. Tuninator was not consulted. See DECISION-064.",
   "events": [
     {
       "id": "p1c1h",
       "startMs": 2050,
-      "endMs": 4050,
+      "endMs": 4036,
       "kind": "note",
       "label": "F#2",
       "pitches": [
@@ -30,8 +30,8 @@
     },
     {
       "id": "p1c1q1",
-      "startMs": 4085,
-      "endMs": 4585,
+      "startMs": 4036,
+      "endMs": 4533,
       "kind": "note",
       "label": "F#2",
       "pitches": [
@@ -44,8 +44,8 @@
     },
     {
       "id": "p1c1q2",
-      "startMs": 4595,
-      "endMs": 5080,
+      "startMs": 4533,
+      "endMs": 5039,
       "kind": "note",
       "label": "F#2",
       "pitches": [
@@ -58,8 +58,8 @@
     },
     {
       "id": "p1c1q3",
-      "startMs": 5080,
-      "endMs": 5575,
+      "startMs": 5039,
+      "endMs": 5523,
       "kind": "note",
       "label": "F#2",
       "pitches": [
@@ -72,7 +72,7 @@
     },
     {
       "id": "p1c1q4",
-      "startMs": 5575,
+      "startMs": 5523,
       "endMs": 6060,
       "kind": "note",
       "label": "F#2",

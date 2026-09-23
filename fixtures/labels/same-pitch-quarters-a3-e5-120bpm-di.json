@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.995s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +55ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.995s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +55ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): e36 moves 35.450 -> 35.490s, onto the note sounding; the old time was the pick's contact. Tuninator was not consulted. See DECISION-064.",
   "events": [
     {
       "id": "a1",
@@ -954,7 +954,7 @@
     },
     {
       "id": "e36",
-      "startMs": 35450,
+      "startMs": 35490,
       "endMs": 35930,
       "kind": "note",
       "label": "E5",

@@ -161,14 +161,14 @@ sixteenth section is flagged as unreliable. It gates nothing and is fitted by
 nothing until someone assigns it and finishes reviewing the labels. Read
 `docs/SAME-PITCH-MATERIAL.md` before using it for either purpose.
 
-**Two structural questions that WERE open are now closed, and a third is not.**
+**Three structural questions that WERE open are now closed.**
 Whether `quarters`' E5 section is 8 measures or 10, and whether `eighths A3`
 contains a sixteenth section, were both answered by the player and the labels
 corrected to follow — an earlier warning here that two takes contradict his
-description was stale and is retired. What is NOT settled:
-`eighths-sixteenths-e5` carries 191 DI events against 190 amped for one
-performance, and the two sets disagree about which picks exist. Both cannot be
-true, and it is the owner's to settle.
+description was stale and is retired. A third was
+settled on 2026-09-23 (DECISION-064): `eighths-sixteenths-e5` carried 192 DI
+events against 190 amped for one performance, and the owner chose the DI set.
+The amped file now holds the DI events shifted +3ms.
 
 **The amped renders of the two gridded takes are far further out than 65ms.**
 `7a216fe` re-timed their DI labels and left the amped twins behind. Measured on
@@ -177,7 +177,7 @@ the current files, amped minus DI per paired event:
 ```
 quarters-a3-e5           median    0ms   (still byte-identical)
 eighths-a3               median +187ms   (p10 +137, p90 +235)
-eighths-sixteenths-e5    median +215ms   (p10 +187, p90 +240)
+eighths-sixteenths-e5    median   +3ms   (DI copied, DECISION-064; was +215ms)
 held-then-picked         median  +15ms   (uniform)
 ```
 

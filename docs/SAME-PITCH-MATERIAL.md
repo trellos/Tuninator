@@ -26,7 +26,7 @@ This material is deliberately nothing but that phenomenon.
 |---|---|---|---|
 | `same-pitch-quarters-a3-e5-120bpm-{di,amped}` | A3 then E5 | 8 measures of quarter notes on A3, then **10** measures on E5 | 72 |
 | `same-pitch-eighths-a3-120bpm-{di,amped}` | A3 | eighth notes, then sixteenths from 19.9s | 184 di / 183 amped |
-| `same-pitch-eighths-sixteenths-e5-120bpm-{di,amped}` | E5 | 8 measures of eighths, then 8 measures of sixteenths | 192 di / 190 amped |
+| `same-pitch-eighths-sixteenths-e5-120bpm-{di,amped}` | E5 | 8 measures of eighths, then 8 measures of sixteenths | 192 (amped copied from DI, DECISION-064) |
 | `held-then-picked-six-strings-120bpm-{di,amped}` | F#2 C3 G3 C4 G4 D5 | per pitch: 4 cycles of [one measure held, one measure of quarter notes] | 120 |
 
 All at 120bpm, so a sixteenth is 125ms — just above the corpus's tightest
@@ -409,11 +409,12 @@ at 14.3% and 31.3% of envelope peak on two amped renders. The floors below which
 no label placement can take these counts are 62, 176, 110 and 45. This is what
 "that is mostly the verifier, not the labels" above was asserting, now measured.
 
-**Structural disagreement, untouched and the owner's.** `e5` carries 191 DI
-events against 190 amped for one performance, and the two sets disagree about
-which picks exist — DI-only `s1626` and `s16128`, amped-only `s1628`; on
-`eighths-a3`, DI-only `e838` and amped-only `s1692`. Both cannot be true. No
-proposal changes a count, so this is unresolved.
+**Structural disagreement: `e5` settled by the owner on 2026-09-23 (DECISION-064).**
+`e5` carried 192 DI events against 190 amped for one performance. The owner
+chose the DI set: the amped file now holds the DI events shifted +3ms (the
+renders align at +2.5ms), which also retires that file's 35-60ms grid drift.
+`eighths-a3` still carries DI-only `e838` and amped-only `s1692`; that pair is
+unresolved.
 
 ### What applying the proposal does to the reported numbers — and why that is not a validation
 
@@ -459,3 +460,34 @@ error gets *worse* (31ms to 37ms) while it loses a label. That disagreement does
 not prove the proposal wrong — the detector is not a judge here — but a proposal
 with no independent support and a dependent measure pointing the other way is
 exactly the one a human should place by ear.
+
+## The owner's third listening pass — 2026-09-23 (DECISION-064)
+
+He answered the label review list through a listening page that played a clip
+of each moment with the labels drawn on its envelope, and moved labels by
+clicking where he heard the note start. Applied verbatim; Tuninator was not
+consulted.
+
+- `quarters-a3-e5-di` `e36` 35.450 → 35.490s (the old time was the contact).
+- `held-then-picked-di` `p1c1q1`–`p1c1q4` → 4.036, 4.533, 5.039, 5.523s, each
+  about 50ms earlier. The rest of that take was not moved: measured against a
+  plain 10ms envelope, its labels' offsets to the strongest nearby rise run from
+  about 60ms early to 60ms late stroke by stroke, so it needs a per-stroke pass,
+  not a shift.
+- `held-then-picked-amped` `p1c4q4` 17.535 → 17.478s.
+- `eighths-a3-di`: all 33 grid placeholders listened to. `s166` → 20.611s,
+  `s1614` → 21.617s, `s1697` → 32.117s (no pick under 31.980s; the pick he hears
+  is after `s1698`, so the events are re-sorted and those two ids run out of
+  numeric order). The other 30 stay on their grid times, now confirmed by ear.
+- `eighths-sixteenths-e5-amped` replaced by the DI events +3ms (above).
+- Confirmed unchanged: `t12`, `s7` and `s161` (two picks each where asked), and
+  the mic triplet `t5` (a separate stroke, not the ring of the note before).
+
+**Twins not moved.** Each answer was applied to the render he judged. The DI
+twin of `p1c4q4` and the amped twins of `e36` and `p1c1q1`–`q4` were not moved,
+so those pairs no longer sit at their files' usual offset.
+
+**Found while applying it, not applied.** `quarters-a3-e5-di` `e26`–`e40` sit
+30 to 52ms before the strongest nearby rise, drifting later along the section.
+His four marks in the `e36` clip land on those rises. The A3 half of the take
+reads a median 18ms the other way.

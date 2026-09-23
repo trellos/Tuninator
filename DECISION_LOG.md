@@ -6,6 +6,66 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+
+#### [DECISION-064]: The owner's third listening pass is applied to the labels, and the E5 amped labels become the DI set
+* **Date:** 2026-09-23
+* **Status:** Accepted
+* **Owner:** The project owner (his answers to the label review list, 2026-09-23); applied by the agent on his word
+* **Context:** The slow-note-splits loop paused on nine single label
+  questions, the 33 grid-placeholder sixteenths on `eighths-a3-di`, and
+  the one-performance-two-answer-keys disagreement on
+  `eighths-sixteenths-e5` (192 DI against 190 amped, measured in
+  `docs/SAME-PITCH-MATERIAL.md`). `fixtures/labels/**` is otherwise
+  read-only; the owner's ear is the one source allowed to change it.
+  He answered through a listening page that played a clip of each
+  moment with the labels drawn on a plain envelope, and he moved labels
+  by clicking where he heard the note start. Nothing in it consults
+  Tuninator.
+* **Decision:** Applied verbatim, each on the render he judged:
+  `quarters-a3-e5-di` `e36` 35450 → 35490; `held-then-picked-di`
+  `p1c1q1`–`p1c1q4` → 4036, 4533, 5039, 5523; `held-then-picked-amped`
+  `p1c4q4` 17535 → 17478; held-out `lead-line-amped-sixteenths` `s46`
+  8527 → 8555; `eighths-a3-di` `s166` → 20611, `s1614` → 21617,
+  `s1697` → 32117 (no pick under 31980; re-sorted after `s1698`), and
+  the other 30 placeholders confirmed on their grid times. The
+  `eighths-sixteenths-e5-amped` file's 190 labels are replaced by the
+  DI file's 192 events shifted +3ms (the renders align at +2.5ms), his
+  choice of the recommended option. Confirmed unchanged: `t12`, `s7`,
+  `s161`, and the mic triplet's `t5` as a separate stroke. Each
+  neighbour's end follows the moved start. `retime-gridded-labels.ts`
+  locks the 33 placeholders and carries his new times; its dry run
+  reads 42/42 against his ear.
+  Numbers, main → this change (the engine did not move): eval PASS with
+  the same one informational failure; corpus split 237 / 276 / 13 →
+  240 / 277 / 13 of 1592 → 1594 labels; slow subset 186 / 221 → 187 /
+  220; ledger MISSED 139 → 140. Every difference is on the E5 amped
+  take (whole take split 23 → 26, missed 13 → 14), which the
+  2026-09-18 measurement predicted for this option. Every other edit
+  moved no count, because each moved label was already matched within
+  the 40ms tolerance or was already missed.
+* **Alternatives Considered:** (a) **Propagate each move to the twin
+  render** (the DI twin of `p1c4q4`, the amped twins of `e36` and
+  `p1c1q*`, the DI twin of `s46`). The owner judged one render each,
+  and on `held-then-picked` the audio does not keep the labels' uniform
+  +15ms between renders. The twins are listed as follow-ups in
+  `docs/SAME-PITCH-MATERIAL.md`. (b) **Re-time all of
+  `held-then-picked-di` by the ~50ms his four moves share.** Measured
+  against a 10ms envelope, that take's label-to-rise offsets run from
+  -60 to +60ms stroke by stroke, so a single shift would be wrong. It
+  needs a per-stroke pass. (c) **Delete `lead-line-di-sixteenths` `s6`.**
+  He hears no new pick at 4.27s. The file is held-out and one of three
+  renders of one performance, so it is left for his explicit word.
+  (d) **Trim the E5 DI set to 190, or leave both.** He chose neither.
+* **Consequences:** Positive: the E5 take is one performance with one
+  answer key, the amped file loses its 35-60ms grid drift, and the A3
+  sixteenth section is now fully human-reviewed. Negative: the E5 amped
+  split count reads three worse, partly the instrument charging
+  early-opening Notes once labels sit on the release. The twins moved
+  here are no longer at their usual offsets. `s1697` and `s1698` run
+  out of numeric order. `quarters-a3-e5-di` `e26`–`e40` were found
+  sitting 30-52ms before the note sounds and are not yet moved.
+
+---
 #### [DECISION-063]: The split instrument charges a Note to the label it overlaps most, each bar widened by the matcher's 40ms
 * **Date:** 2026-09-19
 * **Status:** Accepted
