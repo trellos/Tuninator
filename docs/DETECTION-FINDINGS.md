@@ -7941,3 +7941,29 @@ the gain. The gate already reads the phrase's pace at the boundary
 separated by the phrase's regularity either. The 13 are real and cost
 nothing measured; they are listed as an addition the owner may choose,
 not a door.
+
+
+## A step out of a Note that never held a pitch (DECISION-068)
+
+On the amped rest-and-repick take, three picks shed a stub before the
+real Note. The amp makes a picked G2 aperiodic for 60-160ms, and the
+first voiced hops are harmonics or a stale reading: at 16.08s the fast
+lane read 396Hz, 247Hz, then 98.9Hz, and the pitch-change detector
+confirmed a step from 247Hz into G2 67ms after the attack; at 26.07s it
+confirmed a step "from" 104.1Hz, which was the previous note's damp
+400ms earlier, carried across the silence because the detector keeps its
+last voiced reading. Both stubs had cleared the 55ms announce bar, and
+the arriving G2's first hop had already voted in them, so
+`pitchStillArriving` did not fire.
+
+The measure that separates these from a legato step is the pitch-change
+detector's own: has the Note ever held one reading for
+`stepConfirmFrames` hops? A hammer-on leaves a note that held a pitch.
+These stubs never did. Refusing the step (no boundary at all) cost one
+E5 DI eighth and six exact labels on the derivation takes; ending and
+absorbing, the existing path for an unannounced stub, cost nothing:
+derivation fp 204 → 198 at missed 113, held-out fp 65 → 63 at missed 27.
+The third stub on the take (11.91s) was already absorbed; what remains
+there is the pick's contact, which the amp makes loud enough that
+`isContactOpening` (a DI-derived no-rise test, rise 4-48 here against a
+bar of 1.2) does not recognise it.

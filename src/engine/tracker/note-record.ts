@@ -27,7 +27,7 @@ import type { ConfidenceParts, PitchActivation } from "../contracts.js";
 import { DefaultConfidenceModel } from "./confidence.js";
 import { StatefulHypothesisTracker, type HypothesisTransition } from "./hypotheses.js";
 import { VoiceDecay } from "./voices.js";
-import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
+import { centsBetween, describeFrequency, midiToFrequency } from "../kernels/notes.js";
 
 const confidenceModel = new DefaultConfidenceModel();
 
@@ -97,6 +97,19 @@ export class NoteRecord {
 
   lastVoicedHz: number | null;
   lastVoicedAt: SourceTimeMs;
+  /**
+   * This Note has held one reading for `pitch.stepConfirmFrames` voiced hops
+   * in a row, the pitch-change detector's own test for a pitch being there.
+   *
+   * A Note opened by a confirmed step holds one from its first hop. A Note
+   * opened by an attack does not until its own hops agree, and until then a
+   * "step" out of it is leaving nothing: the readings it leaves are the
+   * attack's harmonics, or the previous Note's last hop carried across a
+   * silence. See `pitchStillArriving` in the tracker.
+   */
+  heldReading: boolean;
+  private runHz: number | null = null;
+  private runHops = 0;
   /**
    * When this Note was last *audible*, which is not the same as last pitched.
    *
@@ -336,6 +349,7 @@ export class NoteRecord {
     this.pitchConfidence = options.confidence;
     this.lastVoicedHz = options.frequencyHz;
     this.lastVoicedAt = options.startTime;
+    this.heldReading = options.trigger === "pitchChange" && options.frequencyHz !== null;
     this.lastAudibleAt = options.startTime;
     this.lastSeenAt = options.startTime;
     this.rms = options.rms;
@@ -485,6 +499,16 @@ export class NoteRecord {
     this.revisionNumber++;
     this.lastChangeType = type;
     return this.revisionNumber;
+  }
+
+  /** Counts one voiced hop toward `heldReading`. */
+  noteReading(hz: number): void {
+    const agrees =
+      this.runHz !== null &&
+      Math.abs(centsBetween(hz, this.runHz)) <= this.config.pitch.stepThresholdCents;
+    this.runHops = agrees ? this.runHops + 1 : 1;
+    this.runHz = hz;
+    if (this.runHops >= this.config.pitch.stepConfirmFrames) this.heldReading = true;
   }
 
   addContourPoint(at: SourceTimeMs, hz: number, confidence: number): void {

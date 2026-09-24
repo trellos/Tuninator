@@ -37,9 +37,9 @@ any number below means anything.
 | `spicy-chords-cmaj9-g-am11` | no | 3 | 5 | 0 | 33.3% | 100.0% | 37ms |
 | `lead-line-di-sixteenths-...-140bpm` | no | 48 | 47 | 1 | 95.8% | 95.8% | 14ms |
 | `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 38 | 10 | 68.1% | 70.2% | 16ms |
-| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 37 | 13 | 70.8% | 70.8% | 16ms |
+| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 36 | 14 | 68.8% | 68.8% | 16ms |
 | `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 61 | 1 | — | — | — |
-| `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 64 | 2 | — | — | — |
+| `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 63 | 1 | — | — | — |
 | `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 79 | 0 | — | — | — |
 
 The three triplet takes score no accuracy because every section of them is marked informational in
@@ -55,7 +55,7 @@ inside its gates — of the 24 takes that score it, ten have a median absolute e
 
 **Not good, and both are the same defect seen from two sides.**
 
-- **Fast single-note lines lose strokes.** The sixteenth-note takes find 35–47 of 48 strokes. The
+- **Fast single-note lines lose strokes.** The sixteenth-note takes find 34–47 of 48 strokes. The
   losses are downstream of the evidence, not in it: the onset kernel covers 44, 44 and 47 of the
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.

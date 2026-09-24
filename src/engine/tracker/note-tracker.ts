@@ -995,7 +995,9 @@ export class NoteTracker {
       (active.soundedMs < active.announceThresholdMs ||
         // Every vote it holds is for the reading it is now leaving: this Note
         // has accumulated no evidence of its own at all.
-        active.dominantMidi() === describeFrequency(pitchChange.fromHz).midi) &&
+        active.dominantMidi() === describeFrequency(pitchChange.fromHz).midi ||
+        // Or it never held any reading: see `NoteRecord.heldReading`.
+        !active.heldReading) &&
       this.cannotDefendReading(active, pitchChange.fromHz, pitchChange.toHz);
 
     if (
@@ -1836,7 +1838,12 @@ export class NoteTracker {
     // A Note that named a chord, or that sustained past one articulation, is an
     // event somebody played. Only the stub of a forming articulation qualifies.
     if (predecessor.harmonyBloomed) return decline("bloomed");
-    if (predecessor.durationMs > this.config.transient.articulationMs) {
+    // Unless it never held a pitch and the survivor is its pitch arriving:
+    // through an amp that can take 130ms. See `NoteRecord.heldReading`.
+    if (
+      predecessor.durationMs > this.config.transient.articulationMs &&
+      !(survivor.absorbedRenaming && !predecessor.heldReading)
+    ) {
       return decline("too-long");
     }
     // And a Note that had already begun to decay was not a stub. See
@@ -2860,6 +2867,7 @@ export class NoteTracker {
       };
     }
 
+    record.noteReading(hz);
     record.lastVoicedHz = hz;
     record.lastVoicedAt = t;
     record.currentFrequencyHz = hz;

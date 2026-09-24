@@ -7,6 +7,48 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-068]: A pitch step out of a Note that never held a pitch is the pitch arriving, not a new note
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take to be fixed next, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` three of the eight
+  picks came out as a 67-133ms stub followed by the real Note (11.91s,
+  16.04s, 25.93s). Through the amp a picked G2 takes 60-160ms to read as
+  periodic, and the first voiced hops are its harmonics (16.08s: 396Hz
+  then 247Hz, then 98.9Hz) or, across a silence, the previous Note's last
+  reading (25.93s: the step "from" 104.1Hz was the damp of the note before,
+  400ms earlier). The pitch-change detector confirmed a step into G2 and
+  the tracker ended the Note there. `pitchStillArriving` exists for
+  exactly this and did not fire: the stub had been announced (67ms over
+  the 55ms bar), and its votes included the arriving G2's first hop, so
+  "every vote is for the reading it is leaving" was false.
+* **Decision:** `NoteRecord.heldReading`: a Note has held a pitch once
+  `pitch.stepConfirmFrames` of its own voiced hops in a row agree within
+  `pitch.stepThresholdCents`, the detector's own test; a Note opened by a
+  confirmed step holds one from its start. A step out of a Note that has
+  never held one is `pitchStillArriving` (with the existing
+  `cannotDefendReading` guard), and the stub it sheds is absorbed even
+  past `transient.articulationMs`, since it has no pitch of its own to
+  stand for. No new constant.
+  Numbers, final Notes and the matcher: derivation missed 113 → 113, fp
+  204 → 198 (`rest-repick-amped` 5 → 3, `held-then-picked-amped` 50 → 48,
+  `eighths-a3-amped` 40 → 39, `quarters-a3-e5-amped` 68 → 67); exact
+  label accuracy unchanged. Held-out, read once: missed 27 → 27, fp 65 →
+  63. Splits: slow subset 190 / 222 → 185 / 214 of 770; corpus 243 / 279
+  / 14 → 238 / 271 / 14 of 1610; ledger MISSED 140 → 140. 542 tests.
+* **Alternatives Considered:** (a) **Refuse the step outright** when the
+  Note never held a pitch, instead of ending and absorbing: derivation fp
+  204 → 197 but missed 113 → 114 (one E5 DI eighth) and exact accuracy
+  down six labels. (b) **Only widen the vote test** without lifting the
+  absorb's 80ms bound: fp 204 → 202; the 25.93s stub is 133ms and stays.
+* **Consequences:** On the amped take the 16.04s and 25.93s stubs are
+  gone; the 11.91s one was already absorbed and its contact Note before
+  it remains. A Note whose first readings are its harmonics now keeps
+  the attack's start. A real grace note too short for two agreeing
+  readings (under ~30ms) followed by a step would now be folded into the
+  note it leads to; none in the corpus.
+
+---
 #### [DECISION-067]: The quarters take's E5 labels `e26`-`e40` move onto the note sounding
 * **Date:** 2026-09-24
 * **Status:** Accepted

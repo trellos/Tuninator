@@ -1439,3 +1439,27 @@ It now knows that a small pitch wobble just before a note goes silent
 is your hand, not a note. All five of those fake notes are gone, and no
 real note was lost anywhere in the other recordings.
 
+
+
+## The amped rest-and-repick take — 2026-09-24 (DECISION-068)
+
+The owner asked for the amped render's leftovers next. Not a loop
+iteration on the same-pitch splits: these are different shapes.
+
+- Stubs before three picks: a step out of a Note that never held a
+  pitch (its first hops through the amp are harmonics, or the previous
+  note's last reading across the rest) now reads as the pitch arriving.
+  Derivation missed 113 → 113, fp 204 → 198; held-out, read once,
+  missed 27 → 27, fp 65 → 63; slow subset 190 / 222 → 185 / 214;
+  corpus 243 / 279 / 14 → 238 / 271 / 14; ledger MISSED 140.
+- Still open on the take: a Note on the pick contact at 7.63s and the
+  contact before 11.91s (the DI contact test does not see an amped
+  contact), one after the damp at 18.33s, and five picks named G5.
+
+**In plain words, for the owner.** Through the amp, a picked low G
+takes a moment to settle, and the first things the engine hears are
+its overtones. It used to treat the settle as a second note starting.
+It now knows a note that never held a pitch cannot change pitch. Two of
+the three short blips before your picks are gone, and 6 more ghost
+notes went with them on the other practice takes, with no real note
+lost.
