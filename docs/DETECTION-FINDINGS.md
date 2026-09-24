@@ -7941,3 +7941,114 @@ the gain. The gate already reads the phrase's pace at the boundary
 separated by the phrase's regularity either. The 13 are real and cost
 nothing measured; they are listed as an addition the owner may choose,
 not a door.
+
+## The refused-contact burst rule a third time, and the re-pick the gate hides: two rows that clear the bar only together
+
+DECISION-044's loop, iterations 19 and 20; DECISION-080, DECISION-081. The
+loop restarted on the owner's word on 2026-09-24 from `main` after
+DECISION-067, whose numbers reproduced bit for bit (derivation missed 113,
+fp 204; slow subset 190 / 222 of 770; corpus 243 / 279 / 14; ledger MISSED
+140; 542 tests).
+
+### What the nine direct-input splits are
+
+Traced one by one on the tuning takes (`--detail` plus the tracker trace):
+
+```
+  p2c3q2, p2c4q3   held-then-picked   a refused contact (ring-out-not-sharp, rise 0.87 / 0.89),
+                                      release 80ms later accepted, boundary backdated onto the contact  (C11)
+  e5, e25          quarters           the fine witness delivers the next pick's contact after its
+                                      gated release has passed; a second fine onset splits again
+  e26, p3c4q1,     quarters, held-    a `sharpness` phantom mid-note (rise 0.94 / 0.99, dip 0.79 / 0.69)
+  e821             then-picked, E5    or the next pick's contact 93ms early
+  p1c1h            held-then-picked   a Note opened by a pitch change on gated hops, 93ms before the pick
+  e865             A3 eighths         an accepted transient 160ms into the note (rise 2.17, dip 0.11)
+```
+
+C25's target (`a14`, `a15`) no longer reads split under DECISION-063's
+instrument, and none of the nine is an attack-branch boundary on a
+band-only onset, so C25 closes without a build.
+
+### C11 rebuilt, with the ring-out clock on the contact
+
+`tracking.burstContactRiseRatio` 1.2 as DECISION-047 built it, plus
+`tracking.burstContactRingOutOnContact`: the Note a moved boundary opens
+reads its ring-out age from the contact (`NoteRecord.ringOutFrom`,
+`ringOutSoundedMs`), the anchor C15 proposed. Falsifier, stated before the
+run: tuning DI slow split below 9 at +0 derivation missed, fp not up.
+
+```
+  alone        slow DI 9 → 7 (p2c3q2, p2c4q3)   amped 148 / 180 unchanged   corpus 241 / 277 / 14
+               derivation missed 113 → 115, fp 204 → 203                     ledger MISSED 142
+```
+
+Falsified on the missed line, by the same two labels as iterations 3 and 5.
+`p2c3q4` was credited to a C5 Note that began at the previous pick's
+contact, 410ms before the label; `e843` to a stub 177ms after it. Neither
+pick was ever found: in both the pick's transient lands on a hop the
+amplitude gate refuses (29467ms, rise 3.19, dip 0.13; 12467ms, rise 1.54,
+dip 0.01), the Note is still open because its tail kept a pitch reading,
+and the next hop is back at full level with no broadband transient. The
+moved boundary shortens the Note that held the credit and the matcher
+lets the label go.
+
+### The re-pick the gate hides
+
+Counted before building (`count-gated-repick`, a scratch probe): every
+settled same-pitch re-articulation refused `gated` at `main`, 70 across
+the corpus, 62 on the four DI same-pitch takes, none on an amped render
+(an amp's floor sits over the gate), 52 within 40ms of a label. Built as
+`tracking.gatedRepickDipRatio`: such a refusal with the envelope fallen to
+the ratio or less is held for one articulation, and if the level comes
+back on an ungated hop by `tracking.releaseRiseRatio` the Note ends at the
+refused transient.
+
+Three readings on the way, all at 0.2 with C11 off:
+
+```
+  as first built           missed 113 → 104, fp 206; E5 DI missed 6 → 10: four sixteenths
+                           dropped (a split ended a Note before it cleared its announce bar)
+  + only if announced      missed 100, fp 207; `e839` split (a contact stub the fine
+                           witness opened, cut at its own gated release, 91ms in)
+  + half the pace sounded  missed 100, fp 206; slow DI 9 → 10: `e843` reads split
+```
+
+The last reading is the finding: the pick it finds at `e843` is followed by
+the refused-contact shape (12640ms refused, 12707ms accepted, boundary
+backdated onto 12640), which is C11's. Each row fails the keep rule alone
+on the other's shape.
+
+### Together
+
+Swept on derivation with both in place, fp 203 at every setting:
+
+```
+  gatedRepickDipRatio   0.1   0.2   0.25   0.3   0.35   0.45   0.7   1.0
+  derivation missed     105   100   97     97    98     98     98    98      (0.35 up: `t20` on clean-lead lost)
+```
+
+0.25 taken. Base → both rules:
+
+```
+slow subset (--subset=slow)     DI tuning: 9 / 9 → 7 / 7       amped+mic tuning: 148 / 180 → 148 / 180
+                                DI held-out: 3 / 3 → 3 / 3      amped+mic held-out: 30 / 30 → 30 / 30
+corpus (measure-splits)         243 / 279 / 14 → 241 / 277 / 15
+tail fragments                  227 / 244 (221 / 0 / 23) → 224 / 241 (218 / 0 / 23)
+ledger MISSED                   140 → 124: held-then-picked DI 14 → 2, A3 eighths DI 63 → 59
+by material                     derivation missed 113 → 97, fp 204 → 203, exact 948 → 975
+                                held-out (once) missed 27 → 27, fp 65 → 66
+eval                            PASS, 0 required failures
+tests                           542 → 549
+```
+
+With the ring-out anchor off, one more split and one more false positive
+on derivation. The held-out cost is one Note at 30120ms on the mic
+triplet take, 2.4s from any label, on a gated hop with dip 0.08: the one
+place the rule fires away from a pick.
+
+### Verdict
+
+Kept, together. Neither row clears the bar alone, each on the other's
+shape, and the pair is better on every derivation line. Sixteen labels the
+engine had not found are found, twelve of them on the held-then-picked DI
+take, whose re-picks after a damp are the owner's tutorial shape.

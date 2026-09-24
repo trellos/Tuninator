@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. RE-TIMED by scripts/retime-gridded-labels.ts: each section's picks located in the DI audio by taking the N most prominent envelope peaks, N being the section's own label count, and assigning them in time order. No threshold and no detector output is involved. The grid is gone from these sections; the count is unchanged. CORRECTED 2026-09-14 (second listening pass): the player listened to the sections named here and gave every pick attack time he heard; those times are applied verbatim to the nearest label and outrank the automated re-timing. Tuninator was not consulted. Sections 19.0-20.8s and 33.3-34.0s. e870 (grid 19.230s) is removed: no pick under it. Two very weak picks at 19.131s and 19.599s are deliberately NOT labelled - the player calls them bad playing and says missing them is fine. s160 (19.875s) is a sixteenth played before the section's nominal start; s16113 (33.955s) is a slight final pick. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): The 33 grid-placeholder labels in 20.6-33.3s were each listened to. s166 moves 20.613 -> 20.611s and s1614 21.605 -> 21.617s. s1697 had no pick under its grid position (31.980s); the pick the owner hears is at 32.117s, after s1698 (32.048s), so s1697 moves there and the events are re-sorted by time (the ids s1697/s1698 now run out of numeric order). The other 30 placeholders stay on their grid times, confirmed by ear. Tuninator was not consulted. See DECISION-064.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. RE-TIMED by scripts/retime-gridded-labels.ts: each section's picks located in the DI audio by taking the N most prominent envelope peaks, N being the section's own label count, and assigning them in time order. No threshold and no detector output is involved. The grid is gone from these sections; the count is unchanged. CORRECTED 2026-09-14 (second listening pass): the player listened to the sections named here and gave every pick attack time he heard; those times are applied verbatim to the nearest label and outrank the automated re-timing. Tuninator was not consulted. Sections 19.0-20.8s and 33.3-34.0s. e870 (grid 19.230s) is removed: no pick under it. Two very weak picks at 19.131s and 19.599s are deliberately NOT labelled - the player calls them bad playing and says missing them is fine. s160 (19.875s) is a sixteenth played before the section's nominal start; s16113 (33.955s) is a slight final pick. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): The 33 grid-placeholder labels in 20.6-33.3s were each listened to. s166 moves 20.613 -> 20.611s and s1614 21.605 -> 21.617s. s1697 had no pick under its grid position (31.980s); the pick the owner hears is at 32.117s, after s1698 (32.048s), so s1697 moves there and the events are re-sorted by time (the ids s1697/s1698 now run out of numeric order). The other 30 placeholders stay on their grid times, confirmed by ear. Tuninator was not consulted. See DECISION-064. CORRECTED 2026-09-24 (the owner's fourth listening pass, on a page where he dragged, added and deleted picks over 17.1-20.0s): e863 17.493 -> 17.481s, e864 17.768 -> 17.741s, e866 18.298 -> 18.287s, e868 18.765 -> 18.742s; four picks the labels lacked are added, e865b 18.153s, e866b 18.362s, e867b 18.620s and e868b 18.852s; the two weak picks near 19.13s and 19.60s, left out on 2026-09-14 as bad playing, are added at his times 19.127s (e869b) and 19.611s (e871b) with required false: he calls them optional, so the matcher lets them absorb a Note and scores them neither as a match nor as a miss. Ends in the stretch re-chained to the next start. Tuninator was not consulted.",
   "events": [
     {
       "id": "e81",
@@ -871,7 +871,7 @@
     {
       "id": "e862",
       "startMs": 17238,
-      "endMs": 17493,
+      "endMs": 17481,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -884,8 +884,8 @@
     },
     {
       "id": "e863",
-      "startMs": 17493,
-      "endMs": 17768,
+      "startMs": 17481,
+      "endMs": 17741,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -898,7 +898,7 @@
     },
     {
       "id": "e864",
-      "startMs": 17768,
+      "startMs": 17741,
       "endMs": 18000,
       "kind": "note",
       "label": "A3",
@@ -913,7 +913,21 @@
     {
       "id": "e865",
       "startMs": 18000,
-      "endMs": 18298,
+      "endMs": 18153,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "e865b",
+      "startMs": 18153,
+      "endMs": 18287,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -926,7 +940,21 @@
     },
     {
       "id": "e866",
-      "startMs": 18298,
+      "startMs": 18287,
+      "endMs": 18362,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "e866b",
+      "startMs": 18362,
       "endMs": 18543,
       "kind": "note",
       "label": "A3",
@@ -941,7 +969,21 @@
     {
       "id": "e867",
       "startMs": 18543,
-      "endMs": 18765,
+      "endMs": 18620,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "e867b",
+      "startMs": 18620,
+      "endMs": 18742,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -954,7 +996,21 @@
     },
     {
       "id": "e868",
-      "startMs": 18765,
+      "startMs": 18742,
+      "endMs": 18852,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": true
+    },
+    {
+      "id": "e868b",
+      "startMs": 18852,
       "endMs": 19019,
       "kind": "note",
       "label": "A3",
@@ -969,7 +1025,7 @@
     {
       "id": "e869",
       "startMs": 19019,
-      "endMs": 19494,
+      "endMs": 19127,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -981,9 +1037,23 @@
       "required": true
     },
     {
+      "id": "e869b",
+      "startMs": 19127,
+      "endMs": 19494,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": false
+    },
+    {
       "id": "e871",
       "startMs": 19494,
-      "endMs": 19747,
+      "endMs": 19611,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -993,6 +1063,20 @@
         "A"
       ],
       "required": true
+    },
+    {
+      "id": "e871b",
+      "startMs": 19611,
+      "endMs": 19747,
+      "kind": "note",
+      "label": "A3",
+      "pitches": [
+        "A3"
+      ],
+      "pitchClasses": [
+        "A"
+      ],
+      "required": false
     },
     {
       "id": "e872",

@@ -39,6 +39,12 @@ export type LabeledEvent = {
   /** Present on a bent note. The bend target is an accepted answer. */
   bendTo?: string;
   voicing?: string;
+  /**
+   * `false` marks a pick the player judged fine to miss (a weak stroke he
+   * calls bad playing). The matcher lets it absorb a Note, so that Note is
+   * not an extra, and then drops the pair: it is never a miss and never a
+   * match. Absent or `true` is an ordinary label.
+   */
   required?: boolean;
 };
 
@@ -408,17 +414,19 @@ export function matchEvents(
     });
   }
 
-  matches.sort((a, b) => a.label.startMs - b.label.startMs || a.labelIndex - b.labelIndex);
+  // Optional labels took part in the assignment only to absorb their Notes.
+  const scored = matches.filter((m) => m.label.required !== false);
+  scored.sort((a, b) => a.label.startMs - b.label.startMs || a.labelIndex - b.labelIndex);
 
   const missed = labels
     .map((label, labelIndex) => ({ label, labelIndex }))
-    .filter((entry) => !usedLabels.has(entry.labelIndex));
+    .filter((entry) => !usedLabels.has(entry.labelIndex) && entry.label.required !== false);
 
   const falsePositives = detections
     .map((detection, detectionIndex) => ({ detection, detectionIndex }))
     .filter((entry) => !usedDetections.has(entry.detectionIndex));
 
-  return { matches, missed, falsePositives };
+  return { matches: scored, missed, falsePositives };
 }
 
 /* -------------------------------------------------------------------------- */

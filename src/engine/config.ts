@@ -750,6 +750,71 @@ export type EngineConfig = {
      * than the loop's rule; see DECISION-062.
      */
     underHandLevelFall: number;
+    /**
+     * A split whose burst began on a transient that rose less than this is
+     * placed on the release, not the burst's first attack. 0 is the burst
+     * rule as shipped.
+     *
+     * On a single string the first transient of a slow re-pick is the pick
+     * landing on the string, which mutes it (rise 0.56 to 0.93); the
+     * re-articulation test refuses it for carrying no energy, and the
+     * release 67 to 80ms later is accepted and ends the Note. The burst rule
+     * then backdates the boundary onto the refused contact, so the next Note
+     * opens 67 to 80ms before it sounds. With this on, when the burst's
+     * first attack rose less than this bar, the split keeps its pitch class
+     * and the attack in hand clears `releaseRiseRatio`, the boundary is the
+     * attack in hand. Strums are untouched: their first transient carries
+     * energy. Built twice before as DECISION-047 and DECISION-049 and
+     * reverted on a score that could not see it; alone it still costs two
+     * labels whose own picks land under the gate (DECISION-080), and it is
+     * kept with `gatedRepickDipRatio`, which finds them (DECISION-081).
+     */
+    burstContactRiseRatio: number;
+    /**
+     * The Note a moved burst boundary opens reads its ring-out age from the
+     * contact, not from its moved start. The string was excited at the
+     * contact, so the decay the ring-out branch fits began there; reading
+     * the age from a start 67 to 80ms later sends a transient in that window
+     * to the rolling-baseline test instead of the decay fit, and one real
+     * phantom came through that way (the held-then-picked DI take, 9213ms,
+     * DECISION-049). False reads it from the start, as every other Note.
+     */
+    burstContactRingOutOnContact: boolean;
+    /**
+     * A re-pick whose transient the amplitude gate refused ends the Note it
+     * interrupts when the envelope had fallen to at most this fraction
+     * before it, and the level comes back within one articulation by
+     * `releaseRiseRatio` or more. 0 is the gate's refusal as shipped.
+     *
+     * On the direct input a note damped before its re-pick falls under
+     * `analysis.rmsGate`, so the pick's transient lands on a hop the gate
+     * refuses and `rearticulation.ts` never reads it. When the Note had
+     * not ended by then (a pitch reading of its tail kept it open), the
+     * re-pick is lost into it: the held-then-picked DI take at 29467ms, the
+     * E5 eighths DI take at 12467ms. The Note must already be announced
+     * and have sounded half the local interval, or the split would drop a
+     * sixteenth still clearing its bar or cut a contact stub the witness
+     * opened. Swept on derivation with DECISION-080's rule in place: 0.1
+     * missed 105, 0.2 100, 0.25 and 0.3 97, 0.35 and above 98 (`t20` on
+     * the clean-lead take); false positives 203 throughout. See
+     * DECISION-081.
+     */
+    gatedRepickDipRatio: number;
+    /**
+     * A Note the fine witness opens on a contact moves its start onto a
+     * same-pitch release already refused as `gated` inside the
+     * articulation window after the contact. False keeps the contact.
+     *
+     * The fine witness confirms an onset 65ms after it, so on a stroke
+     * whose release lands under the gate the release is read, and refused,
+     * on the Note before, and only then does the contact arrive and open
+     * the stroke's Note. DECISION-052 reads the release on the frame that
+     * opens the Note and after; this reads the one that came before it.
+     * The quarters DI take: contact 20397ms, release 20453ms (rise 2.09),
+     * label 20440ms; contact 30419ms, release 30480ms, label 30475ms. The
+     * announce clock stays on the contact. See DECISION-082.
+     */
+    releaseBeforeFineContact: boolean;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -1136,6 +1201,10 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     prefixUnderHand: true,
     underHandUnvoicedFraction: 0.5,
     underHandLevelFall: 0.5,
+    gatedRepickDipRatio: 0.25,
+    burstContactRiseRatio: 1.2,
+    releaseBeforeFineContact: true,
+    burstContactRingOutOnContact: true,
     releaseGraceMs: 90,
     bendThresholdCents: 45,
     backdateWindowMs: 120,
