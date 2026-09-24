@@ -81,6 +81,12 @@ export class NoteRecord {
    * boundary. See `announceSoundedMs` and `tracking.releaseOnFineOpenedFrame`.
    */
   releasedFromContact = false;
+  /**
+   * The pick's contact a burst boundary was moved off, when it was: the
+   * ring-out branch reads this Note's age from there. See
+   * `ringOutSoundedMs` and `tracking.burstContactRingOutOnContact`.
+   */
+  ringOutFrom: SourceTimeMs | null = null;
   /** The pre-pick prefix check has run for this Note. See `NoteTracker.claimPrefix`. */
   prefixClaimed = false;
   startSample: number;
@@ -384,6 +390,15 @@ export class NoteRecord {
   /** How long the Note has actually sounded, not how long ago it began. */
   get soundedMs(): number {
     return Math.max(this.lastVoicedAt, this.lastAudibleAt) - this.startTime;
+  }
+
+  /**
+   * `soundedMs` for the ring-out branch of the re-articulation verdict: from
+   * the pick's contact when a burst boundary moved this Note's start off it,
+   * because the decay that branch fits began when the string was struck.
+   */
+  get ringOutSoundedMs(): number {
+    return Math.max(this.lastVoicedAt, this.lastAudibleAt) - (this.ringOutFrom ?? this.startTime);
   }
 
   /**
