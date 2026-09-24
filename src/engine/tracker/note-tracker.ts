@@ -241,6 +241,8 @@ const DAMP_REACH_MS = 300;
 const DAMP_END_DB = 6;
 /** A Note quieter than this, in dB of RMS, is already too faint to damp. */
 const DAMP_FLOOR_DB = -55;
+/** How close a Note must follow the end of the one before to have been opened in its damp. */
+const DAMP_GHOST_GAP_MS = 1;
 
 /**
  * How close to its own peak a Note must still be for the transient that ends it
@@ -1096,7 +1098,9 @@ export class NoteTracker {
           t - active.silentSince >= config.tracking.releaseGraceMs;
         if (expired) {
           const silentSince = active.silentSince as SourceTimeMs;
-          this.end(active, this.dampedAt(active, silentSince) ?? silentSince, out);
+          if (!this.absorbDampGhost(active, silentSince, out)) {
+            this.end(active, this.dampedAt(active, silentSince)?.end ?? silentSince, out);
+          }
           active = null;
         } else {
           this.observe(active, frame);
@@ -3127,7 +3131,10 @@ export class NoteTracker {
    * came back. Null when nothing in the Note looks like a damp, so it ends
    * where the sound did.
    */
-  private dampedAt(record: NoteRecord, silentSince: SourceTimeMs): SourceTimeMs | null {
+  private dampedAt(
+    record: NoteRecord,
+    silentSince: SourceTimeMs
+  ): { end: SourceTimeMs; fell: SourceTimeMs } | null {
     const { dampFallDb: fall, dampDepthDb: depth } = this.config.tracking;
     if (fall <= 0) return null;
     const log = this.voicedLog;
@@ -3154,9 +3161,89 @@ export class NoteTracker {
       if (recovered || !reached) continue;
       let j = i;
       while (j > first + 1 && db(j - 1) < median - DAMP_END_DB) j--;
-      return Math.max(at(j), record.startTime) as SourceTimeMs;
+      return { end: Math.max(at(j), record.startTime) as SourceTimeMs, fell: at(i) as SourceTimeMs };
     }
     return null;
+  }
+
+  /**
+   * Whether a Note still sounding opened at `record`'s end at least
+   * `tracking.dampFallDb` under `record`'s median level over the 300ms before
+   * it: too quiet to be a pick, so it may be the damp's ghost.
+   */
+  private quietSuccessor(record: NoteRecord): boolean {
+    const fall = this.config.tracking.dampFallDb;
+    if (fall <= 0 || record.endTime === null) return false;
+    const end = record.endTime;
+    let next: NoteRecord | undefined;
+    for (const candidate of this.notes.values()) {
+      if (Math.abs(candidate.startTime - end) <= DAMP_GHOST_GAP_MS) next = candidate;
+    }
+    if (next === undefined || next.openingRms <= 0) return false;
+    const levels = this.voicedLog
+      .filter((entry) => entry.at < end && entry.at >= end - DAMP_MEDIAN_MS && entry.at >= record.startTime)
+      .map((entry) => entry.rms)
+      .sort((a, b) => a - b);
+    const median = levels[levels.length >> 1];
+    if (median === undefined || median <= 0) return false;
+    return 20 * Math.log10(next.openingRms / median) <= -fall;
+  }
+
+  /**
+   * Whether `ghost`, ending in silence at `silentSince`, was opened inside the
+   * damp that stopped the Note before it. Through an amp the damp can push the
+   * string sharp or rattle it hard enough to open a Note while the level is
+   * still falling; nothing the player picked sounds after it. The Note before
+   * must have run right up to it at a pitch within a damp's reach, and the
+   * damp found over the two of them (`dampedAt`) must have begun falling by
+   * the time the ghost opened. The ghost is then absorbed and the Note before
+   * ends at the damp.
+   */
+  private absorbDampGhost(ghost: NoteRecord, silentSince: SourceTimeMs, out: TrackerEmission[]): boolean {
+    if (this.config.tracking.dampFallDb <= 0) return false;
+    const before = this.closing.find(
+      (record) =>
+        !record.merged &&
+        record.announced &&
+        record.endTime !== null &&
+        Math.abs(record.endTime - ghost.startTime) <= DAMP_GHOST_GAP_MS
+    );
+    if (before === undefined) return false;
+    const own = before.dominantMidi();
+    const mine = ghost.dominantMidi();
+    if (own !== null && mine !== null && Math.abs(own - mine) > DAMP_STEP_SEMITONES) return false;
+    const damp = this.dampedAt(before, silentSince);
+    if (damp === null || damp.fell > ghost.startTime) return false;
+
+    ghost.merged = true;
+    this.retractOpening(ghost);
+    this.end(ghost, silentSince, out);
+    before.endTime = damp.end;
+    if (this.trace !== null) {
+      this.trace({
+        kind: "absorbed",
+        at: ghost.startTime,
+        noteId: ghost.id,
+        intoId: before.id,
+        durationMs: ghost.durationMs,
+        intoStartTime: before.startTime,
+        burstAt: ghost.burstAt,
+        intoBurstAt: before.burstAt,
+      });
+    }
+    const revisionNumber = before.bump("structuralRevision");
+    out.push({
+      type: "changed",
+      note: before.snapshot(),
+      change: {
+        type: "structuralRevision",
+        at: damp.end,
+        revisionNumber,
+        relation: "absorbed",
+        relatedNoteIds: ghost.announced ? [ghost.id] : [],
+      },
+    });
+    return true;
   }
 
   private end(record: NoteRecord, at: SourceTimeMs, out: TrackerEmission[]): void {
@@ -3220,6 +3307,9 @@ export class NoteTracker {
         // says. Holding it here is what makes the region reach back over it:
         // once it is gone from `closing` there is nothing left to correct.
         if (!record.deepResolved) continue;
+        // Nor is one cut by a Note that opened far under it, which may yet
+        // turn out to have been opened by its damp. See `absorbDampGhost`.
+        if (this.quietSuccessor(record)) continue;
       }
       this.closing.splice(i, 1);
 

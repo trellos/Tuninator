@@ -19,13 +19,22 @@ const HOP = 640;
 const HOP_MS = (HOP / SAMPLE_RATE) * 1000;
 const MIDI = 43; // G2
 
-function config(dampFallDb: number): EngineConfig {
-  return { ...DEFAULT_ENGINE_CONFIG, tracking: { ...DEFAULT_ENGINE_CONFIG.tracking, dampFallDb } };
+/**
+ * With `anyPick`, every sharp attack re-articulates: whether the rattle of a
+ * damp gets past the ring-out test is `rearticulation.ts`'s question, and
+ * here it is given that it did.
+ */
+function config(dampFallDb: number, anyPick = false): EngineConfig {
+  return {
+    ...DEFAULT_ENGINE_CONFIG,
+    tracking: { ...DEFAULT_ENGINE_CONFIG.tracking, dampFallDb },
+    transient: anyPick ? { ...DEFAULT_ENGINE_CONFIG.transient, ringOutMs: Infinity } : DEFAULT_ENGINE_CONFIG.transient,
+  };
 }
 
 function frame(
   index: number,
-  options: { voiced: boolean; rms: number; attack?: boolean; riseRatio?: number; fineOnsets?: FineOnset[] }
+  options: { voiced: boolean; rms: number; attack?: boolean; riseRatio?: number; sharpness?: number; fineOnsets?: FineOnset[] }
 ): FastFrame {
   const at = index * HOP_MS;
   const sampleIndex = index * HOP;
@@ -64,7 +73,7 @@ function frame(
             fluxValue: 0.4,
             envelope: true,
             riseRatio: options.riseRatio ?? 3,
-            sharpness: 0.6,
+            sharpness: options.sharpness ?? 0.6,
             fluxRatio: 2,
             heldSharpness: 0.6,
             heldFluxRatio: 2,
@@ -79,30 +88,50 @@ function frame(
   };
 }
 
-/** Plays `levels` as one picked note, then silence; returns the Note's start and end. */
-function play(dampFallDb: number, levels: number[]): { start: number; end: number } {
-  const tracker = new NoteTracker(new SampleClock(SAMPLE_RATE), config(dampFallDb));
+/** Plays `levels`, picked on the `struck` hops, then silence; returns the Notes left standing. */
+function notes(dampFallDb: number, levels: number[], struck: number[] = [0]): { start: number; end: number }[] {
+  const tracker = new NoteTracker(new SampleClock(SAMPLE_RATE), config(dampFallDb, struck.length > 1));
   let index = 0;
-  const ended: { start: number; end: number }[] = [];
+  const ended: { id: string; start: number; end: number }[] = [];
+  const emissions: TrackerEmission[] = [];
   const feed = (f: Parameters<typeof frame>[1]): void => {
-    for (const emission of tracker.process(frame(index++, f))) {
-      if (emission.type === "ended") ended.push({ start: emission.note.startTime, end: emission.note.endTime as number });
-    }
+    for (const emission of tracker.process(frame(index++, f))) emissions.push(emission);
   };
-  levels.forEach((rms, i) => feed({ voiced: rms >= DEFAULT_ENGINE_CONFIG.analysis.rmsGate, rms, attack: i === 0 }));
+  levels.forEach((rms, i) =>
+    feed({
+      voiced: rms >= DEFAULT_ENGINE_CONFIG.analysis.rmsGate,
+      rms,
+      attack: struck.includes(i),
+      sharpness: i === 0 ? 0.6 : 3,
+    })
+  );
   for (let i = 0; i < 80; i++) feed({ voiced: false, rms: 0.001 });
-  const closing: TrackerEmission[] = [];
-  tracker.releaseClosed(new Set(), closing, true);
-  for (const emission of closing) {
-    if (emission.type === "ended") ended.push({ start: emission.note.startTime, end: emission.note.endTime as number });
+  tracker.releaseClosed(new Set(), emissions, true);
+  for (const emission of emissions) {
+    if (emission.type === "ended") {
+      ended.push({ id: emission.note.id, start: emission.note.startTime, end: emission.note.endTime as number });
+    }
   }
-  expect(ended).toHaveLength(1);
-  return ended[0] as { start: number; end: number };
+  const absorbed = new Set(
+    [...emissions].flatMap((e) =>
+      e.type === "changed" && e.change.type === "structuralRevision" ? (e.change.relatedNoteIds ?? []) : []
+    )
+  );
+  return ended.filter((note) => !absorbed.has(note.id));
+}
+
+/** The one Note `levels` should read as. */
+function play(dampFallDb: number, levels: number[], struck: number[] = [0]): { start: number; end: number } {
+  const kept = notes(dampFallDb, levels, struck);
+  expect(kept).toHaveLength(1);
+  return kept[0] as { start: number; end: number };
 }
 
 const HELD = 60;
 /** Held at 0.3, damped over two hops, then the amp's ring above the gate for 30 hops. */
 const DAMPED = [...Array(HELD).fill(0.3), 0.1, 0.03, ...Array(30).fill(0.012)];
+/** The same damp rattling the string once, 15dB under the note, on its third hop. */
+const RATTLED = DAMPED.map((rms, i) => (i === HELD + 2 ? 0.05 : rms));
 /** Held, then let decay about 0.5dB a hop until it falls under the gate. */
 const DECAYING = [...Array(HELD).fill(0.3), ...Array.from({ length: 70 }, (_, i) => 0.3 * 0.94 ** (i + 1))];
 
@@ -118,6 +147,12 @@ describe("a Note ending in silence", () => {
   it("left to decay, ends where the sound does", () => {
     const gated = DECAYING.findIndex((rms) => rms < DEFAULT_ENGINE_CONFIG.analysis.rmsGate);
     expect(play(10, DECAYING).end).toBeCloseTo(gated * HOP_MS, 6);
+  });
+
+  it("absorbs a Note the damp itself opened, and ends the one before at the damp", () => {
+    const struck = [0, HELD + 2];
+    expect(notes(0, RATTLED, struck)).toHaveLength(2);
+    expect(play(10, RATTLED, struck).end).toBeCloseTo(HELD * HOP_MS, 6);
   });
 
   it("is on by default", () => {

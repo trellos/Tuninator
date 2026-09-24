@@ -33,7 +33,7 @@ any number below means anything.
 | `cowboy-chords-amped-...-140bpm` | no | 8 | 11 | 0 | 50.0% | 87.5% | 92ms |
 | `power-chords-di-...-140bpm` | no | 16 | 16 | 0 | 93.8% | 100.0% | 19ms |
 | `power-chords-...-140bpm` (mic) | no | 16 | 24 | 0 | 72.7% | 100.0% | 23ms |
-| `power-chords-amped-...-140bpm` | no | 16 | 18 | 0 | 92.3% | 100.0% | 13ms |
+| `power-chords-amped-...-140bpm` | no | 16 | 17 | 0 | 92.3% | 100.0% | 13ms |
 | `spicy-chords-cmaj9-g-am11` | no | 3 | 5 | 0 | 33.3% | 100.0% | 37ms |
 | `lead-line-di-sixteenths-...-140bpm` | no | 48 | 47 | 1 | 95.8% | 95.8% | 14ms |
 | `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 38 | 10 | 68.1% | 70.2% | 16ms |

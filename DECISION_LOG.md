@@ -7,6 +7,53 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-074]: A Note opened inside the damp that stopped the Note before it is absorbed into it
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take's extra Notes to be fixed, and chose "Go on" to fixing the damp splits, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` the damp at 18.1s
+  opened a G2 Note at 18.33s. The level was already 22dB under the
+  note's and still falling. The sharpness fallback accepted it (sharpness
+  2.34, rise 0.78, dip 0.08). DECISION-071 found it was the only
+  sharpness-accepted opening in the derivation takes with a dip under 0.1
+  and no rise, so no bar on those witnesses could be derived. DECISION-073
+  gives a witness that does not need one: the damp itself. The ghost
+  opened after the level had fallen `dampFallDb` under the note, the level
+  never came back, and it ended in silence. The Note before had already
+  been let go by the time the ghost ended, because the deep lane resolved
+  it within one hop.
+* **Decision:** Two parts, with no new tuned constant.
+  (1) A Note is held in `closing` while a Note that opened at its end is
+  still sounding and opened `tracking.dampFallDb` or more under its
+  median level over the 300ms before (`quietSuccessor`). Across all 27
+  takes this holds 9 Notes.
+  (2) When a Note ends in silence and the Note before it ran right up to
+  it, the damp search (`dampedAt`) runs over the two of them. The Note
+  before must be within `DAMP_STEP_SEMITONES` and still closing. If the
+  fall began at or before the later Note opened, the later Note is
+  absorbed (`structuralRevision`, `absorbed`) and the earlier one ends at
+  the damp (`absorbDampGhost`).
+  Numbers: derivation missed 115 → 115, fp 198 → 197
+  (`rest-repick-amped` 2 → 1), exact 1070 unchanged; `rest-repick-di`
+  median end +55 → +48ms. Held-out, read once: missed 27, exact 320,
+  fp 63 → 62 (`power-chords-amped-140bpm` 2 → 1). Splits 237 / 270 with
+  strays 13 → 11; slow subset 184 / 213 with strays 7 → 6. Ledger MISSED
+  142. 547 tests.
+* **Alternatives Considered:** (a) **A bar on the sharpness fallback's
+  dip or rise**: one instance, nothing to derive it from (DECISION-071).
+  (b) **Revise the earlier Note after its `noteEnded`**: a consumer has
+  already been told it is finished, and the offline adapter scores the
+  end it was given then. (c) **Hold every Note until the one after it
+  ends**: delays every legato note's end. The quiet opening confines the
+  hold to the 9 cases where a damp ghost is possible.
+* **Consequences:** A quiet re-pick within a whole tone, opened with no
+  gap straight out of a damp, that then fades to silence without ever
+  coming back within 5dB of the note before, would be folded in. None in
+  the corpus does. A Note followed by a quiet successor ends later for
+  consumers, by as long as that successor sounds.
+
+---
+
 #### [DECISION-073]: A Note ending in silence ends at the player's damp, not where the amp's ring falls under the gate
 * **Date:** 2026-09-24
 * **Status:** Accepted

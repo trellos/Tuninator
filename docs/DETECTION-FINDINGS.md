@@ -8048,3 +8048,15 @@ end error on the rest-repick amped take +445 → +91ms, DI +102 → +55ms;
 held-out power chords amped +125 → +29ms. No Note gained or lost a
 boundary; the only count that moved is that last E5 losing its 7ms
 overlap with a label placed over silence.
+
+## The damp's own ghost (DECISION-074)
+
+The Note at 18.33s on the rest-repick amped take opened 22dB under the G2
+it followed, 0.2s into that G2's damp, and faded to silence. No witness
+on the opening separates it (DECISION-071). The damp does: the ghost is
+contiguous with the Note before, within a whole tone of it, opened after
+the fall began, and nothing after it came back within 5dB of the note.
+Folding it in removes it and the held-out amped power-chord take's one
+ghost of the same shape (fp 63 → 62). No labelled note is lost anywhere.
+The earlier Note is held back from `noteEnded` only while such a quiet
+successor is sounding: 9 Notes across all 27 takes.

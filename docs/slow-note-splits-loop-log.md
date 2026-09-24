@@ -1517,3 +1517,20 @@ On your rest-and-repick take the notes end within about a tenth of a
 second of your damp instead of half a second after it. Four notes that
 end a take stop a little before their label, because the sound had
 already dropped away there.
+
+### The same take: the ghost inside the damp (DECISION-074)
+
+- A Note that opens with no gap inside the damp of the Note before it,
+  within a whole tone and far quieter, then fades to silence, is folded
+  into that Note, which ends at the damp.
+- Derivation fp 198 → 197 (the 18.33s Note on the amped take). Held-out
+  fp 63 → 62 (the amped 140bpm power chords). Missed, exact, splits and
+  ledger unchanged; strays 13 → 11.
+- The take now reads 8 of 8 named G2 with one extra: the pick contact at
+  7.63s.
+
+**In plain words, for the owner.** On the amp, one of your damps made a
+small note of its own right as the string was stopped. The engine now
+recognises it as part of the damp and folds it into the note you
+stopped. Your rest-and-repick take has one blip left, the pick touching
+the string at 7.63 s.
