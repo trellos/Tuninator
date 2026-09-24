@@ -1534,3 +1534,14 @@ small note of its own right as the string was stopped. The engine now
 recognises it as part of the damp and folds it into the note you
 stopped. Your rest-and-repick take has one blip left, the pick touching
 the string at 7.63 s.
+
+### Full un-bloom, re-measured on top of DECISION-074 (not taken)
+
+- Clearing `harmonyBloomed` on one-string Notes: derivation missed 115 →
+  112, fp 197 → 207, exact unchanged. `rest-repick-amped` goes 1 → 6
+  extras and loses one note. Un-bloomed, its damps open G#2 Notes by
+  "new-pitch" on the sharp push (10.04s, 25.09s). Those open at the damp
+  rather than inside its fall and not far enough under the note, so the
+  damp-ghost rule does not reach them. A fine-onset split lands 0.39s
+  into the 4.0s pick, and a pitch-step split at 22.96s. The bloom's
+  shield still pays for itself here.
