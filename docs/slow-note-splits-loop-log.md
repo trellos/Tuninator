@@ -1561,3 +1561,14 @@ had been undone twice because it exposed two of those hidden picks.
   as its ceiling; `p1c1h` above; and `e865`, a transient 160ms into the
   note at rise 2.17 and sharpness 10.6 that no witness here calls a
   phantom and that wants a listen.
+
+### Between rounds — 2026-09-24 — `e865` was a real pick (DECISION-083)
+
+- The owner listened to `e865` and marked every pick over 17.1-20.0s on a
+  drag-and-add page. The transient at 18160ms is his pick `e865b`
+  (18.153s); four labels moved, six picks added, two of them optional.
+- Numbers, engine unchanged: slow DI tuning splits 5 -> 4; derivation
+  missed 97 -> 100 (three new quiet picks the engine does not open a Note
+  on: `e866b`, `e867b`, `e868b`), fp 201 -> 200.
+- Four tuning DI splits remain: the three `sharpness` phantoms and
+  `p1c1h`.

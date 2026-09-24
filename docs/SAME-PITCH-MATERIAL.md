@@ -492,6 +492,17 @@ so those pairs no longer sit at their files' usual offset.
 His four marks in the `e36` clip land on those rises. The A3 half of the take
 reads a median 18ms the other way.
 
+## The owner's fourth listening pass — 2026-09-24 (DECISION-083)
+
+On `eighths-a3-di` he marked every pick over 17.1-20.0s himself, on a page
+where picks are dragged, added and deleted. `e863`, `e864`, `e866`, `e868`
+move 11-27ms earlier. Four picks the labels lacked are added: `e865b`
+18.153s, `e866b` 18.362s, `e867b` 18.620s, `e868b` 18.852s. The two weak
+picks he left out on 2026-09-14 are added at 19.127s (`e869b`) and 19.611s
+(`e871b`) with `required: false`: he calls them optional, and the matcher
+now scores such a label neither as a match nor as a miss. The amped twin was
+not moved.
+
 ## The rest-and-repick take — 2026-09-24 (DECISION-066)
 
 The one shape the corpus lacked: a note picked, rung, damped for a rest,

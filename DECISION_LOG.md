@@ -7,6 +7,44 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-083]: The owner's fourth listening pass on the A3 eighths DI take, and optional labels
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (marked the picks, 2026-09-24; chose "optional" for the two weak ones); evaluation harness carries the matcher rule
+* **Context:** `e865` was one of the five tuning DI slow splits left after
+  DECISION-082: the engine accepts a transient 160ms into the note (rise
+  2.17, sharpness 10.6). Asked to listen, the owner heard more picks than
+  the labels carry over 18-19s, and asked for a page where he could place
+  them himself. He marked every pick over 17.1-20.0s on a drag-and-add
+  page ("A3 Pick Marker 17-20s", db `answers/a3-17-20`). He re-added the
+  two weak picks near 19.13s and 19.60s that he had left out on
+  2026-09-14 as bad playing, and called them optional.
+* **Decision:** Labels: `e863`, `e864`, `e866`, `e868` move 12, 27, 11
+  and 23ms earlier; `e865b` 18.153s, `e866b` 18.362s, `e867b` 18.620s and
+  `e868b` 18.852s are added; `e869b` 19.127s and `e871b` 19.611s are added
+  with `required: false`; ends in the stretch re-chain to the next start.
+  The amped twin is not moved. Matcher: the per-event `required` flag,
+  present in the format but read by nothing, now means something. A
+  `required: false` label takes part in the one-to-one assignment, so the
+  Note under it is not an extra, and the pair is then dropped: never a
+  match, never a miss. `measure-splits.ts` charges Notes to it the same
+  way and leaves it out of its counts. No label carried `false` before.
+  Numbers, engine unchanged: derivation missed 97 -> 100, fp 201 -> 200;
+  slow subset 186 / 218 of 770 -> 185 / 217 of 774 (DI tuning splits 5 ->
+  4: `e865` was a real pick, `e865b`); corpus 239 / 275 -> 238 / 274;
+  ledger MISSED 124 -> 127; held-out unchanged; eval PASS; 552 tests.
+  The three new misses are picks the engine does not open a Note on:
+  `e866b` (an onset at 18373ms, rise 1.05, no split), `e867b` (onset at
+  18627ms, rise 0.78) and `e868b` (no onset).
+* **Alternatives Considered:** (a) **Leave the two weak picks out:** his
+  earlier call; he chose optional instead. (b) **Required:** a miss on a
+  pick he calls bad playing would count against the engine.
+* **Consequences:** `e865` leaves the list of DI slow splits; four remain.
+  The same-pitch loop's next target list gains three quiet re-picks on
+  this take the engine does not hear.
+
+---
+
 #### [DECISION-082]: A contact the fine witness delivers after its release was refused under the gate moves onto that release
 * **Date:** 2026-09-24
 * **Status:** Accepted
