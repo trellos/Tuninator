@@ -60,9 +60,12 @@ are what keep later work from repeating them.
   says: on GuitarSet the rate itself reads 0.89-0.95, and the models add
   their 0.02-0.07 there, not here, where the extras come from a real amp
   and a real player the fake chain does not imitate (DECISION-021 saw the
-  same fall for the boundary target, 0.88 to 0.72). The GuitarSet
-  pipeline stays in `training/` and re-scores a new model on the same
-  rows; extraction takes about 40 minutes in four shards. Do not reopen
+  same fall for the boundary target, 0.88 to 0.72). The owner asked
+  to keep only the record: the bench scripts
+  (`training/extract-outcome-rows.ts`, `extract-guitarset-outcome.ts`,
+  `bench-outcome.py`) are not on `main` and can be recovered from PR #11's
+  history (commit `eccdd93`); GuitarSet extraction took about 40 minutes
+  in four shards. Do not reopen
   door 3 without either a new input the amp does not erase or labelled
   amped material in quantity.
 
@@ -119,8 +122,9 @@ are what keep later work from repeating them.
 * **Consequences:** Positive: a learned vote fitted on the corpus is
   closed for the outcome target as DECISION-031 closed it for the boundary
   one, with the per-take numbers showing where it fails. The pipeline
-  (`training/extract-outcome-rows.ts`, `training/bench-outcome.py`) scores
-  any future model on the same rows in half a minute. Negative: C3's
+  (`training/extract-outcome-rows.ts`, `training/bench-outcome.py`) was
+  not kept on `main` at the owner's call; it is in PR #11's history
+  (commit `eccdd93`). Negative: C3's
   GuitarSet half is untested, blocked on the environment's network
   policy (zenodo.org) and on the owner's settings, not on the record. Its
   prior is low: the trees probe, which can use any interaction of the

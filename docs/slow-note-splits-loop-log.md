@@ -1533,3 +1533,7 @@ with size, but the median per-take gain over the rate stays +0.000 to
 +0.010. The bigger models get better at ranking which takes have many
 ghosts, not which Note within a take is one. The best removes 5 of the
 137 survivors' surplus. The ceiling is the training data, not the size.
+
+The owner closed door 3 for the record only: the bench scripts named
+above are not on `main`. They are in PR #11's history at commit
+`eccdd93`.
