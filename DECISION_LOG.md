@@ -6,6 +6,201 @@ project rejected is logged exactly like one it accepted — the negative results
 are what keep later work from repeating them.
 
 ---
+
+#### [DECISION-067]: The quarters take's E5 labels `e26`-`e40` move onto the note sounding
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner ("move them", 2026-09-24); measured and applied by the agent, returned to him on a listening page to confirm
+* **Context:** While checking his third listening pass (DECISION-064) the
+  agent found that `quarters-a3-e5-di`'s E5 section drifts: measured on
+  a 10ms RMS envelope, `e26`-`e40` sat 30-52ms before the big rise where
+  the note sounds, growing along the section. `e36` was the one he had
+  already moved by ear, 40ms later, onto that rise.
+* **Decision:** `e26`-`e35` and `e37`-`e40` move to the measured rise
+  (30475, 30968, 31458, 31963, 32443, 32950, 33473, 33950, 34445, 34980,
+  35978, 36463, 36973, 37468 ms); each previous label's end follows where
+  it was chained to the old start. Sent to the owner as the "E5 Quarters
+  Label Check" listening page, whose answers land in its db collection
+  `answers`.
+  Numbers, with DECISION-066 in place: derivation missed 113 and fp 204
+  before and after; the move changes no match. Eval PASS with the same one
+  informational failure.
+* **Alternatives Considered:** (a) **Move `e21`-`e25` too** (+25 to +28ms
+  by the same measure): inside the matcher's tolerance and not in what
+  was proposed. (b) **Move the amped twin with them:** the owner judged
+  no amped audio, and DECISION-064 left twins alone for the same reason.
+* **Consequences:** The E5 section's labels sit on the note, as `e36`
+  does. The owner confirmed them on the page on 2026-09-24: all four
+  clips checked, none moved. `quarters-a3-e5-amped` is no longer byte-identical in timing to
+  its DI twin.
+
+---
+#### [DECISION-066]: The owner's rest-and-repick take becomes tuning material, and a damp is not a note
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (recorded the take 2026-09-23; "it should calibrate recognition to these files", 2026-09-24); detection architecture carries the rule
+* **Context:** The corpus lacked the shape of the owner's original
+  complaint: a note picked, rung, damped for a rest, then picked again.
+  He recorded it (G2, four picks 4s apart then four 2s apart, each damped
+  about halfway to the next) as DI and re-amped, and asked that the
+  recognizer be calibrated to both files. On the shipped engine every
+  pick was found on both renders, with five extra Notes on each. On the
+  DI render all five were a 90-170ms G#2 at a damp: laying the hand on
+  the string pushes it sharp for a moment (98Hz to 104.6Hz at 10.08s),
+  and the region lane (`isRealBoundary`, `pitchChange`) held the new
+  leader for two windows and cut it off as a Note. Across the derivation
+  takes the region lane's accepted pitch-change boundaries that reached
+  the final list were exactly these five.
+* **Decision:** `fixtures/audio/Rest Repick {DI,Amped} G2 60-120bpm.mp3`
+  and `fixtures/labels/rest-repick-g2-60-120bpm-{di,amped}.json` are
+  added as derivation material, with no `eval.config.json` entry (like
+  the other calibration takes) and in `measure-splits.ts`'s slow subset.
+  Labels are measured (start where the note sounds, end on the damp;
+  amped = DI +3ms). New constant `deep.dampTailMs` 300: a pitch-change
+  boundary within a whole tone of the Note's name, in the last 300ms of a
+  Note that ended by falling silent (`silentSince` set), is not a
+  boundary. Derivation tails ran 91-240ms. Engine off with 0.
+  Numbers, rule off → on, final Notes and the matcher: derivation missed
+  113 → 113, fp 209 → 204 (all five on the rest-repick DI take, which
+  reads 8 of 8, 0 extra); held-out, read once, missed 27 → 27, fp 67 →
+  65 (`lead-line-amped-sixteenths` 3 → 2, `lead-line-di-triplet` 8 → 7).
+  542 tests.
+  Both changes together against DECISION-065's state: eval PASS with the
+  same one informational failure; slow subset 187 / 220 of 754 → 190 /
+  222 of 770 (the rest-repick amped take adds 3 / 2, its DI take 0);
+  corpus 240 / 277 / 13 of 1594 → 243 / 279 / 14 of 1610; ledger MISSED
+  140 → 140.
+* **Alternatives Considered:** (a) **Hold the takes out** as a transfer
+  check, which is what they were recorded for. The owner chose tuning.
+  (b) **Require a fall in level after the boundary** (the damp's
+  envelope drops 5-12dB in 100ms) instead of the Note's silent end: a
+  second number to tune, and the silent end is already the tracker's own
+  fact about the Note. (c) **Raise `BEND_IS_ONE_NOTE_CENTS`'s reach** to
+  these Notes: the bend tracker never saw the sharp push on four of the
+  five (peak 0 cents), so the region lane is where it has to be refused.
+* **Consequences:** A damp no longer adds a note a half step up on the
+  direct input. A legato note (hammer-on, pull-off, slide) of a tone or
+  less that is muted within 300ms of arriving, with nothing after it, is
+  now folded into the note before; the corpus has none. The amped
+  render's stubs, pitch naming (G5) and ring past the damp are
+  untouched. The DI take's onsets read +35ms late at the median.
+
+---
+#### [DECISION-065]: Door 1, the phrase-regularity decode, is closed on the bench: at no cost it removes 13 derivation extras where the shipped rate gate removes 44
+* **Date:** 2026-09-23
+* **Status:** Rejected
+* **Owner:** The agent, under the slow-note-splits loop brief (§5 door 1), which the owner said go on 2026-09-23
+* **Context:** Door 2 closed on 2026-09-18 (every witness read at a
+  boundary tops out near 0.70 AUC, and through an amp a phantom and a
+  re-pick read the same). Door 1 asks whether the information is in the
+  SEQUENCE instead: judge a phrase's same-pitch boundaries together and
+  drop the one whose removal makes the phrase's note spacing most
+  regular. Ledger row C1. Its falsifier, stated in the brief and in the
+  bench's header before running: on the derivation takes, more extra
+  Notes removed than the shipped rate gate removes on the current
+  engine, at zero added missed labels; then held-out once, not worse.
+  Measured on the labels after DECISION-064.
+* **Decision:** Closed. `scripts/measure-phrase-regularity-decode.ts`
+  simulates the drop on the final detection list (survivor's end
+  extended, matcher re-run), nothing in the engine changed. The gate's
+  share, measured by running the engine with both span fractions at 0:
+  missed 113 → 112, fp 199 → 243, so the gate removes 44 extras at +1
+  missed. 126 settings of the decode (three grids of allowed interval
+  multiples, six margins, seven variants: candidates restricted to
+  accepted same-pitch re-articulations, a dip penalty, abstaining on
+  phrases whose median interval is under 200ms) were read on top of the
+  shipped engine and in place of the gate. Best at +0 missed: halves
+  grid, accepted boundaries only, dip weight 1, abstain under 200ms,
+  margin 0.5: fp 199 → 186 (-13), on three takes
+  (`held-then-picked-amped` 50 → 43, `quarters-a3-e5-amped` 68 → 64,
+  `quarters-a3-e5-di` 3 → 1). Held-out, read once at that setting:
+  missed 27 → 27, fp 67 → 65. In place of the gate, no setting reaches
+  the gate's count at +1 missed or less (best fp 232 at -1). The
+  frontier across all 126 settings: -16 at +1 missed, -22 at +3, -37 at
+  +6, -42 at +8. Below the falsifier's bar at every price; the door
+  closes with its numbers.
+* **Alternatives Considered:** (a) **Build the -13 as an addition on top
+  of the gate.** It costs nothing on the tuning takes and nothing
+  held-out, but it is a new deep-lane mechanism (a joint decode and an
+  absorption) for 13 of 199 extras, and the falsifier the owner agreed
+  measured it against the gate, not against zero. Offered to the owner
+  instead of taken. (b) **Enumerate subsets (the brief's DP) instead of
+  greedy best-first.** The greedy path's losses are real notes whose
+  removal also improves regularity, which an exact search over the same
+  cost finds too; the cost, not the search, is what separates poorly.
+  (c) **Thirds in the grid** (triplet takes). The derivation set holds
+  no triplet take and the held-out triplets would then set the grid.
+* **Consequences:** Negative result: the phrase's own spacing carries
+  less than the local-interval span the gate already reads (0.905 AUC
+  in DECISION-030's measurement) once the gate has taken its share,
+  and the real notes it drops first sit in the sixteenth sections,
+  where a real note's interval jitters as much as a phantom's (read
+  with `--detail`; abstaining under 200ms removes those losses and most
+  of the gain with them).
+  Ledger C1 closed. The amped column now needs door 3 (a learned
+  classifier) or new material; the owner's rest-repick DI take is a
+  transfer check, not a fix.
+
+---
+#### [DECISION-064]: The owner's third listening pass is applied to the labels, and the E5 amped labels become the DI set
+* **Date:** 2026-09-23
+* **Status:** Accepted
+* **Owner:** The project owner (his answers to the label review list, 2026-09-23); applied by the agent on his word
+* **Context:** The slow-note-splits loop paused on nine single label
+  questions, the 33 grid-placeholder sixteenths on `eighths-a3-di`, and
+  the one-performance-two-answer-keys disagreement on
+  `eighths-sixteenths-e5` (192 DI against 190 amped, measured in
+  `docs/SAME-PITCH-MATERIAL.md`). `fixtures/labels/**` is otherwise
+  read-only; the owner's ear is the one source allowed to change it.
+  He answered through a listening page that played a clip of each
+  moment with the labels drawn on a plain envelope, and he moved labels
+  by clicking where he heard the note start. Nothing in it consults
+  Tuninator.
+* **Decision:** Applied verbatim, each on the render he judged:
+  `quarters-a3-e5-di` `e36` 35450 → 35490; `held-then-picked-di`
+  `p1c1q1`–`p1c1q4` → 4036, 4533, 5039, 5523; `held-then-picked-amped`
+  `p1c4q4` 17535 → 17478; held-out `lead-line-amped-sixteenths` `s46`
+  8527 → 8555; `eighths-a3-di` `s166` → 20611, `s1614` → 21617,
+  `s1697` → 32117 (no pick under 31980; re-sorted after `s1698`), and
+  the other 30 placeholders confirmed on their grid times. The
+  `eighths-sixteenths-e5-amped` file's 190 labels are replaced by the
+  DI file's 192 events shifted +3ms (the renders align at +2.5ms), his
+  choice of the recommended option. Confirmed unchanged: `t12`, `s7`,
+  `s161`, and the mic triplet's `t5` as a separate stroke. Each
+  neighbour's end follows the moved start. `retime-gridded-labels.ts`
+  locks the 33 placeholders and carries his new times; its dry run
+  reads 42/42 against his ear.
+  Numbers, main → this change (the engine did not move): eval PASS with
+  the same one informational failure; corpus split 237 / 276 / 13 →
+  240 / 277 / 13 of 1592 → 1594 labels; slow subset 186 / 221 → 187 /
+  220; ledger MISSED 139 → 140. Every difference is on the E5 amped
+  take (whole take split 23 → 26, missed 13 → 14), which the
+  2026-09-18 measurement predicted for this option. Every other edit
+  moved no count, because each moved label was already matched within
+  the 40ms tolerance or was already missed.
+* **Alternatives Considered:** (a) **Propagate each move to the twin
+  render** (the DI twin of `p1c4q4`, the amped twins of `e36` and
+  `p1c1q*`, the DI twin of `s46`). The owner judged one render each,
+  and on `held-then-picked` the audio does not keep the labels' uniform
+  +15ms between renders. The twins are listed as follow-ups in
+  `docs/SAME-PITCH-MATERIAL.md`. (b) **Re-time all of
+  `held-then-picked-di` by the ~50ms his four moves share.** Measured
+  against a 10ms envelope, that take's label-to-rise offsets run from
+  -60 to +60ms stroke by stroke, so a single shift would be wrong. It
+  needs a per-stroke pass. (c) **Delete `lead-line-di-sixteenths` `s6`.**
+  He hears no new pick at 4.27s. The file is held-out and one of three
+  renders of one performance, so it is left for his explicit word.
+  (d) **Trim the E5 DI set to 190, or leave both.** He chose neither.
+* **Consequences:** Positive: the E5 take is one performance with one
+  answer key, the amped file loses its 35-60ms grid drift, and the A3
+  sixteenth section is now fully human-reviewed. Negative: the E5 amped
+  split count reads three worse, partly the instrument charging
+  early-opening Notes once labels sit on the release. The twins moved
+  here are no longer at their usual offsets. `s1697` and `s1698` run
+  out of numeric order. `quarters-a3-e5-di` `e26`–`e40` were found
+  sitting 30-52ms before the note sounds and are not yet moved.
+
+---
 #### [DECISION-063]: The split instrument charges a Note to the label it overlaps most, each bar widened by the matcher's 40ms
 * **Date:** 2026-09-19
 * **Status:** Accepted

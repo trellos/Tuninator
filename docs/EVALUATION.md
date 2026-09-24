@@ -37,8 +37,8 @@ any number below means anything.
 | `spicy-chords-cmaj9-g-am11` | no | 3 | 5 | 0 | 33.3% | 100.0% | 37ms |
 | `lead-line-di-sixteenths-...-140bpm` | no | 48 | 47 | 1 | 95.8% | 95.8% | 14ms |
 | `lead-line-sixteenths-...-140bpm` (mic) | no | 48 | 38 | 10 | 68.1% | 70.2% | 16ms |
-| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 38 | 13 | 70.8% | 70.8% | 16ms |
-| `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 62 | 1 | — | — | — |
+| `lead-line-amped-sixteenths-...-140bpm` | no | 48 | 37 | 13 | 70.8% | 70.8% | 16ms |
+| `lead-line-di-quarter-eighth-triplet-140bpm` | no | 55 | 61 | 1 | — | — | — |
 | `lead-line-quarter-eighth-triplet-140bpm` (mic) | no | 55 | 64 | 2 | — | — | — |
 | `lead-line-amped-quarter-eighth-triplet-140bpm` | no | 55 | 79 | 0 | — | — | — |
 
@@ -49,7 +49,7 @@ as not applicable rather than failed.
 ## What is good and what is not
 
 **Good.** Every chord fixture on every signal path finds all of its labels. Onset timing is well
-inside its gates — of the 22 takes that score it, nine have a median absolute error under
+inside its gates — of the 24 takes that score it, ten have a median absolute error under
 25ms and the worst is 107ms against a 120ms limit. Pitch class on the required lead fixture is
 92.9%.
 
@@ -59,7 +59,7 @@ inside its gates — of the 22 takes that score it, nine have a median absolute 
   losses are downstream of the evidence, not in it: the onset kernel covers 44, 44 and 47 of the
   48 on the three paths, and the Notes are lost afterwards — absorbed, ended too young, or created
   and then paired with a neighbouring label.
-- **Fast single-note lines also produce extra Notes.** The triplet takes emit 62–79 Notes for 55
+- **Fast single-note lines also produce extra Notes.** The triplet takes emit 61–79 Notes for 55
   labels. `npx tsx scripts/measure-splits.ts` puts the 17 scored takes at 86 of 459 events split
   with 94 extra Notes, and 49 of those 86 are the three triplet takes. The shape is one thing: a
   correctly-named Note followed by a short SAME-PITCH tail fragment, so a single played event

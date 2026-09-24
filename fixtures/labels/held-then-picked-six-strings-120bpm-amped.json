@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 2.020s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +80ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 2.020s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +80ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): p1c4q4 moves 17.535 -> 17.478s: the owner hears the fourth quarter's pick there. Tuninator was not consulted. See DECISION-064.",
   "events": [
     {
       "id": "p1c1h",
@@ -269,7 +269,7 @@
     {
       "id": "p1c4q3",
       "startMs": 17040,
-      "endMs": 17535,
+      "endMs": 17478,
       "kind": "note",
       "label": "F#2",
       "pitches": [
@@ -282,7 +282,7 @@
     },
     {
       "id": "p1c4q4",
-      "startMs": 17535,
+      "startMs": 17478,
       "endMs": 17980,
       "kind": "note",
       "label": "F#2",

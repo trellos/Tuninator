@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "title": "Rest and repick G2, 60 then 120bpm (DI)",
+  "sourceAudio": "../audio/Rest Repick DI G2 60-120bpm.mp3",
+  "instrument": "guitar-di",
+  "tempoBpm": 60,
+  "tuning": [
+    "E2",
+    "A2",
+    "D3",
+    "G3",
+    "B3",
+    "E4"
+  ],
+  "timingNotes": "PROVISIONAL, measured not hand-annotated: generated 2026-09-24 from a plain 10ms RMS envelope (2.5ms hop) written for this purpose; Tuninator was not used to place any label. The owner's rest-and-repick take (brief: pick, ring, damp, rest, re-pick one pitch), recorded 2026-09-23: eight picks of G2 (98Hz, autocorrelation on both renders), four 4s apart (60bpm, one per bar) then four 2s apart (120bpm, one per bar), each damped about halfway to the next pick. A start is where the note sounds (the level first reaches within 10dB of the note's peak), the corpus convention; the quiet pick contact 150-350ms before most picks (35dB under the note) is not labelled, nor the sounds at 2.21s and 28.2s. An end is the damp (the level first falls 6dB below its previous 300ms median). The owner assigned both renders as tuning (derivation) material on 2026-09-24. See DECISION-066.",
+  "events": [
+    {
+      "id": "r1",
+      "startMs": 4028,
+      "endMs": 6183,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r2",
+      "startMs": 7983,
+      "endMs": 10120,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r3",
+      "startMs": 12013,
+      "endMs": 14018,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r4",
+      "startMs": 16025,
+      "endMs": 18073,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r5",
+      "startMs": 20035,
+      "endMs": 21105,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r6",
+      "startMs": 22023,
+      "endMs": 23070,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r7",
+      "startMs": 24033,
+      "endMs": 25078,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r8",
+      "startMs": 25985,
+      "endMs": 27065,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    }
+  ]
+}

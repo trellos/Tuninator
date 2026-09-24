@@ -1015,6 +1015,21 @@ export type EngineConfig = {
      * voice in a fast run is routinely the note before this one.
      */
     regionCorrectPitch: boolean;
+    /**
+     * How close to a Note's silent end a small pitch change may fall and still
+     * be the hand stopping the string rather than a new note. 0 turns it off.
+     *
+     * Damping a fretted note (fretting fingers or palm laid on the string)
+     * pushes the string sharp for a moment as it dies: on the owner's
+     * rest-and-repick DI take, G2 at 98Hz reads 104.6Hz at the damp. The region
+     * lane holds that for two windows and cuts it off as a G#2 Note of 90-170ms,
+     * five of eight damps. A pitch-change boundary within a whole tone of the
+     * Note's name, in the last `dampTailMs` of a Note that ended by falling
+     * silent, is not a boundary. Derivation tails ran 91-240ms; 300 is a margin
+     * over that, above an eighth at 120bpm. A legato note arrives before the
+     * Note stops sounding and the next event, not silence, ends it. DECISION-066.
+     */
+    dampTailMs: number;
   };
 
   diagnostics: {
@@ -1160,6 +1175,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     regionCarveSeesEveryNote: true,
     regionMerge: false,
     regionCorrectPitch: false,
+    dampTailMs: 300,
   },
   diagnostics: {
     pitchFrames: false,

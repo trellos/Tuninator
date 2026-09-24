@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "title": "Rest and repick G2, 60 then 120bpm (amped)",
+  "sourceAudio": "../audio/Rest Repick Amped G2 60-120bpm.mp3",
+  "instrument": "guitar-amped",
+  "tempoBpm": 60,
+  "tuning": [
+    "E2",
+    "A2",
+    "D3",
+    "G3",
+    "B3",
+    "E4"
+  ],
+  "timingNotes": "PROVISIONAL, measured not hand-annotated: generated 2026-09-24 from a plain 10ms RMS envelope (2.5ms hop) written for this purpose; Tuninator was not used to place any label. The owner's rest-and-repick take (brief: pick, ring, damp, rest, re-pick one pitch), recorded 2026-09-23: eight picks of G2 (98Hz, autocorrelation on both renders), four 4s apart (60bpm, one per bar) then four 2s apart (120bpm, one per bar), each damped about halfway to the next pick. A start is where the note sounds (the level first reaches within 10dB of the note's peak), the corpus convention; the quiet pick contact 150-350ms before most picks (35dB under the note) is not labelled, nor the sounds at 2.21s and 28.2s. An end is the damp (the level first falls 6dB below its previous 300ms median). The owner assigned both renders as tuning (derivation) material on 2026-09-24. See DECISION-066. The amped file is a re-amp of the same performance and lags the DI by about 3ms (raw cross-correlation), so its labels are the DI labels +3ms, as DECISION-064 did for eighths-sixteenths-e5. Its own envelope crosses the 10dB mark 30-45ms earlier (the amp makes the pick contact loud) and rings 20-100ms past the damp.",
+  "events": [
+    {
+      "id": "r1",
+      "startMs": 4031,
+      "endMs": 6186,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r2",
+      "startMs": 7986,
+      "endMs": 10123,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r3",
+      "startMs": 12016,
+      "endMs": 14021,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r4",
+      "startMs": 16028,
+      "endMs": 18076,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r5",
+      "startMs": 20038,
+      "endMs": 21108,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r6",
+      "startMs": 22026,
+      "endMs": 23073,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r7",
+      "startMs": 24036,
+      "endMs": 25081,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    },
+    {
+      "id": "r8",
+      "startMs": 25988,
+      "endMs": 27068,
+      "kind": "note",
+      "label": "G2",
+      "pitches": [
+        "G2"
+      ],
+      "pitchClasses": [
+        "G"
+      ],
+      "required": true
+    }
+  ]
+}
