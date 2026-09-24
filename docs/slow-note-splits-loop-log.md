@@ -205,6 +205,7 @@ is half a beat short at the median.
 | C26 | The under-the-hand witness (DECISION-058) reads only the pitch's absence, and on the mic a sustained note the detector loses reads the same as a damped string: the mic triplet take's Note at 24973ms, no pitch on 9 of 12 hops with its level holding at 0.02–0.04 RMS, was absorbed and cost `t6`. Candidate: the level's fall read alongside — the fraction of the Note's hops under `analysis.rmsGate` (the two direct-input Notes under the hand on the tuning takes sit there on 4 of 8 and 5 of 8 hops), or its RMS at its end over its own peak (the amped one on the A3 eighths take falls to 6%; the mic Note holds) | tracker | DECISION-058 (the witness it completes); DECISION-046 (`CONTACT_RISE`, a level witness on the fast lane's own opening) | derived on the tuning takes alone: an edge with the three absorptions kept and every one of the twenty-one real notes under `region-attack` still refused; then held-out read once — `t6` regained with the two DI triplet absorptions kept is the prediction | **built and reverted, iteration 15** (DECISION-059): the gate in place of the pitch, `tracking.underHandReadsGate`. Keeps the two DI absorptions, regains `t6` on held-out (missed 28 → 27), and lets the amped duplicate on the A3 eighths take go (amped 148 → 149, fp 200 → 201) because an amp's floor sits above the gate; reverted on the letter. Spent: the level must be read relative to the Note, not the gate (C27) |
 | C27 | The under-the-hand witness as two readings together: no pitch on at least half the Note's hops (DECISION-058) and the level fallen to at most half — its lowest hop over its loudest, or its RMS at its end over its own peak. On the tuning takes the three Notes DECISION-058 absorbs read 0.75 / 0.09, 0.50 / 0.37 and 0.75 / 0.06 (no pitch / lowest over loudest); the twenty-one real notes under `region-attack` read no pitch on at most 0.33 whatever their fall; the mic triplet Note that cost `t6` reads 0.73 / about 0.7 | tracker | DECISION-058 (the pitch half); DECISION-059 (the gate, which an amp's floor sits over) | on the tuning takes: bit-identical to DECISION-058's engine (the three absorptions kept, the twenty-one refused); then held-out read once — `t6` back with the two DI triplet absorptions kept is the prediction | **built and reverted, iteration 16** (DECISION-060): `tracking.underHandLevelFall` 0.5. Derivation bit-identical to DECISION-058's on every take; held-out `t6` back and nothing else moved — the prediction exactly. Reverted on the letter: better on no derivation path, a constant only a held-out take can see. Spent; **kept 2026-09-19 on the owner's decision** (PR decision 5, option 2; DECISION-062), outside the keep rule |
 | C28 | A re-pick after a damp whose transient lands on a hop the amplitude gate refuses, on a Note still open because its tail kept a pitch reading: `rearticulation.ts` returns `gated` unread and the next hop, back at full level, has no broadband transient, so the pick is lost. Candidate: hold the refusal one articulation when the envelope had fallen (dip at most a bar) and split at it when the level comes back by `releaseRiseRatio` | tracker | DECISION-050 (the release read on a gated hop, for an unsettled contact-opened Note only); C7 (lowering the gate itself turns gated misses into splits) | on the tuning takes: the count of settled same-pitch `gated` refusals and how many sit on a label; then `p2c3q4` and `e843` found at +0 derivation missed lost, fp not up, slow DI not worse, amped bit-identical | **kept, iteration 20** (DECISION-081), with C11: 70 such refusals, 62 on the DI same-pitch takes, none amped; `tracking.gatedRepickDipRatio` 0.25; derivation missed 113 → 97, fp 204 → 203, slow DI 9 → 7; held-out fp 65 → 66 |
+| C29 | The fine witness delivers a contact 65ms late, so a release that lands under the gate is refused on the Note before and only then does the contact open the stroke's Note, 56 to 61ms early; a second fine onset splits it again (`e5`, `e25`, quarters DI) | tracker | DECISION-052 (the release on the frame that opens a fine-opened Note, and after; never before) | `e5` and `e25` cleared at +0 derivation missed, fp not up, amped bit-identical | **kept, iteration 21** (DECISION-082): `tracking.releaseBeforeFineContact`; slow DI 7 → 5, fp 203 → 201, missed flat, held-out unchanged |
 
 ## Owner-side blockers (living)
 
@@ -1514,3 +1515,27 @@ notes it used to miss on the practice recordings, 12 of them on the
 held-then-picked take, and lost none. It also let the fix for the pick
 touch (moving a note's start to the moment it sounds) finally go in: it
 had been undone twice because it exposed two of those hidden picks.
+
+### Iteration 21 — 2026-09-24 — KEPT — a contact the fine witness delivers after its release was refused moves onto that release
+
+- Candidate: **C29**, from the trace of `e5` and `e25`.
+- Falsifier, stated before measuring: both cleared at +0 derivation
+  missed, fp not up, amped bit-identical.
+- Built: `tracking.releaseBeforeFineContact`. The newest same-pitch
+  `gated` refusal is remembered; a Note the fine witness opens moves its
+  start onto it when it lies inside the articulation window after the
+  contact and rose by `releaseRiseRatio`.
+- Numbers, before → after: slow subset 188 / 220 → 186 / 218 (DI tuning
+  7 → 5; amped and mic 148 / 180 unchanged); corpus 241 / 277 / 15 →
+  239 / 275 / 15; tail fragments 224 / 241 → 223 / 239; derivation
+  missed 97 → 97, fp 203 → 201; ledger MISSED 124; held-out, read once,
+  27 / 66 unchanged; eval PASS; 551 tests.
+- Verdict: kept.
+- What a GOATerizer player would notice: on the plugged-in quarters take
+  two more notes that came out split now read as one, each starting
+  within 40ms of when it sounds. Nothing else moved.
+- Findings: DECISION-082 carries the reading; no separate findings
+  section, the mechanism being DECISION-052's read one frame earlier.
+- Exit rule: not fired. Five tuning DI splits remain: `sharpness`
+  phantoms (`e26`, `p3c4q1`, `e821`), a gated pitch-change opening
+  (`p1c1h`) and an accepted mid-note transient (`e865`).

@@ -10,6 +10,11 @@
   found on the derivation takes, none lost; two fewer slow DI splits; the
   amped renders are unchanged. `tracking.gatedRepickDipRatio`,
   `tracking.burstContactRiseRatio`; DECISION-080, DECISION-081.
+- On a direct input, a stroke whose release lands under the amplitude gate
+  now starts at that release even when the fine onset witness reports the
+  pick's contact only afterwards; it used to start on the contact, 56 to
+  61ms early, and split again. Two fewer slow DI splits on the quarters
+  take. `tracking.releaseBeforeFineContact`; DECISION-082.
 
 ## 0.21.0 — 2026-09-24
 

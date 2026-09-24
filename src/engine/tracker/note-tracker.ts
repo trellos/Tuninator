@@ -489,6 +489,13 @@ export class NoteTracker {
    */
   private pendingGatedRepick: { attack: AttackEvidence; noteId: string } | null = null;
   /**
+   * The newest same-pitch transient the verdict refused as `gated`, with the
+   * rise it read. The fine witness delivers a contact 65ms late, so the
+   * release this may be arrives before the Note it belongs to exists. See
+   * `tracking.releaseBeforeFineContact`.
+   */
+  private lastGatedRefusal: { attack: AttackEvidence; riseRatio: number } | null = null;
+  /**
    * When energy last arrived, oldest first.
    *
    * The fast lane sees every transient and then declines to act on most of
@@ -587,6 +594,7 @@ export class NoteTracker {
     this.lastAttack = null;
     this.attackBurstStart = null;
     this.pendingGatedRepick = null;
+    this.lastGatedRefusal = null;
     this.attackTimes.length = 0;
     this.attackSamples.length = 0;
     this.attackRises.length = 0;
@@ -916,6 +924,9 @@ export class NoteTracker {
           bloomed: active.harmonyBloomed,
           localIoiMs: this.localIoiMs(frame.attack.at),
         });
+      }
+      if (!rearticulated && verdict.reason === "gated" && !pitchDiffers) {
+        this.lastGatedRefusal = { attack: frame.attack, riseRatio: frame.riseRatio };
       }
       if (
         !rearticulated &&
@@ -1809,6 +1820,7 @@ export class NoteTracker {
       );
       opened.lastAudibleAt = frame.at;
       opened.fineOpened = true;
+      this.releaseAlreadyPassed(opened);
       return;
     }
 
@@ -1867,6 +1879,41 @@ export class NoteTracker {
     // finds it too young to be ended.
     successor.lastAudibleAt = frame.at;
     successor.fineOpened = true;
+    this.releaseAlreadyPassed(successor);
+  }
+
+  /**
+   * A Note the fine witness just opened on a contact whose release has
+   * already been and gone: refused as `gated` on the Note before, because
+   * the witness confirms an onset 65ms after it and the release arrived
+   * first. The start moves onto it, as the release test would have moved
+   * it had the Note existed, and the announce clock stays on the contact.
+   * See `tracking.releaseBeforeFineContact`.
+   */
+  private releaseAlreadyPassed(record: NoteRecord): void {
+    const refusal = this.lastGatedRefusal;
+    if (!this.config.tracking.releaseBeforeFineContact || refusal === null) return;
+    const window = this.clock.durationSamples(this.config.transient.articulationMs);
+    const gap = refusal.attack.atSample - record.startSample;
+    if (gap <= 0 || gap > window) return;
+    if (refusal.riseRatio < this.config.tracking.releaseRiseRatio) return;
+    if (this.trace !== null) {
+      this.trace({
+        kind: "released",
+        at: refusal.attack.at,
+        noteId: record.id,
+        from: record.startTime,
+        riseRatio: refusal.riseRatio,
+        dipRatio: refusal.attack.dipRatio,
+        localIoiMs: this.localIoiMs(refusal.attack.at),
+        contact: "fine",
+        via: "gated",
+      });
+    }
+    record.releasedFromContact = true;
+    record.startTime = refusal.attack.at;
+    record.startSample = refusal.attack.atSample;
+    this.lastGatedRefusal = null;
   }
 
   /**

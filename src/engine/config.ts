@@ -800,6 +800,21 @@ export type EngineConfig = {
      * DECISION-081.
      */
     gatedRepickDipRatio: number;
+    /**
+     * A Note the fine witness opens on a contact moves its start onto a
+     * same-pitch release already refused as `gated` inside the
+     * articulation window after the contact. False keeps the contact.
+     *
+     * The fine witness confirms an onset 65ms after it, so on a stroke
+     * whose release lands under the gate the release is read, and refused,
+     * on the Note before, and only then does the contact arrive and open
+     * the stroke's Note. DECISION-052 reads the release on the frame that
+     * opens the Note and after; this reads the one that came before it.
+     * The quarters DI take: contact 20397ms, release 20453ms (rise 2.09),
+     * label 20440ms; contact 30419ms, release 30480ms, label 30475ms. The
+     * announce clock stays on the contact. See DECISION-082.
+     */
+    releaseBeforeFineContact: boolean;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
     bendThresholdCents: number;
@@ -1188,6 +1203,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     underHandLevelFall: 0.5,
     gatedRepickDipRatio: 0.25,
     burstContactRiseRatio: 1.2,
+    releaseBeforeFineContact: true,
     burstContactRingOutOnContact: true,
     releaseGraceMs: 90,
     bendThresholdCents: 45,

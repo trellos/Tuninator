@@ -9,6 +9,10 @@
  * into it unless the level coming back is read. See
  * `tracking.gatedRepickDipRatio`.
  *
+ * A contact the fine witness delivers 65ms late, after its release was
+ * already refused as gated on the Note before, moves the Note it opens onto
+ * that release. See `tracking.releaseBeforeFineContact`.
+ *
  * A re-pick whose burst began on the pick landing — a transient that carried
  * no energy and was refused — is split at the release, not backdated onto the
  * contact. See `tracking.burstContactRiseRatio`.
@@ -18,6 +22,7 @@ import { describe, expect, it } from "vitest";
 import { SampleClock } from "../../src/engine/clock.js";
 import { DEFAULT_ENGINE_CONFIG, type EngineConfig } from "../../src/engine/config.js";
 import type { FastFrame } from "../../src/engine/contracts.js";
+import type { FineOnset } from "../../src/engine/kernels/fine-onset.js";
 import { midiToFrequency, midiToOctave, midiToPitchClass } from "../../src/engine/kernels/notes.js";
 import { NoteTracker, type TrackerEmission } from "../../src/engine/tracker/note-tracker.js";
 
@@ -32,6 +37,7 @@ type FrameOptions = {
   attack?: boolean;
   riseRatio?: number;
   dipRatio?: number;
+  fineOnsets?: FineOnset[];
 };
 
 function frame(index: number, options: FrameOptions): FastFrame {
@@ -82,7 +88,7 @@ function frame(index: number, options: FrameOptions): FastFrame {
         : null,
     riseRatio: options.riseRatio ?? 1,
     bandOnset: false,
-    fineOnsets: [],
+    fineOnsets: options.fineOnsets ?? [],
     hop: index,
   };
 }
@@ -174,5 +180,41 @@ describe("a split whose burst began on a refused contact", () => {
 
   it("is on by default", () => {
     expect(DEFAULT_ENGINE_CONFIG.tracking.burstContactRiseRatio).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * A3 sounded for 30 hops; the pick lands (three hops under the gate); its
+ * release rises 3 on a fourth gated hop and is refused on the Note before;
+ * only on the next hop does the fine witness deliver the contact, 56ms back.
+ */
+const LATE_RELEASE_AT = 34 * HOP_MS;
+function lateContact(feed: (f: FrameOptions) => void): void {
+  feed({ voiced: true, rms: 0.05, attack: true });
+  for (let i = 0; i < 30; i++) feed({ voiced: true, rms: 0.05 });
+  for (let i = 0; i < 3; i++) feed({ voiced: false, rms: 0.001 });
+  feed({ voiced: false, rms: 0.001, attack: true, riseRatio: 3, dipRatio: 0.05 });
+  const contact: FineOnset = {
+    atSample: Math.round(((LATE_RELEASE_AT - 56) / 1000) * SAMPLE_RATE),
+    value: 3,
+    dipDb: -15,
+    reboundDb: 8,
+  };
+  feed({ voiced: true, rms: 0.05, fineOnsets: [contact] });
+  for (let i = 0; i < 20; i++) feed({ voiced: true, rms: 0.05 });
+  for (let i = 0; i < 20; i++) feed({ voiced: false, rms: 0.0001 });
+}
+
+describe("a contact the fine witness delivers after its release was refused", () => {
+  it("moves the Note it opens onto the release", () => {
+    const notes = starts(play(tracking({ releaseBeforeFineContact: true }), lateContact));
+    expect(notes).toHaveLength(2);
+    expect(notes[1]).toBeCloseTo(LATE_RELEASE_AT, 6);
+  });
+
+  it("off, the Note keeps the contact", () => {
+    const notes = starts(play(tracking({ releaseBeforeFineContact: false }), lateContact));
+    expect(notes).toHaveLength(2);
+    expect(notes[1]).toBeCloseTo(LATE_RELEASE_AT - 56, 0);
   });
 });

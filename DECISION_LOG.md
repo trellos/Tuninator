@@ -7,6 +7,43 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-082]: A contact the fine witness delivers after its release was refused under the gate moves onto that release
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** Detection architecture (DECISION-044's loop, iteration 21)
+* **Context:** Two of the seven tuning DI slow splits left after
+  DECISION-081 (`e5`, `e25`, quarters DI) are one shape. The pick's
+  release lands on a hop under `analysis.rmsGate` (20453ms rise 2.09;
+  30480ms rise 2.81) and is refused `gated` on the Note before. Only
+  afterwards does the fine witness, which confirms an onset 65ms late,
+  deliver the contact (20397ms, 30419ms) and open the stroke's Note there,
+  56 to 61ms early. A second fine onset then splits that Note again
+  (20459ms, 30488ms). DECISION-052 reads a release on the frame that
+  opens a fine-opened Note and after it, never one that came before.
+* **Decision:** `tracking.releaseBeforeFineContact` (on). The newest
+  same-pitch `gated` refusal is remembered with its rise; when the fine
+  witness opens a Note and that refusal sits inside the articulation
+  window after the contact with a rise of `tracking.releaseRiseRatio` or
+  more, the Note's start moves onto it (traced `released` via `gated`,
+  contact `fine`) and its announce clock stays on the contact.
+  Numbers (derivation predicate "not 140bpm"): slow subset 188 / 220 →
+  186 / 218 (DI tuning 7 → 5; amped and mic unchanged); corpus 241 / 277
+  / 15 → 239 / 275 / 15; tail fragments 224 / 241 → 223 / 239;
+  derivation missed 97 → 97, fp 203 → 201; ledger MISSED 124; `e5` and
+  `e25` now match 27 and 37ms from their labels; held-out, read once,
+  missed 27, fp 66, unchanged; eval PASS; 551 tests.
+* **Alternatives Considered:** (a) **Dedupe the second fine onset
+  alone:** it would leave the Note on the contact, 56ms early, and
+  `e5`'s bar would still hold the early Note. (b) **A flag with no rise
+  bar:** not built; the release bar is the one every other release rule
+  reads.
+* **Consequences:** Nothing a derivation count can see moved but the two
+  targets. The rule reads a refusal made on another Note, so it depends
+  on the order the fine witness and the gate report in; both are hop
+  order in source time, as offline and live.
+
+---
+
 #### [DECISION-081]: A damped re-pick whose transient the gate refused splits the Note, and the refused-contact burst rule ships with it
 * **Date:** 2026-09-24
 * **Status:** Accepted
