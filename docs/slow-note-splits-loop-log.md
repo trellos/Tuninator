@@ -1539,3 +1539,25 @@ had been undone twice because it exposed two of those hidden picks.
 - Exit rule: not fired. Five tuning DI splits remain: `sharpness`
   phantoms (`e26`, `p3c4q1`, `e821`), a gated pitch-change opening
   (`p1c1h`) and an accepted mid-note transient (`e865`).
+
+### Iteration 22 — 2026-09-24 — REVERTED — the release test on a Note that has not yet sounded: its one target is past the window
+
+- Candidate: `p1c1h` (held-then-picked DI). A pitch reading on gated hops
+  opens a Note at 3960ms, the string under the hand; the pick's release
+  arrives at 4053ms (rise 7.7), accepted but unsettled, so it neither
+  splits nor moves the start; label `p1c1q1` at 4036ms.
+- Falsifier: `p1c1h` cleared at +0 derivation missed, fp not up.
+- Built: `tracking.releaseOnSilentOpening`, the release test also reading
+  a Note with no audible or voiced hop yet.
+- Numbers: derivation bit-identical (missed 97, fp 201, slow 186 / 218);
+  held-out, read once, fp 66 → 65 on the DI triplet take.
+- Verdict: reverted. The release lands 93ms after the opening, past the
+  80ms articulation window (six hops), and widening that window is the
+  107ms trap. Better only on held-out, which is not a result.
+- What a GOATerizer player would notice: nothing changed.
+- Exit rule: not fired by its letter. Five tuning DI splits remain:
+  three `sharpness` phantoms at rise 0.71 to 0.99 and dip 0.69 to 0.79
+  (`e26`, `p3c4q1`, `e821`), inside the separation DECISION-045 measured
+  as its ceiling; `p1c1h` above; and `e865`, a transient 160ms into the
+  note at rise 2.17 and sharpness 10.6 that no witness here calls a
+  phantom and that wants a listen.
