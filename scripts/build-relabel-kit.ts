@@ -165,7 +165,7 @@ function main(): void {
     // 2. Extra-Note boundaries under the splits ownership rule.
     const owned = new Map<number, Array<{ startedAt: number }>>();
     for (const detection of detections) {
-      const owner = ownerIndexOf(labels, detection.startedAt);
+      const owner = ownerIndexOf(labels, detection.startedAt, detection.endedAt);
       if (owner === -1) continue;
       const list = owned.get(owner) ?? [];
       list.push({ startedAt: detection.startedAt });

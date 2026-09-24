@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.995s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +55ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.995s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +55ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): e36 moves 35.450 -> 35.490s, onto the note sounding; the old time was the pick's contact. Tuninator was not consulted. See DECISION-064. CORRECTED 2026-09-24 (the owner's word, 'move them', on the drift found during his third listening pass): e26-e35 and e37-e40 move onto the note sounding (the big rise on a 10ms RMS envelope), 30-52ms later than before; they had drifted onto the pick's contact along the E5 section, the same error he corrected by ear on e36. Measured, then confirmed by the owner on a listening page on 2026-09-24: all four clips checked, no label moved. The amped twin is not moved. Tuninator was not consulted. See DECISION-067.",
   "events": [
     {
       "id": "a1",
@@ -801,7 +801,7 @@
     {
       "id": "e25",
       "startMs": 29950,
-      "endMs": 30445,
+      "endMs": 30475,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -814,8 +814,8 @@
     },
     {
       "id": "e26",
-      "startMs": 30445,
-      "endMs": 30935,
+      "startMs": 30475,
+      "endMs": 30968,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -828,8 +828,8 @@
     },
     {
       "id": "e27",
-      "startMs": 30935,
-      "endMs": 31425,
+      "startMs": 30968,
+      "endMs": 31458,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -842,7 +842,7 @@
     },
     {
       "id": "e28",
-      "startMs": 31425,
+      "startMs": 31458,
       "endMs": 31925,
       "kind": "note",
       "label": "E5",
@@ -856,8 +856,8 @@
     },
     {
       "id": "e29",
-      "startMs": 31930,
-      "endMs": 32410,
+      "startMs": 31963,
+      "endMs": 32443,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -870,7 +870,7 @@
     },
     {
       "id": "e30",
-      "startMs": 32410,
+      "startMs": 32443,
       "endMs": 32910,
       "kind": "note",
       "label": "E5",
@@ -884,7 +884,7 @@
     },
     {
       "id": "e31",
-      "startMs": 32915,
+      "startMs": 32950,
       "endMs": 33415,
       "kind": "note",
       "label": "E5",
@@ -898,8 +898,8 @@
     },
     {
       "id": "e32",
-      "startMs": 33435,
-      "endMs": 33915,
+      "startMs": 33473,
+      "endMs": 33950,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -912,8 +912,8 @@
     },
     {
       "id": "e33",
-      "startMs": 33915,
-      "endMs": 34405,
+      "startMs": 33950,
+      "endMs": 34445,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -926,7 +926,7 @@
     },
     {
       "id": "e34",
-      "startMs": 34405,
+      "startMs": 34445,
       "endMs": 34905,
       "kind": "note",
       "label": "E5",
@@ -940,7 +940,7 @@
     },
     {
       "id": "e35",
-      "startMs": 34940,
+      "startMs": 34980,
       "endMs": 35440,
       "kind": "note",
       "label": "E5",
@@ -954,8 +954,8 @@
     },
     {
       "id": "e36",
-      "startMs": 35450,
-      "endMs": 35930,
+      "startMs": 35490,
+      "endMs": 35978,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -968,8 +968,8 @@
     },
     {
       "id": "e37",
-      "startMs": 35930,
-      "endMs": 36420,
+      "startMs": 35978,
+      "endMs": 36463,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -982,8 +982,8 @@
     },
     {
       "id": "e38",
-      "startMs": 36420,
-      "endMs": 36920,
+      "startMs": 36463,
+      "endMs": 36973,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -996,8 +996,8 @@
     },
     {
       "id": "e39",
-      "startMs": 36920,
-      "endMs": 37420,
+      "startMs": 36973,
+      "endMs": 37468,
       "kind": "note",
       "label": "E5",
       "pitches": [
@@ -1010,7 +1010,7 @@
     },
     {
       "id": "e40",
-      "startMs": 37420,
+      "startMs": 37468,
       "endMs": 37920,
       "kind": "note",
       "label": "E5",

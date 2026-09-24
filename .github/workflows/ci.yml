@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # publish.yml runs this same job against a release tag before publishing.
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}

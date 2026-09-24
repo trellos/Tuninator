@@ -1,0 +1,125 @@
+name: Publish
+
+# Publishes tuninator to npm when a release tag is pushed.
+#
+# Releasing:
+#
+#   1. Set `version` in package.json, add the CHANGELOG entry, commit.
+#   2. git tag v<version> && git push origin main v<version>
+#
+# The tag is the trigger and the gate. The run first re-verifies the tagged
+# commit with the same job every push to main gets (ci.yml, called below),
+# then publishes with provenance, so the version on npm is attested to the
+# commit that built it. A tag whose name disagrees with package.json fails
+# before anything is sent, and a version already on the registry is skipped
+# rather than re-sent, so re-running a failed run is safe.
+#
+# Authentication is OIDC trusted publishing: no token lives in this
+# repository. npm exchanges the workflow's GitHub identity for a publish
+# credential scoped to this one run, which is why `id-token: write` is
+# granted to the publish job alone, and why that job installs with
+# --ignore-scripts: nothing but this repository's own scripts runs while the
+# permission is held. The trusted publisher is configured on npmjs.com
+# (package -> Settings -> Trusted publisher -> GitHub Actions): user
+# `trellos`, repository `Tuninator`, workflow `publish.yml`, no environment.
+#
+# Bootstrap, once: npm cannot configure a trusted publisher for a package
+# that does not exist yet, and cannot stage one either, so the FIRST publish
+# of the name has to authenticate with a token. Create a granular access
+# token on npmjs.com (read and write, bypass 2FA, the shortest expiry
+# offered), store it as the repository secret NPM_TOKEN, push the tag, then
+# configure the trusted publisher on the now-existing package and delete
+# both the token and the secret. From then on the OIDC exchange succeeds and
+# takes precedence over any token; the secret is only ever read when it does
+# not. If NPM_TOKEN is absent and no trusted publisher exists, the publish
+# step fails with ENEEDAUTH and nothing is sent.
+
+on:
+  push:
+    tags: ["v*"]
+
+# One run per tag, never cancelled: a publish must not be interrupted.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The verification bar from AGENTS.md §4, exactly as CI runs it on main.
+  verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: publish ${{ github.ref_name }}
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 rather than the .nvmrc 20 of the dev toolchain: trusted
+      # publishing needs npm 11.5.1+, which Node 20 does not carry. The
+      # library itself does not run on Node at all.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Tag matches package.json
+        run: |
+          expected="v$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version ($expected)"
+            exit 1
+          fi
+          echo "releasing $expected"
+
+      - name: npm can do trusted publishing
+        run: |
+          npm_version="$(npm --version)"
+          echo "node $(node --version), npm $npm_version"
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!ok) {
+              console.error(`trusted publishing needs npm 11.5.1 or later, have ${process.argv[1]}`);
+              process.exit(1);
+            }
+          ' "$npm_version"
+
+      # Only two packages in the tree have install scripts: ffmpeg-static,
+      # which the eval needs and the verify job already ran, and esbuild,
+      # which works without its postinstall through its platform package.
+      - name: Install
+        run: npm ci --ignore-scripts
+
+      - name: Already on the registry?
+        id: registry
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if npm view "tuninator@$version" version >/dev/null 2>&1; then
+            echo "::notice::tuninator@$version is already published; nothing to do"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # prepublishOnly runs typecheck, tests and the build with its bundle
+      # assertions, so what is packed here was built from this checkout by
+      # this run. --provenance is the default for OIDC publishes from a public
+      # repository and is stated anyway, so a token-authenticated bootstrap
+      # publish is attested too rather than silently not. --access public is
+      # not redundant for an unscoped name: npm refuses to attest a package it
+      # has never seen unless the access is stated, and the first publish of
+      # this package failed on exactly that.
+      - name: Publish
+        if: steps.registry.outputs.published == 'false'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

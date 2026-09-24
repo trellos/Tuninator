@@ -9,7 +9,10 @@ export default defineConfig([
     // Cleaning is done once by scripts/clean-dist.mjs. A per-config clean races
     // the other config's output.
     clean: false,
-    sourcemap: true,
+    // No sourcemaps in the published package: the two maps were 70% of its
+    // unpacked size, traded for debugging the library inside a consumer's
+    // app. Build from source to step through it.
+    sourcemap: false,
     target: "es2022",
     platform: "browser",
   },
@@ -34,7 +37,7 @@ export default defineConfig([
     format: ["esm"],
     dts: false,
     clean: false,
-    sourcemap: true,
+    sourcemap: false,
     target: "es2022",
     platform: "browser",
   },

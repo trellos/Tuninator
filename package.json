@@ -1,6 +1,6 @@
 {
   "name": "tuninator",
-  "version": "0.2.0",
+  "version": "0.21.0",
   "description": "UI-free browser library turning guitar microphone input into a streaming musical event recognizer: Notes that start early and are revised as the evidence improves.",
   "type": "module",
   "license": "MIT",
@@ -27,8 +27,8 @@
     "docs/API.md",
     "docs/NOTE-MODEL.md",
     "docs/EVALUATION.md",
-    "docs/MIGRATION.md",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "exports": {
@@ -62,8 +62,5 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
-  },
-  "engines": {
-    "node": ">=20"
   }
 }

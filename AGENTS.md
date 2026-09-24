@@ -133,6 +133,8 @@ DERIVATION (every tuned constant comes from here, and only here)     78 events
   spicy-chords-cmaj9-g-am11
   + the eight 120bpm same-pitch takes, assigned as calibration material by
     DECISION-028. See the paragraph below: they are derivation, not held out.
+  + rest-repick-g2-60-120bpm, DI and amped (16 events): the owner's pick,
+    ring, damp, rest take, assigned as tuning material by him (DECISION-066).
 
 HELD OUT (scored every run, never fitted)                           381 events
   four Les Paul performances x three signal paths (DI / amp sim / room mic):
@@ -161,14 +163,14 @@ sixteenth section is flagged as unreliable. It gates nothing and is fitted by
 nothing until someone assigns it and finishes reviewing the labels. Read
 `docs/SAME-PITCH-MATERIAL.md` before using it for either purpose.
 
-**Two structural questions that WERE open are now closed, and a third is not.**
+**Three structural questions that WERE open are now closed.**
 Whether `quarters`' E5 section is 8 measures or 10, and whether `eighths A3`
 contains a sixteenth section, were both answered by the player and the labels
 corrected to follow — an earlier warning here that two takes contradict his
-description was stale and is retired. What is NOT settled:
-`eighths-sixteenths-e5` carries 191 DI events against 190 amped for one
-performance, and the two sets disagree about which picks exist. Both cannot be
-true, and it is the owner's to settle.
+description was stale and is retired. A third was
+settled on 2026-09-23 (DECISION-064): `eighths-sixteenths-e5` carried 192 DI
+events against 190 amped for one performance, and the owner chose the DI set.
+The amped file now holds the DI events shifted +3ms.
 
 **The amped renders of the two gridded takes are far further out than 65ms.**
 `7a216fe` re-timed their DI labels and left the amped twins behind. Measured on
@@ -177,7 +179,7 @@ the current files, amped minus DI per paired event:
 ```
 quarters-a3-e5           median    0ms   (still byte-identical)
 eighths-a3               median +187ms   (p10 +137, p90 +235)
-eighths-sixteenths-e5    median +215ms   (p10 +187, p90 +240)
+eighths-sixteenths-e5    median   +3ms   (DI copied, DECISION-064; was +215ms)
 held-then-picked         median  +15ms   (uniform)
 ```
 
@@ -279,6 +281,20 @@ and 407 extra Notes to 379 **with missed labels unchanged at 159**. Before
 proposing anything on this decision, read that entry: the ceiling results above
 are about single numbers at single boundaries, and they do not bound a claim
 about a sequence.
+
+### `docs/slow-note-splits-loop-prompt.md` — the open line of work, run as a loop
+
+The one brief that is NOT closed. It targets the same-pitch tail fragment on
+the quarter- and eighth-note material specifically (`measure-splits.ts
+--subset=slow`, 754 labels: 52 of 365 split on the direct input, 189 of 389
+through an amp or a room mic, as of 2026-09-18), because that is what the
+owner's consumer plays and it is not where the sixteenth-note ceiling studies
+looked. It is designed to be run one iteration per session; the hand-off
+between sessions is `docs/slow-note-splits-loop-log.md`, which carries the
+baseline, every iteration's verdict, the living candidate ledger and the
+owner-side blockers. Read the journal before the brief's numbers — they go
+stale. The brief's §4 is a table of every closed direction above with its
+number, and its §5 ranks what the record itself names as untested.
 
 ### `docs/archive/` — closed lines of work
 
@@ -434,3 +450,28 @@ Every logged decision must use this exact schema:
    the next sequential ADR markdown file.
 4. **Link:** If this decision supersedes a previous one, immediately update the
    status of the older decision to "Superseded by [New ID]".
+
+---
+
+## 7. Releasing
+
+A release is a tag. `.github/workflows/publish.yml` runs on any `v*` tag: it
+re-runs the CI job against the tagged commit, checks the tag against
+`package.json`, and publishes to npm with provenance through OIDC trusted
+publishing — no token lives in this repository. The workflow's header comment
+is the procedure, including the one-time bootstrap for a name that does not
+exist on npm yet (DECISION-043).
+
+```bash
+# bump `version` in package.json, add the CHANGELOG.md entry, commit, then:
+git tag v0.2.0
+git push origin main v0.2.0
+```
+
+**Pushing the tag is the publish.** Unpublishing is restricted to a 72-hour
+window and burns the version number, so rehearse first: `npm run build` and
+`npm publish --dry-run`, and read every line of what it says it will send. The
+published package is `dist/`, three docs pages, `README.md`, `CHANGELOG.md`
+and `LICENSE` — `package.json`'s `files` — with no sourcemaps and no
+`engines` field, both deliberately (DECISION-041, DECISION-042). `.nvmrc`
+carries the toolchain's Node pin instead.

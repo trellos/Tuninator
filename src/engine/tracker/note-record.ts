@@ -27,7 +27,7 @@ import type { ConfidenceParts, PitchActivation } from "../contracts.js";
 import { DefaultConfidenceModel } from "./confidence.js";
 import { StatefulHypothesisTracker, type HypothesisTransition } from "./hypotheses.js";
 import { VoiceDecay } from "./voices.js";
-import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
+import { centsBetween, describeFrequency, midiToFrequency } from "../kernels/notes.js";
 
 const confidenceModel = new DefaultConfidenceModel();
 
@@ -59,8 +59,34 @@ export class NoteRecord {
    * was one.
    */
   readonly ownStartTime: SourceTimeMs;
+  /**
+   * `FastFrame.riseRatio` on the hop that opened this Note: how much louder
+   * the audio was than the 80ms before it. A pick's contact opens a Note with
+   * no rise; its release, 45–70ms later, arrives with one. See
+   * `tracking.releaseRiseRatio`.
+   */
+  readonly openingRise: number;
+  /** `FastFrame.dipRatio` on the hop that opened this Note. */
+  readonly openingDip: number;
+  /** `FastFrame.rms` on the hop that opened this Note. See `tracking.contactGainDb`. */
+  readonly openingRms: number;
+  /** Opened by the fine-hop witness, which fires on a pick's contact. */
+  fineOpened = false;
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
   absorbedRenaming = false;
+  /**
+   * The release test moved this Note's start off the contact the fine witness
+   * opened it on. The announce clock keeps reading from that contact: the
+   * witness decided the stroke was a Note, and the move only places its
+   * boundary. See `announceSoundedMs` and `tracking.releaseOnFineOpenedFrame`.
+   */
+  releasedFromContact = false;
+  /**
+   * The pick's contact a burst boundary was moved off, when it was: the
+   * ring-out branch reads this Note's age from there. See
+   * `ringOutSoundedMs` and `tracking.burstContactRingOutOnContact`.
+   */
+  ringOutFrom: SourceTimeMs | null = null;
   /** The pre-pick prefix check has run for this Note. See `NoteTracker.claimPrefix`. */
   prefixClaimed = false;
   startSample: number;
@@ -79,6 +105,34 @@ export class NoteRecord {
 
   lastVoicedHz: number | null;
   lastVoicedAt: SourceTimeMs;
+  /**
+   * This Note has held one reading for `pitch.stepConfirmFrames` voiced hops
+   * in a row, the pitch-change detector's own test for a pitch being there.
+   *
+   * A Note opened by a confirmed step holds one from its first hop. A Note
+   * opened by an attack does not until its own hops agree, and until then a
+   * "step" out of it is leaving nothing: the readings it leaves are the
+   * attack's harmonics, or the previous Note's last hop carried across a
+   * silence. See `pitchStillArriving` in the tracker.
+   */
+  heldReading: boolean;
+  /**
+   * Multi-pitch readings taken after `heldReading`, and how many of them
+   * found fewer than `harmony.minPolyphony` fundamentals. See
+   * `harmony.oneStringReadingFraction`.
+   */
+  heldHarmonyReadings = 0;
+  heldSingleReadings = 0;
+  /**
+   * This Note bloomed, but its readings since it held a pitch say one string
+   * is sounding, so it reports its pitch and no harmony. `harmonyBloomed`
+   * stays set: lifting the guards a bloomed Note gets from pitch-step and
+   * re-articulation splits cost 14 extra Notes on the derivation takes, the
+   * amp's damps among them (DECISION-069).
+   */
+  oneString = false;
+  private runHz: number | null = null;
+  private runHops = 0;
   /**
    * When this Note was last *audible*, which is not the same as last pitched.
    *
@@ -298,6 +352,8 @@ export class NoteRecord {
     confidence: number;
     rms: number;
     peak: number;
+    openingRise?: number;
+    openingDip?: number;
   }) {
     this.id = options.id;
     this.config = options.config;
@@ -306,6 +362,9 @@ export class NoteRecord {
     this.ownStartTime = options.startTime;
     this.startSample = options.startSample;
     this.trigger = options.trigger;
+    this.openingRise = options.openingRise ?? 1;
+    this.openingRms = options.rms;
+    this.openingDip = options.openingDip ?? 1;
     this.originPitch = options.originPitch;
     this.initialConfidence = options.confidence;
     this.refFrequencyHz = options.frequencyHz;
@@ -314,6 +373,7 @@ export class NoteRecord {
     this.pitchConfidence = options.confidence;
     this.lastVoicedHz = options.frequencyHz;
     this.lastVoicedAt = options.startTime;
+    this.heldReading = options.trigger === "pitchChange" && options.frequencyHz !== null;
     this.lastAudibleAt = options.startTime;
     this.lastSeenAt = options.startTime;
     this.rms = options.rms;
@@ -333,6 +393,15 @@ export class NoteRecord {
   }
 
   /**
+   * `soundedMs` for the ring-out branch of the re-articulation verdict: from
+   * the pick's contact when a burst boundary moved this Note's start off it,
+   * because the decay that branch fits began when the string was struck.
+   */
+  get ringOutSoundedMs(): number {
+    return Math.max(this.lastVoicedAt, this.lastAudibleAt) - (this.ringOutFrom ?? this.startTime);
+  }
+
+  /**
    * `soundedMs` for the announcement decision.
    *
    * The merged span everywhere except when this Note absorbed a stub a pitch
@@ -341,9 +410,15 @@ export class NoteRecord {
    * note BEFORE this one still ringing while the estimator caught up — audio
    * that belongs to its predecessor. Counting it toward the bar lets a 40ms
    * stub and a 53ms tail add up to a Note where neither was one.
+   *
+   * Also from the Note's own start when the release test moved it off a
+   * contact the fine witness opened: the muted stretch between contact and
+   * release is this stroke's, and a release that barely re-excites the
+   * string is still the release of a Note the witness already decided on.
    */
   get announceSoundedMs(): number {
-    const from = this.absorbedRenaming ? this.ownStartTime : this.startTime;
+    const from =
+      this.absorbedRenaming || this.releasedFromContact ? this.ownStartTime : this.startTime;
     return Math.max(this.lastVoicedAt, this.lastAudibleAt) - from;
   }
 
@@ -449,7 +524,7 @@ export class NoteRecord {
   }
 
   currentLabel(): string {
-    if (this.harmonyBloomed) return this.harmonyLabel ?? "unknown";
+    if (this.harmonyBloomed && !this.oneString) return this.harmonyLabel ?? "unknown";
     return this.settledPitch()?.name ?? "unknown";
   }
 
@@ -457,6 +532,16 @@ export class NoteRecord {
     this.revisionNumber++;
     this.lastChangeType = type;
     return this.revisionNumber;
+  }
+
+  /** Counts one voiced hop toward `heldReading`. */
+  noteReading(hz: number): void {
+    const agrees =
+      this.runHz !== null &&
+      Math.abs(centsBetween(hz, this.runHz)) <= this.config.pitch.stepThresholdCents;
+    this.runHops = agrees ? this.runHops + 1 : 1;
+    this.runHz = hz;
+    if (this.runHops >= this.config.pitch.stepConfirmFrames) this.heldReading = true;
   }
 
   addContourPoint(at: SourceTimeMs, hz: number, confidence: number): void {
@@ -521,7 +606,7 @@ export class NoteRecord {
       };
     }
 
-    if (this.harmonyBloomed) {
+    if (this.harmonyBloomed && !this.oneString) {
       const harmony: NonNullable<Note["harmony"]> = {
         confidence: this.harmonyConfidence,
       };
