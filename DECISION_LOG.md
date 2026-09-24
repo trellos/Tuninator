@@ -30,8 +30,8 @@ are what keep later work from repeating them.
   was proposed. (b) **Move the amped twin with them:** the owner judged
   no amped audio, and DECISION-064 left twins alone for the same reason.
 * **Consequences:** The E5 section's labels sit on the note, as `e36`
-  does. They are measured, not placed by ear, until he confirms the
-  page. `quarters-a3-e5-amped` is no longer byte-identical in timing to
+  does. The owner confirmed them on the page on 2026-09-24: all four
+  clips checked, none moved. `quarters-a3-e5-amped` is no longer byte-identical in timing to
   its DI twin.
 
 ---

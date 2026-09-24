@@ -519,6 +519,6 @@ both files, so they are **derivation**, not held out.
 `quarters-a3-e5-di` `e26`-`e35` and `e37`-`e40` sat 30-52ms before the
 note sounds, drifting later along the section, the error the owner
 corrected by ear on `e36`. On his word they are moved onto the big rise
-of a 10ms RMS envelope, and sent back to him on a listening page to
-confirm. The amped twin is not moved.
+of a 10ms RMS envelope. He confirmed all fourteen on a listening page
+the same night and moved none. The amped twin is not moved.
 
