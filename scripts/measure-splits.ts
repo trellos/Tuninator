@@ -68,8 +68,9 @@ export const OWNERSHIP_LEEWAY_MS = 40;
  * label ids carry the section: on the three lead-line takes `q*` and `e*` are
  * the 13 quarters and 18 eighths and `t*` the triplets; on the two same-pitch
  * eighths takes `e*` is the eighth section and `s16*` the sixteenths;
- * `clean-lead`'s `q*` is its quarter section. The quarters and
- * held-then-picked takes are slow throughout. Chord takes are strummed at
+ * `clean-lead`'s `q*` is its quarter section. The quarters,
+ * held-then-picked and rest-repick takes are slow throughout (rest-repick
+ * added 2026-09-24, DECISION-066). Chord takes are strummed at
  * quarter spacing too but are a different phenomenon and are left out. A
  * fixture not listed contributes nothing to the slice. 754 labels as of
  * 2026-09-18; `docs/slow-note-splits-loop-log.md` carries the baseline.
@@ -82,6 +83,7 @@ const SUBSETS: Record<string, ReadonlyArray<{ fixtures: RegExp; ids: RegExp }>> 
     { fixtures: /^same-pitch-eighths-a3-120bpm/, ids: /^e/ },
     { fixtures: /^same-pitch-eighths-sixteenths-e5-120bpm/, ids: /^e/ },
     { fixtures: /^held-then-picked-six-strings-120bpm/, ids: /./ },
+    { fixtures: /^rest-repick-g2-60-120bpm/, ids: /./ },
   ],
 };
 

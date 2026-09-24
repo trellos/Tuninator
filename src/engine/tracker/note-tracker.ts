@@ -271,6 +271,8 @@ const CONFIDENCE_EPSILON = 0.15;
  * run back to the fast lane.
  */
 const BEND_IS_ONE_NOTE_CENTS = 150;
+/** The widest pitch step a damp drags the string through: a whole tone. */
+const DAMP_STEP_SEMITONES = 2;
 
 /** Bend movement below this is not worth an event, in cents. */
 const BEND_EPSILON = 10;
@@ -2415,6 +2417,24 @@ export class NoteTracker {
       // for its whole life. This is the fast lane's own Voices-versus-Notes
       // rule, applied to region evidence.
       if (record.harmonyBloomed) return false;
+      // A damp, not a note. Stopping a fretted string pushes it sharp for a
+      // moment as it dies, and the region hears the new leader for as long as
+      // the string still rings. A small change in the last stretch of a Note
+      // that then fell silent is the hand, not the player's next note: a legato
+      // note is ended by what follows it, not by silence. See `deep.dampTailMs`.
+      const tail = this.config.deep.dampTailMs;
+      const own = record.dominantMidi();
+      if (
+        tail > 0 &&
+        record.silentSince !== null &&
+        record.endTime !== null &&
+        record.endTime - segment.from <= tail &&
+        segment.dominantMidi !== null &&
+        own !== null &&
+        Math.abs(segment.dominantMidi - own) <= DAMP_STEP_SEMITONES
+      ) {
+        return false;
+      }
       // The boundary was found from the window that FIRST showed a new leader.
       // Whether the leader stayed changed is a question about the whole
       // segment, and only the accumulated answer is worth splitting a Note

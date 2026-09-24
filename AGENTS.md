@@ -133,6 +133,8 @@ DERIVATION (every tuned constant comes from here, and only here)     78 events
   spicy-chords-cmaj9-g-am11
   + the eight 120bpm same-pitch takes, assigned as calibration material by
     DECISION-028. See the paragraph below: they are derivation, not held out.
+  + rest-repick-g2-60-120bpm, DI and amped (16 events): the owner's pick,
+    ring, damp, rest take, assigned as tuning material by him (DECISION-066).
 
 HELD OUT (scored every run, never fitted)                           381 events
   four Les Paul performances x three signal paths (DI / amp sim / room mic):

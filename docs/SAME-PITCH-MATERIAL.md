@@ -491,3 +491,34 @@ so those pairs no longer sit at their files' usual offset.
 30 to 52ms before the strongest nearby rise, drifting later along the section.
 His four marks in the `e36` clip land on those rises. The A3 half of the take
 reads a median 18ms the other way.
+
+## The rest-and-repick take — 2026-09-24 (DECISION-066)
+
+The one shape the corpus lacked: a note picked, rung, damped for a rest,
+then picked again. The owner recorded it on 2026-09-23 as a DI take and
+re-amped it, and on 2026-09-24 asked that recognition be calibrated to
+both files, so they are **derivation**, not held out.
+
+- `rest-repick-g2-60-120bpm-di` and `-amped`, eight picks of G2 each:
+  four 4s apart, then four 2s apart, each damped about halfway to the
+  next pick. The amped render lags the DI by about 3ms.
+- Labels are measured, not placed by ear (see the files' `timingNotes`):
+  a start where the note sounds, an end on the damp. The amped labels
+  are the DI labels +3ms. The quiet pick contact 150-350ms before most
+  picks is not labelled.
+- Before any change the engine found all eight picks on both renders,
+  with five extra Notes on each. On the DI take every extra was a
+  90-170ms G#2 at a damp: stopping the string pushes it sharp for a
+  moment (98Hz to 104.6Hz at 10.08s), and the region lane cut that off
+  as a Note. `deep.dampTailMs` removes all five. On the amped take the
+  extras are stubs before three picks, one on a pick contact and one
+  after a damp; five picks are named G5 and one "unknown".
+
+## The quarters take's E5 section re-timed — 2026-09-24 (DECISION-067)
+
+`quarters-a3-e5-di` `e26`-`e35` and `e37`-`e40` sat 30-52ms before the
+note sounds, drifting later along the section, the error the owner
+corrected by ear on `e36`. On his word they are moved onto the big rise
+of a 10ms RMS envelope, and sent back to him on a listening page to
+confirm. The amped twin is not moved.
+

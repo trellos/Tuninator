@@ -1408,3 +1408,34 @@ rhythm idea started deleting real notes, mostly in fast sixteenth-note
 runs where real playing is not perfectly even. So the rhythm idea is
 not the big fix for the amp and microphone recordings. The 13 can still
 be added on top if you want them.
+
+## The rest-and-repick take and the damp — 2026-09-24 (DECISION-066, DECISION-067)
+
+The owner recorded the take the corpus lacked (pick, ring, damp, rest,
+re-pick; G2, DI and re-amped) and asked that recognition be calibrated
+to it, so both renders are derivation material and in the slow subset.
+Not a loop iteration on the same-pitch splits: the new failure it showed
+is a different shape.
+
+- On the DI render all eight picks were found, and every one of the five
+  extra Notes was a 90-170ms G#2 at a damp. The hand pushes the string
+  sharp as it stops it (98 → 104.6Hz), and the region lane cut that off
+  as a pitch-change Note. `deep.dampTailMs` (300) refuses a pitch-change
+  boundary within a whole tone in the last 300ms of a Note that fell
+  silent. Derivation missed 113 → 113, fp 209 → 204; held-out, read
+  once, missed 27 → 27, fp 67 → 65; 542 tests.
+- Same session, on the owner's word: `quarters-a3-e5-di` `e26`-`e40`
+  moved onto the note sounding (DECISION-067), sent to him on the "E5
+  Quarters Label Check" page. No count moves.
+- Totals now: slow subset 190 / 222 of 770; corpus 243 / 279 / 14 of
+  1610; ledger MISSED 140.
+- Still open on the new amped render: stubs before three picks, a Note
+  on one pick contact, one after a damp, and five picks named G5.
+
+**In plain words, for the owner.** On the plugged-in recording, each
+time you stopped a note with your hand the string went slightly sharp
+for a split second, and the engine heard that as a new, higher note.
+It now knows that a small pitch wobble just before a note goes silent
+is your hand, not a note. All five of those fake notes are gone, and no
+real note was lost anywhere in the other recordings.
+

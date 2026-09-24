@@ -7,6 +7,85 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-067]: The quarters take's E5 labels `e26`-`e40` move onto the note sounding
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner ("move them", 2026-09-24); measured and applied by the agent, returned to him on a listening page to confirm
+* **Context:** While checking his third listening pass (DECISION-064) the
+  agent found that `quarters-a3-e5-di`'s E5 section drifts: measured on
+  a 10ms RMS envelope, `e26`-`e40` sat 30-52ms before the big rise where
+  the note sounds, growing along the section. `e36` was the one he had
+  already moved by ear, 40ms later, onto that rise.
+* **Decision:** `e26`-`e35` and `e37`-`e40` move to the measured rise
+  (30475, 30968, 31458, 31963, 32443, 32950, 33473, 33950, 34445, 34980,
+  35978, 36463, 36973, 37468 ms); each previous label's end follows where
+  it was chained to the old start. Sent to the owner as the "E5 Quarters
+  Label Check" listening page, whose answers land in its db collection
+  `answers`.
+  Numbers, with DECISION-066 in place: derivation missed 113 and fp 204
+  before and after; the move changes no match. Eval PASS with the same one
+  informational failure.
+* **Alternatives Considered:** (a) **Move `e21`-`e25` too** (+25 to +28ms
+  by the same measure): inside the matcher's tolerance and not in what
+  was proposed. (b) **Move the amped twin with them:** the owner judged
+  no amped audio, and DECISION-064 left twins alone for the same reason.
+* **Consequences:** The E5 section's labels sit on the note, as `e36`
+  does. They are measured, not placed by ear, until he confirms the
+  page. `quarters-a3-e5-amped` is no longer byte-identical in timing to
+  its DI twin.
+
+---
+#### [DECISION-066]: The owner's rest-and-repick take becomes tuning material, and a damp is not a note
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (recorded the take 2026-09-23; "it should calibrate recognition to these files", 2026-09-24); detection architecture carries the rule
+* **Context:** The corpus lacked the shape of the owner's original
+  complaint: a note picked, rung, damped for a rest, then picked again.
+  He recorded it (G2, four picks 4s apart then four 2s apart, each damped
+  about halfway to the next) as DI and re-amped, and asked that the
+  recognizer be calibrated to both files. On the shipped engine every
+  pick was found on both renders, with five extra Notes on each. On the
+  DI render all five were a 90-170ms G#2 at a damp: laying the hand on
+  the string pushes it sharp for a moment (98Hz to 104.6Hz at 10.08s),
+  and the region lane (`isRealBoundary`, `pitchChange`) held the new
+  leader for two windows and cut it off as a Note. Across the derivation
+  takes the region lane's accepted pitch-change boundaries that reached
+  the final list were exactly these five.
+* **Decision:** `fixtures/audio/Rest Repick {DI,Amped} G2 60-120bpm.mp3`
+  and `fixtures/labels/rest-repick-g2-60-120bpm-{di,amped}.json` are
+  added as derivation material, with no `eval.config.json` entry (like
+  the other calibration takes) and in `measure-splits.ts`'s slow subset.
+  Labels are measured (start where the note sounds, end on the damp;
+  amped = DI +3ms). New constant `deep.dampTailMs` 300: a pitch-change
+  boundary within a whole tone of the Note's name, in the last 300ms of a
+  Note that ended by falling silent (`silentSince` set), is not a
+  boundary. Derivation tails ran 91-240ms. Engine off with 0.
+  Numbers, rule off → on, final Notes and the matcher: derivation missed
+  113 → 113, fp 209 → 204 (all five on the rest-repick DI take, which
+  reads 8 of 8, 0 extra); held-out, read once, missed 27 → 27, fp 67 →
+  65 (`lead-line-amped-sixteenths` 3 → 2, `lead-line-di-triplet` 8 → 7).
+  542 tests.
+  Both changes together against DECISION-065's state: eval PASS with the
+  same one informational failure; slow subset 187 / 220 of 754 → 190 /
+  222 of 770 (the rest-repick amped take adds 3 / 2, its DI take 0);
+  corpus 240 / 277 / 13 of 1594 → 243 / 279 / 14 of 1610; ledger MISSED
+  140 → 140.
+* **Alternatives Considered:** (a) **Hold the takes out** as a transfer
+  check, which is what they were recorded for. The owner chose tuning.
+  (b) **Require a fall in level after the boundary** (the damp's
+  envelope drops 5-12dB in 100ms) instead of the Note's silent end: a
+  second number to tune, and the silent end is already the tracker's own
+  fact about the Note. (c) **Raise `BEND_IS_ONE_NOTE_CENTS`'s reach** to
+  these Notes: the bend tracker never saw the sharp push on four of the
+  five (peak 0 cents), so the region lane is where it has to be refused.
+* **Consequences:** A damp no longer adds a note a half step up on the
+  direct input. A legato note (hammer-on, pull-off, slide) of a tone or
+  less that is muted within 300ms of arriving, with nothing after it, is
+  now folded into the note before; the corpus has none. The amped
+  render's stubs, pitch naming (G5) and ring past the damp are
+  untouched. The DI take's onsets read +35ms late at the median.
+
+---
 #### [DECISION-065]: Door 1, the phrase-regularity decode, is closed on the bench: at no cost it removes 13 derivation extras where the shipped rate gate removes 44
 * **Date:** 2026-09-23
 * **Status:** Rejected
