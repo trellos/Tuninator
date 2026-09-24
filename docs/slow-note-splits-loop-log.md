@@ -187,7 +187,7 @@ is half a beat short at the median.
 | C9 | DI: the `envelope-rise` acceptance. On the outcome-shaped population, DI takes only, read `riseRatio` and `rms / sustainedRms` at the phantoms against the real re-picks; then whether a note past `ringOutMs` with a trustworthy decay fit should reach the ring-out branch instead of the rolling-baseline test | fast | the sweep that set `rearticulationRiseRatio` 1.2 (swept DOWN on the five originals for sensitivity; raising it was not the question asked); "Hypotheses tested and rejected" rows on `restrumSharpness` | separation ≥ 0.80 AUC on DI rows, then a bar that removes DI fragments at +0 missed on derivation | **spent, iteration 1**: `riseRatio` 0.909 on emitted DI rows (0.502 amped); shipped as the rate gate's second witness, DECISION-045, at +1 on an overlap credit; the emitted DI phantoms are `sharpness`-accepted, not `envelope-rise` |
 | C9b | A PROSPECTIVE bar on the predecessor's age over the local interval, so the fragment is refused rather than opened | tracker | DECISION-030 (announce bar on the fragment's own span) | 0.80 AUC on the outcome-shaped population | **closed, iteration 1**: 0.45–0.55 AUC on every population; the predecessor is a normal-length note |
 | C10 | The DI slow splits the no-rise witness stops at: the E5 take's 13 survivors read rise 0.8–1.0 against real re-picks from 1.01, the quarters DI take's 9 are `fine-onset` and near-unity rise. A witness other than the envelope's level (C2a/C2b band-limited, or the owner's own recordings) | fast | DECISION-045 (rise bar at 0.9 costs three real re-picks whose predecessor was still loud) | DI slow split below 42 of 365 at +0 missed; amped not worse | **spent, iteration 2**: the survivors were a TIMING error, not phantoms — 27 of 35 open on the pick's contact, 45–70ms before the release the labels sit on. DECISION-046 moves the boundary; slow DI 35 → 30 on derivation at +0 missed, amped one extra better. What is left is C11–C13 |
-| C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | **built and reverted, iteration 3** (DECISION-047): 22 of 23 boundaries land within 33ms of their labels, score worse (slow DI 30 → 33, missed +2, fp +2) through C14 and two overlap credits. **Re-run and reverted, iteration 5** (DECISION-049): the estimator holds (E5 fp 2 → 2), slow DI 30 → 30, missed +2 on the same two overlap credits, held-out fp 66 → 64; the held-then-picked take reads 8 → 10 because `measure-splits.ts` charges a Note 67ms early to the label before it and the rule moves the charge along the chain to the C12 shapes; and one moved start reopened the rolling-baseline test on a held note (C15). Spent: reads clean only after C12 and C15. **Reopened 2026-09-19 under DECISION-063's instrument**, which reads the tuning DI takes at 8: the row's falsifier is now the tuning DI slow split below 8 at +0 derivation missed, fp not up, with C12 and C15 as read (C15 closed clean, DECISION-051); the burst boundaries it moved are the ones the old count could not see |
+| C11 | The burst rule's boundary when the burst's FIRST attack was refused for carrying no energy (`no-energy-not-sharp`, `ring-out-not-sharp`, rise 0.56–0.93) and a later attack in the same burst was accepted: on a strum the first transient is the boundary; on a single string it is the pick's landing, and the accepted attack 67–80ms later is the release. 9 of the 30 remaining DI slow splits, 5 of them on the held-then-picked take | tracker | DECISION-046 (same mechanism, read at the burst-backdate site in step (a)); the burst rule itself ("the boundary is the FIRST attack of this burst") | DI slow split below 30 at +0 derivation missed; the amped burst behaviour on the cowboy and power-chord takes bit-identical | **built and reverted, iteration 3** (DECISION-047): 22 of 23 boundaries land within 33ms of their labels, score worse (slow DI 30 → 33, missed +2, fp +2) through C14 and two overlap credits. **Re-run and reverted, iteration 5** (DECISION-049): the estimator holds (E5 fp 2 → 2), slow DI 30 → 30, missed +2 on the same two overlap credits, held-out fp 66 → 64; the held-then-picked take reads 8 → 10 because `measure-splits.ts` charges a Note 67ms early to the label before it and the rule moves the charge along the chain to the C12 shapes; and one moved start reopened the rolling-baseline test on a held note (C15). Spent: reads clean only after C12 and C15. **Reopened 2026-09-19 under DECISION-063's instrument**, which reads the tuning DI takes at 8: the row's falsifier is now the tuning DI slow split below 8 at +0 derivation missed, fp not up, with C12 and C15 as read (C15 closed clean, DECISION-051); the burst boundaries it moved are the ones the old count could not see. **Rebuilt, iteration 19** (DECISION-080) with the ring-out clock on the contact: tuning DI 9 → 7, missed +2 (`p2c3q4`, `e843`, picks under the gate); **kept with C28, iteration 20** (DECISION-081) |
 | C12 | The release arriving on a hop the amplitude gate refuses (`gated`): the muted string is under `analysis.rmsGate` when the release begins, `rearticulation.ts` never sees it, the Note keeps the contact. 3 of the 30; plus 1 at 80ms, the edge of the window DECISION-046 reuses from `transient.articulationMs`, and 2 inside the window and over the bar that did not move (`a3`, `e830`), unread | tracker | DECISION-046; C7 (lowering the gate turns gated misses into splits, so the gate is not the lever) | the 3 + 1 + 2 fall at +0 derivation missed | **spent, iteration 6** (DECISION-050): read on the trace, only 2 of the 6 are reachable at the release test — `e851` sits six hops after its contact, which is 80.0000000000018ms in doubles, and `e815`'s release hop is under the gate. Both fixed (`tracking.releaseOnGatedHop`, window in samples): slow DI 30 → 29, +0 missed, +0 fp, held-out identical; three boundaries right, one label's charge moved along the chain to `e818` (C16). The rest: `e839` release 91ms after a fine-opened contact (past the window); `e830` the fine witness delivering the contact after its release; `e835`, `a3` region-lane Notes at the contact |
 | C14 | The pace estimator's cliff: `localIoiMs` is the median of the last eight opening gaps, and on material whose gaps sit in two clusters (the E5 take: eighths ~227ms, sixteenths ~120ms) one gap shortened by a 67ms boundary move tips it 227 → 160ms, so every bar denominated in it — DECISION-030's 0.35, DECISION-045's 0.5 — moves by a third. Reproduction: E5 DI take, 15907ms, `announceBarMs` 113 → 80 under DECISION-047's build. Candidates: gaps read from ATTACK times (which a boundary move does not change) rather than Note openings; a percentile or trimmed median that one gap cannot tip; or the bar denominated in the predecessor's own length | tracker | DECISION-030 (the estimator as built), DECISION-037 (estimator / oracle ratio "not yet decidable") | under DECISION-047's build re-applied, the two E5 false positives do not appear and derivation is not worse; the estimator/oracle ratio per take does not fall | **spent, iteration 4** (DECISION-048): retracted openings struck out; derivation fp 223 → 211, extras 281 → 271, missed 114 → 114, amped slow 188 → 182; estimate / labels 0.85 → 0.96 at the median. The E5 stubs' bars read 133 and 140ms (were 113 and 100). C11 re-run next |
 | C13 | A sharpness ceiling on the CONTACT opening for DECISION-046: the two moves that cost something on held-out had a broadband transient of sharpness 9.9 and 12.8 at the "contact" (a mic sixteenth at 140bpm, a mic strum), the direct-input contacts read 0.5–6.6. A contact does not scrape. Read on held-out material, so not a constant this iteration | tracker | DECISION-046 (d) | derived on the DERIVATION predicate alone: an edge between the DI contacts and the loudest derivation openings the rule moves; then held-out read once — `lead-line-sixteenths` missed 10 → 8 is the prediction | **spent, iteration 17** (DECISION-061), falsified by count: 54 release moves on the tuning takes; the contacts sharper than 6.6 are five DI moves of 0–14ms on the E5 eighths take (up to 10.5), the amped and mic moves carry no broadband contact; no ceiling from 6.6 to 12 changes a derivation count. A constant only held-out sees, as DECISION-060 |
@@ -201,9 +201,11 @@ is half a beat short at the median.
 | C22 | An unannounced stub the pitch tracker split off the first hops of an attack lends its start to the Note the pitch change then opened: `s161`, A3 eighths DI — attack at 20026.67ms read 885 then 553Hz on an A3, the pitch change opened the A3 Note at 20053.33ms, the 27ms stub died unannounced and lent nothing, the label is at 20011ms and the Note reads 42ms late. The region's carve had been crediting it from 20024ms as a wholly overlapping duplicate, which C21 removes | tracker | DECISION-055 (the carve it replaces); DECISION-046 (a stub the release split off is absorbed and lends its start) | on the tuning takes, the count of unannounced stubs ended by a pitch change onto the same pitch class or its octave within two hops of an attack; then `s161` regained at +0 derivation missed and fp not up; held-out read once after | **spent, iteration 12** (DECISION-056), falsified by its read: 101 such stubs on the tuning takes, 82 the successor's pitch or its octave; DI stubs 0–13ms with successors on time; `s161` cannot be regained, one Note stands for two picks there and the miss moves to `s162`. Restated for the amped column: nine amped successors 42–77ms late would read within 40ms of their labels with the stub's start lent (seven on the E5 eighths amped take); falsifier those nine within 40ms at +0 derivation missed, fp and extras not up, DI takes bit-identical. **Amped restatement falsified by count, iteration 17** (DECISION-061): every such start lent on the tuning takes reads slow 168 → 170, extras 255 → 259, DI not bit-identical; an onset row for the amped column, not this loop's |
 | C23 | A carved prefix of no pitch between a note's end and the next stroke's release — the string under the hand, level fallen to 1% — is offered to that stroke as its contact stub, the way the fast lane offers one, rather than declined as `prefix:unpitched`. Its two sites are HELD-OUT (the DI triplet take, 5693–5787ms and 6989–7080ms, where the shipped engine's window-start boundary produced the same Note and absorbed it), so the row reads on the tuning takes first | tracker | DECISION-055; `tryClaimPrefix` | on the tuning takes: every carved prefix declined `unpitched` under DECISION-055 listed with what sounds under it; a rule derived from those alone at +0 derivation missed and fp not up; held-out read once after, the two triplet Notes the prediction | **spent, iteration 14** (DECISION-058): the count found no `unpitched` decline on the tuning takes — the row as written falsified — and the shape standing twice there under `region-attack` (the held-then-picked DI take, 17413 and 41893ms, the attack branch's boundary on the contact). Rebuilt on the witness that separates them from the twenty-one real notes under the same decline, the fast lane's unvoiced hops (0.57 and 0.83 against 0 to 0.33): `tracking.prefixUnderHand`. Kept: slow DI 21 → 20, amped 149 → 148, fp 203 → 200, missed flat; held-out the two triplet Notes absorbed as predicted, and `t6` lost on the mic triplet take to a Note the detector lost the pitch of while its level held (C26) |
 | C24 | The rise a transient carries is read over the two hops after it, not one: `a15` (quarters DI, 9000ms) reads 0.91, 1.997, 2.05 against the release bar of 2, and stays in the mute. The bar is not the lever (a lower one reads the contact, DECISION-053) | tracker (the list) | DECISION-055 (one hop) | `a14`'s charge cleared with nothing else on the DI takes moving, fp and extras not up; the count of transients whose rise peaks on the second hop after them, on the tuning takes | **built and reverted, iteration 12** (DECISION-056): `deep.transientRiseHops` 2 and 3 leave the quarters DI take bit-identical — the deep lane reads 9000ms at 2.053 and the boundary is the ATTACK branch's on the band-only mute onset at 8960ms, which the envelope-branch rule never sees — and cost `t17` on the clean-lead take (an earlier transient outranks the release under a longer reading). Spent: the reachable rule is C25 |
-| C25 | The attack branch of `resegment.ts` places its boundary on the transient in the hop before a window's start, and `attackSamples` carries band-only onsets, so on a direct-input same-pitch stroke that transient is the mute's onset, 40–55ms before the release. Candidate: when that transient is band-only and a broadband transient whose rise clears `tracking.releaseRiseRatio` sits inside the window, the boundary is the latter — DECISION-055's envelope-branch rule applied to the branch that placed `a15`'s boundary. Reproduction: quarters DI, region 8507–9680ms, `attack@8960` on the band-only onset, broadband 9000ms rise 1.997, label 9015ms | deep | DECISION-055 (the envelope branch); DECISION-053 (the first transient, which read the mute) | on the tuning takes, the count of attack-branch boundaries standing on a band-only onset and how many have a rising broadband transient in their window; then `a14`'s charge cleared at +0 derivation missed, fp and extras not up, amped and mic not worse; held-out read once after | **built and reverted, iteration 13** (DECISION-057): `deep.segmentAttackOnRisingTransient`; count 648 attack-branch windows, 335 on a band-only onset, 163 with a rising transient in reach, 41 contacts; `a15` not reachable (1.997 under the bar on one hop). Slow DI 21 → 22, amped 149 → 148, fp 203 → 201, missed flat; the one DI change is two boundaries right (80 and 107ms early → 27ms) and the chain charge on `p1c3q4`. Spent: reads right, the count cannot see it. **Reopened 2026-09-19 under DECISION-063's instrument**: the falsifier is `a14`'s bar, the tuning DI slow split below 8 at +0 derivation missed, fp and extras not up, amped and mic not worse; `deep.segmentAttackOnRisingTransient` is in the commit history at DECISION-057 |
+| C25 | The attack branch of `resegment.ts` places its boundary on the transient in the hop before a window's start, and `attackSamples` carries band-only onsets, so on a direct-input same-pitch stroke that transient is the mute's onset, 40–55ms before the release. Candidate: when that transient is band-only and a broadband transient whose rise clears `tracking.releaseRiseRatio` sits inside the window, the boundary is the latter — DECISION-055's envelope-branch rule applied to the branch that placed `a15`'s boundary. Reproduction: quarters DI, region 8507–9680ms, `attack@8960` on the band-only onset, broadband 9000ms rise 1.997, label 9015ms | deep | DECISION-055 (the envelope branch); DECISION-053 (the first transient, which read the mute) | on the tuning takes, the count of attack-branch boundaries standing on a band-only onset and how many have a rising broadband transient in their window; then `a14`'s charge cleared at +0 derivation missed, fp and extras not up, amped and mic not worse; held-out read once after | **built and reverted, iteration 13** (DECISION-057): `deep.segmentAttackOnRisingTransient`; count 648 attack-branch windows, 335 on a band-only onset, 163 with a rising transient in reach, 41 contacts; `a15` not reachable (1.997 under the bar on one hop). Slow DI 21 → 22, amped 149 → 148, fp 203 → 201, missed flat; the one DI change is two boundaries right (80 and 107ms early → 27ms) and the chain charge on `p1c3q4`. Spent: reads right, the count cannot see it. **Reopened 2026-09-19 under DECISION-063's instrument**: the falsifier is `a14`'s bar, the tuning DI slow split below 8 at +0 derivation missed, fp and extras not up, amped and mic not worse; `deep.segmentAttackOnRisingTransient` is in the commit history at DECISION-057. **Closed by count, iteration 19** (DECISION-080): `a14` and `a15` no longer read split, and none of the nine tuning DI splits is an attack-branch boundary on a band-only onset |
 | C26 | The under-the-hand witness (DECISION-058) reads only the pitch's absence, and on the mic a sustained note the detector loses reads the same as a damped string: the mic triplet take's Note at 24973ms, no pitch on 9 of 12 hops with its level holding at 0.02–0.04 RMS, was absorbed and cost `t6`. Candidate: the level's fall read alongside — the fraction of the Note's hops under `analysis.rmsGate` (the two direct-input Notes under the hand on the tuning takes sit there on 4 of 8 and 5 of 8 hops), or its RMS at its end over its own peak (the amped one on the A3 eighths take falls to 6%; the mic Note holds) | tracker | DECISION-058 (the witness it completes); DECISION-046 (`CONTACT_RISE`, a level witness on the fast lane's own opening) | derived on the tuning takes alone: an edge with the three absorptions kept and every one of the twenty-one real notes under `region-attack` still refused; then held-out read once — `t6` regained with the two DI triplet absorptions kept is the prediction | **built and reverted, iteration 15** (DECISION-059): the gate in place of the pitch, `tracking.underHandReadsGate`. Keeps the two DI absorptions, regains `t6` on held-out (missed 28 → 27), and lets the amped duplicate on the A3 eighths take go (amped 148 → 149, fp 200 → 201) because an amp's floor sits above the gate; reverted on the letter. Spent: the level must be read relative to the Note, not the gate (C27) |
 | C27 | The under-the-hand witness as two readings together: no pitch on at least half the Note's hops (DECISION-058) and the level fallen to at most half — its lowest hop over its loudest, or its RMS at its end over its own peak. On the tuning takes the three Notes DECISION-058 absorbs read 0.75 / 0.09, 0.50 / 0.37 and 0.75 / 0.06 (no pitch / lowest over loudest); the twenty-one real notes under `region-attack` read no pitch on at most 0.33 whatever their fall; the mic triplet Note that cost `t6` reads 0.73 / about 0.7 | tracker | DECISION-058 (the pitch half); DECISION-059 (the gate, which an amp's floor sits over) | on the tuning takes: bit-identical to DECISION-058's engine (the three absorptions kept, the twenty-one refused); then held-out read once — `t6` back with the two DI triplet absorptions kept is the prediction | **built and reverted, iteration 16** (DECISION-060): `tracking.underHandLevelFall` 0.5. Derivation bit-identical to DECISION-058's on every take; held-out `t6` back and nothing else moved — the prediction exactly. Reverted on the letter: better on no derivation path, a constant only a held-out take can see. Spent; **kept 2026-09-19 on the owner's decision** (PR decision 5, option 2; DECISION-062), outside the keep rule |
+| C28 | A re-pick after a damp whose transient lands on a hop the amplitude gate refuses, on a Note still open because its tail kept a pitch reading: `rearticulation.ts` returns `gated` unread and the next hop, back at full level, has no broadband transient, so the pick is lost. Candidate: hold the refusal one articulation when the envelope had fallen (dip at most a bar) and split at it when the level comes back by `releaseRiseRatio` | tracker | DECISION-050 (the release read on a gated hop, for an unsettled contact-opened Note only); C7 (lowering the gate itself turns gated misses into splits) | on the tuning takes: the count of settled same-pitch `gated` refusals and how many sit on a label; then `p2c3q4` and `e843` found at +0 derivation missed lost, fp not up, slow DI not worse, amped bit-identical | **kept, iteration 20** (DECISION-081), with C11: 70 such refusals, 62 on the DI same-pitch takes, none amped; `tracking.gatedRepickDipRatio` 0.25; derivation missed 113 → 97, fp 204 → 203, slow DI 9 → 7; held-out fp 65 → 66 |
+| C29 | The fine witness delivers a contact 65ms late, so a release that lands under the gate is refused on the Note before and only then does the contact open the stroke's Note, 56 to 61ms early; a second fine onset splits it again (`e5`, `e25`, quarters DI) | tracker | DECISION-052 (the release on the frame that opens a fine-opened Note, and after; never before) | `e5` and `e25` cleared at +0 derivation missed, fp not up, amped bit-identical | **kept, iteration 21** (DECISION-082): `tracking.releaseBeforeFineContact`; slow DI 7 → 5, fp 203 → 201, missed flat, held-out unchanged |
 
 ## Owner-side blockers (living)
 
@@ -1537,3 +1539,249 @@ ghosts, not which Note within a take is one. The best removes 5 of the
 The owner closed door 3 for the record only: the bench scripts named
 above are not on `main`. They are in PR #11's history at commit
 `eccdd93`.
+
+### Iteration 19 — 2026-09-24 — REVERTED (alone) — C25 without a site, and C11 a third time: two splits right, two picks under the gate lost
+
+- Restart: the owner asked why the loop had stopped and said go. `main`
+  after DECISION-067 reproduced bit for bit: derivation missed 113, fp
+  204; slow subset 190 / 222 of 770; corpus 243 / 279 / 14; ledger MISSED
+  140; 542 tests. The tuning DI takes read 9 slow splits (`p1c1h`,
+  `p2c3q2`, `p2c4q3`, `p3c4q1`, `e865`, `e821`, `e5`, `e25`, `e26`),
+  each traced in the findings entry.
+- Candidates: **C25** read on the count first; then **C11**.
+- Falsifiers, stated before measuring: C25 — a nine-split site that is
+  an attack-branch boundary on a band-only onset. C11 — tuning DI slow
+  split below 9 at +0 derivation missed, fp not up.
+- Counts: C25 — no such site; `a14` and `a15` no longer read split.
+  Closed. C11 — rebuilt as DECISION-047, plus the ring-out clock on the
+  contact (C15's anchor): tuning DI 9 → 7 (`p2c3q2`, `p2c4q3`), amped
+  unchanged, corpus 241 / 277 / 14, fp 204 → 203, derivation missed
+  113 → 115 (`p2c3q4`, `e843`).
+- Verdict and why: falsified on the missed line alone. Both labels are
+  picks the engine never found, credited to Notes that began at the
+  previous pick's contact; both picks land on a hop the amplitude gate
+  refuses. New row C28.
+- What a GOATerizer player would notice: nothing changed this iteration.
+- Findings section: "The refused-contact burst rule a third time, and
+  the re-pick the gate hides"; DECISION-080.
+- Ledger changes: C25 closed; C11 annotated; C28 added.
+- Exit rule: not fired.
+
+### Iteration 20 — 2026-09-24 — KEPT (with C11) — a damped re-pick whose transient the gate refused splits the Note
+
+- Candidate: **C28**, then C11 re-applied on top.
+- Falsifier, stated before measuring: `p2c3q4` and `e843` found at +0
+  derivation labels lost, fp not up, slow DI not worse, amped
+  bit-identical.
+- Built: `tracking.gatedRepickDipRatio` (held one articulation, split
+  when the level comes back by `releaseRiseRatio`; only on an announced
+  Note that has sounded half the local interval). Alone at 0.2: missed
+  113 → 100, fp 206, and `e843` reads split behind the pick it finds,
+  C11's shape. With C11: swept 0.1 to 1.0, missed 105 / 100 / 97 / 97 /
+  98 at 0.1 / 0.2 / 0.25 / 0.3 / 0.35 and up (`t20` on clean-lead), fp
+  203 throughout; 0.25 taken.
+- Numbers, before → after: slow subset 190 / 222 → 188 / 220 (DI tuning
+  9 → 7; amped and mic 148 / 180 and 30 / 30 unchanged; DI held-out 3);
+  corpus 243 / 279 / 14 → 241 / 277 / 15; tail fragments 227 / 244 →
+  224 / 241; ledger MISSED 140 → 124 (held-then-picked DI 14 → 2, A3
+  eighths DI 63 → 59); derivation missed 113 → 97, fp 204 → 203, none
+  lost; held-out, read once, missed 27 → 27, fp 65 → 66 (one Note on a
+  gated hop at 30120ms on the mic triplet take, far from any label);
+  eval PASS; 549 tests. Ring-out anchor off: one more split, one more fp.
+- Verdict and why: kept, as a pair. Each row fails the keep rule alone
+  on the other's shape; together every derivation line is better.
+- What a GOATerizer player would notice: on the direct input, a note you
+  damp and then pick again is now heard as a new note far more often.
+  On the held-then-picked practice take 12 of the 14 picks the engine
+  used to miss are found; on the A3 eighths take 4 more. Two slow notes
+  that used to come out split now read as one. Through an amp or a room
+  mic nothing changed, and one test recording gained one extra note.
+- Findings section: as iteration 19; DECISION-081.
+- Ledger changes: C28 kept; C11 kept with it.
+- Exit rule: not fired. Seven tuning DI splits remain: the late fine
+  witness past a gated release (`e5`, `e25`), `sharpness` phantoms
+  (`e26`, `p3c4q1`, `e821`), a gated pitch-change opening (`p1c1h`) and
+  an accepted mid-note transient (`e865`).
+
+**In plain words, for the owner.** When you stop a note with your hand
+and pick it again, the plugged-in signal goes almost silent in between,
+quieter than the engine's noise gate. The engine was throwing away the
+first instant of your next pick because it arrived while the level was
+still under that gate, and if it was still hearing the old note's tail,
+the new pick simply disappeared into it. It now notices when the sound
+comes straight back up and treats that as the new pick. That found 16
+notes it used to miss on the practice recordings, 12 of them on the
+held-then-picked take, and lost none. It also let the fix for the pick
+touch (moving a note's start to the moment it sounds) finally go in: it
+had been undone twice because it exposed two of those hidden picks.
+
+### Iteration 21 — 2026-09-24 — KEPT — a contact the fine witness delivers after its release was refused moves onto that release
+
+- Candidate: **C29**, from the trace of `e5` and `e25`.
+- Falsifier, stated before measuring: both cleared at +0 derivation
+  missed, fp not up, amped bit-identical.
+- Built: `tracking.releaseBeforeFineContact`. The newest same-pitch
+  `gated` refusal is remembered; a Note the fine witness opens moves its
+  start onto it when it lies inside the articulation window after the
+  contact and rose by `releaseRiseRatio`.
+- Numbers, before → after: slow subset 188 / 220 → 186 / 218 (DI tuning
+  7 → 5; amped and mic 148 / 180 unchanged); corpus 241 / 277 / 15 →
+  239 / 275 / 15; tail fragments 224 / 241 → 223 / 239; derivation
+  missed 97 → 97, fp 203 → 201; ledger MISSED 124; held-out, read once,
+  27 / 66 unchanged; eval PASS; 551 tests.
+- Verdict: kept.
+- What a GOATerizer player would notice: on the plugged-in quarters take
+  two more notes that came out split now read as one, each starting
+  within 40ms of when it sounds. Nothing else moved.
+- Findings: DECISION-082 carries the reading; no separate findings
+  section, the mechanism being DECISION-052's read one frame earlier.
+- Exit rule: not fired. Five tuning DI splits remain: `sharpness`
+  phantoms (`e26`, `p3c4q1`, `e821`), a gated pitch-change opening
+  (`p1c1h`) and an accepted mid-note transient (`e865`).
+
+### Iteration 22 — 2026-09-24 — REVERTED — the release test on a Note that has not yet sounded: its one target is past the window
+
+- Candidate: `p1c1h` (held-then-picked DI). A pitch reading on gated hops
+  opens a Note at 3960ms, the string under the hand; the pick's release
+  arrives at 4053ms (rise 7.7), accepted but unsettled, so it neither
+  splits nor moves the start; label `p1c1q1` at 4036ms.
+- Falsifier: `p1c1h` cleared at +0 derivation missed, fp not up.
+- Built: `tracking.releaseOnSilentOpening`, the release test also reading
+  a Note with no audible or voiced hop yet.
+- Numbers: derivation bit-identical (missed 97, fp 201, slow 186 / 218);
+  held-out, read once, fp 66 → 65 on the DI triplet take.
+- Verdict: reverted. The release lands 93ms after the opening, past the
+  80ms articulation window (six hops), and widening that window is the
+  107ms trap. Better only on held-out, which is not a result.
+- What a GOATerizer player would notice: nothing changed.
+- Exit rule: not fired by its letter. Five tuning DI splits remain:
+  three `sharpness` phantoms at rise 0.71 to 0.99 and dip 0.69 to 0.79
+  (`e26`, `p3c4q1`, `e821`), inside the separation DECISION-045 measured
+  as its ceiling; `p1c1h` above; and `e865`, a transient 160ms into the
+  note at rise 2.17 and sharpness 10.6 that no witness here calls a
+  phantom and that wants a listen.
+
+### Between rounds — 2026-09-24 — `e865` was a real pick (DECISION-083)
+
+- The owner listened to `e865` and marked every pick over 17.1-20.0s on a
+  drag-and-add page. The transient at 18160ms is his pick `e865b`
+  (18.153s); four labels moved, six picks added, two of them optional.
+- Numbers, engine unchanged: slow DI tuning splits 5 -> 4; derivation
+  missed 97 -> 100 (three new quiet picks the engine does not open a Note
+  on: `e866b`, `e867b`, `e868b`), fp 201 -> 200.
+- Four tuning DI splits remain: the three `sharpness` phantoms and
+  `p1c1h`.
+
+
+## The amped rest-and-repick take — 2026-09-24 (DECISION-068)
+
+The owner asked for the amped render's leftovers next. Not a loop
+iteration on the same-pitch splits: these are different shapes.
+
+- Stubs before three picks: a step out of a Note that never held a
+  pitch (its first hops through the amp are harmonics, or the previous
+  note's last reading across the rest) now reads as the pitch arriving.
+  Derivation missed 113 → 113, fp 204 → 198; held-out, read once,
+  missed 27 → 27, fp 65 → 63; slow subset 190 / 222 → 185 / 214;
+  corpus 243 / 279 / 14 → 238 / 271 / 14; ledger MISSED 140.
+- Still open on the take: a Note on the pick contact at 7.63s and the
+  contact before 11.91s (the DI contact test does not see an amped
+  contact), one after the damp at 18.33s, and five picks named G5.
+
+**In plain words, for the owner.** Through the amp, a picked low G
+takes a moment to settle, and the first things the engine hears are
+its overtones. It used to treat the settle as a second note starting.
+It now knows a note that never held a pitch cannot change pitch. Two of
+the three short blips before your picks are gone, and 6 more ghost
+notes went with them on the other practice takes, with no real note
+lost.
+
+
+### The same take: G5 (DECISION-069)
+
+- Five picks named "G5" and one "unknown": the amp's aperiodic attack
+  kept the Note's mean pitch confidence under the monophonic veto while
+  its noisy spectrum read as polyphony. A bloomed Note whose readings
+  after its pitch settled find a lone fundamental 20% of the time or more
+  now reports its pitch. Derivation exact labels 1027 → 1071; missed 113
+  → 114 and fp 198 → 199, a matcher re-pairing on identical Notes;
+  held-out missed 27, fp 63, exact 320 unchanged. Splits unchanged.
+- The take now reads 8 of 8 named G2, with 3 extra Notes (the contact at
+  7.63s, the contact before 11.91s, and 18.33s after a damp).
+
+**In plain words, for the owner.** Through the amp, your low G's
+overtones made the engine think it was hearing a power chord. It now
+checks, once the note has settled, whether it keeps hearing just one
+string, and if so names the note. All eight picks now read G2, and 44
+more notes on the other practice recordings got their right names, with
+the same notes found as before.
+
+
+### The same take: the pick contact (DECISION-071)
+
+- A short Note whose successor opens on an attack 15dB or more louder
+  than it did was the pick's contact through the amp: absorbed, boundary
+  on the release. Derivation fp 199 → 197 at missed 114; held-out
+  unchanged; splits 237 / 270 / 13; slow subset 184 / 213.
+- The take now reads 8 of 8 named G2 with 2 extras: the contact at 7.63s
+  (no note within 200ms) and 18.33s after a damp, which has no other
+  instance in the corpus to calibrate on.
+
+**In plain words, for the owner.** Through the amp, the pick touching
+the string is loud enough to sound like a note. When the real note then
+arrives much louder right behind it, the engine now folds the touch into
+the note. One more blip on your take is gone, and one on the A3 eighths.
+
+### The same take: ending a Note at the damp (DECISION-073)
+
+- A Note ending in silence now ends where the level fell 10dB under its
+  300ms median, reached 25dB under within 300ms and never came back,
+  placed on the first hop 6dB under. Before, it ended where the amp's
+  ring fell under the gate, about 0.45s later.
+- Median end error: rest-repick amped +445 → +91ms, DI +102 → +55ms.
+  Splits, slow subset and held-out counts unchanged. Derivation missed
+  and fp each +1, both the last E5 of the C-A-G power chords, whose label
+  sits over silence after the chord stops.
+
+**In plain words, for the owner.** When you damp a note, the engine now
+ends it where your hand stopped it, not when the amp finishes ringing.
+On your rest-and-repick take the notes end within about a tenth of a
+second of your damp instead of half a second after it. Four notes that
+end a take stop a little before their label, because the sound had
+already dropped away there.
+
+### The same take: the ghost inside the damp (DECISION-074)
+
+- A Note that opens with no gap inside the damp of the Note before it,
+  within a whole tone and far quieter, then fades to silence, is folded
+  into that Note, which ends at the damp.
+- Derivation fp 198 → 197 (the 18.33s Note on the amped take). Held-out
+  fp 63 → 62 (the amped 140bpm power chords). Missed, exact, splits and
+  ledger unchanged; strays 13 → 11.
+- The take now reads 8 of 8 named G2 with one extra: the pick contact at
+  7.63s.
+
+**In plain words, for the owner.** On the amp, one of your damps made a
+small note of its own right as the string was stopped. The engine now
+recognises it as part of the damp and folds it into the note you
+stopped. Your rest-and-repick take has one blip left, the pick touching
+the string at 7.63 s.
+
+### Full un-bloom, re-measured on top of DECISION-074 (not taken)
+
+- Clearing `harmonyBloomed` on one-string Notes: derivation missed 115 →
+  112, fp 197 → 207, exact unchanged. `rest-repick-amped` goes 1 → 6
+  extras and loses one note. Un-bloomed, its damps open G#2 Notes by
+  "new-pitch" on the sharp push (10.04s, 25.09s). Those open at the damp
+  rather than inside its fall and not far enough under the note, so the
+  damp-ghost rule does not reach them. A fine-onset split lands 0.39s
+  into the 4.0s pick, and a pitch-step split at 22.96s. The bloom's
+  shield still pays for itself here.
+
+### The owner's label for the last E5 (DECISION-075)
+
+- `p8` on `power-chords-c-a-g-e-c-d-fsharp-e-120bpm` moved from its grid
+  slot 19.1-20.75s, over silence, to 18.175-18.848s, marked by the
+  owner's ear. Derivation missed 115 → 114, fp 197 → 196; everything
+  else unchanged. With it, the damp work (DECISION-073, 074) costs no
+  real note anywhere.

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- On a direct input, a note damped nearly silent and then picked again is
+  now split at the pick even when its first transient lands on a hop the
+  amplitude gate refuses: the Note ends there once the level comes back.
+  With it, a split whose burst began on the pick's contact is placed on
+  the release instead of backdated onto the contact. Sixteen more labels
+  found on the derivation takes, none lost; two fewer slow DI splits; the
+  amped renders are unchanged. `tracking.gatedRepickDipRatio`,
+  `tracking.burstContactRiseRatio`; DECISION-080, DECISION-081.
+- On a direct input, a stroke whose release lands under the amplitude gate
+  now starts at that release even when the fine onset witness reports the
+  pick's contact only afterwards; it used to start on the contact, 56 to
+  61ms early, and split again. Two fewer slow DI splits on the quarters
+  take. `tracking.releaseBeforeFineContact`; DECISION-082.
+- A label marked `required: false` is now optional in the evaluation: a
+  Note on it is not an extra, and missing it is not a miss. The A3 eighths
+  DI take gains six picks from the owner's fourth listening pass, two of
+  them optional; the one DI slow split there was a real pick. DECISION-083.
+
+## 0.21.0 — 2026-09-24
+
 - On a direct input, a same-pitch re-articulation over which no energy
   arrived — the envelope after it no louder than the 80ms before it, with no
   pick-contact dip under it — now has to outlast half the local note interval

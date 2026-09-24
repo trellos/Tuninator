@@ -128,14 +128,19 @@ export type TrackerTraceEvent =
       dipRatio: number;
       /** The pace being played when the boundary moved, or null with none read. */
       localIoiMs: number | null;
-      /** What said the Note opened on a contact: the fine hop, or no rise. */
-      contact: "fine" | "no-rise";
+      /**
+       * What said the Note opened on a contact: the fine hop, no rise, or
+       * the release far louder (`tracking.contactGainDb`); `burst` when a
+       * split's burst began on a contact that rose too little
+       * (`tracking.burstContactRiseRatio`).
+       */
+      contact: "fine" | "no-rise" | "gain" | "burst";
       /**
        * `stub` when a split stub was absorbed without lending its start;
        * `gated` when the release was read on a hop the amplitude gate
        * refused (`tracking.releaseOnGatedHop`).
        */
-      via: "unsettled" | "stub" | "gated";
+      via: "unsettled" | "stub" | "gated" | "burst";
     }
   | {
       kind: "absorbed";
@@ -172,6 +177,18 @@ export type TrackerTraceEvent =
       fellTo: number;
       /** How much of it the fast lane heard no pitch on; null when it has no hops there. Prefix offers only. */
       unvoiced?: number | null;
+    }
+  | {
+      /**
+       * A settled Note split at a transient the amplitude gate refused, once
+       * the level came back. See `tracking.gatedRepickDipRatio`.
+       */
+      kind: "gatedRepick";
+      at: SourceTimeMs;
+      noteId: string;
+      dipRatio: number;
+      /** The rise on the hop that confirmed it. */
+      riseRatio: number;
     }
   | {
       kind: "ended";
@@ -233,6 +250,16 @@ const HARMONIC_CONTEXT_THRESHOLD = 0.5;
 const ATTACK_HISTORY = 256;
 /** How far back the tracker remembers whether each hop was voiced, for a carved span the region lane delivers late. */
 const VOICED_LOG_MS = 4000;
+/** The window a damp's fall is measured against: see `tracking.dampFallDb`. */
+const DAMP_MEDIAN_MS = 300;
+/** How soon after the fall a damp must reach `tracking.dampDepthDb`. */
+const DAMP_REACH_MS = 300;
+/** Where a damped Note ends: the first hop this far under the median, in dB. */
+const DAMP_END_DB = 6;
+/** A Note quieter than this, in dB of RMS, is already too faint to damp. */
+const DAMP_FLOOR_DB = -55;
+/** How close a Note must follow the end of the one before to have been opened in its damp. */
+const DAMP_GHOST_GAP_MS = 1;
 
 /**
  * How close to its own peak a Note must still be for the transient that ends it
@@ -468,6 +495,18 @@ export class NoteTracker {
    */
   private attackBurstStart: AttackEvidence | null = null;
   /**
+   * A re-pick the amplitude gate refused on a settled Note, waiting one
+   * articulation for the level to come back. See `tracking.gatedRepickDipRatio`.
+   */
+  private pendingGatedRepick: { attack: AttackEvidence; noteId: string } | null = null;
+  /**
+   * The newest same-pitch transient the verdict refused as `gated`, with the
+   * rise it read. The fine witness delivers a contact 65ms late, so the
+   * release this may be arrives before the Note it belongs to exists. See
+   * `tracking.releaseBeforeFineContact`.
+   */
+  private lastGatedRefusal: { attack: AttackEvidence; riseRatio: number } | null = null;
+  /**
    * When energy last arrived, oldest first.
    *
    * The fast lane sees every transient and then declines to act on most of
@@ -565,6 +604,8 @@ export class NoteTracker {
     this.nextId = 1;
     this.lastAttack = null;
     this.attackBurstStart = null;
+    this.pendingGatedRepick = null;
+    this.lastGatedRefusal = null;
     this.attackTimes.length = 0;
     this.attackSamples.length = 0;
     this.attackRises.length = 0;
@@ -704,6 +745,8 @@ export class NoteTracker {
     let active = this.current();
     /** Set when a split ends a Note whose successor should inherit its decay. */
     let splitFrom: NoteRecord | null = null;
+    /** The contact a split's boundary was moved off, for the successor's ring-out clock. */
+    let burstContactAt: SourceTimeMs | null = null;
     /**
      * `dipRatio` at a SAME-PITCH split, for the Note that split is about to
      * open. Null when nothing split, or when the split changed pitch — a
@@ -716,6 +759,61 @@ export class NoteTracker {
      * read on the direct input. See `tracking.rateFragmentNoRiseRatio`.
      */
     let splitSamePitchRise: number | null = null;
+
+    /* (a-) A re-pick whose release began under the amplitude gate: the
+     *      string was damped nearly silent, the pick's transient landed on a
+     *      hop the gate refused, and the level has now come back. The
+     *      boundary is the refused transient. See
+     *      `tracking.gatedRepickDipRatio`. */
+    if (this.pendingGatedRepick !== null) {
+      const pending = this.pendingGatedRepick;
+      const window = this.clock.durationSamples(config.transient.articulationMs);
+      if (
+        active === null ||
+        pending.noteId !== active.id ||
+        frame.sampleIndex - pending.attack.atSample > window
+      ) {
+        this.pendingGatedRepick = null;
+      } else if (
+        !frame.gated &&
+        frame.riseRatio >= config.tracking.releaseRiseRatio &&
+        // Ending a Note not yet announced drops it. The damped note behind a
+        // gated re-pick has sounded its full length; one this young is a
+        // stroke still being decided, and a sixteenth that has not cleared
+        // its bar would be lost to the split (the E5 eighths DI take, 28227ms).
+        active.announced &&
+        // And it has sounded at least half the pace being played. Shorter is
+        // the next stroke's contact that a witness already opened, and the
+        // gated transient is that stroke's own release, not a second stroke
+        // (the E5 eighths DI take, 11602 to 11693ms).
+        this.soundedHalfThePace(active, pending.attack.at)
+      ) {
+        this.pendingGatedRepick = null;
+        if (this.trace !== null) {
+          this.trace({
+            kind: "gatedRepick",
+            at: pending.attack.at,
+            noteId: active.id,
+            dipRatio: pending.attack.dipRatio,
+            riseRatio: frame.riseRatio,
+          });
+        }
+        const previous = active;
+        active.restruck = true;
+        this.end(active, pending.attack.at, out);
+        active = this.begin(
+          "attack",
+          frame,
+          {
+            at: pending.attack.at,
+            atSample: pending.attack.atSample,
+            frequencyHz: frame.pitch.frequencyHz,
+          },
+          previous,
+          true
+        );
+      }
+    }
 
     /* (a) An attack over something already sounding: a restrum or a re-pick.
      *     Only a genuine energy injection counts, and never mid-glide — a bend
@@ -797,7 +895,7 @@ export class NoteTracker {
         // that needed it, and the chord then went down the monophonic route and
         // shed a Note every few hundred milliseconds.
         active.harmonyBloomed,
-        active.soundedMs
+        active.ringOutSoundedMs
       );
       const rearticulated = verdict.accepted;
       // A harmonically-named Note has proved it is a chord, and a chord's own
@@ -837,6 +935,20 @@ export class NoteTracker {
           bloomed: active.harmonyBloomed,
           localIoiMs: this.localIoiMs(frame.attack.at),
         });
+      }
+      if (!rearticulated && verdict.reason === "gated" && !pitchDiffers) {
+        this.lastGatedRefusal = { attack: frame.attack, riseRatio: frame.riseRatio };
+      }
+      if (
+        !rearticulated &&
+        verdict.reason === "gated" &&
+        settled &&
+        !pitchDiffers &&
+        !active.harmonyBloomed &&
+        config.tracking.gatedRepickDipRatio > 0 &&
+        frame.attack.dipRatio <= config.tracking.gatedRepickDipRatio
+      ) {
+        this.pendingGatedRepick = { attack: frame.attack, noteId: active.id };
       }
       // A muted restrum refused for a weak transient is the one rejection in
       // this detector that later evidence can overturn. Hold it.
@@ -915,7 +1027,35 @@ export class NoteTracker {
         // When the burst is already this Note's own, the boundary is the
         // transient in hand.
         const burst = this.attackBurstStart ?? frame.attack;
-        const boundary = burst.at > active.startTime ? burst : frame.attack;
+        let boundary = burst.at > active.startTime ? burst : frame.attack;
+        // Unless that first attack was the pick landing on a single string:
+        // it mutes the string, the verdict refused it for carrying no energy,
+        // and the stroke sounds at the release in hand. See
+        // `tracking.burstContactRiseRatio`.
+        if (
+          boundary !== frame.attack &&
+          config.tracking.burstContactRiseRatio > 0 &&
+          boundary.riseRatio < config.tracking.burstContactRiseRatio &&
+          !pitchDiffers &&
+          !active.harmonyBloomed &&
+          frame.riseRatio >= config.tracking.releaseRiseRatio
+        ) {
+          if (this.trace !== null) {
+            this.trace({
+              kind: "released",
+              at: frame.attack.at,
+              noteId: active.id,
+              from: boundary.at,
+              riseRatio: frame.riseRatio,
+              dipRatio: frame.attack.dipRatio,
+              localIoiMs: this.localIoiMs(frame.attack.at),
+              contact: "burst",
+              via: "burst",
+            });
+          }
+          burstContactAt = boundary.at;
+          boundary = frame.attack;
+        }
         active.restruck = true;
         this.end(active, boundary.at, out);
         // The successor is created below, once this hop has decided what it is.
@@ -995,7 +1135,9 @@ export class NoteTracker {
       (active.soundedMs < active.announceThresholdMs ||
         // Every vote it holds is for the reading it is now leaving: this Note
         // has accumulated no evidence of its own at all.
-        active.dominantMidi() === describeFrequency(pitchChange.fromHz).midi) &&
+        active.dominantMidi() === describeFrequency(pitchChange.fromHz).midi ||
+        // Or it never held any reading: see `NoteRecord.heldReading`.
+        !active.heldReading) &&
       this.cannotDefendReading(active, pitchChange.fromHz, pitchChange.toHz);
 
     if (
@@ -1053,6 +1195,9 @@ export class NoteTracker {
         // so this refuses the fragment rather than announcing and retracting
         // it, and costs latency only on a boundary that is doubtful in both
         // witnesses at once.
+        if (burstContactAt !== null && this.config.tracking.burstContactRingOutOnContact) {
+          active.ringOutFrom = burstContactAt;
+        }
         const fraction = rateFragmentSpanFraction(
           splitSamePitchDip,
           splitSamePitchRise,
@@ -1085,7 +1230,10 @@ export class NoteTracker {
           active.silentSince !== null &&
           t - active.silentSince >= config.tracking.releaseGraceMs;
         if (expired) {
-          this.end(active, active.silentSince as SourceTimeMs, out);
+          const silentSince = active.silentSince as SourceTimeMs;
+          if (!this.absorbDampGhost(active, silentSince, out)) {
+            this.end(active, this.dampedAt(active, silentSince)?.end ?? silentSince, out);
+          }
           active = null;
         } else {
           this.observe(active, frame);
@@ -1126,6 +1274,10 @@ export class NoteTracker {
 
     record.polyphonySum += polyphony;
     record.polyphonyHops++;
+    if (record.heldReading) {
+      record.heldHarmonyReadings++;
+      if (polyphony < this.config.harmony.minPolyphony) record.heldSingleReadings++;
+    }
     if (activations.length > 0) record.recordActivations(activations);
     const runningPolyphony =
       record.polyphonyHops > 0 ? record.polyphonySum / record.polyphonyHops : polyphony;
@@ -1254,6 +1406,28 @@ export class NoteTracker {
       record.frames > 0 ? record.confidenceSum / record.frames : 0;
     const monophonic =
       meanPitchConfidence > this.config.harmony.maxMonophonicConfidence && !virtualPitch;
+    // One string, whatever its attack looked like: it answers to its pitch.
+    // See `harmony.oneStringReadingFraction`. Only the name follows; the
+    // Note keeps the segmentation a bloomed Note gets (see `NoteRecord.oneString`).
+    const oneStringBar = this.config.harmony.oneStringReadingFraction;
+    const oneString =
+      oneStringBar > 0 &&
+      record.heldHarmonyReadings > 0 &&
+      record.heldSingleReadings >= oneStringBar * record.heldHarmonyReadings;
+    if (oneString !== record.oneString) {
+      const previous = record.currentLabel();
+      record.oneString = oneString;
+      const label = record.currentLabel();
+      if (record.announced && record.endTime === null && label !== record.lastEmitted.label) {
+        const revisionNumber = record.bump("harmonyCorrection");
+        record.lastEmitted.label = label;
+        out.push({
+          type: "changed",
+          note: record.snapshot(),
+          change: { type: "harmonyCorrection", at, revisionNumber, previous: { label: previous } },
+        });
+      }
+    }
     if (!record.polyphonic || monophonic || !enoughEvidence) return out;
 
     const winner = bestHarmonyVote(record.harmonyVotes, this.config.harmony.minEvidenceHops);
@@ -1688,6 +1862,7 @@ export class NoteTracker {
       );
       opened.lastAudibleAt = frame.at;
       opened.fineOpened = true;
+      this.releaseAlreadyPassed(opened);
       return;
     }
 
@@ -1746,6 +1921,41 @@ export class NoteTracker {
     // finds it too young to be ended.
     successor.lastAudibleAt = frame.at;
     successor.fineOpened = true;
+    this.releaseAlreadyPassed(successor);
+  }
+
+  /**
+   * A Note the fine witness just opened on a contact whose release has
+   * already been and gone: refused as `gated` on the Note before, because
+   * the witness confirms an onset 65ms after it and the release arrived
+   * first. The start moves onto it, as the release test would have moved
+   * it had the Note existed, and the announce clock stays on the contact.
+   * See `tracking.releaseBeforeFineContact`.
+   */
+  private releaseAlreadyPassed(record: NoteRecord): void {
+    const refusal = this.lastGatedRefusal;
+    if (!this.config.tracking.releaseBeforeFineContact || refusal === null) return;
+    const window = this.clock.durationSamples(this.config.transient.articulationMs);
+    const gap = refusal.attack.atSample - record.startSample;
+    if (gap <= 0 || gap > window) return;
+    if (refusal.riseRatio < this.config.tracking.releaseRiseRatio) return;
+    if (this.trace !== null) {
+      this.trace({
+        kind: "released",
+        at: refusal.attack.at,
+        noteId: record.id,
+        from: record.startTime,
+        riseRatio: refusal.riseRatio,
+        dipRatio: refusal.attack.dipRatio,
+        localIoiMs: this.localIoiMs(refusal.attack.at),
+        contact: "fine",
+        via: "gated",
+      });
+    }
+    record.releasedFromContact = true;
+    record.startTime = refusal.attack.at;
+    record.startSample = refusal.attack.atSample;
+    this.lastGatedRefusal = null;
   }
 
   /**
@@ -1836,7 +2046,14 @@ export class NoteTracker {
     // A Note that named a chord, or that sustained past one articulation, is an
     // event somebody played. Only the stub of a forming articulation qualifies.
     if (predecessor.harmonyBloomed) return decline("bloomed");
-    if (predecessor.durationMs > this.config.transient.articulationMs) {
+    // Unless it never held a pitch and the survivor is its pitch arriving:
+    // through an amp that can take 130ms. See `NoteRecord.heldReading`.
+    const contact = this.isLoudContact(predecessor, survivor);
+    if (
+      predecessor.durationMs > this.config.transient.articulationMs &&
+      !(survivor.absorbedRenaming && !predecessor.heldReading) &&
+      !contact
+    ) {
       return decline("too-long");
     }
     // And a Note that had already begun to decay was not a stub. See
@@ -1877,7 +2094,7 @@ export class NoteTracker {
     // absorbed like any stub, but the boundary stays on the release. See
     // `tracking.releaseRiseRatio`.
     const bar = this.config.tracking.releaseRiseRatio;
-    if (bar > 0 && isContactOpening(predecessor) && survivor.openingRise >= bar) {
+    if (contact || (bar > 0 && isContactOpening(predecessor) && survivor.openingRise >= bar)) {
       if (this.trace !== null) {
         this.trace({
           kind: "released",
@@ -1887,7 +2104,7 @@ export class NoteTracker {
           riseRatio: survivor.openingRise,
           dipRatio: survivor.openingDip,
           localIoiMs: this.localIoiMs(survivor.startTime),
-          contact: predecessor.fineOpened ? "fine" : "no-rise",
+          contact: predecessor.fineOpened ? "fine" : contact ? "gain" : "no-rise",
           via: "stub",
         });
       }
@@ -1898,12 +2115,30 @@ export class NoteTracker {
   }
 
   /**
+   * Whether `stub`, split off by the attack that opened `survivor`, was the
+   * pick's contact heard through an amp: opened by an attack, and the note
+   * arriving on the release at least `tracking.contactGainDb` louder than it.
+   */
+  private isLoudContact(stub: NoteRecord, survivor: NoteRecord): boolean {
+    const bar = this.config.tracking.contactGainDb;
+    if (bar <= 0 || stub.trigger !== "attack" || survivor.trigger !== "attack") return false;
+    if (stub.openingRms <= 0) return false;
+    return 20 * Math.log10(survivor.openingRms / stub.openingRms) >= bar;
+  }
+
+  /**
    * Whether `frame.attack`, landing in a Note too young to be re-articulated,
    * is the release of the pick whose contact opened it: the Note opened on a
    * contact, this hop is inside one articulation of its start, and the audio
    * rose over the 80ms before it — which spans the contact — by the bar. See
    * `tracking.releaseRiseRatio`.
    */
+  /** Whether `record` has sounded at least half the local interval, or no pace is read. */
+  private soundedHalfThePace(record: NoteRecord, at: SourceTimeMs): boolean {
+    const ioi = this.localIoiMs(at);
+    return ioi === null || record.soundedMs >= 0.5 * ioi;
+  }
+
   private isRelease(active: NoteRecord, frame: FastFrame): boolean {
     const bar = this.config.tracking.releaseRiseRatio;
     if (bar <= 0 || frame.attack === null) return false;
@@ -2860,6 +3095,7 @@ export class NoteTracker {
       };
     }
 
+    record.noteReading(hz);
     record.lastVoicedHz = hz;
     record.lastVoicedAt = t;
     record.currentFrequencyHz = hz;
@@ -3063,6 +3299,128 @@ export class NoteTracker {
     return gaps[Math.min(gaps.length - 1, Math.round((gaps.length - 1) * RATE_PERCENTILE))] as number;
   }
 
+  /**
+   * Where the player damped `record`, when it is ending in silence at
+   * `silentSince`: the level fell `tracking.dampFallDb` under its recent
+   * median, reached `tracking.dampDepthDb` under it soon after, and never
+   * came back. Null when nothing in the Note looks like a damp, so it ends
+   * where the sound did.
+   */
+  private dampedAt(
+    record: NoteRecord,
+    silentSince: SourceTimeMs
+  ): { end: SourceTimeMs; fell: SourceTimeMs } | null {
+    const { dampFallDb: fall, dampDepthDb: depth } = this.config.tracking;
+    if (fall <= 0) return null;
+    const log = this.voicedLog;
+    const db = (i: number): number => 20 * Math.log10(Math.max((log[i] as { rms: number }).rms, 1e-9));
+    const at = (i: number): number => (log[i] as { at: number }).at;
+    const first = log.findIndex((entry) => entry.at >= record.startTime);
+    if (first < 0) return null;
+    for (let i = first + 1; i < log.length && at(i) < silentSince; i++) {
+      const window: number[] = [];
+      for (let k = i - 1; k >= first && at(k) >= at(i) - DAMP_MEDIAN_MS; k--) window.push(db(k));
+      if (window.length * 2 < DAMP_MEDIAN_MS / Math.max(at(i) - at(i - 1), 1)) continue;
+      window.sort((a, b) => a - b);
+      const median = window[window.length >> 1] as number;
+      if (median < DAMP_FLOOR_DB || db(i) >= median - fall) continue;
+      let reached = false;
+      let recovered = false;
+      for (let k = i + 1; k < log.length; k++) {
+        if (db(k) > median - fall / 2) {
+          recovered = true;
+          break;
+        }
+        if (at(k) - at(i) <= DAMP_REACH_MS && db(k) <= median - depth) reached = true;
+      }
+      if (recovered || !reached) continue;
+      let j = i;
+      while (j > first + 1 && db(j - 1) < median - DAMP_END_DB) j--;
+      return { end: Math.max(at(j), record.startTime) as SourceTimeMs, fell: at(i) as SourceTimeMs };
+    }
+    return null;
+  }
+
+  /**
+   * Whether a Note still sounding opened at `record`'s end at least
+   * `tracking.dampFallDb` under `record`'s median level over the 300ms before
+   * it: too quiet to be a pick, so it may be the damp's ghost.
+   */
+  private quietSuccessor(record: NoteRecord): boolean {
+    const fall = this.config.tracking.dampFallDb;
+    if (fall <= 0 || record.endTime === null) return false;
+    const end = record.endTime;
+    let next: NoteRecord | undefined;
+    for (const candidate of this.notes.values()) {
+      if (Math.abs(candidate.startTime - end) <= DAMP_GHOST_GAP_MS) next = candidate;
+    }
+    if (next === undefined || next.openingRms <= 0) return false;
+    const levels = this.voicedLog
+      .filter((entry) => entry.at < end && entry.at >= end - DAMP_MEDIAN_MS && entry.at >= record.startTime)
+      .map((entry) => entry.rms)
+      .sort((a, b) => a - b);
+    const median = levels[levels.length >> 1];
+    if (median === undefined || median <= 0) return false;
+    return 20 * Math.log10(next.openingRms / median) <= -fall;
+  }
+
+  /**
+   * Whether `ghost`, ending in silence at `silentSince`, was opened inside the
+   * damp that stopped the Note before it. Through an amp the damp can push the
+   * string sharp or rattle it hard enough to open a Note while the level is
+   * still falling; nothing the player picked sounds after it. The Note before
+   * must have run right up to it at a pitch within a damp's reach, and the
+   * damp found over the two of them (`dampedAt`) must have begun falling by
+   * the time the ghost opened. The ghost is then absorbed and the Note before
+   * ends at the damp.
+   */
+  private absorbDampGhost(ghost: NoteRecord, silentSince: SourceTimeMs, out: TrackerEmission[]): boolean {
+    if (this.config.tracking.dampFallDb <= 0) return false;
+    const before = this.closing.find(
+      (record) =>
+        !record.merged &&
+        record.announced &&
+        record.endTime !== null &&
+        Math.abs(record.endTime - ghost.startTime) <= DAMP_GHOST_GAP_MS
+    );
+    if (before === undefined) return false;
+    const own = before.dominantMidi();
+    const mine = ghost.dominantMidi();
+    if (own !== null && mine !== null && Math.abs(own - mine) > DAMP_STEP_SEMITONES) return false;
+    const damp = this.dampedAt(before, silentSince);
+    if (damp === null || damp.fell > ghost.startTime) return false;
+
+    ghost.merged = true;
+    this.retractOpening(ghost);
+    this.end(ghost, silentSince, out);
+    before.endTime = damp.end;
+    if (this.trace !== null) {
+      this.trace({
+        kind: "absorbed",
+        at: ghost.startTime,
+        noteId: ghost.id,
+        intoId: before.id,
+        durationMs: ghost.durationMs,
+        intoStartTime: before.startTime,
+        burstAt: ghost.burstAt,
+        intoBurstAt: before.burstAt,
+      });
+    }
+    const revisionNumber = before.bump("structuralRevision");
+    out.push({
+      type: "changed",
+      note: before.snapshot(),
+      change: {
+        type: "structuralRevision",
+        at: damp.end,
+        revisionNumber,
+        relation: "absorbed",
+        relatedNoteIds: ghost.announced ? [ghost.id] : [],
+      },
+    });
+    return true;
+  }
+
   private end(record: NoteRecord, at: SourceTimeMs, out: TrackerEmission[]): void {
     this.notes.delete(record.id);
     const endAt = Math.max(at, record.startTime);
@@ -3124,6 +3482,9 @@ export class NoteTracker {
         // says. Holding it here is what makes the region reach back over it:
         // once it is gone from `closing` there is nothing left to correct.
         if (!record.deepResolved) continue;
+        // Nor is one cut by a Note that opened far under it, which may yet
+        // turn out to have been opened by its damp. See `absorbDampGhost`.
+        if (this.quietSuccessor(record)) continue;
       }
       this.closing.splice(i, 1);
 

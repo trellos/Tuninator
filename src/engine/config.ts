@@ -655,6 +655,22 @@ export type EngineConfig = {
      */
     releaseRiseRatio: number;
     /**
+     * How much louder, in dB, the hop that opens a Note must be than the
+     * hop that opened the short Note it split from, for that Note to have
+     * been the pick's contact. The stub is then absorbed and the boundary
+     * stays on the release.
+     *
+     * `releaseRiseRatio` finds a contact by its lack of rise, which is how
+     * it sounds on the direct input. Through an amp the contact is loud
+     * enough to rise 4-48x over the silence before it, and that test never
+     * fires; what still gives it away is that the note, when it sounds, is
+     * far louder again. On the derivation takes, over every attack-opened
+     * Note ended within 200ms by an accepted re-articulation: the release
+     * sits 12-22dB over the opening on four false positives and at most
+     * 11.2dB on the 413 that matched a label. 0 turns it off.
+     */
+    contactGainDb: number;
+    /**
      * Whether an opening that never became a Note — absorbed as a stub, or
      * dropped before it was announced — is struck from the local-rate
      * estimate (`localIoiMs` in the tracker) once that is known. False keeps
@@ -750,8 +766,87 @@ export type EngineConfig = {
      * than the loop's rule; see DECISION-062.
      */
     underHandLevelFall: number;
+    /**
+     * A split whose burst began on a transient that rose less than this is
+     * placed on the release, not the burst's first attack. 0 is the burst
+     * rule as shipped.
+     *
+     * On a single string the first transient of a slow re-pick is the pick
+     * landing on the string, which mutes it (rise 0.56 to 0.93); the
+     * re-articulation test refuses it for carrying no energy, and the
+     * release 67 to 80ms later is accepted and ends the Note. The burst rule
+     * then backdates the boundary onto the refused contact, so the next Note
+     * opens 67 to 80ms before it sounds. With this on, when the burst's
+     * first attack rose less than this bar, the split keeps its pitch class
+     * and the attack in hand clears `releaseRiseRatio`, the boundary is the
+     * attack in hand. Strums are untouched: their first transient carries
+     * energy. Built twice before as DECISION-047 and DECISION-049 and
+     * reverted on a score that could not see it; alone it still costs two
+     * labels whose own picks land under the gate (DECISION-080), and it is
+     * kept with `gatedRepickDipRatio`, which finds them (DECISION-081).
+     */
+    burstContactRiseRatio: number;
+    /**
+     * The Note a moved burst boundary opens reads its ring-out age from the
+     * contact, not from its moved start. The string was excited at the
+     * contact, so the decay the ring-out branch fits began there; reading
+     * the age from a start 67 to 80ms later sends a transient in that window
+     * to the rolling-baseline test instead of the decay fit, and one real
+     * phantom came through that way (the held-then-picked DI take, 9213ms,
+     * DECISION-049). False reads it from the start, as every other Note.
+     */
+    burstContactRingOutOnContact: boolean;
+    /**
+     * A re-pick whose transient the amplitude gate refused ends the Note it
+     * interrupts when the envelope had fallen to at most this fraction
+     * before it, and the level comes back within one articulation by
+     * `releaseRiseRatio` or more. 0 is the gate's refusal as shipped.
+     *
+     * On the direct input a note damped before its re-pick falls under
+     * `analysis.rmsGate`, so the pick's transient lands on a hop the gate
+     * refuses and `rearticulation.ts` never reads it. When the Note had
+     * not ended by then (a pitch reading of its tail kept it open), the
+     * re-pick is lost into it: the held-then-picked DI take at 29467ms, the
+     * E5 eighths DI take at 12467ms. The Note must already be announced
+     * and have sounded half the local interval, or the split would drop a
+     * sixteenth still clearing its bar or cut a contact stub the witness
+     * opened. Swept on derivation with DECISION-080's rule in place: 0.1
+     * missed 105, 0.2 100, 0.25 and 0.3 97, 0.35 and above 98 (`t20` on
+     * the clean-lead take); false positives 203 throughout. See
+     * DECISION-081.
+     */
+    gatedRepickDipRatio: number;
+    /**
+     * A Note the fine witness opens on a contact moves its start onto a
+     * same-pitch release already refused as `gated` inside the
+     * articulation window after the contact. False keeps the contact.
+     *
+     * The fine witness confirms an onset 65ms after it, so on a stroke
+     * whose release lands under the gate the release is read, and refused,
+     * on the Note before, and only then does the contact arrive and open
+     * the stroke's Note. DECISION-052 reads the release on the frame that
+     * opens the Note and after; this reads the one that came before it.
+     * The quarters DI take: contact 20397ms, release 20453ms (rise 2.09),
+     * label 20440ms; contact 30419ms, release 30480ms, label 30475ms. The
+     * announce clock stays on the contact. See DECISION-082.
+     */
+    releaseBeforeFineContact: boolean;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
+    /**
+     * How far, in dB, the level must fall under its median over the 300ms
+     * before for a Note ending in silence to have been damped there. The
+     * Note then ends at the damp instead of where the sound fell under the
+     * gate. Through an amp the string rings about 0.45s past the player's
+     * damp before the gate closes, and the Note ran on with it.
+     *
+     * The fall must also reach `dampDepthDb` under the median within 300ms
+     * and never climb back past half of this bar before the silence. The
+     * end lands on the first hop 6dB under the median. 0 turns it off.
+     */
+    dampFallDb: number;
+    /** How deep under the median a damp must reach within 300ms; see `dampFallDb`. */
+    dampDepthDb: number;
     bendThresholdCents: number;
     /** How long after an attack a new Note may still be backdated onto it. */
     backdateWindowMs: number;
@@ -808,6 +903,22 @@ export type EngineConfig = {
      * 0.65 to 0.90 on the chord fixtures).
      */
     maxMonophonicConfidence: number;
+    /**
+     * Share of a Note's multi-pitch readings, taken after it has held a
+     * pitch (`NoteRecord.heldReading`), that may find a single fundamental
+     * before the Note is one string rather than a chord. At or above it the
+     * Note reports its pitch rather than a chord name.
+     *
+     * Mean confidence cannot see this through an amp: a picked G2 is
+     * aperiodic for up to 160ms there, the unvoiced hops drag the mean under
+     * `maxMonophonicConfidence` for its first second or more, and the
+     * attack's noisy spectrum supplies the polyphony. The readings after the
+     * pitch arrives say what is sounding: on the derivation takes no chord
+     * reads more than 1 in 39 single-fundamental (all 37 under 10%), and of
+     * the 66 single notes that bloomed as "G5", "C5", "F#5" and the like, 48
+     * read 20% or more and 58 read 10% or more. 0 turns it off.
+     */
+    oneStringReadingFraction: number;
     /**
      * How harmonic the recent audio must read before an octave-sized pitch jump
      * is treated as the detector moving between strings rather than as a note
@@ -1130,13 +1241,20 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rateFragmentNoRiseDipRatio: 0.4,
     rateFragmentNoRiseSpanFraction: 0.5,
     releaseRiseRatio: 2,
+    contactGainDb: 15,
     paceIgnoresRetracted: true,
     releaseOnGatedHop: true,
     releaseOnFineOpenedFrame: true,
     prefixUnderHand: true,
     underHandUnvoicedFraction: 0.5,
     underHandLevelFall: 0.5,
+    gatedRepickDipRatio: 0.25,
+    burstContactRiseRatio: 1.2,
+    releaseBeforeFineContact: true,
+    burstContactRingOutOnContact: true,
     releaseGraceMs: 90,
+    dampFallDb: 10,
+    dampDepthDb: 25,
     bendThresholdCents: 45,
     backdateWindowMs: 120,
     endedNoteHistory: 64,
@@ -1151,6 +1269,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minPolyphony: 2,
     minVoiceSpreadSemitones: 7,
     maxMonophonicConfidence: 0.9,
+    oneStringReadingFraction: 0.2,
     octaveFlipContext: 0.25,
     stepSuppressContext: 0.8,
     hopDivisor: 4,

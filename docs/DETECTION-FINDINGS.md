@@ -7941,3 +7941,232 @@ the gain. The gate already reads the phrase's pace at the boundary
 separated by the phrase's regularity either. The 13 are real and cost
 nothing measured; they are listed as an addition the owner may choose,
 not a door.
+
+## The refused-contact burst rule a third time, and the re-pick the gate hides: two rows that clear the bar only together
+
+DECISION-044's loop, iterations 19 and 20; DECISION-080, DECISION-081. The
+loop restarted on the owner's word on 2026-09-24 from `main` after
+DECISION-067, whose numbers reproduced bit for bit (derivation missed 113,
+fp 204; slow subset 190 / 222 of 770; corpus 243 / 279 / 14; ledger MISSED
+140; 542 tests).
+
+### What the nine direct-input splits are
+
+Traced one by one on the tuning takes (`--detail` plus the tracker trace):
+
+```
+  p2c3q2, p2c4q3   held-then-picked   a refused contact (ring-out-not-sharp, rise 0.87 / 0.89),
+                                      release 80ms later accepted, boundary backdated onto the contact  (C11)
+  e5, e25          quarters           the fine witness delivers the next pick's contact after its
+                                      gated release has passed; a second fine onset splits again
+  e26, p3c4q1,     quarters, held-    a `sharpness` phantom mid-note (rise 0.94 / 0.99, dip 0.79 / 0.69)
+  e821             then-picked, E5    or the next pick's contact 93ms early
+  p1c1h            held-then-picked   a Note opened by a pitch change on gated hops, 93ms before the pick
+  e865             A3 eighths         an accepted transient 160ms into the note (rise 2.17, dip 0.11)
+```
+
+C25's target (`a14`, `a15`) no longer reads split under DECISION-063's
+instrument, and none of the nine is an attack-branch boundary on a
+band-only onset, so C25 closes without a build.
+
+### C11 rebuilt, with the ring-out clock on the contact
+
+`tracking.burstContactRiseRatio` 1.2 as DECISION-047 built it, plus
+`tracking.burstContactRingOutOnContact`: the Note a moved boundary opens
+reads its ring-out age from the contact (`NoteRecord.ringOutFrom`,
+`ringOutSoundedMs`), the anchor C15 proposed. Falsifier, stated before the
+run: tuning DI slow split below 9 at +0 derivation missed, fp not up.
+
+```
+  alone        slow DI 9 → 7 (p2c3q2, p2c4q3)   amped 148 / 180 unchanged   corpus 241 / 277 / 14
+               derivation missed 113 → 115, fp 204 → 203                     ledger MISSED 142
+```
+
+Falsified on the missed line, by the same two labels as iterations 3 and 5.
+`p2c3q4` was credited to a C5 Note that began at the previous pick's
+contact, 410ms before the label; `e843` to a stub 177ms after it. Neither
+pick was ever found: in both the pick's transient lands on a hop the
+amplitude gate refuses (29467ms, rise 3.19, dip 0.13; 12467ms, rise 1.54,
+dip 0.01), the Note is still open because its tail kept a pitch reading,
+and the next hop is back at full level with no broadband transient. The
+moved boundary shortens the Note that held the credit and the matcher
+lets the label go.
+
+### The re-pick the gate hides
+
+Counted before building (`count-gated-repick`, a scratch probe): every
+settled same-pitch re-articulation refused `gated` at `main`, 70 across
+the corpus, 62 on the four DI same-pitch takes, none on an amped render
+(an amp's floor sits over the gate), 52 within 40ms of a label. Built as
+`tracking.gatedRepickDipRatio`: such a refusal with the envelope fallen to
+the ratio or less is held for one articulation, and if the level comes
+back on an ungated hop by `tracking.releaseRiseRatio` the Note ends at the
+refused transient.
+
+Three readings on the way, all at 0.2 with C11 off:
+
+```
+  as first built           missed 113 → 104, fp 206; E5 DI missed 6 → 10: four sixteenths
+                           dropped (a split ended a Note before it cleared its announce bar)
+  + only if announced      missed 100, fp 207; `e839` split (a contact stub the fine
+                           witness opened, cut at its own gated release, 91ms in)
+  + half the pace sounded  missed 100, fp 206; slow DI 9 → 10: `e843` reads split
+```
+
+The last reading is the finding: the pick it finds at `e843` is followed by
+the refused-contact shape (12640ms refused, 12707ms accepted, boundary
+backdated onto 12640), which is C11's. Each row fails the keep rule alone
+on the other's shape.
+
+### Together
+
+Swept on derivation with both in place, fp 203 at every setting:
+
+```
+  gatedRepickDipRatio   0.1   0.2   0.25   0.3   0.35   0.45   0.7   1.0
+  derivation missed     105   100   97     97    98     98     98    98      (0.35 up: `t20` on clean-lead lost)
+```
+
+0.25 taken. Base → both rules:
+
+```
+slow subset (--subset=slow)     DI tuning: 9 / 9 → 7 / 7       amped+mic tuning: 148 / 180 → 148 / 180
+                                DI held-out: 3 / 3 → 3 / 3      amped+mic held-out: 30 / 30 → 30 / 30
+corpus (measure-splits)         243 / 279 / 14 → 241 / 277 / 15
+tail fragments                  227 / 244 (221 / 0 / 23) → 224 / 241 (218 / 0 / 23)
+ledger MISSED                   140 → 124: held-then-picked DI 14 → 2, A3 eighths DI 63 → 59
+by material                     derivation missed 113 → 97, fp 204 → 203, exact 948 → 975
+                                held-out (once) missed 27 → 27, fp 65 → 66
+eval                            PASS, 0 required failures
+tests                           542 → 549
+```
+
+With the ring-out anchor off, one more split and one more false positive
+on derivation. The held-out cost is one Note at 30120ms on the mic
+triplet take, 2.4s from any label, on a gated hop with dip 0.08: the one
+place the rule fires away from a pick.
+
+### Verdict
+
+Kept, together. Neither row clears the bar alone, each on the other's
+shape, and the pair is better on every derivation line. Sixteen labels the
+engine had not found are found, twelve of them on the held-then-picked DI
+take, whose re-picks after a damp are the owner's tutorial shape.
+
+## A step out of a Note that never held a pitch (DECISION-068)
+
+On the amped rest-and-repick take, three picks shed a stub before the
+real Note. The amp makes a picked G2 aperiodic for 60-160ms, and the
+first voiced hops are harmonics or a stale reading: at 16.08s the fast
+lane read 396Hz, 247Hz, then 98.9Hz, and the pitch-change detector
+confirmed a step from 247Hz into G2 67ms after the attack; at 26.07s it
+confirmed a step "from" 104.1Hz, which was the previous note's damp
+400ms earlier, carried across the silence because the detector keeps its
+last voiced reading. Both stubs had cleared the 55ms announce bar, and
+the arriving G2's first hop had already voted in them, so
+`pitchStillArriving` did not fire.
+
+The measure that separates these from a legato step is the pitch-change
+detector's own: has the Note ever held one reading for
+`stepConfirmFrames` hops? A hammer-on leaves a note that held a pitch.
+These stubs never did. Refusing the step (no boundary at all) cost one
+E5 DI eighth and six exact labels on the derivation takes; ending and
+absorbing, the existing path for an unannounced stub, cost nothing:
+derivation fp 204 → 198 at missed 113, held-out fp 65 → 63 at missed 27.
+The third stub on the take (11.91s) was already absorbed; what remains
+there is the pick's contact, which the amp makes loud enough that
+`isContactOpening` (a DI-derived no-rise test, rise 4-48 here against a
+bar of 1.2) does not recognise it.
+
+
+## One string through an amp, named as a chord (DECISION-069)
+
+The amped rest-and-repick take named five of eight G2 picks "G5" and one
+"unknown". The monophonic veto on blooming reads the Note's mean pitch
+confidence, and on the amp a picked G2 spends 60-160ms aperiodic: 12
+unvoiced hops near zero hold the mean under 0.9 until 1.76s into a note
+(0.28 when it bloomed at 4.16s). Meanwhile the attack's spectrum reads 3
+to 6 fundamentals, which sets the room's harmonic context, and the Note
+blooms. From then on nearly every reading finds only G2, whose harmonics'
+chroma matches "G5".
+
+A measure that separates this from a chord: of the multi-pitch readings
+taken after the Note has held a pitch, the share that find a single
+fundamental. Over every derivation Note that ended bloomed:
+
+```
+                         <10%   10-20%   20-40%   >=40%   no readings
+over a chord label        34      0        0        0         3
+over a note label          7     10       15       33         1
+```
+
+The chord maximum is 1 of 39. At a bar of 20% the name follows the
+evidence; derivation exact labels go 1027 → 1071 with the same Notes.
+Letting the Note un-bloom entirely was measured too: exact 1073, missed
+113 → 109, but fp 198 → 212, because a bloomed Note is shielded from
+pitch-step and re-articulation splits and on the amp its damps then
+split it (at 10.04s a "new-pitch" re-articulation on the damp's sharp
+push, rise 0.88; at 25.09s an "envelope-rise" on the damp, rise 1.31).
+Those splits are the next thing to fix before the shield can come off.
+
+
+## A pick's contact through an amp, found by the release's gain (DECISION-071)
+
+Through an amp the pick's contact rises 4-48x over the silence, so the
+direct input's no-rise contact test never fires there. Over every
+attack-opened derivation Note ended within 200ms by an accepted, settled
+re-articulation, the level of the next Note's opening hop over the short
+Note's opening hop:
+
+```
+gain at the release     under 5dB   5-10   10-12   12-15   15-20   20+
+false positive              73        1      0       2       1      1
+matched a label            394       18      1       0       0      0
+```
+
+At 15dB the short Note is absorbed and the boundary stays on the release:
+fp 199 → 197 on the derivation takes, nothing else moves, held-out
+unchanged. The contact before 7.98s on the rest-repick amped take has no
+note within 200ms and stays. The Note after the damp at 18.33s (accepted
+by the sharpness fallback with rise 0.78 after a dip to 0.08) is the only
+sharpness-accepted opening in the derivation takes with a dip under 0.1
+and no rise, so there is nothing to derive a rule from.
+
+## A damp is a level event, and the amp rings past it (DECISION-073)
+
+A Note ends where the sound falls under the gate. Through an amp the
+string rings about 0.45s past the player's damp first, so a damped amped
+Note ran on 0.45s. A damp reads as a sharp fall under the recent level
+that does not come back. Swept on the cached fast-frame levels of the
+derivation takes (fall under the 300ms median / depth reached within
+300ms / no recovery), with each firing classed against the labels:
+
+```
+setting            at a labelled end   before next   near end   mid-note   outside   rest-repick damps
+10 / 25 / 500            15                 1            6          1          9         16 of 16
+```
+
+The near-end, mid and before-next firings are the last notes of takes
+(A3 eighths, A-Bm chords, held-then-picked), the rest-repick DI damps,
+and the last chord of the C-A-G power chords. That take's last E5 sounds
+18.2-18.9s over a file silent from 19.4s; its label sits at 19.1-20.75s.
+The outside firings are after a take's last label.
+
+With the end on the first hop 6dB under the median, the end lands where
+the labels put it (they sit where a note has fallen about 6dB): median
+end error on the rest-repick amped take +445 → +91ms, DI +102 → +55ms;
+held-out power chords amped +125 → +29ms. No Note gained or lost a
+boundary; the only count that moved is that last E5 losing its 7ms
+overlap with a label placed over silence.
+
+## The damp's own ghost (DECISION-074)
+
+The Note at 18.33s on the rest-repick amped take opened 22dB under the G2
+it followed, 0.2s into that G2's damp, and faded to silence. No witness
+on the opening separates it (DECISION-071). The damp does: the ghost is
+contiguous with the Note before, within a whole tone of it, opened after
+the fall began, and nothing after it came back within 5dB of the note.
+Folding it in removes it and the held-out amped power-chord take's one
+ghost of the same shape (fp 63 → 62). No labelled note is lost anywhere.
+The earlier Note is held back from `noteEnded` only while such a quiet
+successor is sounding: 9 Notes across all 27 takes.
