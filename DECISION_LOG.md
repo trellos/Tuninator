@@ -7,6 +7,48 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-071]: A short Note the release arrives 15dB louder than was the pick's contact through an amp
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take's extra Notes to be fixed, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` the pick at 12.01s
+  came out as a 133ms Note opened at 11.91s (-39.6dB, one C3 hop) and
+  then the pick. The amp makes the pick's contact loud enough to be an
+  attack of its own. The repository finds a contact by its lack of rise
+  (`isContactOpening`, rise under 1.2, DECISION-046), which is what a DI
+  contact sounds like, but through the amp contacts rise 4-48x over the
+  silence before them and the test never fires. What still gives it
+  away is that the note, when it sounds, is far louder again.
+  Benched on the derivation takes, over every attack-opened Note ended
+  within 200ms by an accepted, settled re-articulation: the level on the
+  hop that opens the next Note sits 12.0-21.6dB over the short Note's
+  opening hop on four false positives, and at most 11.2dB on the 413
+  that matched a label.
+* **Decision:** `tracking.contactGainDb` 15. When a re-articulation
+  opens a Note on an attack at least that much louder than the attack
+  that opened the Note it ends, the short Note was the contact: it is
+  absorbed even past `transient.articulationMs`, and the boundary stays
+  on the release (`released`, `contact: "gain"`). 0 turns it off.
+  Numbers: derivation missed 114 → 114, fp 199 → 197
+  (`rest-repick-amped` 3 → 2, `eighths-a3-amped` 39 → 38), exact labels
+  unchanged. 12dB reads the same (the other two false positives above
+  12dB are declined by other guards). Held-out, read once: missed 27,
+  fp 63, exact 320, all unchanged. Splits 238 / 271 / 14 → 237 / 270 /
+  13; slow subset 185 / 214 → 184 / 213. Ledger MISSED 141. 542 tests.
+* **Alternatives Considered:** (a) **Widen `isContactOpening`'s rise
+  bar** to reach the amped contacts: a rise of 4-48 overlaps every real
+  attack out of silence. (b) **Drop unvoiced short Notes before a louder
+  one**: the voiced fraction does not separate them (the rest-repick
+  contact is 0.1 voiced, the eighths one 0.42, matched stubs range 0 to
+  1).
+* **Consequences:** Two contacts on the amped takes stop reading as
+  notes. A real quiet note answered within 200ms by a note 15dB louder,
+  on an attack, would now be folded into it; none in the derivation
+  takes comes within 3.8dB of the bar. The contact at 7.63s on the
+  rest-repick amped take is not touched: no note follows it within
+  200ms.
+
+---
 #### [DECISION-069]: A Note whose readings after its pitch settles find one fundamental reports its pitch, not a chord
 * **Date:** 2026-09-24
 * **Status:** Accepted

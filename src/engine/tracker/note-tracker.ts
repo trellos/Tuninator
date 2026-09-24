@@ -128,8 +128,8 @@ export type TrackerTraceEvent =
       dipRatio: number;
       /** The pace being played when the boundary moved, or null with none read. */
       localIoiMs: number | null;
-      /** What said the Note opened on a contact: the fine hop, or no rise. */
-      contact: "fine" | "no-rise";
+      /** What said the Note opened on a contact: the fine hop, no rise, or the release far louder. */
+      contact: "fine" | "no-rise" | "gain";
       /**
        * `stub` when a split stub was absorbed without lending its start;
        * `gated` when the release was read on a hop the amplitude gate
@@ -1866,9 +1866,11 @@ export class NoteTracker {
     if (predecessor.harmonyBloomed) return decline("bloomed");
     // Unless it never held a pitch and the survivor is its pitch arriving:
     // through an amp that can take 130ms. See `NoteRecord.heldReading`.
+    const contact = this.isLoudContact(predecessor, survivor);
     if (
       predecessor.durationMs > this.config.transient.articulationMs &&
-      !(survivor.absorbedRenaming && !predecessor.heldReading)
+      !(survivor.absorbedRenaming && !predecessor.heldReading) &&
+      !contact
     ) {
       return decline("too-long");
     }
@@ -1910,7 +1912,7 @@ export class NoteTracker {
     // absorbed like any stub, but the boundary stays on the release. See
     // `tracking.releaseRiseRatio`.
     const bar = this.config.tracking.releaseRiseRatio;
-    if (bar > 0 && isContactOpening(predecessor) && survivor.openingRise >= bar) {
+    if (contact || (bar > 0 && isContactOpening(predecessor) && survivor.openingRise >= bar)) {
       if (this.trace !== null) {
         this.trace({
           kind: "released",
@@ -1920,7 +1922,7 @@ export class NoteTracker {
           riseRatio: survivor.openingRise,
           dipRatio: survivor.openingDip,
           localIoiMs: this.localIoiMs(survivor.startTime),
-          contact: predecessor.fineOpened ? "fine" : "no-rise",
+          contact: predecessor.fineOpened ? "fine" : contact ? "gain" : "no-rise",
           via: "stub",
         });
       }
@@ -1928,6 +1930,18 @@ export class NoteTracker {
     }
     survivor.startTime = predecessor.startTime;
     survivor.startSample = predecessor.startSample;
+  }
+
+  /**
+   * Whether `stub`, split off by the attack that opened `survivor`, was the
+   * pick's contact heard through an amp: opened by an attack, and the note
+   * arriving on the release at least `tracking.contactGainDb` louder than it.
+   */
+  private isLoudContact(stub: NoteRecord, survivor: NoteRecord): boolean {
+    const bar = this.config.tracking.contactGainDb;
+    if (bar <= 0 || stub.trigger !== "attack" || survivor.trigger !== "attack") return false;
+    if (stub.openingRms <= 0) return false;
+    return 20 * Math.log10(survivor.openingRms / stub.openingRms) >= bar;
   }
 
   /**

@@ -7998,3 +7998,26 @@ pitch-step and re-articulation splits and on the amp its damps then
 split it (at 10.04s a "new-pitch" re-articulation on the damp's sharp
 push, rise 0.88; at 25.09s an "envelope-rise" on the damp, rise 1.31).
 Those splits are the next thing to fix before the shield can come off.
+
+
+## A pick's contact through an amp, found by the release's gain (DECISION-071)
+
+Through an amp the pick's contact rises 4-48x over the silence, so the
+direct input's no-rise contact test never fires there. Over every
+attack-opened derivation Note ended within 200ms by an accepted, settled
+re-articulation, the level of the next Note's opening hop over the short
+Note's opening hop:
+
+```
+gain at the release     under 5dB   5-10   10-12   12-15   15-20   20+
+false positive              73        1      0       2       1      1
+matched a label            394       18      1       0       0      0
+```
+
+At 15dB the short Note is absorbed and the boundary stays on the release:
+fp 199 → 197 on the derivation takes, nothing else moves, held-out
+unchanged. The contact before 7.98s on the rest-repick amped take has no
+note within 200ms and stays. The Note after the damp at 18.33s (accepted
+by the sharpness fallback with rise 0.78 after a dip to 0.08) is the only
+sharpness-accepted opening in the derivation takes with a dip under 0.1
+and no rise, so there is nothing to derive a rule from.

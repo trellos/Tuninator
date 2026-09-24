@@ -655,6 +655,22 @@ export type EngineConfig = {
      */
     releaseRiseRatio: number;
     /**
+     * How much louder, in dB, the hop that opens a Note must be than the
+     * hop that opened the short Note it split from, for that Note to have
+     * been the pick's contact. The stub is then absorbed and the boundary
+     * stays on the release.
+     *
+     * `releaseRiseRatio` finds a contact by its lack of rise, which is how
+     * it sounds on the direct input. Through an amp the contact is loud
+     * enough to rise 4-48x over the silence before it, and that test never
+     * fires; what still gives it away is that the note, when it sounds, is
+     * far louder again. On the derivation takes, over every attack-opened
+     * Note ended within 200ms by an accepted re-articulation: the release
+     * sits 12-22dB over the opening on four false positives and at most
+     * 11.2dB on the 413 that matched a label. 0 turns it off.
+     */
+    contactGainDb: number;
+    /**
      * Whether an opening that never became a Note — absorbed as a stub, or
      * dropped before it was announced — is struck from the local-rate
      * estimate (`localIoiMs` in the tracker) once that is known. False keeps
@@ -1146,6 +1162,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rateFragmentNoRiseDipRatio: 0.4,
     rateFragmentNoRiseSpanFraction: 0.5,
     releaseRiseRatio: 2,
+    contactGainDb: 15,
     paceIgnoresRetracted: true,
     releaseOnGatedHop: true,
     releaseOnFineOpenedFrame: true,

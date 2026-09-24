@@ -68,6 +68,8 @@ export class NoteRecord {
   readonly openingRise: number;
   /** `FastFrame.dipRatio` on the hop that opened this Note. */
   readonly openingDip: number;
+  /** `FastFrame.rms` on the hop that opened this Note. See `tracking.contactGainDb`. */
+  readonly openingRms: number;
   /** Opened by the fine-hop witness, which fires on a pick's contact. */
   fineOpened = false;
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
@@ -355,6 +357,7 @@ export class NoteRecord {
     this.startSample = options.startSample;
     this.trigger = options.trigger;
     this.openingRise = options.openingRise ?? 1;
+    this.openingRms = options.rms;
     this.openingDip = options.openingDip ?? 1;
     this.originPitch = options.originPitch;
     this.initialConfidence = options.confidence;
