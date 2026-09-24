@@ -165,6 +165,82 @@ def zero_cost(scores, y):
     return int((scores[ok & (y == 1)] > top).sum())
 
 
+EXTERNAL_MODELS = {
+    # Fixed before any external row existed. The MLP is the shippable shape:
+    # 245 -> 32 -> 16 -> 1 is about 8,400 numbers, inside the ~25,000 bound.
+    "logistic, scalars": ("s", lambda: make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=2000))),
+    "logistic, scalars + audio": ("sq", lambda: make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=4000))),
+    "MLP 32-16, scalars + audio": ("sq", lambda: make_pipeline(StandardScaler(), MLPClassifier((32, 16), alpha=1e-3, max_iter=300, early_stopping=True, random_state=0))),
+    "boosted trees d3 (probe)": ("sq", lambda: HistGradientBoostingClassifier(max_depth=3, random_state=0)),
+}
+
+VALIDATION_PLAYERS = ("04", "05")
+
+
+def matrices(data):
+    S = np.stack([d[2] for d in data])
+    Q = np.stack([d[3] for d in data])
+    y = np.array([0 if d[1]["paired"] else 1 for d in data])
+    return {"s": S, "sq": np.concatenate([S, Q], axis=1)}, y
+
+
+def external_mode(a):
+    """Clause 1 and 2 with the model trained on GuitarSet rows.
+
+    Every corpus take is unseen by construction, so no fold structure is
+    needed for clause 1. Clause 2's threshold is the highest score any PAIRED
+    corpus Note earns on the OTHER tuning takes, so the left-out take never
+    sets its own threshold.
+    """
+    ext = load(a.external, "off")
+    corpus = load(a.rows, "off")
+    survivors = load(a.rows, "shipped", emitted_only=True)
+    Xe, ye = matrices(ext)
+    Xc, yc = matrices(corpus)
+    Xs, ys = matrices(survivors)
+    players = np.array([d[0][:2] for d in ext])
+    cstems = np.array([d[0] for d in corpus])
+    sstems = np.array([d[0] for d in survivors])
+    rate = np.array([d[1]["fragmentMs"] / (d[1]["localIoiMs"] or REFERENCE_IOI_MS) for d in corpus])
+    base = roc_auc_score(yc, -rate)
+    print(f"external: {len(ye)} rows, {ye.sum()} surplus, {len(set(d[0] for d in ext))} renders; "
+          f"corpus: {len(yc)} rows, {yc.sum()} surplus; survivors: {len(ys)} rows, {ys.sum()} surplus")
+    print(f"  rate feature on the corpus rows: AUC {base:.3f}")
+    for flavour in sorted(set(d[0].split("-")[-2] + "-" + d[0].split("-")[-1] for d in ext)):
+        m = np.array([d[0].endswith(flavour) for d in ext])
+        r = np.array([d[1]["fragmentMs"] / (d[1]["localIoiMs"] or REFERENCE_IOI_MS) for d in ext])
+        if 0 < ye[m].sum() < m.sum():
+            print(f"  rate feature on GuitarSet {flavour:13s} {roc_auc_score(ye[m], -r[m]):.3f}  ({m.sum()} rows)")
+    val = np.isin(players, VALIDATION_PLAYERS)
+    for name, (cols, make) in EXTERNAL_MODELS.items():
+        m = make()
+        m.fit(Xe[cols][~val], ye[~val])
+        ext_val = roc_auc_score(ye[val], m.predict_proba(Xe[cols][val])[:, 1])
+        m = make()
+        m.fit(Xe[cols], ye)
+        sc = m.predict_proba(Xc[cols])[:, 1]
+        auc = roc_auc_score(yc, sc)
+        gains = []
+        for st in sorted(set(cstems)):
+            k = cstems == st
+            if 0 < yc[k].sum() < k.sum():
+                gains.append((st, roc_auc_score(yc[k], sc[k]) - roc_auc_score(yc[k], -rate[k])))
+        ss = m.predict_proba(Xs[cols])[:, 1]
+        removed = cost = 0
+        for st in sorted(set(sstems)):
+            others = cstems != st
+            top = sc[others & (yc == 0)].max()
+            k = sstems == st
+            removed += int(((ss > top) & k & (ys == 1)).sum())
+            cost += int(((ss > top) & k & (ys == 0)).sum())
+        g = np.array([v for _, v in gains])
+        print(f"  {name:28s} GuitarSet players 04-05 AUC {ext_val:.3f}   corpus AUC {auc:.3f}  "
+              f"(per-take gain over rate: median {np.median(g):+.3f}, range {g.min():+.3f}..{g.max():+.3f})  "
+              f"beside the gate: removes {removed} surplus, costs {cost} paired")
+        amped = [f"{st.replace('same-pitch-', '').split('-120bpm')[0]} {v:+.3f}" for st, v in gains if st.endswith("-amped")]
+        print(f"      amped takes, gain over rate: {', '.join(amped)}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", default="training/out/outcome")
@@ -172,7 +248,11 @@ def main():
     ap.add_argument("--oof")
     ap.add_argument("--emitted-only", action="store_true",
                     help="only Notes the engine emitted: at the shipped config, the gate's survivors")
+    ap.add_argument("--external", help="GuitarSet rows from extract-guitarset-outcome.ts: train there, test on the corpus")
     a = ap.parse_args()
+    if a.external:
+        external_mode(a)
+        return
     data = load(a.rows, a.config, a.emitted_only)
     stems = np.array([d[0] for d in data])
     y = np.array([0 if d[1]["paired"] else 1 for d in data])

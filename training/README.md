@@ -110,4 +110,17 @@ python3 training/bench-outcome.py --config shipped --emitted-only
 ```
 
 Trained on the corpus alone it does not clear its bar (DECISION-070).
-The GuitarSet half has not been run.
+
+The GuitarSet half trains on GuitarSet and tests on every tuning take,
+none of which it has seen:
+
+```bash
+npx tsx training/extract-guitarset-outcome.ts --data <root> \
+    --out training/out/guitarset-outcome [--shard i/n]
+    # 360 takes x {mic,pickup} x {clean,amp,room}, rate gate off; writes
+    # the chained audio beside the rows so the bench reads what the engine heard
+
+python3 training/bench-outcome.py --external training/out/guitarset-outcome
+    # GuitarSet players 04-05 as a sanity check, then the same two clauses
+    # on the corpus rows
+```
