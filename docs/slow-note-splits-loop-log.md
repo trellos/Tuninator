@@ -1522,3 +1522,14 @@ better than the simple check the engine already uses (how short the
 note is compared with your pace), and alongside that check it could not
 remove a ghost note without also deleting real ones. Door 3 is closed.
 Nothing in the engine changed.
+
+**Follow-up, the owner asked whether a bigger model would fit better.**
+Four larger probes on the same rows, chosen after the verdict and so not
+candidates: MLP 256-128 (~96k numbers) 0.798, removes 3 for 1 real;
+MLP 512-256-128 (~290k) 0.818, 6 for 1; trees depth 6 x 300 rounds
+0.850, 1 for 0; trees 63 leaves x 500 rounds 0.856, 5 for 0. All read
+0.97-0.98 on GuitarSet's held-out players. The pooled corpus AUC rises
+with size, but the median per-take gain over the rate stays +0.000 to
++0.010. The bigger models get better at ranking which takes have many
+ghosts, not which Note within a take is one. The best removes 5 of the
+137 survivors' surplus. The ceiling is the training data, not the size.
