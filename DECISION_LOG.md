@@ -7,6 +7,69 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-068]: Door 3 trained on the corpus alone is closed: no model beats the rate feature one take at a time
+* **Date:** 2026-09-24
+* **Status:** Rejected
+* **Owner:** The project owner asked for door 3 ("Let's do door 3 now", 2026-09-24); measured by the agent
+* **Context:** Ledger row C3 is a small learned classifier judged on the
+  OUTCOME target (was the Note a same-pitch split opened paired with a
+  label), trained on GuitarSet run through the engine and scored
+  leave-one-take-out on this corpus. GuitarSet lives on zenodo.org, which
+  this environment's network policy refuses, so the GuitarSet half could
+  not be run. The corpus half needs no download: the same classifier,
+  trained on the fifteen tuning takes and scored one take at a time, is
+  the cheapest reading of whether the idea has any room. The bar was
+  written down before measuring: pooled leave-one-take-out AUC above the
+  rate feature's on the same rows by more than the spread across takes,
+  and, at the shipped engine, a vote beside the gate that removes extras
+  at zero label cost with its threshold set on the training takes.
+  Models fixed in advance: logistic regression on 25 scalars (the
+  boundary witnesses, the pace, the fragment's span over the pace, the
+  gaps either side); logistic and a 16-unit MLP on those plus 220 audio
+  values (a 5ms envelope and 2-8kHz flux 100ms before to 200ms after the
+  boundary, and envelope and three band fluxes over one interval before
+  to 1.5 after, resampled to 25 points); gradient-boosted trees of depth 3
+  as a probe of what the inputs carry, not shippable. The 140bpm takes
+  were not extracted.
+* **Decision:** **Both clauses fail; nothing is wired and `src/` is
+  unchanged.** Rows: 1,054 accepted, settled same-pitch re-articulations
+  with the rate gate switched off, 336 of them surplus. The rate feature
+  (fragment span over the engine's own pace estimate), unfitted, reads
+  **0.790** on them (the 0.826 the ledger quoted was read on an older
+  engine and population). Leave-one-take-out: logistic on scalars 0.733,
+  logistic with audio 0.682, MLP 0.666, trees 0.801. Grouping each DI
+  take with its amped twin moves every figure down or not at all. On the
+  four amped same-pitch takes, where the extras are, the models read below
+  the rate feature on every take but one (trees 0.600-0.873 against
+  0.654-0.944; the exception is logistic on scalars at 0.686 against 0.654
+  on the quarters take). At the shipped engine, on the 847 Notes the gate lets
+  through (137 surplus), the best zero-cost threshold learned on the
+  other takes removes 5 surplus for 3 real notes; no model removes one
+  at zero cost.
+* **Alternatives Considered:** (a) **Picking the model, input set or
+  regularisation on the leave-one-take-out column**, where trees came
+  closest: rejected as tuning on the falsifier's own rows; +0.011 with a
+  per-take spread of -0.07 to +0.50 is not a result. (b) **Reading the DI
+  column as evidence**: the models tie or edge the rate there (0.92-1.00
+  against 0.95-0.99), where the rate already separates; the amped column
+  is the question and they lose there. (c) **Waiting for GuitarSet before
+  recording anything**: rejected; this half is the cheaper one and its
+  answer bounds what the other can be expected to add (below).
+* **Consequences:** Positive: a learned vote fitted on the corpus is
+  closed for the outcome target as DECISION-031 closed it for the boundary
+  one, with the per-take numbers showing where it fails. The pipeline
+  (`training/extract-outcome-rows.ts`, `training/bench-outcome.py`) scores
+  any future model on the same rows in half a minute. Negative: C3's
+  GuitarSet half is untested, blocked on the environment's network
+  policy (zenodo.org) and on the owner's settings, not on the record. Its
+  prior is low: the trees probe, which can use any interaction of the
+  same inputs, adds 0.011 over the rate on this corpus, so what GuitarSet
+  would have to supply is a feature the amp does not erase, and DECISION-021
+  saw GuitarSet-through-a-fake-amp fall from 0.88 on its own players to
+  0.72 here. If it is run, the bar is the same two clauses on these rows.
+
+---
+
 #### [DECISION-067]: The quarters take's E5 labels `e26`-`e40` move onto the note sounding
 * **Date:** 2026-09-24
 * **Status:** Accepted

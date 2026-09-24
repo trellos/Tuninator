@@ -91,3 +91,23 @@ the same code path.
 - The twelve 140bpm held-out takes are never loaded by anything in this
   directory. They are scored once, at the end, by the falsifier-3 ledger run,
   and that read is spent.
+
+## Door 3: the outcome-target bench
+
+Ledger row C3 asks a different question from the onset head above: not
+"should this boundary exist" but "was the Note this same-pitch split
+opened paired with a label" (the OUTCOME target, DECISION-032).
+
+```bash
+npx tsx training/extract-outcome-rows.ts --out training/out/outcome
+    # 15 tuning takes x {shipped, gate off}: one row per accepted, settled
+    # same-pitch re-articulation, with its witnesses and match outcome
+
+python3 training/bench-outcome.py --config off
+python3 training/bench-outcome.py --config shipped --emitted-only
+    # leave-one-take-out (and twins held out together) against the rate
+    # feature on the same rows; needs numpy and scikit-learn
+```
+
+Trained on the corpus alone it does not clear its bar (DECISION-068).
+The GuitarSet half has not been run.
