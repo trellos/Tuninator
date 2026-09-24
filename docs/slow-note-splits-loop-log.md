@@ -1499,3 +1499,21 @@ the same notes found as before.
 the string is loud enough to sound like a note. When the real note then
 arrives much louder right behind it, the engine now folds the touch into
 the note. One more blip on your take is gone, and one on the A3 eighths.
+
+### The same take: ending a Note at the damp (DECISION-073)
+
+- A Note ending in silence now ends where the level fell 10dB under its
+  300ms median, reached 25dB under within 300ms and never came back,
+  placed on the first hop 6dB under. Before, it ended where the amp's
+  ring fell under the gate, about 0.45s later.
+- Median end error: rest-repick amped +445 → +91ms, DI +102 → +55ms.
+  Splits, slow subset and held-out counts unchanged. Derivation missed
+  and fp each +1, both the last E5 of the C-A-G power chords, whose label
+  sits over silence after the chord stops.
+
+**In plain words, for the owner.** When you damp a note, the engine now
+ends it where your hand stopped it, not when the amp finishes ringing.
+On your rest-and-repick take the notes end within about a tenth of a
+second of your damp instead of half a second after it. Four notes that
+end a take stop a little before their label, because the sound had
+already dropped away there.

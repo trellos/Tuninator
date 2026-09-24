@@ -26,7 +26,7 @@ any number below means anything.
 |---|---|---|---|---|---|---|---|
 | `chords-a-bm-g-d-2x-120bpm` | **yes** | 16 | 16 | 0 | 91.7% | 100.0% | 0ms |
 | `clean-lead-120bpm` | **yes** | 43 | 42 | 2 | 82.1% | 92.9% | 46ms |
-| `power-chords-c-a-g-e-...-120bpm` | **yes** | 8 | 9 | 0 | 100.0% | 100.0% | 107ms |
+| `power-chords-c-a-g-e-...-120bpm` | **yes** | 8 | 9 | 1 | 87.5% | 87.5% | 100ms |
 | `cowboy-chords-...-120bpm` | no | 8 | 12 | 0 | 75.0% | 87.5% | 40ms |
 | `cowboy-chords-di-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 52ms |
 | `cowboy-chords-mic-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 94ms |
@@ -50,7 +50,7 @@ as not applicable rather than failed.
 
 **Good.** Every chord fixture on every signal path finds all of its labels. Onset timing is well
 inside its gates — of the 24 takes that score it, ten have a median absolute error under
-25ms and the worst is 107ms against a 120ms limit. Pitch class on the required lead fixture is
+25ms and the worst is 100ms against a 120ms limit. Pitch class on the required lead fixture is
 92.9%.
 
 **Not good, and both are the same defect seen from two sides.**

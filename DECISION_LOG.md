@@ -7,6 +7,68 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-073]: A Note ending in silence ends at the player's damp, not where the amp's ring falls under the gate
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (chose "Build damp ending" and then "Build it" on the damp-test numbers, 2026-09-24); detection architecture carries the rule
+* **Context:** A Note ends when the sound falls under the amplitude gate
+  (`releaseGraceMs` after it). Through an amp the string rings about
+  0.45s past the player's damp before the gate closes, so every damped
+  amped Note ran on with it: on `rest-repick-g2-60-120bpm-amped` the
+  median end was +445ms against the labels. Un-blooming those Notes
+  (DECISION-069's follow-on) appeared to help only because ghost splits
+  cut them at the damp. A damp is a level event: the level falls
+  sharply under where it has been and does not come back. Benched on the
+  cached fast-frame levels of every derivation take, with the fall at
+  6 / 10dB under the 300ms median, depth 15 / 20 / 25dB within 150 /
+  300ms, and no recovery for 150 / 300 / 500ms. At 10 / 25 / 300 / 500
+  it found all 16 damps on the two rest-repick takes and fired nowhere
+  in the middle of a held note. Elsewhere it fired only where a take's
+  last note, or one chord before a change, falls silent. With the end
+  on the first hop 6dB under the median, the rest-repick ends land
+  30-120ms after the labels. Four labelled notes end before theirs: the
+  last notes of the A3 eighths amped (135ms) and DI (53ms) and of the
+  A-Bm chords (80ms), and the last E5 of the C-A-G power chords, whose
+  label sits over silence (below). The owner saw these numbers and chose
+  to build. The held-out takes were looked at once on the bench, at the
+  walk-back placement; nothing was chosen from them.
+* **Decision:** `tracking.dampFallDb` 10 and `tracking.dampDepthDb` 25.
+  When a Note ends in silence, the tracker looks back over its own level
+  log (`NoteTracker.dampedAt`) for the first hop 10dB under the median
+  of the 300ms before it that reaches 25dB under within 300ms and never
+  climbs back past 5dB under before the silence. The Note ends on the
+  first hop 6dB under that median instead of where the gate closed.
+  Notes ended by what follows them are untouched. 0 turns it off.
+  Numbers: derivation missed 114 → 115, fp 197 → 198, exact 1071 →
+  1070; all three are one Note on `power-chords-c-a-g-e-c-d-fsharp-e-120bpm`.
+  Its last E5 sounds 18.2-18.9s, then the file is silent (-61dB from
+  19.4s to its end at 20.75s). The label `p8` sits at 19.1-20.75s, and
+  the Note used to ring to 19.107s, touching it by 7ms. It still opens at
+  18.17s named E5 and now ends at 18.88s. Median end error:
+  `rest-repick-amped` +445 → +91ms, `rest-repick-di` +102 → +55ms.
+  Held-out, read once: missed 27, fp 63, exact 320, all unchanged; end
+  error `power-chords-amped` +125 → +29ms, `power-chords-di` +31 → +9ms,
+  `power-chords` (room) +24 → -18ms. Splits 237 / 270 / 13 and slow
+  subset 184 / 213 unchanged. Ledger MISSED 141 → 142 (the same E5).
+  546 tests (`tests/engine/damp-end.test.ts` adds four).
+* **Alternatives Considered:** (a) **Un-bloom the amped single notes so
+  the ghost splits end them**: +10 to +14 false positives, and the
+  better end was the ghosts' doing (DECISION-069). (b) **A fall over
+  100ms among short contiguous Notes ending in silence**: 3 false
+  positives and 1 matched Note above 8dB. (c) **Fall 6dB, reach 15dB
+  within 150ms**: missed 3 of the 8 DI damps and fired 30 times on other
+  takes. (d) **End on the hop where the fall starts** (the walk-back to
+  the median): 70-130ms before the labels, which sit where the note has
+  dropped about 6dB.
+* **Consequences:** Notes the player stops now end when they stopped
+  them, on both paths. A note left to decay into silence with no sharp
+  fall is untouched. A last note whose level drops 25dB fast is ended at
+  that drop, which on three takes is 53-135ms before the label. The
+  ghost Notes after a damp (the Note at 18.33s on `rest-repick-amped`)
+  are not touched by this and are still counted.
+
+---
+
 #### [DECISION-071]: A short Note the release arrives 15dB louder than was the pick's contact through an amp
 * **Date:** 2026-09-24
 * **Status:** Accepted

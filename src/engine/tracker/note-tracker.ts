@@ -233,6 +233,14 @@ const HARMONIC_CONTEXT_THRESHOLD = 0.5;
 const ATTACK_HISTORY = 256;
 /** How far back the tracker remembers whether each hop was voiced, for a carved span the region lane delivers late. */
 const VOICED_LOG_MS = 4000;
+/** The window a damp's fall is measured against: see `tracking.dampFallDb`. */
+const DAMP_MEDIAN_MS = 300;
+/** How soon after the fall a damp must reach `tracking.dampDepthDb`. */
+const DAMP_REACH_MS = 300;
+/** Where a damped Note ends: the first hop this far under the median, in dB. */
+const DAMP_END_DB = 6;
+/** A Note quieter than this, in dB of RMS, is already too faint to damp. */
+const DAMP_FLOOR_DB = -55;
 
 /**
  * How close to its own peak a Note must still be for the transient that ends it
@@ -1087,7 +1095,8 @@ export class NoteTracker {
           active.silentSince !== null &&
           t - active.silentSince >= config.tracking.releaseGraceMs;
         if (expired) {
-          this.end(active, active.silentSince as SourceTimeMs, out);
+          const silentSince = active.silentSince as SourceTimeMs;
+          this.end(active, this.dampedAt(active, silentSince) ?? silentSince, out);
           active = null;
         } else {
           this.observe(active, frame);
@@ -3109,6 +3118,45 @@ export class NoteTracker {
     if (gaps.length === 0) return null;
     gaps.sort((a, b) => a - b);
     return gaps[Math.min(gaps.length - 1, Math.round((gaps.length - 1) * RATE_PERCENTILE))] as number;
+  }
+
+  /**
+   * Where the player damped `record`, when it is ending in silence at
+   * `silentSince`: the level fell `tracking.dampFallDb` under its recent
+   * median, reached `tracking.dampDepthDb` under it soon after, and never
+   * came back. Null when nothing in the Note looks like a damp, so it ends
+   * where the sound did.
+   */
+  private dampedAt(record: NoteRecord, silentSince: SourceTimeMs): SourceTimeMs | null {
+    const { dampFallDb: fall, dampDepthDb: depth } = this.config.tracking;
+    if (fall <= 0) return null;
+    const log = this.voicedLog;
+    const db = (i: number): number => 20 * Math.log10(Math.max((log[i] as { rms: number }).rms, 1e-9));
+    const at = (i: number): number => (log[i] as { at: number }).at;
+    const first = log.findIndex((entry) => entry.at >= record.startTime);
+    if (first < 0) return null;
+    for (let i = first + 1; i < log.length && at(i) < silentSince; i++) {
+      const window: number[] = [];
+      for (let k = i - 1; k >= first && at(k) >= at(i) - DAMP_MEDIAN_MS; k--) window.push(db(k));
+      if (window.length * 2 < DAMP_MEDIAN_MS / Math.max(at(i) - at(i - 1), 1)) continue;
+      window.sort((a, b) => a - b);
+      const median = window[window.length >> 1] as number;
+      if (median < DAMP_FLOOR_DB || db(i) >= median - fall) continue;
+      let reached = false;
+      let recovered = false;
+      for (let k = i + 1; k < log.length; k++) {
+        if (db(k) > median - fall / 2) {
+          recovered = true;
+          break;
+        }
+        if (at(k) - at(i) <= DAMP_REACH_MS && db(k) <= median - depth) reached = true;
+      }
+      if (recovered || !reached) continue;
+      let j = i;
+      while (j > first + 1 && db(j - 1) < median - DAMP_END_DB) j--;
+      return Math.max(at(j), record.startTime) as SourceTimeMs;
+    }
+    return null;
   }
 
   private end(record: NoteRecord, at: SourceTimeMs, out: TrackerEmission[]): void {

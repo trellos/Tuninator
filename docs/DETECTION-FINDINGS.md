@@ -8021,3 +8021,30 @@ note within 200ms and stays. The Note after the damp at 18.33s (accepted
 by the sharpness fallback with rise 0.78 after a dip to 0.08) is the only
 sharpness-accepted opening in the derivation takes with a dip under 0.1
 and no rise, so there is nothing to derive a rule from.
+
+## A damp is a level event, and the amp rings past it (DECISION-073)
+
+A Note ends where the sound falls under the gate. Through an amp the
+string rings about 0.45s past the player's damp first, so a damped amped
+Note ran on 0.45s. A damp reads as a sharp fall under the recent level
+that does not come back. Swept on the cached fast-frame levels of the
+derivation takes (fall under the 300ms median / depth reached within
+300ms / no recovery), with each firing classed against the labels:
+
+```
+setting            at a labelled end   before next   near end   mid-note   outside   rest-repick damps
+10 / 25 / 500            15                 1            6          1          9         16 of 16
+```
+
+The near-end, mid and before-next firings are the last notes of takes
+(A3 eighths, A-Bm chords, held-then-picked), the rest-repick DI damps,
+and the last chord of the C-A-G power chords. That take's last E5 sounds
+18.2-18.9s over a file silent from 19.4s; its label sits at 19.1-20.75s.
+The outside firings are after a take's last label.
+
+With the end on the first hop 6dB under the median, the end lands where
+the labels put it (they sit where a note has fallen about 6dB): median
+end error on the rest-repick amped take +445 → +91ms, DI +102 → +55ms;
+held-out power chords amped +125 → +29ms. No Note gained or lost a
+boundary; the only count that moved is that last E5 losing its 7ms
+overlap with a label placed over silence.

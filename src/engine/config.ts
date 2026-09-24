@@ -768,6 +768,20 @@ export type EngineConfig = {
     underHandLevelFall: number;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
+    /**
+     * How far, in dB, the level must fall under its median over the 300ms
+     * before for a Note ending in silence to have been damped there. The
+     * Note then ends at the damp instead of where the sound fell under the
+     * gate. Through an amp the string rings about 0.45s past the player's
+     * damp before the gate closes, and the Note ran on with it.
+     *
+     * The fall must also reach `dampDepthDb` under the median within 300ms
+     * and never climb back past half of this bar before the silence. The
+     * end lands on the first hop 6dB under the median. 0 turns it off.
+     */
+    dampFallDb: number;
+    /** How deep under the median a damp must reach within 300ms; see `dampFallDb`. */
+    dampDepthDb: number;
     bendThresholdCents: number;
     /** How long after an attack a new Note may still be backdated onto it. */
     backdateWindowMs: number;
@@ -1170,6 +1184,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     underHandUnvoicedFraction: 0.5,
     underHandLevelFall: 0.5,
     releaseGraceMs: 90,
+    dampFallDb: 10,
+    dampDepthDb: 25,
     bendThresholdCents: 45,
     backdateWindowMs: 120,
     endedNoteHistory: 64,
