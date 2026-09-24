@@ -151,6 +151,8 @@ export function ownerIndexOf(
 
 type LabelRow = {
   id: string;
+  /** `required: false` on the label: owns Notes, is never counted. */
+  optional: boolean;
   label: string;
   startMs: number;
   endMs: number;
@@ -186,6 +188,7 @@ function measure(): FixtureRow[] {
 
     const labels: LabelRow[] = fixture.label.events.map((event) => ({
       id: event.id,
+      optional: event.required === false,
       label: event.label,
       startMs: event.startMs,
       endMs: event.endMs,
@@ -209,6 +212,7 @@ function measure(): FixtureRow[] {
     let overlapSplit = 0;
     let overlapExtras = 0;
     for (const label of labels) {
+      if (label.optional) continue;
       const touching = detections.filter((d) => {
         const end = d.endedAt ?? d.startedAt;
         return end > label.startMs && d.startedAt < label.endMs;
@@ -219,10 +223,12 @@ function measure(): FixtureRow[] {
       }
     }
 
+    // An optional label kept its Notes off its neighbours; it is not reported.
+    const counted = labels.filter((label) => !label.optional);
     rows.push({
       stem: fixture.stem,
-      labels,
-      wholeTakeLabels: labels.length,
+      labels: counted,
+      wholeTakeLabels: counted.length,
       strays,
       overlapSplit,
       overlapExtras,

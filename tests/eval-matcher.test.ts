@@ -399,6 +399,23 @@ describe("matchEvents", () => {
     expect(result.matches).toHaveLength(1);
     expect(result.matches[0]?.endDeltaMs).toBeNull();
   });
+
+  it("lets an optional label absorb a Note without scoring it either way", () => {
+    const labels = [
+      label("a", 1000, 1250, "A3"),
+      label("weak", 1250, 1500, "A3", { required: false }),
+      label("b", 1500, 1750, "A3"),
+      label("weak2", 1750, 2000, "A3", { required: false }),
+    ];
+    const result = matchEvents(labels, [
+      detected("d1", 1000, 1250, "A3"),
+      detected("d2", 1250, 1500, "A3"),
+      detected("d3", 1500, 1750, "A3"),
+    ]);
+    expect(result.matches.map((m) => m.label.id)).toEqual(["a", "b"]);
+    expect(result.falsePositives).toHaveLength(0);
+    expect(result.missed).toHaveLength(0);
+  });
 });
 
 /* -------------------------------------------------------------------------- */
