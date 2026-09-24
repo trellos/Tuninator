@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.21.0 — 2026-09-24
+
 - On a direct input, a same-pitch re-articulation over which no energy
   arrived — the envelope after it no louder than the 80ms before it, with no
   pick-contact dip under it — now has to outlast half the local note interval

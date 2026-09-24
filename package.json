@@ -1,6 +1,6 @@
 {
   "name": "tuninator",
-  "version": "0.2.0",
+  "version": "0.21.0",
   "description": "UI-free browser library turning guitar microphone input into a streaming musical event recognizer: Notes that start early and are revised as the evidence improves.",
   "type": "module",
   "license": "MIT",
