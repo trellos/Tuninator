@@ -1463,3 +1463,23 @@ It now knows a note that never held a pitch cannot change pitch. Two of
 the three short blips before your picks are gone, and 6 more ghost
 notes went with them on the other practice takes, with no real note
 lost.
+
+
+### The same take: G5 (DECISION-069)
+
+- Five picks named "G5" and one "unknown": the amp's aperiodic attack
+  kept the Note's mean pitch confidence under the monophonic veto while
+  its noisy spectrum read as polyphony. A bloomed Note whose readings
+  after its pitch settled find a lone fundamental 20% of the time or more
+  now reports its pitch. Derivation exact labels 1027 → 1071; missed 113
+  → 114 and fp 198 → 199, a matcher re-pairing on identical Notes;
+  held-out missed 27, fp 63, exact 320 unchanged. Splits unchanged.
+- The take now reads 8 of 8 named G2, with 3 extra Notes (the contact at
+  7.63s, the contact before 11.91s, and 18.33s after a damp).
+
+**In plain words, for the owner.** Through the amp, your low G's
+overtones made the engine think it was hearing a power chord. It now
+checks, once the note has settled, whether it keeps hearing just one
+string, and if so names the note. All eight picks now read G2, and 44
+more notes on the other practice recordings got their right names, with
+the same notes found as before.

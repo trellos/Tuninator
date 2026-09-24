@@ -1128,6 +1128,10 @@ export class NoteTracker {
 
     record.polyphonySum += polyphony;
     record.polyphonyHops++;
+    if (record.heldReading) {
+      record.heldHarmonyReadings++;
+      if (polyphony < this.config.harmony.minPolyphony) record.heldSingleReadings++;
+    }
     if (activations.length > 0) record.recordActivations(activations);
     const runningPolyphony =
       record.polyphonyHops > 0 ? record.polyphonySum / record.polyphonyHops : polyphony;
@@ -1256,6 +1260,28 @@ export class NoteTracker {
       record.frames > 0 ? record.confidenceSum / record.frames : 0;
     const monophonic =
       meanPitchConfidence > this.config.harmony.maxMonophonicConfidence && !virtualPitch;
+    // One string, whatever its attack looked like: it answers to its pitch.
+    // See `harmony.oneStringReadingFraction`. Only the name follows; the
+    // Note keeps the segmentation a bloomed Note gets (see `NoteRecord.oneString`).
+    const oneStringBar = this.config.harmony.oneStringReadingFraction;
+    const oneString =
+      oneStringBar > 0 &&
+      record.heldHarmonyReadings > 0 &&
+      record.heldSingleReadings >= oneStringBar * record.heldHarmonyReadings;
+    if (oneString !== record.oneString) {
+      const previous = record.currentLabel();
+      record.oneString = oneString;
+      const label = record.currentLabel();
+      if (record.announced && record.endTime === null && label !== record.lastEmitted.label) {
+        const revisionNumber = record.bump("harmonyCorrection");
+        record.lastEmitted.label = label;
+        out.push({
+          type: "changed",
+          note: record.snapshot(),
+          change: { type: "harmonyCorrection", at, revisionNumber, previous: { label: previous } },
+        });
+      }
+    }
     if (!record.polyphonic || monophonic || !enoughEvidence) return out;
 
     const winner = bestHarmonyVote(record.harmonyVotes, this.config.harmony.minEvidenceHops);

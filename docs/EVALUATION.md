@@ -30,7 +30,7 @@ any number below means anything.
 | `cowboy-chords-...-120bpm` | no | 8 | 12 | 0 | 75.0% | 87.5% | 40ms |
 | `cowboy-chords-di-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 52ms |
 | `cowboy-chords-mic-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 88ms |
-| `cowboy-chords-amped-...-140bpm` | no | 8 | 11 | 0 | 62.5% | 100.0% | 92ms |
+| `cowboy-chords-amped-...-140bpm` | no | 8 | 11 | 0 | 50.0% | 87.5% | 92ms |
 | `power-chords-di-...-140bpm` | no | 16 | 16 | 0 | 93.8% | 100.0% | 19ms |
 | `power-chords-...-140bpm` (mic) | no | 16 | 24 | 0 | 72.7% | 100.0% | 23ms |
 | `power-chords-amped-...-140bpm` | no | 16 | 18 | 0 | 92.3% | 100.0% | 13ms |

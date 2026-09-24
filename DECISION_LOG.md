@@ -7,6 +7,60 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-069]: A Note whose readings after its pitch settles find one fundamental reports its pitch, not a chord
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take's "G5" naming to be fixed, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` five of the eight G2
+  picks were named "G5" and one "unknown": the Note bloomed into a chord.
+  Blooming is vetoed for a Note whose mean fast-lane pitch confidence is
+  over `harmony.maxMonophonicConfidence` (0.9), but through an amp a
+  picked G2 is aperiodic for 60-160ms, and those unvoiced hops hold the
+  mean under 0.9 for a second or more (0.28 at 4.16s, 0.9 only at 5.76s)
+  while the attack's noisy spectrum supplies the polyphony. After that,
+  most multi-pitch readings find one fundamental, G2, and the chroma of
+  its harmonics (G and D) matches the "G5" template.
+  Benched on the derivation takes, over every Note that ended bloomed:
+  the share of multi-pitch readings taken after the Note held a pitch
+  (DECISION-068) that found fewer than `harmony.minPolyphony`
+  fundamentals. All 37 over a chord label read under 10% (the most, 1 in
+  39); of the 66 over a single-note label, 48 read 20% or more, 58 read
+  10% or more.
+* **Decision:** `harmony.oneStringReadingFraction` 0.2. At or above it
+  a bloomed Note is `oneString`: it reports its pitch and no harmony,
+  delivered as a `harmonyCorrection`. Only the name follows;
+  `harmonyBloomed` stays set, so segmentation is unchanged. 0 turns it
+  off.
+  Numbers, final Notes and the matcher: derivation exact labels 1027 →
+  1071 of 1220-1222 (`held-then-picked-amped` 76 → 109 of 120,
+  `rest-repick-amped` 2 → 8 of 8, `rest-repick-di` 7 → 8,
+  `eighths-a3-amped` 160 → 163, `held-then-picked-di` 104 → 105); missed
+  113 → 114, fp 198 → 199, both on `held-then-picked-di`, where the Notes
+  are identical and the matcher now pairs `p2c3q3` with the Note it
+  overlaps by name instead of the one 410ms before `p2c3q4`. Held-out,
+  read once: missed 27 → 27, fp 63 → 63, exact 320 → 320 of 372 (one
+  `cowboy-chords-amped` chord now reads as its root note; one triplet
+  note gains its name). Splits unchanged (238 / 271 / 14; slow subset
+  185 / 214). Ledger MISSED 140 → 141, the same re-pairing. 542 tests.
+* **Alternatives Considered:** (a) **Un-bloom the Note outright**
+  (clear `harmonyBloomed`): exact 1027 → 1073 and missed 113 → 109, but
+  fp 198 → 212: a bloomed Note is shielded from pitch-step and
+  re-articulation splits, and without the shield the amp's damps and
+  some mid-note transients cut the Note (on the rest-repick amped take 3 →
+  8 extra). It also brings the amped end error from +445ms to +135ms.
+  Worth taking once those splits are handled; not before. (b) **Mean
+  confidence over voiced hops, or since the pitch arrived:** the first
+  voiced hops of an amped pick read 0.54-0.64, so the bloom still happens
+  on the attack. (c) **Bar 0.1:** ten more single notes renamed, but a
+  chord with eight readings would flip on one lone-fundamental reading.
+* **Consequences:** A single string through an amp is named as a note.
+  A real chord whose later readings keep finding a single fundamental
+  (a power chord whose fifth has died, a chord reduced to its root) now
+  reports that root note: one held-out amped chord does. The segmentation
+  a bloomed Note gets still applies to these Notes, which keeps their
+  ends late on the amp.
+
+---
 #### [DECISION-068]: A pitch step out of a Note that never held a pitch is the pitch arriving, not a new note
 * **Date:** 2026-09-24
 * **Status:** Accepted

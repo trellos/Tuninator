@@ -809,6 +809,22 @@ export type EngineConfig = {
      */
     maxMonophonicConfidence: number;
     /**
+     * Share of a Note's multi-pitch readings, taken after it has held a
+     * pitch (`NoteRecord.heldReading`), that may find a single fundamental
+     * before the Note is one string rather than a chord. At or above it the
+     * Note reports its pitch rather than a chord name.
+     *
+     * Mean confidence cannot see this through an amp: a picked G2 is
+     * aperiodic for up to 160ms there, the unvoiced hops drag the mean under
+     * `maxMonophonicConfidence` for its first second or more, and the
+     * attack's noisy spectrum supplies the polyphony. The readings after the
+     * pitch arrives say what is sounding: on the derivation takes no chord
+     * reads more than 1 in 39 single-fundamental (all 37 under 10%), and of
+     * the 66 single notes that bloomed as "G5", "C5", "F#5" and the like, 48
+     * read 20% or more and 58 read 10% or more. 0 turns it off.
+     */
+    oneStringReadingFraction: number;
+    /**
      * How harmonic the recent audio must read before an octave-sized pitch jump
      * is treated as the detector moving between strings rather than as a note
      * change.
@@ -1151,6 +1167,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minPolyphony: 2,
     minVoiceSpreadSemitones: 7,
     maxMonophonicConfidence: 0.9,
+    oneStringReadingFraction: 0.2,
     octaveFlipContext: 0.25,
     stepSuppressContext: 0.8,
     hopDivisor: 4,

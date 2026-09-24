@@ -108,6 +108,21 @@ export class NoteRecord {
    * silence. See `pitchStillArriving` in the tracker.
    */
   heldReading: boolean;
+  /**
+   * Multi-pitch readings taken after `heldReading`, and how many of them
+   * found fewer than `harmony.minPolyphony` fundamentals. See
+   * `harmony.oneStringReadingFraction`.
+   */
+  heldHarmonyReadings = 0;
+  heldSingleReadings = 0;
+  /**
+   * This Note bloomed, but its readings since it held a pitch say one string
+   * is sounding, so it reports its pitch and no harmony. `harmonyBloomed`
+   * stays set: lifting the guards a bloomed Note gets from pitch-step and
+   * re-articulation splits cost 14 extra Notes on the derivation takes, the
+   * amp's damps among them (DECISION-069).
+   */
+  oneString = false;
   private runHz: number | null = null;
   private runHops = 0;
   /**
@@ -491,7 +506,7 @@ export class NoteRecord {
   }
 
   currentLabel(): string {
-    if (this.harmonyBloomed) return this.harmonyLabel ?? "unknown";
+    if (this.harmonyBloomed && !this.oneString) return this.harmonyLabel ?? "unknown";
     return this.settledPitch()?.name ?? "unknown";
   }
 
@@ -573,7 +588,7 @@ export class NoteRecord {
       };
     }
 
-    if (this.harmonyBloomed) {
+    if (this.harmonyBloomed && !this.oneString) {
       const harmony: NonNullable<Note["harmony"]> = {
         confidence: this.harmonyConfidence,
       };

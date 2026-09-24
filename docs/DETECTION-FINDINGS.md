@@ -7967,3 +7967,34 @@ The third stub on the take (11.91s) was already absorbed; what remains
 there is the pick's contact, which the amp makes loud enough that
 `isContactOpening` (a DI-derived no-rise test, rise 4-48 here against a
 bar of 1.2) does not recognise it.
+
+
+## One string through an amp, named as a chord (DECISION-069)
+
+The amped rest-and-repick take named five of eight G2 picks "G5" and one
+"unknown". The monophonic veto on blooming reads the Note's mean pitch
+confidence, and on the amp a picked G2 spends 60-160ms aperiodic: 12
+unvoiced hops near zero hold the mean under 0.9 until 1.76s into a note
+(0.28 when it bloomed at 4.16s). Meanwhile the attack's spectrum reads 3
+to 6 fundamentals, which sets the room's harmonic context, and the Note
+blooms. From then on nearly every reading finds only G2, whose harmonics'
+chroma matches "G5".
+
+A measure that separates this from a chord: of the multi-pitch readings
+taken after the Note has held a pitch, the share that find a single
+fundamental. Over every derivation Note that ended bloomed:
+
+```
+                         <10%   10-20%   20-40%   >=40%   no readings
+over a chord label        34      0        0        0         3
+over a note label          7     10       15       33         1
+```
+
+The chord maximum is 1 of 39. At a bar of 20% the name follows the
+evidence; derivation exact labels go 1027 → 1071 with the same Notes.
+Letting the Note un-bloom entirely was measured too: exact 1073, missed
+113 → 109, but fp 198 → 212, because a bloomed Note is shielded from
+pitch-step and re-articulation splits and on the amp its damps then
+split it (at 10.04s a "new-pitch" re-articulation on the damp's sharp
+push, rise 0.88; at 25.09s an "envelope-rise" on the damp, rise 1.31).
+Those splits are the next thing to fix before the shield can come off.
