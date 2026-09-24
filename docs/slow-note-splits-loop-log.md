@@ -178,7 +178,7 @@ is half a beat short at the median.
 | C2b | Band-limited (1–6kHz) envelope dip | fast | DECISION-028 (d) varied window length, not band | 0.80 AUC as above | **closed, iteration 2**: 0.507 on the amped slow subset, 0.511 on all emitted amped; 0.506 on DI |
 | C2c | Octave displacement of the fragment as a retrospective witness | deep | none; observation above | 0.80 AUC as above, or usable as the rate gate's second witness | **closed, iteration 2**: 0.49–0.51 everywhere; no fragment is octave-displaced on this material |
 | C2d | Spectral-shape (centroid / flatness) novelty at fine hop | fast | DECISION-014, DECISION-015 measured spectral change, not shape | 0.80 AUC as above | **closed, iteration 2**: centroid jump 0.58, flatness 0.52 on the amped slow subset (centroid after/before 0.83 on DI, where it is the rise again) |
-| C3 | Retrospective learned classifier (≤25k params) judged on the OUTCOME target, trained on GuitarSet rows labelled by the matcher | deep | DECISION-021, DECISION-031 (both boundary-target; group R weak there) | LOTO AUC above the shipped rate feature's 0.826 on the same rows; pipeline beats the shipped gate at +0 missed on derivation | **corpus half closed, 2026-09-24** (DECISION-068): trained on the 15 tuning takes, no model beats the rate feature leave-one-take-out (0.733 / 0.682 / 0.666 / trees 0.801 against 0.790, re-measured on 1,054 gate-off rows) and none removes a surplus Note beside the gate at zero cost. GuitarSet half not run: zenodo.org refused by the environment's network policy (owner-side blocker) |
+| C3 | Retrospective learned classifier (≤25k params) judged on the OUTCOME target, trained on GuitarSet rows labelled by the matcher | deep | DECISION-021, DECISION-031 (both boundary-target; group R weak there) | LOTO AUC above the shipped rate feature's 0.826 on the same rows; pipeline beats the shipped gate at +0 missed on derivation | **corpus half closed, 2026-09-24** (DECISION-070): trained on the 15 tuning takes, no model beats the rate feature leave-one-take-out (0.733 / 0.682 / 0.666 / trees 0.801 against 0.790, re-measured on 1,054 gate-off rows) and none removes a surplus Note beside the gate at zero cost. GuitarSet half not run: zenodo.org refused by the environment's network policy (owner-side blocker) |
 | C4 | Pace absorb at 0.40 — the named measurement only (estimator / oracle ratio per take) | — | DECISION-037: "not yet decidable" | ratio ≈ 0.82 ⇒ 0.50 is derived | blocked on the label review (owner) |
 | C5 | Rate gate restricted by the PREDECESSOR's `harmonyBloomed` | tracker | DECISION-030 amendment (room-context flag regressed) | chord-take extras fall, nothing else moves | open (door 5) |
 | C6 | Lower the amplitude gate so decayed slow strings reach the witnesses | fast | DECISION-035 names it, unmeasured | ledger `rejected: gated` falls at no extras cost | open (door 6, misses not splits) |
@@ -216,7 +216,7 @@ is half a beat short at the median.
 | A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the recordings above being what the recognizer really hears, DI first | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. Briefed as `docs/goaterizer-capture-and-judgment-prompt.md`, to run in parallel in that repository. |
 | A tempo hint on `EngineTuning` (product decision; the record bounds its value at about twice the shipped gate's reach, and not free) | nothing in the loop; a consumer-side lever | 2026-09-18 | — |
 | The split instrument's forward reach: `measure-splits.ts` charges a Note that starts more than 40ms before its label to the label before it, so on a passage where every Note opens early (the DI same-pitch takes) fixing one boundary moves the charge to its neighbour and the column cannot fall one boundary at a time (iterations 5, 7, 10). Charge by nearest label start, or by most overlap? Every number in this journal moves with the answer | whether the DI slow-split column can read the boundary moves the loop is making | 2026-09-18 | — Iteration 13 (DECISION-057) adds a fourth: two boundaries on the held-then-picked DI take moved from 80ms and 107ms early to 27ms, and the count read one worse. With C11 also blocked on it, no open row targets the direct-input column until this is decided. **Decided 2026-09-19: most overlap with 40ms leeway (DECISION-063).** C11 and C25 reopened; see "The instrument re-read" below |
-| Network access to zenodo.org in the project's environment settings, where GuitarSet lives | C3's GuitarSet half (DECISION-068 ran the corpus half) | 2026-09-24 (door 3 thread) | — |
+| Network access to zenodo.org in the project's environment settings, where GuitarSet lives | C3's GuitarSet half (DECISION-070 ran the corpus half) | 2026-09-24 (door 3 thread) | — |
 
 ---
 
@@ -1440,7 +1440,7 @@ It now knows that a small pitch wobble just before a note goes silent
 is your hand, not a note. All five of those fake notes are gone, and no
 real note was lost anywhere in the other recordings.
 
-## Door 3 on the corpus alone — 2026-09-24 (DECISION-068)
+## Door 3 on the corpus alone — 2026-09-24 (DECISION-070)
 
 The owner said go on door 3. Its GuitarSet half could not start:
 zenodo.org, where GuitarSet lives, is refused by this environment's

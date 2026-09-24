@@ -7,7 +7,7 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-068]: Door 3 trained on the corpus alone is closed: no model beats the rate feature one take at a time
+#### [DECISION-070]: Door 3 trained on the corpus alone is closed: no model beats the rate feature one take at a time
 * **Date:** 2026-09-24
 * **Status:** Rejected
 * **Owner:** The project owner asked for door 3 ("Let's do door 3 now", 2026-09-24); measured by the agent

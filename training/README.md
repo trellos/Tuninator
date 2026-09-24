@@ -109,5 +109,5 @@ python3 training/bench-outcome.py --config shipped --emitted-only
     # feature on the same rows; needs numpy and scikit-learn
 ```
 
-Trained on the corpus alone it does not clear its bar (DECISION-068).
+Trained on the corpus alone it does not clear its bar (DECISION-070).
 The GuitarSet half has not been run.
