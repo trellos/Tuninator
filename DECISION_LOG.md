@@ -7,6 +7,33 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-075]: The last E5 of the C-A-G power chords take is labelled where the owner hears it
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (chose "Move label", then marked the times by ear on a listening page and pasted them into the thread, 2026-09-24)
+* **Context:** `power-chords-c-a-g-e-c-d-fsharp-e-120bpm` is labelled on
+  a bar grid. Its last chord, `p8` E5, sat at 19.1-20.75s. The file is
+  under -45dB from 19.13s to its end; the chord sounds 18.2-18.9s.
+  Before DECISION-073 the E5 Note rang to 19.107s and touched the label
+  by 7ms, which the matcher counted as a match. Once the Note ends at
+  the damp (18.88s) the label is missed and the Note is an extra.
+* **Decision:** `p8` moved to 18175-18848ms, the start and end the owner
+  marked on the "Last E5 Label" listening page. Tuninator was not used
+  to place it; the file's `timingNotes` records the correction. `p7`
+  stays on its grid slot (17.1-19.1s), overlapping the new `p8`.
+  Numbers against DECISION-074: derivation missed 115 → 114, fp 197 →
+  196, exact 1070 → 1071; held-out unchanged (27 / 62 / 320); splits
+  237 / 270 / 11 and slow subset 184 / 213 unchanged; ledger MISSED
+  142 → 141. The engine did not change.
+* **Alternatives Considered:** (a) **Leave the grid slot**: keeps a
+  label over silence and charges DECISION-073 with a miss and an extra
+  it did not cause. (b) **The plain-envelope suggestion, 18170-18850ms**:
+  the owner's marks are within 5ms of it; his are used.
+* **Consequences:** The take scores 8 of 8 with one extra. The other
+  seven chords remain on the grid and were not re-examined here.
+
+---
+
 #### [DECISION-074]: A Note opened inside the damp that stopped the Note before it is absorbed into it
 * **Date:** 2026-09-24
 * **Status:** Accepted

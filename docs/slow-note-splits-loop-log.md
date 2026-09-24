@@ -1545,3 +1545,11 @@ the string at 7.63 s.
   damp-ghost rule does not reach them. A fine-onset split lands 0.39s
   into the 4.0s pick, and a pitch-step split at 22.96s. The bloom's
   shield still pays for itself here.
+
+### The owner's label for the last E5 (DECISION-075)
+
+- `p8` on `power-chords-c-a-g-e-c-d-fsharp-e-120bpm` moved from its grid
+  slot 19.1-20.75s, over silence, to 18.175-18.848s, marked by the
+  owner's ear. Derivation missed 115 → 114, fp 197 → 196; everything
+  else unchanged. With it, the damp work (DECISION-073, 074) costs no
+  real note anywhere.
