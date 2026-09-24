@@ -7,6 +7,67 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-072]: Door 3 trained on GuitarSet is closed: the shippable model ties the rate feature on this corpus
+* **Date:** 2026-09-24
+* **Status:** Rejected
+* **Owner:** The project owner asked for door 3 ("Let's do door 3 now") and picked "Try GuitarSet" after DECISION-070, then opened the network setting ("try now", 2026-09-24); measured by the agent
+* **Context:** DECISION-070 closed C3's corpus half and left its GuitarSet
+  half blocked on zenodo.org. With the network setting changed, the three
+  GuitarSet archives (annotation, mono mic, mono pickup mix) were
+  downloaded and converted to 48kHz mono as `training/README.md` says, and
+  `training/extract-guitarset-outcome.ts` ran all 360 takes through the
+  engine with the rate gate off, each in two flavours (mic, pickup) and
+  three chains (clean, fake amp, room): 2,160 renders, 106,905 accepted,
+  settled same-pitch re-articulation rows, 38,865 of them surplus
+  (unpaired with a GuitarSet note). `bench-outcome.py --external` then
+  trained the four models fixed in the script before any external row
+  existed, on GuitarSet players 00-03 for a validation reading on 04-05
+  and on all six for the corpus reading, and scored them on the same
+  1,054 gate-off corpus rows (336 surplus) and 847 shipped survivors (137
+  surplus) as DECISION-070. The corpus rows were regenerated and
+  reproduce DECISION-070's figures exactly. The bar was the same two
+  clauses: corpus AUC above the rate feature's 0.790 by more than the
+  per-take spread; beside the gate, surplus removed at zero label cost
+  with the threshold set on the other tuning takes. The 140bpm takes
+  were not extracted.
+* **Decision:** **Both clauses fail for every shippable model; nothing is
+  wired and `src/` is unchanged.** On GuitarSet itself the models learn
+  the task well (players 04-05: logistic 0.957, logistic with audio
+  0.964, MLP 0.971, trees 0.972; the rate feature alone reads 0.89-0.95
+  per flavour there). On this corpus: logistic on scalars 0.745,
+  logistic with audio 0.750, the MLP 32-16 (the shippable shape, about
+  8,400 numbers) **0.794**, against the rate feature's **0.790**. Median
+  per-take gain over the rate is +0.000 for all three, with the amped
+  held-then-picked take losing 0.11-0.12. Beside the gate: logistic
+  removes 0 surplus for 2 real notes, logistic with audio 1 for 1, the
+  MLP 4 for 2. The depth-3 trees probe, fixed in advance as a probe and
+  not a candidate, reads 0.822 (+0.032, per-take gain -0.032 to +0.500,
+  median +0.007) and removes 4 of the 137 survivors' surplus at zero
+  cost; +0.032 is inside the spread, so it does not pass clause 1 even
+  if it were a candidate.
+* **Alternatives Considered:** (a) **Promote the trees probe to the
+  candidate** because it alone clears clause 2: rejected; choosing the
+  model after reading the corpus column is tuning on the falsifier, and
+  4 of 137 surplus is below anything a player would notice.
+  (b) **Retune the MLP (width, regularisation, the amp chain's
+  parameters) until the corpus column moves**: rejected for the same
+  reason; the models are fixed in the script. (c) **Train on GuitarSet
+  plus the corpus**: that is DECISION-070's regime with more clean data
+  added, and DECISION-070's trees, free to use any interaction of these
+  inputs, already sat at the rate.
+* **Consequences:** C3 is closed on both halves. What a large clean set
+  teaches a model about same-pitch ghosts is what the rate feature already
+  says: on GuitarSet the rate itself reads 0.89-0.95, and the models add
+  their 0.02-0.07 there, not here, where the extras come from a real amp
+  and a real player the fake chain does not imitate (DECISION-021 saw the
+  same fall for the boundary target, 0.88 to 0.72). The GuitarSet
+  pipeline stays in `training/` and re-scores a new model on the same
+  rows; extraction takes about 40 minutes in four shards. Do not reopen
+  door 3 without either a new input the amp does not erase or labelled
+  amped material in quantity.
+
+---
+
 #### [DECISION-070]: Door 3 trained on the corpus alone is closed: no model beats the rate feature one take at a time
 * **Date:** 2026-09-24
 * **Status:** Rejected

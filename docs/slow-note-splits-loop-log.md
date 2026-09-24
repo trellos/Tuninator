@@ -178,7 +178,7 @@ is half a beat short at the median.
 | C2b | Band-limited (1–6kHz) envelope dip | fast | DECISION-028 (d) varied window length, not band | 0.80 AUC as above | **closed, iteration 2**: 0.507 on the amped slow subset, 0.511 on all emitted amped; 0.506 on DI |
 | C2c | Octave displacement of the fragment as a retrospective witness | deep | none; observation above | 0.80 AUC as above, or usable as the rate gate's second witness | **closed, iteration 2**: 0.49–0.51 everywhere; no fragment is octave-displaced on this material |
 | C2d | Spectral-shape (centroid / flatness) novelty at fine hop | fast | DECISION-014, DECISION-015 measured spectral change, not shape | 0.80 AUC as above | **closed, iteration 2**: centroid jump 0.58, flatness 0.52 on the amped slow subset (centroid after/before 0.83 on DI, where it is the rise again) |
-| C3 | Retrospective learned classifier (≤25k params) judged on the OUTCOME target, trained on GuitarSet rows labelled by the matcher | deep | DECISION-021, DECISION-031 (both boundary-target; group R weak there) | LOTO AUC above the shipped rate feature's 0.826 on the same rows; pipeline beats the shipped gate at +0 missed on derivation | **corpus half closed, 2026-09-24** (DECISION-070): trained on the 15 tuning takes, no model beats the rate feature leave-one-take-out (0.733 / 0.682 / 0.666 / trees 0.801 against 0.790, re-measured on 1,054 gate-off rows) and none removes a surplus Note beside the gate at zero cost. GuitarSet half not run: zenodo.org refused by the environment's network policy (owner-side blocker) |
+| C3 | Retrospective learned classifier (≤25k params) judged on the OUTCOME target, trained on GuitarSet rows labelled by the matcher | deep | DECISION-021, DECISION-031 (both boundary-target; group R weak there) | LOTO AUC above the shipped rate feature's 0.826 on the same rows; pipeline beats the shipped gate at +0 missed on derivation | **corpus half closed, 2026-09-24** (DECISION-070): trained on the 15 tuning takes, no model beats the rate feature leave-one-take-out (0.733 / 0.682 / 0.666 / trees 0.801 against 0.790, re-measured on 1,054 gate-off rows) and none removes a surplus Note beside the gate at zero cost. **GuitarSet half closed, 2026-09-24** (DECISION-072): trained on 106,905 GuitarSet rows (2,160 renders), the shippable MLP reads 0.794 on the corpus against the rate's 0.790 (logistic 0.745 / 0.750; trees probe 0.822, inside the per-take spread) and removes 4 surplus for 2 real notes beside the gate. **C3 closed** |
 | C4 | Pace absorb at 0.40 — the named measurement only (estimator / oracle ratio per take) | — | DECISION-037: "not yet decidable" | ratio ≈ 0.82 ⇒ 0.50 is derived | blocked on the label review (owner) |
 | C5 | Rate gate restricted by the PREDECESSOR's `harmonyBloomed` | tracker | DECISION-030 amendment (room-context flag regressed) | chord-take extras fall, nothing else moves | open (door 5) |
 | C6 | Lower the amplitude gate so decayed slow strings reach the witnesses | fast | DECISION-035 names it, unmeasured | ledger `rejected: gated` falls at no extras cost | open (door 6, misses not splits) |
@@ -216,7 +216,7 @@ is half a beat short at the median.
 | A raw-capture switch in GOATerizer (dump the worklet input to WAV) | the recordings above being what the recognizer really hears, DI first | 2026-09-18 | No such switch exists yet; GOATerizer has no `MediaRecorder` or file capture anywhere in `src/`. Its labels editor reads this repository's `fixtures/`, it does not record. Briefed as `docs/goaterizer-capture-and-judgment-prompt.md`, to run in parallel in that repository. |
 | A tempo hint on `EngineTuning` (product decision; the record bounds its value at about twice the shipped gate's reach, and not free) | nothing in the loop; a consumer-side lever | 2026-09-18 | — |
 | The split instrument's forward reach: `measure-splits.ts` charges a Note that starts more than 40ms before its label to the label before it, so on a passage where every Note opens early (the DI same-pitch takes) fixing one boundary moves the charge to its neighbour and the column cannot fall one boundary at a time (iterations 5, 7, 10). Charge by nearest label start, or by most overlap? Every number in this journal moves with the answer | whether the DI slow-split column can read the boundary moves the loop is making | 2026-09-18 | — Iteration 13 (DECISION-057) adds a fourth: two boundaries on the held-then-picked DI take moved from 80ms and 107ms early to 27ms, and the count read one worse. With C11 also blocked on it, no open row targets the direct-input column until this is decided. **Decided 2026-09-19: most overlap with 40ms leeway (DECISION-063).** C11 and C25 reopened; see "The instrument re-read" below |
-| Network access to zenodo.org in the project's environment settings, where GuitarSet lives | C3's GuitarSet half (DECISION-070 ran the corpus half) | 2026-09-24 (door 3 thread) | — |
+| Network access to zenodo.org in the project's environment settings, where GuitarSet lives | C3's GuitarSet half (DECISION-070 ran the corpus half) | 2026-09-24 (door 3 thread) | **Allowed 2026-09-24** ("try now"); the GuitarSet half ran in a fresh thread, DECISION-072 |
 
 ---
 
@@ -1483,4 +1483,42 @@ check the engine already uses (how short the note is compared with the
 pace you are playing), and on the amped recordings, where the ghost
 notes are, it did worse. Used alongside today's check it could not
 remove a single extra ghost note without also deleting real ones.
+Nothing in the engine changed.
+
+## Door 3 on GuitarSet — 2026-09-24 (DECISION-072)
+
+The owner allowed zenodo.org and picked "Try GuitarSet". Same bar,
+same models (fixed in `bench-outcome.py` before any GuitarSet row
+existed), same corpus rows as DECISION-070, which reproduced exactly.
+
+- Rows (`training/extract-guitarset-outcome.ts`, four shards, about 40
+  minutes): 360 takes x {mic, pickup} x {clean, fake amp, room}, gate
+  off: 106,905 rows, 38,865 surplus. The rate feature reads 0.89-0.95 on
+  them by flavour, higher than on the corpus.
+- On GuitarSet's held-out players 04-05 every model learns the task:
+  0.957 / 0.964 / 0.971, trees 0.972.
+- On the corpus: logistic on scalars 0.745, with audio 0.750, MLP 32-16
+  (the shippable shape, ~8,400 numbers) 0.794, against the rate's 0.790.
+  Median per-take gain +0.000; the amped held-then-picked take loses
+  0.11-0.12 for all three. The trees probe reads 0.822, per-take gain
+  -0.032 to +0.500, median +0.007: inside the spread.
+- Beside the gate, on the 847 survivors (137 surplus): logistic removes
+  0 for 2 real notes, with audio 1 for 1, MLP 4 for 2. The trees probe
+  removes 4 at zero cost; it was fixed as a probe, not a candidate, and
+  4 of 137 would not be noticed.
+- Built: nothing. Engine unchanged.
+- Verdict: falsified on both clauses. A big clean set teaches a model
+  what the rate already says; the extras here come from a real amp and
+  a real player the fake chain does not imitate.
+- What a GOATerizer player would notice: nothing changed.
+- Ledger: C3 closed on both halves; the zenodo.org blocker row answered.
+
+**In plain words, for the owner.** With the download unblocked, the
+small learned model was trained on GuitarSet: 360 recordings of other
+guitarists, each played through clean, fake-amp and room versions,
+about 107,000 examples. On GuitarSet's own unseen players it got very
+good at telling ghost notes from real ones. On your recordings it did no
+better than the simple check the engine already uses (how short the
+note is compared with your pace), and alongside that check it could not
+remove a ghost note without also deleting real ones. Door 3 is closed.
 Nothing in the engine changed.
