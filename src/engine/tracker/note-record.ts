@@ -27,7 +27,7 @@ import type { ConfidenceParts, PitchActivation } from "../contracts.js";
 import { DefaultConfidenceModel } from "./confidence.js";
 import { StatefulHypothesisTracker, type HypothesisTransition } from "./hypotheses.js";
 import { VoiceDecay } from "./voices.js";
-import { describeFrequency, midiToFrequency } from "../kernels/notes.js";
+import { centsBetween, describeFrequency, midiToFrequency } from "../kernels/notes.js";
 
 const confidenceModel = new DefaultConfidenceModel();
 
@@ -68,6 +68,8 @@ export class NoteRecord {
   readonly openingRise: number;
   /** `FastFrame.dipRatio` on the hop that opened this Note. */
   readonly openingDip: number;
+  /** `FastFrame.rms` on the hop that opened this Note. See `tracking.contactGainDb`. */
+  readonly openingRms: number;
   /** Opened by the fine-hop witness, which fires on a pick's contact. */
   fineOpened = false;
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
@@ -103,6 +105,34 @@ export class NoteRecord {
 
   lastVoicedHz: number | null;
   lastVoicedAt: SourceTimeMs;
+  /**
+   * This Note has held one reading for `pitch.stepConfirmFrames` voiced hops
+   * in a row, the pitch-change detector's own test for a pitch being there.
+   *
+   * A Note opened by a confirmed step holds one from its first hop. A Note
+   * opened by an attack does not until its own hops agree, and until then a
+   * "step" out of it is leaving nothing: the readings it leaves are the
+   * attack's harmonics, or the previous Note's last hop carried across a
+   * silence. See `pitchStillArriving` in the tracker.
+   */
+  heldReading: boolean;
+  /**
+   * Multi-pitch readings taken after `heldReading`, and how many of them
+   * found fewer than `harmony.minPolyphony` fundamentals. See
+   * `harmony.oneStringReadingFraction`.
+   */
+  heldHarmonyReadings = 0;
+  heldSingleReadings = 0;
+  /**
+   * This Note bloomed, but its readings since it held a pitch say one string
+   * is sounding, so it reports its pitch and no harmony. `harmonyBloomed`
+   * stays set: lifting the guards a bloomed Note gets from pitch-step and
+   * re-articulation splits cost 14 extra Notes on the derivation takes, the
+   * amp's damps among them (DECISION-069).
+   */
+  oneString = false;
+  private runHz: number | null = null;
+  private runHops = 0;
   /**
    * When this Note was last *audible*, which is not the same as last pitched.
    *
@@ -333,6 +363,7 @@ export class NoteRecord {
     this.startSample = options.startSample;
     this.trigger = options.trigger;
     this.openingRise = options.openingRise ?? 1;
+    this.openingRms = options.rms;
     this.openingDip = options.openingDip ?? 1;
     this.originPitch = options.originPitch;
     this.initialConfidence = options.confidence;
@@ -342,6 +373,7 @@ export class NoteRecord {
     this.pitchConfidence = options.confidence;
     this.lastVoicedHz = options.frequencyHz;
     this.lastVoicedAt = options.startTime;
+    this.heldReading = options.trigger === "pitchChange" && options.frequencyHz !== null;
     this.lastAudibleAt = options.startTime;
     this.lastSeenAt = options.startTime;
     this.rms = options.rms;
@@ -492,7 +524,7 @@ export class NoteRecord {
   }
 
   currentLabel(): string {
-    if (this.harmonyBloomed) return this.harmonyLabel ?? "unknown";
+    if (this.harmonyBloomed && !this.oneString) return this.harmonyLabel ?? "unknown";
     return this.settledPitch()?.name ?? "unknown";
   }
 
@@ -500,6 +532,16 @@ export class NoteRecord {
     this.revisionNumber++;
     this.lastChangeType = type;
     return this.revisionNumber;
+  }
+
+  /** Counts one voiced hop toward `heldReading`. */
+  noteReading(hz: number): void {
+    const agrees =
+      this.runHz !== null &&
+      Math.abs(centsBetween(hz, this.runHz)) <= this.config.pitch.stepThresholdCents;
+    this.runHops = agrees ? this.runHops + 1 : 1;
+    this.runHz = hz;
+    if (this.runHops >= this.config.pitch.stepConfirmFrames) this.heldReading = true;
   }
 
   addContourPoint(at: SourceTimeMs, hz: number, confidence: number): void {
@@ -564,7 +606,7 @@ export class NoteRecord {
       };
     }
 
-    if (this.harmonyBloomed) {
+    if (this.harmonyBloomed && !this.oneString) {
       const harmony: NonNullable<Note["harmony"]> = {
         confidence: this.harmonyConfidence,
       };

@@ -8052,3 +8052,121 @@ Kept, together. Neither row clears the bar alone, each on the other's
 shape, and the pair is better on every derivation line. Sixteen labels the
 engine had not found are found, twelve of them on the held-then-picked DI
 take, whose re-picks after a damp are the owner's tutorial shape.
+
+## A step out of a Note that never held a pitch (DECISION-068)
+
+On the amped rest-and-repick take, three picks shed a stub before the
+real Note. The amp makes a picked G2 aperiodic for 60-160ms, and the
+first voiced hops are harmonics or a stale reading: at 16.08s the fast
+lane read 396Hz, 247Hz, then 98.9Hz, and the pitch-change detector
+confirmed a step from 247Hz into G2 67ms after the attack; at 26.07s it
+confirmed a step "from" 104.1Hz, which was the previous note's damp
+400ms earlier, carried across the silence because the detector keeps its
+last voiced reading. Both stubs had cleared the 55ms announce bar, and
+the arriving G2's first hop had already voted in them, so
+`pitchStillArriving` did not fire.
+
+The measure that separates these from a legato step is the pitch-change
+detector's own: has the Note ever held one reading for
+`stepConfirmFrames` hops? A hammer-on leaves a note that held a pitch.
+These stubs never did. Refusing the step (no boundary at all) cost one
+E5 DI eighth and six exact labels on the derivation takes; ending and
+absorbing, the existing path for an unannounced stub, cost nothing:
+derivation fp 204 → 198 at missed 113, held-out fp 65 → 63 at missed 27.
+The third stub on the take (11.91s) was already absorbed; what remains
+there is the pick's contact, which the amp makes loud enough that
+`isContactOpening` (a DI-derived no-rise test, rise 4-48 here against a
+bar of 1.2) does not recognise it.
+
+
+## One string through an amp, named as a chord (DECISION-069)
+
+The amped rest-and-repick take named five of eight G2 picks "G5" and one
+"unknown". The monophonic veto on blooming reads the Note's mean pitch
+confidence, and on the amp a picked G2 spends 60-160ms aperiodic: 12
+unvoiced hops near zero hold the mean under 0.9 until 1.76s into a note
+(0.28 when it bloomed at 4.16s). Meanwhile the attack's spectrum reads 3
+to 6 fundamentals, which sets the room's harmonic context, and the Note
+blooms. From then on nearly every reading finds only G2, whose harmonics'
+chroma matches "G5".
+
+A measure that separates this from a chord: of the multi-pitch readings
+taken after the Note has held a pitch, the share that find a single
+fundamental. Over every derivation Note that ended bloomed:
+
+```
+                         <10%   10-20%   20-40%   >=40%   no readings
+over a chord label        34      0        0        0         3
+over a note label          7     10       15       33         1
+```
+
+The chord maximum is 1 of 39. At a bar of 20% the name follows the
+evidence; derivation exact labels go 1027 → 1071 with the same Notes.
+Letting the Note un-bloom entirely was measured too: exact 1073, missed
+113 → 109, but fp 198 → 212, because a bloomed Note is shielded from
+pitch-step and re-articulation splits and on the amp its damps then
+split it (at 10.04s a "new-pitch" re-articulation on the damp's sharp
+push, rise 0.88; at 25.09s an "envelope-rise" on the damp, rise 1.31).
+Those splits are the next thing to fix before the shield can come off.
+
+
+## A pick's contact through an amp, found by the release's gain (DECISION-071)
+
+Through an amp the pick's contact rises 4-48x over the silence, so the
+direct input's no-rise contact test never fires there. Over every
+attack-opened derivation Note ended within 200ms by an accepted, settled
+re-articulation, the level of the next Note's opening hop over the short
+Note's opening hop:
+
+```
+gain at the release     under 5dB   5-10   10-12   12-15   15-20   20+
+false positive              73        1      0       2       1      1
+matched a label            394       18      1       0       0      0
+```
+
+At 15dB the short Note is absorbed and the boundary stays on the release:
+fp 199 → 197 on the derivation takes, nothing else moves, held-out
+unchanged. The contact before 7.98s on the rest-repick amped take has no
+note within 200ms and stays. The Note after the damp at 18.33s (accepted
+by the sharpness fallback with rise 0.78 after a dip to 0.08) is the only
+sharpness-accepted opening in the derivation takes with a dip under 0.1
+and no rise, so there is nothing to derive a rule from.
+
+## A damp is a level event, and the amp rings past it (DECISION-073)
+
+A Note ends where the sound falls under the gate. Through an amp the
+string rings about 0.45s past the player's damp first, so a damped amped
+Note ran on 0.45s. A damp reads as a sharp fall under the recent level
+that does not come back. Swept on the cached fast-frame levels of the
+derivation takes (fall under the 300ms median / depth reached within
+300ms / no recovery), with each firing classed against the labels:
+
+```
+setting            at a labelled end   before next   near end   mid-note   outside   rest-repick damps
+10 / 25 / 500            15                 1            6          1          9         16 of 16
+```
+
+The near-end, mid and before-next firings are the last notes of takes
+(A3 eighths, A-Bm chords, held-then-picked), the rest-repick DI damps,
+and the last chord of the C-A-G power chords. That take's last E5 sounds
+18.2-18.9s over a file silent from 19.4s; its label sits at 19.1-20.75s.
+The outside firings are after a take's last label.
+
+With the end on the first hop 6dB under the median, the end lands where
+the labels put it (they sit where a note has fallen about 6dB): median
+end error on the rest-repick amped take +445 → +91ms, DI +102 → +55ms;
+held-out power chords amped +125 → +29ms. No Note gained or lost a
+boundary; the only count that moved is that last E5 losing its 7ms
+overlap with a label placed over silence.
+
+## The damp's own ghost (DECISION-074)
+
+The Note at 18.33s on the rest-repick amped take opened 22dB under the G2
+it followed, 0.2s into that G2's damp, and faded to silence. No witness
+on the opening separates it (DECISION-071). The damp does: the ghost is
+contiguous with the Note before, within a whole tone of it, opened after
+the fall began, and nothing after it came back within 5dB of the note.
+Folding it in removes it and the held-out amped power-chord take's one
+ghost of the same shape (fp 63 → 62). No labelled note is lost anywhere.
+The earlier Note is held back from `noteEnded` only while such a quiet
+successor is sounding: 9 Notes across all 27 takes.

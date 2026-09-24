@@ -1572,3 +1572,117 @@ had been undone twice because it exposed two of those hidden picks.
   on: `e866b`, `e867b`, `e868b`), fp 201 -> 200.
 - Four tuning DI splits remain: the three `sharpness` phantoms and
   `p1c1h`.
+
+
+## The amped rest-and-repick take — 2026-09-24 (DECISION-068)
+
+The owner asked for the amped render's leftovers next. Not a loop
+iteration on the same-pitch splits: these are different shapes.
+
+- Stubs before three picks: a step out of a Note that never held a
+  pitch (its first hops through the amp are harmonics, or the previous
+  note's last reading across the rest) now reads as the pitch arriving.
+  Derivation missed 113 → 113, fp 204 → 198; held-out, read once,
+  missed 27 → 27, fp 65 → 63; slow subset 190 / 222 → 185 / 214;
+  corpus 243 / 279 / 14 → 238 / 271 / 14; ledger MISSED 140.
+- Still open on the take: a Note on the pick contact at 7.63s and the
+  contact before 11.91s (the DI contact test does not see an amped
+  contact), one after the damp at 18.33s, and five picks named G5.
+
+**In plain words, for the owner.** Through the amp, a picked low G
+takes a moment to settle, and the first things the engine hears are
+its overtones. It used to treat the settle as a second note starting.
+It now knows a note that never held a pitch cannot change pitch. Two of
+the three short blips before your picks are gone, and 6 more ghost
+notes went with them on the other practice takes, with no real note
+lost.
+
+
+### The same take: G5 (DECISION-069)
+
+- Five picks named "G5" and one "unknown": the amp's aperiodic attack
+  kept the Note's mean pitch confidence under the monophonic veto while
+  its noisy spectrum read as polyphony. A bloomed Note whose readings
+  after its pitch settled find a lone fundamental 20% of the time or more
+  now reports its pitch. Derivation exact labels 1027 → 1071; missed 113
+  → 114 and fp 198 → 199, a matcher re-pairing on identical Notes;
+  held-out missed 27, fp 63, exact 320 unchanged. Splits unchanged.
+- The take now reads 8 of 8 named G2, with 3 extra Notes (the contact at
+  7.63s, the contact before 11.91s, and 18.33s after a damp).
+
+**In plain words, for the owner.** Through the amp, your low G's
+overtones made the engine think it was hearing a power chord. It now
+checks, once the note has settled, whether it keeps hearing just one
+string, and if so names the note. All eight picks now read G2, and 44
+more notes on the other practice recordings got their right names, with
+the same notes found as before.
+
+
+### The same take: the pick contact (DECISION-071)
+
+- A short Note whose successor opens on an attack 15dB or more louder
+  than it did was the pick's contact through the amp: absorbed, boundary
+  on the release. Derivation fp 199 → 197 at missed 114; held-out
+  unchanged; splits 237 / 270 / 13; slow subset 184 / 213.
+- The take now reads 8 of 8 named G2 with 2 extras: the contact at 7.63s
+  (no note within 200ms) and 18.33s after a damp, which has no other
+  instance in the corpus to calibrate on.
+
+**In plain words, for the owner.** Through the amp, the pick touching
+the string is loud enough to sound like a note. When the real note then
+arrives much louder right behind it, the engine now folds the touch into
+the note. One more blip on your take is gone, and one on the A3 eighths.
+
+### The same take: ending a Note at the damp (DECISION-073)
+
+- A Note ending in silence now ends where the level fell 10dB under its
+  300ms median, reached 25dB under within 300ms and never came back,
+  placed on the first hop 6dB under. Before, it ended where the amp's
+  ring fell under the gate, about 0.45s later.
+- Median end error: rest-repick amped +445 → +91ms, DI +102 → +55ms.
+  Splits, slow subset and held-out counts unchanged. Derivation missed
+  and fp each +1, both the last E5 of the C-A-G power chords, whose label
+  sits over silence after the chord stops.
+
+**In plain words, for the owner.** When you damp a note, the engine now
+ends it where your hand stopped it, not when the amp finishes ringing.
+On your rest-and-repick take the notes end within about a tenth of a
+second of your damp instead of half a second after it. Four notes that
+end a take stop a little before their label, because the sound had
+already dropped away there.
+
+### The same take: the ghost inside the damp (DECISION-074)
+
+- A Note that opens with no gap inside the damp of the Note before it,
+  within a whole tone and far quieter, then fades to silence, is folded
+  into that Note, which ends at the damp.
+- Derivation fp 198 → 197 (the 18.33s Note on the amped take). Held-out
+  fp 63 → 62 (the amped 140bpm power chords). Missed, exact, splits and
+  ledger unchanged; strays 13 → 11.
+- The take now reads 8 of 8 named G2 with one extra: the pick contact at
+  7.63s.
+
+**In plain words, for the owner.** On the amp, one of your damps made a
+small note of its own right as the string was stopped. The engine now
+recognises it as part of the damp and folds it into the note you
+stopped. Your rest-and-repick take has one blip left, the pick touching
+the string at 7.63 s.
+
+### Full un-bloom, re-measured on top of DECISION-074 (not taken)
+
+- Clearing `harmonyBloomed` on one-string Notes: derivation missed 115 →
+  112, fp 197 → 207, exact unchanged. `rest-repick-amped` goes 1 → 6
+  extras and loses one note. Un-bloomed, its damps open G#2 Notes by
+  "new-pitch" on the sharp push (10.04s, 25.09s). Those open at the damp
+  rather than inside its fall and not far enough under the note, so the
+  damp-ghost rule does not reach them. A fine-onset split lands 0.39s
+  into the 4.0s pick, and a pitch-step split at 22.96s. The bloom's
+  shield still pays for itself here.
+
+### The owner's label for the last E5 (DECISION-075)
+
+- `p8` on `power-chords-c-a-g-e-c-d-fsharp-e-120bpm` moved from its grid
+  slot 19.1-20.75s, over silence, to 18.175-18.848s, marked by the
+  owner's ear. Derivation missed 115 → 114, fp 197 → 196; everything
+  else unchanged. With it, the damp work (DECISION-073, 074) costs no
+  real note anywhere.

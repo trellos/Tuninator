@@ -172,6 +172,281 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-075]: The last E5 of the C-A-G power chords take is labelled where the owner hears it
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (chose "Move label", then marked the times by ear on a listening page and pasted them into the thread, 2026-09-24)
+* **Context:** `power-chords-c-a-g-e-c-d-fsharp-e-120bpm` is labelled on
+  a bar grid. Its last chord, `p8` E5, sat at 19.1-20.75s. The file is
+  under -45dB from 19.13s to its end; the chord sounds 18.2-18.9s.
+  Before DECISION-073 the E5 Note rang to 19.107s and touched the label
+  by 7ms, which the matcher counted as a match. Once the Note ends at
+  the damp (18.88s) the label is missed and the Note is an extra.
+* **Decision:** `p8` moved to 18175-18848ms, the start and end the owner
+  marked on the "Last E5 Label" listening page. Tuninator was not used
+  to place it; the file's `timingNotes` records the correction. `p7`
+  stays on its grid slot (17.1-19.1s), overlapping the new `p8`.
+  Numbers against DECISION-074: derivation missed 115 → 114, fp 197 →
+  196, exact 1070 → 1071; held-out unchanged (27 / 62 / 320); splits
+  237 / 270 / 11 and slow subset 184 / 213 unchanged; ledger MISSED
+  142 → 141. The engine did not change.
+* **Alternatives Considered:** (a) **Leave the grid slot**: keeps a
+  label over silence and charges DECISION-073 with a miss and an extra
+  it did not cause. (b) **The plain-envelope suggestion, 18170-18850ms**:
+  the owner's marks are within 5ms of it; his are used.
+* **Consequences:** The take scores 8 of 8 with one extra. The other
+  seven chords remain on the grid and were not re-examined here.
+
+---
+
+#### [DECISION-074]: A Note opened inside the damp that stopped the Note before it is absorbed into it
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take's extra Notes to be fixed, and chose "Go on" to fixing the damp splits, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` the damp at 18.1s
+  opened a G2 Note at 18.33s. The level was already 22dB under the
+  note's and still falling. The sharpness fallback accepted it (sharpness
+  2.34, rise 0.78, dip 0.08). DECISION-071 found it was the only
+  sharpness-accepted opening in the derivation takes with a dip under 0.1
+  and no rise, so no bar on those witnesses could be derived. DECISION-073
+  gives a witness that does not need one: the damp itself. The ghost
+  opened after the level had fallen `dampFallDb` under the note, the level
+  never came back, and it ended in silence. The Note before had already
+  been let go by the time the ghost ended, because the deep lane resolved
+  it within one hop.
+* **Decision:** Two parts, with no new tuned constant.
+  (1) A Note is held in `closing` while a Note that opened at its end is
+  still sounding and opened `tracking.dampFallDb` or more under its
+  median level over the 300ms before (`quietSuccessor`). Across all 27
+  takes this holds 9 Notes.
+  (2) When a Note ends in silence and the Note before it ran right up to
+  it, the damp search (`dampedAt`) runs over the two of them. The Note
+  before must be within `DAMP_STEP_SEMITONES` and still closing. If the
+  fall began at or before the later Note opened, the later Note is
+  absorbed (`structuralRevision`, `absorbed`) and the earlier one ends at
+  the damp (`absorbDampGhost`).
+  Numbers: derivation missed 115 → 115, fp 198 → 197
+  (`rest-repick-amped` 2 → 1), exact 1070 unchanged; `rest-repick-di`
+  median end +55 → +48ms. Held-out, read once: missed 27, exact 320,
+  fp 63 → 62 (`power-chords-amped-140bpm` 2 → 1). Splits 237 / 270 with
+  strays 13 → 11; slow subset 184 / 213 with strays 7 → 6. Ledger MISSED
+  142. 547 tests.
+* **Alternatives Considered:** (a) **A bar on the sharpness fallback's
+  dip or rise**: one instance, nothing to derive it from (DECISION-071).
+  (b) **Revise the earlier Note after its `noteEnded`**: a consumer has
+  already been told it is finished, and the offline adapter scores the
+  end it was given then. (c) **Hold every Note until the one after it
+  ends**: delays every legato note's end. The quiet opening confines the
+  hold to the 9 cases where a damp ghost is possible.
+* **Consequences:** A quiet re-pick within a whole tone, opened with no
+  gap straight out of a damp, that then fades to silence without ever
+  coming back within 5dB of the note before, would be folded in. None in
+  the corpus does. A Note followed by a quiet successor ends later for
+  consumers, by as long as that successor sounds.
+
+---
+
+#### [DECISION-073]: A Note ending in silence ends at the player's damp, not where the amp's ring falls under the gate
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (chose "Build damp ending" and then "Build it" on the damp-test numbers, 2026-09-24); detection architecture carries the rule
+* **Context:** A Note ends when the sound falls under the amplitude gate
+  (`releaseGraceMs` after it). Through an amp the string rings about
+  0.45s past the player's damp before the gate closes, so every damped
+  amped Note ran on with it: on `rest-repick-g2-60-120bpm-amped` the
+  median end was +445ms against the labels. Un-blooming those Notes
+  (DECISION-069's follow-on) appeared to help only because ghost splits
+  cut them at the damp. A damp is a level event: the level falls
+  sharply under where it has been and does not come back. Benched on the
+  cached fast-frame levels of every derivation take, with the fall at
+  6 / 10dB under the 300ms median, depth 15 / 20 / 25dB within 150 /
+  300ms, and no recovery for 150 / 300 / 500ms. At 10 / 25 / 300 / 500
+  it found all 16 damps on the two rest-repick takes and fired nowhere
+  in the middle of a held note. Elsewhere it fired only where a take's
+  last note, or one chord before a change, falls silent. With the end
+  on the first hop 6dB under the median, the rest-repick ends land
+  30-120ms after the labels. Four labelled notes end before theirs: the
+  last notes of the A3 eighths amped (135ms) and DI (53ms) and of the
+  A-Bm chords (80ms), and the last E5 of the C-A-G power chords, whose
+  label sits over silence (below). The owner saw these numbers and chose
+  to build. The held-out takes were looked at once on the bench, at the
+  walk-back placement; nothing was chosen from them.
+* **Decision:** `tracking.dampFallDb` 10 and `tracking.dampDepthDb` 25.
+  When a Note ends in silence, the tracker looks back over its own level
+  log (`NoteTracker.dampedAt`) for the first hop 10dB under the median
+  of the 300ms before it that reaches 25dB under within 300ms and never
+  climbs back past 5dB under before the silence. The Note ends on the
+  first hop 6dB under that median instead of where the gate closed.
+  Notes ended by what follows them are untouched. 0 turns it off.
+  Numbers: derivation missed 114 → 115, fp 197 → 198, exact 1071 →
+  1070; all three are one Note on `power-chords-c-a-g-e-c-d-fsharp-e-120bpm`.
+  Its last E5 sounds 18.2-18.9s, then the file is silent (-61dB from
+  19.4s to its end at 20.75s). The label `p8` sits at 19.1-20.75s, and
+  the Note used to ring to 19.107s, touching it by 7ms. It still opens at
+  18.17s named E5 and now ends at 18.88s. Median end error:
+  `rest-repick-amped` +445 → +91ms, `rest-repick-di` +102 → +55ms.
+  Held-out, read once: missed 27, fp 63, exact 320, all unchanged; end
+  error `power-chords-amped` +125 → +29ms, `power-chords-di` +31 → +9ms,
+  `power-chords` (room) +24 → -18ms. Splits 237 / 270 / 13 and slow
+  subset 184 / 213 unchanged. Ledger MISSED 141 → 142 (the same E5).
+  546 tests (`tests/engine/damp-end.test.ts` adds four).
+* **Alternatives Considered:** (a) **Un-bloom the amped single notes so
+  the ghost splits end them**: +10 to +14 false positives, and the
+  better end was the ghosts' doing (DECISION-069). (b) **A fall over
+  100ms among short contiguous Notes ending in silence**: 3 false
+  positives and 1 matched Note above 8dB. (c) **Fall 6dB, reach 15dB
+  within 150ms**: missed 3 of the 8 DI damps and fired 30 times on other
+  takes. (d) **End on the hop where the fall starts** (the walk-back to
+  the median): 70-130ms before the labels, which sit where the note has
+  dropped about 6dB.
+* **Consequences:** Notes the player stops now end when they stopped
+  them, on both paths. A note left to decay into silence with no sharp
+  fall is untouched. A last note whose level drops 25dB fast is ended at
+  that drop, which on three takes is 53-135ms before the label. The
+  ghost Notes after a damp (the Note at 18.33s on `rest-repick-amped`)
+  are not touched by this and are still counted.
+
+---
+
+#### [DECISION-071]: A short Note the release arrives 15dB louder than was the pick's contact through an amp
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take's extra Notes to be fixed, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` the pick at 12.01s
+  came out as a 133ms Note opened at 11.91s (-39.6dB, one C3 hop) and
+  then the pick. The amp makes the pick's contact loud enough to be an
+  attack of its own. The repository finds a contact by its lack of rise
+  (`isContactOpening`, rise under 1.2, DECISION-046), which is what a DI
+  contact sounds like, but through the amp contacts rise 4-48x over the
+  silence before them and the test never fires. What still gives it
+  away is that the note, when it sounds, is far louder again.
+  Benched on the derivation takes, over every attack-opened Note ended
+  within 200ms by an accepted, settled re-articulation: the level on the
+  hop that opens the next Note sits 12.0-21.6dB over the short Note's
+  opening hop on four false positives, and at most 11.2dB on the 413
+  that matched a label.
+* **Decision:** `tracking.contactGainDb` 15. When a re-articulation
+  opens a Note on an attack at least that much louder than the attack
+  that opened the Note it ends, the short Note was the contact: it is
+  absorbed even past `transient.articulationMs`, and the boundary stays
+  on the release (`released`, `contact: "gain"`). 0 turns it off.
+  Numbers: derivation missed 114 → 114, fp 199 → 197
+  (`rest-repick-amped` 3 → 2, `eighths-a3-amped` 39 → 38), exact labels
+  unchanged. 12dB reads the same (the other two false positives above
+  12dB are declined by other guards). Held-out, read once: missed 27,
+  fp 63, exact 320, all unchanged. Splits 238 / 271 / 14 → 237 / 270 /
+  13; slow subset 185 / 214 → 184 / 213. Ledger MISSED 141. 542 tests.
+* **Alternatives Considered:** (a) **Widen `isContactOpening`'s rise
+  bar** to reach the amped contacts: a rise of 4-48 overlaps every real
+  attack out of silence. (b) **Drop unvoiced short Notes before a louder
+  one**: the voiced fraction does not separate them (the rest-repick
+  contact is 0.1 voiced, the eighths one 0.42, matched stubs range 0 to
+  1).
+* **Consequences:** Two contacts on the amped takes stop reading as
+  notes. A real quiet note answered within 200ms by a note 15dB louder,
+  on an attack, would now be folded into it; none in the derivation
+  takes comes within 3.8dB of the bar. The contact at 7.63s on the
+  rest-repick amped take is not touched: no note follows it within
+  200ms.
+
+---
+#### [DECISION-069]: A Note whose readings after its pitch settles find one fundamental reports its pitch, not a chord
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take's "G5" naming to be fixed, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` five of the eight G2
+  picks were named "G5" and one "unknown": the Note bloomed into a chord.
+  Blooming is vetoed for a Note whose mean fast-lane pitch confidence is
+  over `harmony.maxMonophonicConfidence` (0.9), but through an amp a
+  picked G2 is aperiodic for 60-160ms, and those unvoiced hops hold the
+  mean under 0.9 for a second or more (0.28 at 4.16s, 0.9 only at 5.76s)
+  while the attack's noisy spectrum supplies the polyphony. After that,
+  most multi-pitch readings find one fundamental, G2, and the chroma of
+  its harmonics (G and D) matches the "G5" template.
+  Benched on the derivation takes, over every Note that ended bloomed:
+  the share of multi-pitch readings taken after the Note held a pitch
+  (DECISION-068) that found fewer than `harmony.minPolyphony`
+  fundamentals. All 37 over a chord label read under 10% (the most, 1 in
+  39); of the 66 over a single-note label, 48 read 20% or more, 58 read
+  10% or more.
+* **Decision:** `harmony.oneStringReadingFraction` 0.2. At or above it
+  a bloomed Note is `oneString`: it reports its pitch and no harmony,
+  delivered as a `harmonyCorrection`. Only the name follows;
+  `harmonyBloomed` stays set, so segmentation is unchanged. 0 turns it
+  off.
+  Numbers, final Notes and the matcher: derivation exact labels 1027 →
+  1071 of 1220-1222 (`held-then-picked-amped` 76 → 109 of 120,
+  `rest-repick-amped` 2 → 8 of 8, `rest-repick-di` 7 → 8,
+  `eighths-a3-amped` 160 → 163, `held-then-picked-di` 104 → 105); missed
+  113 → 114, fp 198 → 199, both on `held-then-picked-di`, where the Notes
+  are identical and the matcher now pairs `p2c3q3` with the Note it
+  overlaps by name instead of the one 410ms before `p2c3q4`. Held-out,
+  read once: missed 27 → 27, fp 63 → 63, exact 320 → 320 of 372 (one
+  `cowboy-chords-amped` chord now reads as its root note; one triplet
+  note gains its name). Splits unchanged (238 / 271 / 14; slow subset
+  185 / 214). Ledger MISSED 140 → 141, the same re-pairing. 542 tests.
+* **Alternatives Considered:** (a) **Un-bloom the Note outright**
+  (clear `harmonyBloomed`): exact 1027 → 1073 and missed 113 → 109, but
+  fp 198 → 212: a bloomed Note is shielded from pitch-step and
+  re-articulation splits, and without the shield the amp's damps and
+  some mid-note transients cut the Note (on the rest-repick amped take 3 →
+  8 extra). It also brings the amped end error from +445ms to +135ms.
+  Worth taking once those splits are handled; not before. (b) **Mean
+  confidence over voiced hops, or since the pitch arrived:** the first
+  voiced hops of an amped pick read 0.54-0.64, so the bloom still happens
+  on the attack. (c) **Bar 0.1:** ten more single notes renamed, but a
+  chord with eight readings would flip on one lone-fundamental reading.
+* **Consequences:** A single string through an amp is named as a note.
+  A real chord whose later readings keep finding a single fundamental
+  (a power chord whose fifth has died, a chord reduced to its root) now
+  reports that root note: one held-out amped chord does. The segmentation
+  a bloomed Note gets still applies to these Notes, which keeps their
+  ends late on the amp.
+
+---
+#### [DECISION-068]: A pitch step out of a Note that never held a pitch is the pitch arriving, not a new note
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the amped rest-and-repick take to be fixed next, 2026-09-24); detection architecture carries the rule
+* **Context:** On `rest-repick-g2-60-120bpm-amped` three of the eight
+  picks came out as a 67-133ms stub followed by the real Note (11.91s,
+  16.04s, 25.93s). Through the amp a picked G2 takes 60-160ms to read as
+  periodic, and the first voiced hops are its harmonics (16.08s: 396Hz
+  then 247Hz, then 98.9Hz) or, across a silence, the previous Note's last
+  reading (25.93s: the step "from" 104.1Hz was the damp of the note before,
+  400ms earlier). The pitch-change detector confirmed a step into G2 and
+  the tracker ended the Note there. `pitchStillArriving` exists for
+  exactly this and did not fire: the stub had been announced (67ms over
+  the 55ms bar), and its votes included the arriving G2's first hop, so
+  "every vote is for the reading it is leaving" was false.
+* **Decision:** `NoteRecord.heldReading`: a Note has held a pitch once
+  `pitch.stepConfirmFrames` of its own voiced hops in a row agree within
+  `pitch.stepThresholdCents`, the detector's own test; a Note opened by a
+  confirmed step holds one from its start. A step out of a Note that has
+  never held one is `pitchStillArriving` (with the existing
+  `cannotDefendReading` guard), and the stub it sheds is absorbed even
+  past `transient.articulationMs`, since it has no pitch of its own to
+  stand for. No new constant.
+  Numbers, final Notes and the matcher: derivation missed 113 → 113, fp
+  204 → 198 (`rest-repick-amped` 5 → 3, `held-then-picked-amped` 50 → 48,
+  `eighths-a3-amped` 40 → 39, `quarters-a3-e5-amped` 68 → 67); exact
+  label accuracy unchanged. Held-out, read once: missed 27 → 27, fp 65 →
+  63. Splits: slow subset 190 / 222 → 185 / 214 of 770; corpus 243 / 279
+  / 14 → 238 / 271 / 14 of 1610; ledger MISSED 140 → 140. 542 tests.
+* **Alternatives Considered:** (a) **Refuse the step outright** when the
+  Note never held a pitch, instead of ending and absorbing: derivation fp
+  204 → 197 but missed 113 → 114 (one E5 DI eighth) and exact accuracy
+  down six labels. (b) **Only widen the vote test** without lifting the
+  absorb's 80ms bound: fp 204 → 202; the 25.93s stub is 133ms and stays.
+* **Consequences:** On the amped take the 16.04s and 25.93s stubs are
+  gone; the 11.91s one was already absorbed and its contact Note before
+  it remains. A Note whose first readings are its harmonics now keeps
+  the attack's start. A real grace note too short for two agreeing
+  readings (under ~30ms) followed by a step would now be folded into the
+  note it leads to; none in the corpus.
+
+---
+
 #### [DECISION-067]: The quarters take's E5 labels `e26`-`e40` move onto the note sounding
 * **Date:** 2026-09-24
 * **Status:** Accepted

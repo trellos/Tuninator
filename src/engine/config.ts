@@ -655,6 +655,22 @@ export type EngineConfig = {
      */
     releaseRiseRatio: number;
     /**
+     * How much louder, in dB, the hop that opens a Note must be than the
+     * hop that opened the short Note it split from, for that Note to have
+     * been the pick's contact. The stub is then absorbed and the boundary
+     * stays on the release.
+     *
+     * `releaseRiseRatio` finds a contact by its lack of rise, which is how
+     * it sounds on the direct input. Through an amp the contact is loud
+     * enough to rise 4-48x over the silence before it, and that test never
+     * fires; what still gives it away is that the note, when it sounds, is
+     * far louder again. On the derivation takes, over every attack-opened
+     * Note ended within 200ms by an accepted re-articulation: the release
+     * sits 12-22dB over the opening on four false positives and at most
+     * 11.2dB on the 413 that matched a label. 0 turns it off.
+     */
+    contactGainDb: number;
+    /**
      * Whether an opening that never became a Note — absorbed as a stub, or
      * dropped before it was announced — is struck from the local-rate
      * estimate (`localIoiMs` in the tracker) once that is known. False keeps
@@ -817,6 +833,20 @@ export type EngineConfig = {
     releaseBeforeFineContact: boolean;
     /** How long silence must persist before a Note is ended. */
     releaseGraceMs: number;
+    /**
+     * How far, in dB, the level must fall under its median over the 300ms
+     * before for a Note ending in silence to have been damped there. The
+     * Note then ends at the damp instead of where the sound fell under the
+     * gate. Through an amp the string rings about 0.45s past the player's
+     * damp before the gate closes, and the Note ran on with it.
+     *
+     * The fall must also reach `dampDepthDb` under the median within 300ms
+     * and never climb back past half of this bar before the silence. The
+     * end lands on the first hop 6dB under the median. 0 turns it off.
+     */
+    dampFallDb: number;
+    /** How deep under the median a damp must reach within 300ms; see `dampFallDb`. */
+    dampDepthDb: number;
     bendThresholdCents: number;
     /** How long after an attack a new Note may still be backdated onto it. */
     backdateWindowMs: number;
@@ -873,6 +903,22 @@ export type EngineConfig = {
      * 0.65 to 0.90 on the chord fixtures).
      */
     maxMonophonicConfidence: number;
+    /**
+     * Share of a Note's multi-pitch readings, taken after it has held a
+     * pitch (`NoteRecord.heldReading`), that may find a single fundamental
+     * before the Note is one string rather than a chord. At or above it the
+     * Note reports its pitch rather than a chord name.
+     *
+     * Mean confidence cannot see this through an amp: a picked G2 is
+     * aperiodic for up to 160ms there, the unvoiced hops drag the mean under
+     * `maxMonophonicConfidence` for its first second or more, and the
+     * attack's noisy spectrum supplies the polyphony. The readings after the
+     * pitch arrives say what is sounding: on the derivation takes no chord
+     * reads more than 1 in 39 single-fundamental (all 37 under 10%), and of
+     * the 66 single notes that bloomed as "G5", "C5", "F#5" and the like, 48
+     * read 20% or more and 58 read 10% or more. 0 turns it off.
+     */
+    oneStringReadingFraction: number;
     /**
      * How harmonic the recent audio must read before an octave-sized pitch jump
      * is treated as the detector moving between strings rather than as a note
@@ -1195,6 +1241,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     rateFragmentNoRiseDipRatio: 0.4,
     rateFragmentNoRiseSpanFraction: 0.5,
     releaseRiseRatio: 2,
+    contactGainDb: 15,
     paceIgnoresRetracted: true,
     releaseOnGatedHop: true,
     releaseOnFineOpenedFrame: true,
@@ -1206,6 +1253,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     releaseBeforeFineContact: true,
     burstContactRingOutOnContact: true,
     releaseGraceMs: 90,
+    dampFallDb: 10,
+    dampDepthDb: 25,
     bendThresholdCents: 45,
     backdateWindowMs: 120,
     endedNoteHistory: 64,
@@ -1220,6 +1269,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     minPolyphony: 2,
     minVoiceSpreadSemitones: 7,
     maxMonophonicConfidence: 0.9,
+    oneStringReadingFraction: 0.2,
     octaveFlipContext: 0.25,
     stepSuppressContext: 0.8,
     hopDivisor: 4,
