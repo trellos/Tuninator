@@ -7,6 +7,96 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-081]: A damped re-pick whose transient the gate refused splits the Note, and the refused-contact burst rule ships with it
+* **Date:** 2026-09-24
+* **Status:** Accepted
+* **Owner:** Detection architecture (DECISION-044's loop, iteration 20; the owner restarted the loop 2026-09-24, "go")
+* **Context:** DECISION-080 re-ran the refused-contact burst rule (ledger
+  C11) and found both labels it costs are one shape: a re-pick after a
+  damp whose transient lands on a hop `analysis.rmsGate` refuses, on a
+  Note still open because its tail kept a pitch reading
+  (`held-then-picked-di` at 29467ms, `eighths-sixteenths-e5-di` at
+  12467ms). `rearticulation.ts` returns `gated` before reading anything,
+  and the next hop, back at full level, carries no broadband transient of
+  its own, so the pick is lost into the Note. Counted on every take at
+  `main`: 70 settled same-pitch `gated` refusals, 62 of them on the four
+  DI same-pitch takes and none on an amped render; 52 of the 70 sit
+  within 40ms of a label.
+* **Decision:** `tracking.gatedRepickDipRatio` 0.25 (new ledger row C28).
+  A settled, unbloomed Note refused a same-pitch transient as `gated`
+  with the envelope fallen to 0.25 or less before it is held pending for
+  one articulation (`transient.articulationMs`); if the level comes back
+  on an ungated hop by `tracking.releaseRiseRatio` while the Note is
+  announced and has sounded half the local interval, the Note ends at the
+  refused transient and a new Note opens there (traced `gatedRepick`).
+  DECISION-080's rule, `tracking.burstContactRiseRatio` 1.2 with
+  `tracking.burstContactRingOutOnContact`, ships with it.
+  Numbers (derivation predicate "not 140bpm"), base → both rules:
+  derivation missed 113 → 97, fp 204 → 203, exact 948 → 975; slow subset
+  190 / 222 → 188 / 220 of 770 (DI tuning 9 → 7, amped and mic 148 / 180
+  unchanged, DI held-out 3); corpus 243 / 279 / 14 → 241 / 277 / 15; tail
+  fragments 227 / 244 → 224 / 241; ledger MISSED 140 → 124
+  (`held-then-picked-di` 14 → 2, `eighths-a3-di` 63 → 59); eval PASS;
+  549 tests. Held-out, read once: missed 27 → 27, fp 65 → 66 (a Note at
+  30120ms on the mic triplet take, 2.4s from any label, on a gated hop
+  with dip 0.08). The sweep and the guards are in `config.ts`.
+* **Alternatives Considered:** (a) **This rule alone**, at 0.2: missed
+  113 → 100 but `e843` reads split, the refused-contact shape behind the
+  pick it finds, so the slow DI column is worse by one; kept only with
+  DECISION-080's rule, which clears it. (b) **Without the announced
+  guard:** four sixteenths on the E5 take lost (a split drops the young
+  Note before it clears its bar). (c) **Without the half-the-pace guard:**
+  `e839` split (a contact stub the fine witness opened, cut by its own
+  release). (d) **The ring-out clock from the moved start**, as every
+  other Note: one more split and one more false positive on derivation,
+  the phantom DECISION-049 named. (e) **Accepting a gated transient
+  outright when it rises by the release bar:** not built; it cannot reach
+  `e843`, whose transient rose 1.54 and whose level came back on the
+  next hop.
+* **Consequences:** Two rows ship together, each defended by the other's
+  numbers; neither clears the keep rule alone, and that is recorded
+  rather than argued around. Sixteen derivation labels the engine did
+  not find are now found with none lost, most on the held-then-picked DI
+  take, whose damped re-picks were the rule's target. The amped renders
+  are bit-identical in count (an amp's floor sits over the gate). The
+  held-out mic triplet take gains one Note on a gated hop far from any
+  label, the one reading the rule costs.
+
+---
+
+#### [DECISION-080]: Door C25 has no site left, and the refused-contact burst rule re-run alone still costs two labels
+* **Date:** 2026-09-24
+* **Status:** Rejected (the rule alone); carried into DECISION-081
+* **Owner:** Detection architecture (DECISION-044's loop, iteration 19; the owner restarted the loop 2026-09-24)
+* **Context:** The loop paused on 2026-09-19 with C11 (the refused-contact
+  burst) and C25 (the attack branch on the rising transient) reopened
+  under DECISION-063's instrument and never re-run. At `main` (after
+  DECISION-067) the tuning DI takes read 9 slow splits: `p1c1h`,
+  `p2c3q2`, `p2c4q3`, `p3c4q1` (held-then-picked), `e865` (A3 eighths),
+  `e821` (E5 eighths), `e5`, `e25`, `e26` (quarters).
+* **Decision:** C25 is closed by count: its target (`a14`, `a15`) no
+  longer reads split, and none of the nine is an attack-branch boundary
+  on a band-only onset. C11 was rebuilt as DECISION-047 had it
+  (`tracking.burstContactRiseRatio` 1.2) plus the anchor ledger row C15
+  proposed and DECISION-049 asked for: the Note a moved boundary opens
+  reads its ring-out age from the contact (`NoteRecord.ringOutFrom`).
+  Alone: slow DI tuning 9 → 7 (`p2c3q2`, `p2c4q3`), amped unchanged,
+  corpus 243 / 279 → 241 / 277, fp 204 → 203, and derivation missed
+  113 → 115: `p2c3q4` and `e843`, the same two overlap credits as
+  iterations 3 and 5. Both are labels whose own pick the engine never
+  found; each was credited to a Note that began at the previous pick's
+  contact (410ms early, and 177ms late). Rejected alone on the missed
+  line; the shape that hides both picks is DECISION-081's.
+* **Alternatives Considered:** (a) **Keep it on the owner's word**, as
+  DECISION-062 did: not needed, since the next row finds the two picks.
+  (b) **Without the ring-out anchor:** read in DECISION-081, one phantom
+  more.
+* **Consequences:** C11's two obstacles from DECISION-049 are both
+  answered: the instrument (DECISION-063) and the ring-out clock (this
+  anchor). What remained was two picks under the gate. C25 is spent.
+
+---
+
 #### [DECISION-067]: The quarters take's E5 labels `e26`-`e40` move onto the note sounding
 * **Date:** 2026-09-24
 * **Status:** Accepted

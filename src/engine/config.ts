@@ -764,8 +764,10 @@ export type EngineConfig = {
      * first attack rose less than this bar, the split keeps its pitch class
      * and the attack in hand clears `releaseRiseRatio`, the boundary is the
      * attack in hand. Strums are untouched: their first transient carries
-     * energy. See DECISION-080; built twice before as DECISION-047 and
-     * DECISION-049 and reverted on a score that could not see it.
+     * energy. Built twice before as DECISION-047 and DECISION-049 and
+     * reverted on a score that could not see it; alone it still costs two
+     * labels whose own picks land under the gate (DECISION-080), and it is
+     * kept with `gatedRepickDipRatio`, which finds them (DECISION-081).
      */
     burstContactRiseRatio: number;
     /**
@@ -789,7 +791,13 @@ export type EngineConfig = {
      * refuses and `rearticulation.ts` never reads it. When the Note had
      * not ended by then (a pitch reading of its tail kept it open), the
      * re-pick is lost into it: the held-then-picked DI take at 29467ms, the
-     * E5 eighths DI take at 12467ms. See DECISION-081.
+     * E5 eighths DI take at 12467ms. The Note must already be announced
+     * and have sounded half the local interval, or the split would drop a
+     * sixteenth still clearing its bar or cut a contact stub the witness
+     * opened. Swept on derivation with DECISION-080's rule in place: 0.1
+     * missed 105, 0.2 100, 0.25 and 0.3 97, 0.35 and above 98 (`t20` on
+     * the clean-lead take); false positives 203 throughout. See
+     * DECISION-081.
      */
     gatedRepickDipRatio: number;
     /** How long silence must persist before a Note is ended. */

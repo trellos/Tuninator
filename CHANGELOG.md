@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- On a direct input, a note damped nearly silent and then picked again is
+  now split at the pick even when its first transient lands on a hop the
+  amplitude gate refuses: the Note ends there once the level comes back.
+  With it, a split whose burst began on the pick's contact is placed on
+  the release instead of backdated onto the contact. Sixteen more labels
+  found on the derivation takes, none lost; two fewer slow DI splits; the
+  amped renders are unchanged. `tracking.gatedRepickDipRatio`,
+  `tracking.burstContactRiseRatio`; DECISION-080, DECISION-081.
+
 ## 0.21.0 — 2026-09-24
 
 - On a direct input, a same-pitch re-articulation over which no energy
