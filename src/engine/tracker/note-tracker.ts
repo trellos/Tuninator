@@ -128,14 +128,18 @@ export type TrackerTraceEvent =
       dipRatio: number;
       /** The pace being played when the boundary moved, or null with none read. */
       localIoiMs: number | null;
-      /** What said the Note opened on a contact: the fine hop, or no rise. */
-      contact: "fine" | "no-rise";
+      /**
+       * What said the Note opened on a contact: the fine hop, or no rise;
+       * `burst` when a split's burst began on a contact that rose too little
+       * (`tracking.burstContactRiseRatio`).
+       */
+      contact: "fine" | "no-rise" | "burst";
       /**
        * `stub` when a split stub was absorbed without lending its start;
        * `gated` when the release was read on a hop the amplitude gate
        * refused (`tracking.releaseOnGatedHop`).
        */
-      via: "unsettled" | "stub" | "gated";
+      via: "unsettled" | "stub" | "gated" | "burst";
     }
   | {
       kind: "absorbed";
@@ -172,6 +176,18 @@ export type TrackerTraceEvent =
       fellTo: number;
       /** How much of it the fast lane heard no pitch on; null when it has no hops there. Prefix offers only. */
       unvoiced?: number | null;
+    }
+  | {
+      /**
+       * A settled Note split at a transient the amplitude gate refused, once
+       * the level came back. See `tracking.gatedRepickDipRatio`.
+       */
+      kind: "gatedRepick";
+      at: SourceTimeMs;
+      noteId: string;
+      dipRatio: number;
+      /** The rise on the hop that confirmed it. */
+      riseRatio: number;
     }
   | {
       kind: "ended";
@@ -468,6 +484,11 @@ export class NoteTracker {
    */
   private attackBurstStart: AttackEvidence | null = null;
   /**
+   * A re-pick the amplitude gate refused on a settled Note, waiting one
+   * articulation for the level to come back. See `tracking.gatedRepickDipRatio`.
+   */
+  private pendingGatedRepick: { attack: AttackEvidence; noteId: string } | null = null;
+  /**
    * When energy last arrived, oldest first.
    *
    * The fast lane sees every transient and then declines to act on most of
@@ -565,6 +586,7 @@ export class NoteTracker {
     this.nextId = 1;
     this.lastAttack = null;
     this.attackBurstStart = null;
+    this.pendingGatedRepick = null;
     this.attackTimes.length = 0;
     this.attackSamples.length = 0;
     this.attackRises.length = 0;
@@ -704,6 +726,8 @@ export class NoteTracker {
     let active = this.current();
     /** Set when a split ends a Note whose successor should inherit its decay. */
     let splitFrom: NoteRecord | null = null;
+    /** The contact a split's boundary was moved off, for the successor's ring-out clock. */
+    let burstContactAt: SourceTimeMs | null = null;
     /**
      * `dipRatio` at a SAME-PITCH split, for the Note that split is about to
      * open. Null when nothing split, or when the split changed pitch — a
@@ -716,6 +740,61 @@ export class NoteTracker {
      * read on the direct input. See `tracking.rateFragmentNoRiseRatio`.
      */
     let splitSamePitchRise: number | null = null;
+
+    /* (a-) A re-pick whose release began under the amplitude gate: the
+     *      string was damped nearly silent, the pick's transient landed on a
+     *      hop the gate refused, and the level has now come back. The
+     *      boundary is the refused transient. See
+     *      `tracking.gatedRepickDipRatio`. */
+    if (this.pendingGatedRepick !== null) {
+      const pending = this.pendingGatedRepick;
+      const window = this.clock.durationSamples(config.transient.articulationMs);
+      if (
+        active === null ||
+        pending.noteId !== active.id ||
+        frame.sampleIndex - pending.attack.atSample > window
+      ) {
+        this.pendingGatedRepick = null;
+      } else if (
+        !frame.gated &&
+        frame.riseRatio >= config.tracking.releaseRiseRatio &&
+        // Ending a Note not yet announced drops it. The damped note behind a
+        // gated re-pick has sounded its full length; one this young is a
+        // stroke still being decided, and a sixteenth that has not cleared
+        // its bar would be lost to the split (the E5 eighths DI take, 28227ms).
+        active.announced &&
+        // And it has sounded at least half the pace being played. Shorter is
+        // the next stroke's contact that a witness already opened, and the
+        // gated transient is that stroke's own release, not a second stroke
+        // (the E5 eighths DI take, 11602 to 11693ms).
+        this.soundedHalfThePace(active, pending.attack.at)
+      ) {
+        this.pendingGatedRepick = null;
+        if (this.trace !== null) {
+          this.trace({
+            kind: "gatedRepick",
+            at: pending.attack.at,
+            noteId: active.id,
+            dipRatio: pending.attack.dipRatio,
+            riseRatio: frame.riseRatio,
+          });
+        }
+        const previous = active;
+        active.restruck = true;
+        this.end(active, pending.attack.at, out);
+        active = this.begin(
+          "attack",
+          frame,
+          {
+            at: pending.attack.at,
+            atSample: pending.attack.atSample,
+            frequencyHz: frame.pitch.frequencyHz,
+          },
+          previous,
+          true
+        );
+      }
+    }
 
     /* (a) An attack over something already sounding: a restrum or a re-pick.
      *     Only a genuine energy injection counts, and never mid-glide — a bend
@@ -797,7 +876,7 @@ export class NoteTracker {
         // that needed it, and the chord then went down the monophonic route and
         // shed a Note every few hundred milliseconds.
         active.harmonyBloomed,
-        active.soundedMs
+        active.ringOutSoundedMs
       );
       const rearticulated = verdict.accepted;
       // A harmonically-named Note has proved it is a chord, and a chord's own
@@ -837,6 +916,17 @@ export class NoteTracker {
           bloomed: active.harmonyBloomed,
           localIoiMs: this.localIoiMs(frame.attack.at),
         });
+      }
+      if (
+        !rearticulated &&
+        verdict.reason === "gated" &&
+        settled &&
+        !pitchDiffers &&
+        !active.harmonyBloomed &&
+        config.tracking.gatedRepickDipRatio > 0 &&
+        frame.attack.dipRatio <= config.tracking.gatedRepickDipRatio
+      ) {
+        this.pendingGatedRepick = { attack: frame.attack, noteId: active.id };
       }
       // A muted restrum refused for a weak transient is the one rejection in
       // this detector that later evidence can overturn. Hold it.
@@ -915,7 +1005,35 @@ export class NoteTracker {
         // When the burst is already this Note's own, the boundary is the
         // transient in hand.
         const burst = this.attackBurstStart ?? frame.attack;
-        const boundary = burst.at > active.startTime ? burst : frame.attack;
+        let boundary = burst.at > active.startTime ? burst : frame.attack;
+        // Unless that first attack was the pick landing on a single string:
+        // it mutes the string, the verdict refused it for carrying no energy,
+        // and the stroke sounds at the release in hand. See
+        // `tracking.burstContactRiseRatio`.
+        if (
+          boundary !== frame.attack &&
+          config.tracking.burstContactRiseRatio > 0 &&
+          boundary.riseRatio < config.tracking.burstContactRiseRatio &&
+          !pitchDiffers &&
+          !active.harmonyBloomed &&
+          frame.riseRatio >= config.tracking.releaseRiseRatio
+        ) {
+          if (this.trace !== null) {
+            this.trace({
+              kind: "released",
+              at: frame.attack.at,
+              noteId: active.id,
+              from: boundary.at,
+              riseRatio: frame.riseRatio,
+              dipRatio: frame.attack.dipRatio,
+              localIoiMs: this.localIoiMs(frame.attack.at),
+              contact: "burst",
+              via: "burst",
+            });
+          }
+          burstContactAt = boundary.at;
+          boundary = frame.attack;
+        }
         active.restruck = true;
         this.end(active, boundary.at, out);
         // The successor is created below, once this hop has decided what it is.
@@ -1053,6 +1171,9 @@ export class NoteTracker {
         // so this refuses the fragment rather than announcing and retracting
         // it, and costs latency only on a boundary that is doubtful in both
         // witnesses at once.
+        if (burstContactAt !== null && this.config.tracking.burstContactRingOutOnContact) {
+          active.ringOutFrom = burstContactAt;
+        }
         const fraction = rateFragmentSpanFraction(
           splitSamePitchDip,
           splitSamePitchRise,
@@ -1904,6 +2025,12 @@ export class NoteTracker {
    * rose over the 80ms before it — which spans the contact — by the bar. See
    * `tracking.releaseRiseRatio`.
    */
+  /** Whether `record` has sounded at least half the local interval, or no pace is read. */
+  private soundedHalfThePace(record: NoteRecord, at: SourceTimeMs): boolean {
+    const ioi = this.localIoiMs(at);
+    return ioi === null || record.soundedMs >= 0.5 * ioi;
+  }
+
   private isRelease(active: NoteRecord, frame: FastFrame): boolean {
     const bar = this.config.tracking.releaseRiseRatio;
     if (bar <= 0 || frame.attack === null) return false;
