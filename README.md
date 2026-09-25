@@ -80,11 +80,11 @@ await recognizer.dispose();  // stop, then release the mic and worklet
 
 ## Docs
 
-- [**API reference**](docs/API.md) — methods, options, error codes, `PitchFrame`, timestamps,
+- [**API reference**](https://github.com/trellos/Tuninator/blob/main/docs/API.md) — methods, options, error codes, `PitchFrame`, timestamps,
   running the engine in a Worker, multi-channel interfaces, and the worklet asset in full.
-- [**The Note model**](docs/NOTE-MODEL.md) — why a bend is one Note and a re-pick is two, how
+- [**The Note model**](https://github.com/trellos/Tuninator/blob/main/docs/NOTE-MODEL.md) — why a bend is one Note and a re-pick is two, how
   chords bloom, and how the recognizer works underneath.
-- [**Evaluation**](docs/EVALUATION.md) — what it gets right and wrong, measured against 459
+- [**Evaluation**](https://github.com/trellos/Tuninator/blob/main/docs/EVALUATION.md) — what it gets right and wrong, measured against 459
   hand-labelled events.
 
 ## License
@@ -93,9 +93,17 @@ MIT
 
 ## Example app
 
+**[Try it in your browser](https://trellos.github.io/Tuninator-Example/)**, or
+[without a microphone](https://trellos.github.io/Tuninator-Example/?mock=1) if you
+would rather just watch.
+
 A working browser demo — mic start/stop, live frequency and cents, a scrolling
 canvas timeline driven by a metronome clock, and a mock stream (`?mock=1`) for
 developing without a microphone — lives in its own repository:
 **[trellos/Tuninator-Example](https://github.com/trellos/Tuninator-Example)**.
 
 It consumes this library through its public entry point only.
+
+## License
+
+MIT
