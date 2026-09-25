@@ -7,6 +7,66 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-085]: `greblus/solitito-ai` is not read as a boundary witness: it answers once per 0.77s window, and its finest target is 96ms
+* **Date:** 2026-09-25
+* **Status:** Rejected
+* **Owner:** Detection architecture (the project owner's brief, 2026-09-25)
+* **Context:** The recognizer's remaining errors are note boundaries: splits
+  (`measure-splits.ts`), ghosts (the extras in `npm run eval`) and 140bpm
+  sixteenths the tracker absorbs (`measure-downstream-ledger.ts --all`). The
+  owner asked whether a published model, `greblus/solitito-ai`, carries
+  boundary information the engine's witnesses lack. It has 7,442,194
+  parameters (a CNN with squeeze-and-excitation and a four-layer Transformer,
+  ONNX), heads for root, chord quality, pitch classes sounding and pitch
+  classes struck, and was trained on GuitarSet and its author's NAM-rendered
+  synthetic takes; MIT. The brief set the deciding fact before any
+  measurement: what the model outputs over time, and at what resolution. (c),
+  one label per clip, or anything coarser than about 50ms stops the line at
+  Phase 1, because a model that cannot resolve a 107ms sixteenth cannot
+  witness these boundaries.
+* **Decision:** **Stopped at Phase 1; nothing read on the corpus; engine
+  unchanged.** Read from the model's own trainer and app source at pinned
+  revisions (`training/solitito-phase1.ts`):
+  - every forward pass returns one vector for a 48-frame, 768ms window;
+  - root, quality and pitch come off the CLS token, and the pitch target is
+    "sounds for at least a quarter of the window";
+  - the finest target any head is trained on is the onset head's "struck
+    inside the last six frames", 96ms;
+  - the app computes each frame from the last 512ms of audio, with every CQT
+    bin centred 256ms behind the newest sample.
+
+  That is (c), and coarser than 50ms. The author's own measurements agree and
+  are coarser still: the onset head answers 0.2–0.5s after a strike (202ms at
+  best) and stays above 0.02 for a median of one second, and the pitch head
+  named the previous note in 79% of windows on a scale at 0.6s per note. No
+  head has an octave. At 298 times the 25,000-parameter cap the model could
+  never have shipped; a win could only have named a feature for the engine's
+  own kernels.
+* **Alternatives Considered:** (a) **Running Phase 2 on the onset head
+  anyway**, since a perfect 96ms-bin head could tell a re-pick at a cut from a
+  pick more than 96ms before it: rejected. The brief's bar is 50ms, and the
+  trained head's measured behaviour is an order of magnitude coarser than its
+  own bin. An AUC built on it would be the window-wider-than-the-spacing error
+  AGENTS.md §3 records at least four times. (b) **Fetching the weights another
+  way**: rejected. `us.aws.cdn.hf.co`, which serves them, is refused by the
+  environment's egress policy, and the brief says to stop and name the host.
+  The verdict rests on the targets the model was trained to answer, which no
+  weight file changes. (c) **Retraining its onset head against a one-frame
+  strike label**: not what this brief asked, which was whether the published
+  model carries the information. The front end would allow it (above E4 its
+  CQT windows are under 50ms), but a model trained here is a separate line;
+  DECISION-021, -070 and -072 record the ones already run.
+* **Consequences:** Positive: a clean negative at the cost of reading source
+  code. Its reason is a design fact any session can re-check without weights,
+  and the held-out read is unspent. Negative: the model's own published
+  results (Phase 1 step 3) were not reproduced, and its author's timing
+  measurements are cited, not re-measured, because the weights could not be
+  fetched. The verdict is about what the model outputs, not about its input
+  front end, whose upper bins are short enough to support a finer target than
+  the one it was trained on.
+
+---
+
 #### [DECISION-084]: CI and publish workflows move to `actions/checkout@v5` and `actions/setup-node@v5`
 * **Date:** 2026-09-25
 * **Status:** Accepted

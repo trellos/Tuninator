@@ -206,6 +206,7 @@ is half a beat short at the median.
 | C27 | The under-the-hand witness as two readings together: no pitch on at least half the Note's hops (DECISION-058) and the level fallen to at most half — its lowest hop over its loudest, or its RMS at its end over its own peak. On the tuning takes the three Notes DECISION-058 absorbs read 0.75 / 0.09, 0.50 / 0.37 and 0.75 / 0.06 (no pitch / lowest over loudest); the twenty-one real notes under `region-attack` read no pitch on at most 0.33 whatever their fall; the mic triplet Note that cost `t6` reads 0.73 / about 0.7 | tracker | DECISION-058 (the pitch half); DECISION-059 (the gate, which an amp's floor sits over) | on the tuning takes: bit-identical to DECISION-058's engine (the three absorptions kept, the twenty-one refused); then held-out read once — `t6` back with the two DI triplet absorptions kept is the prediction | **built and reverted, iteration 16** (DECISION-060): `tracking.underHandLevelFall` 0.5. Derivation bit-identical to DECISION-058's on every take; held-out `t6` back and nothing else moved — the prediction exactly. Reverted on the letter: better on no derivation path, a constant only a held-out take can see. Spent; **kept 2026-09-19 on the owner's decision** (PR decision 5, option 2; DECISION-062), outside the keep rule |
 | C28 | A re-pick after a damp whose transient lands on a hop the amplitude gate refuses, on a Note still open because its tail kept a pitch reading: `rearticulation.ts` returns `gated` unread and the next hop, back at full level, has no broadband transient, so the pick is lost. Candidate: hold the refusal one articulation when the envelope had fallen (dip at most a bar) and split at it when the level comes back by `releaseRiseRatio` | tracker | DECISION-050 (the release read on a gated hop, for an unsettled contact-opened Note only); C7 (lowering the gate itself turns gated misses into splits) | on the tuning takes: the count of settled same-pitch `gated` refusals and how many sit on a label; then `p2c3q4` and `e843` found at +0 derivation missed lost, fp not up, slow DI not worse, amped bit-identical | **kept, iteration 20** (DECISION-081), with C11: 70 such refusals, 62 on the DI same-pitch takes, none amped; `tracking.gatedRepickDipRatio` 0.25; derivation missed 113 → 97, fp 204 → 203, slow DI 9 → 7; held-out fp 65 → 66 |
 | C29 | The fine witness delivers a contact 65ms late, so a release that lands under the gate is refused on the Note before and only then does the contact open the stroke's Note, 56 to 61ms early; a second fine onset splits it again (`e5`, `e25`, quarters DI) | tracker | DECISION-052 (the release on the frame that opens a fine-opened Note, and after; never before) | `e5` and `e25` cleared at +0 derivation missed, fp not up, amped bit-identical | **kept, iteration 21** (DECISION-082): `tracking.releaseBeforeFineContact`; slow DI 7 → 5, fp 203 → 201, missed flat, held-out unchanged |
+| C30 | A published pretrained model, `greblus/solitito-ai` (7.44M parameters, CNN + Transformer, ONNX; heads for root, chord quality, pitch classes sounding, and pitch classes struck in the last 96ms), read on the corpus as a witness for ghosts (outcome target), same-pitch splits (boundary target, beside DECISION-030's gate) and lost 140bpm sixteenths, with pitch secondary | deep (the app reads it 256ms behind the newest sample, and its onset answer comes 0.2–0.5s after the strike) | C3 / DECISION-070, -072 and DECISION-021: learned models trained here, on the corpus and on GuitarSet. This one is read as published, with an onset head of its own | Phase 1, before any corpus read: an output defined per frame at 50ms or finer. Then Q1 AUC ≥ 0.80 on derivation; Q2 above 0.698 as a boundary witness, plus a conditional AUC above chance on the rows the rate gate lets through; Q3 at least half the misses of some ledger branch, at a false-alarm rate stated in advance | **closed at Phase 1, 2026-09-25** (DECISION-085): (c), one answer per 768ms window. The finest target any head is trained on is the onset head's 96ms bin, and its author measures that head answering 0.2–0.5s after a strike and staying up for a median of one second. Nothing read on the corpus; held-out unspent. The weights sit behind `us.aws.cdn.hf.co`, refused by the egress policy, and the verdict does not need them. 298x the 25,000 cap |
 
 ## Owner-side blockers (living)
 
@@ -1785,3 +1786,36 @@ the string at 7.63 s.
   owner's ear. Derivation missed 115 → 114, fp 197 → 196; everything
   else unchanged. With it, the damp work (DECISION-073, 074) costs no
   real note anywhere.
+
+## An external model as a boundary witness — 2026-09-25 (DECISION-085)
+
+The owner asked whether `greblus/solitito-ai`, a published guitar chord and
+note model with an onset head, carries boundary information the engine's
+witnesses lack. Not a loop iteration: the brief ran its own phases, with a
+stop rule at the first.
+
+- Phase 1's deciding fact, fixed before anything was read: does the model
+  output something defined per frame at 50ms or finer? It does not. Each
+  forward pass answers once for a 768ms window. The finest target any head is
+  trained on is the onset head's "struck in the last 96ms". The app reads its
+  frames 512ms wide, every bin centred 256ms behind the newest sample. Its
+  author measures the onset head answering 0.2–0.5s after a strike and staying
+  up for about a second.
+- `training/solitito-phase1.ts` prints all of it from the model's own source
+  and DSP kernel at pinned revisions. It needs no weights.
+- Not done: reproducing the model's own published results. Its weights are
+  served from `us.aws.cdn.hf.co`, which the environment's egress policy
+  refused.
+- Nothing read on the corpus; held-out unspent; engine unchanged.
+- Findings section: "A published guitar model read as a boundary witness";
+  DECISION-085. Ledger: C30 closed.
+
+**In plain words, for the owner.** This model listens to about three quarters
+of a second at a time and gives one answer for all of it: which notes are
+sounding, and which were struck in roughly the last tenth of a second. Its own
+author measured that the "struck" answer arrives a fifth to half a second after
+the pick and lingers for about a second. The mistakes the engine still makes
+happen at the scale of a tenth of a second: a sixteenth note at 140bpm, or a
+short false note split off a real one. So the model cannot tell us where one
+note ends and the next begins. I stopped there, as the brief said to, without
+running it on your recordings. Nothing in the engine changed.
