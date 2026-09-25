@@ -60,12 +60,12 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Node 24 rather than the .nvmrc 20 of the dev toolchain: trusted
       # publishing needs npm 11.5.1+, which Node 20 does not carry. The
       # library itself does not run on Node at all.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
