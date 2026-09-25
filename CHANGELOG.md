@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 — 2026-09-25
+
+The version 0.21.0, published on 2026-09-24, was meant to be 0.2.1; this
+release carries the entries here and everything listed under 0.21.0.
 
 - On a direct input, a note damped nearly silent and then picked again is
   now split at the pick even when its first transient lands on a hop the
@@ -20,7 +23,7 @@
   DI take gains six picks from the owner's fourth listening pass, two of
   them optional; the one DI slow split there was a real pick. DECISION-083.
 
-## 0.21.0 — 2026-09-24
+## 0.21.0 — 2026-09-24 (published by mistake; superseded by 0.2.1)
 
 - On a direct input, a same-pitch re-articulation over which no energy
   arrived — the envelope after it no louder than the 80ms before it, with no

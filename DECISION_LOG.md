@@ -7,6 +7,31 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-084]: CI and publish workflows move to `actions/checkout@v5` and `actions/setup-node@v5`
+* **Date:** 2026-09-25
+* **Status:** Accepted
+* **Owner:** The project owner (asked for the bump, 2026-09-25)
+* **Context:** The publish run's `verify` job warned that Node.js 20 is
+  deprecated as an Actions runtime: `actions/checkout@v4` and
+  `actions/setup-node@v4` declare `node20` and were being forced onto
+  Node 24. It was a warning only, but a later runner release will refuse
+  Node 20 actions and break both `ci.yml` and `publish.yml` (DECISION-043).
+* **Decision:** Both actions go to `@v5`, whose runtime is Node 24, in
+  `ci.yml` and `publish.yml`. Nothing else changes: the `node-version` the
+  project builds and tests on (20 in `ci.yml`, 24 in the publish job) is a
+  separate setting and stays as it was.
+* **Alternatives Considered:** (a) **Leave v4 until it breaks:** the
+  failure would land on a release tag's publish run. (b) **Also move
+  `ci.yml`'s `node-version` off 20** (end of life April 2026): a separate
+  question about what the project tests on, not asked for here.
+* **Consequences:** The deprecation warning goes away. `setup-node@v5`
+  caches automatically only when `package.json` names a `packageManager`;
+  both jobs already set `cache: npm`, so caching is unchanged.
+  `checkout@v5` needs Actions runner 2.327.1 or later, which GitHub-hosted
+  runners already have.
+
+---
+
 #### [DECISION-083]: The owner's fourth listening pass on the A3 eighths DI take, and optional labels
 * **Date:** 2026-09-24
 * **Status:** Accepted
