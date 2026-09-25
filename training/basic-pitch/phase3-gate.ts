@@ -44,6 +44,14 @@
  * `npm run eval`'s totals, `measure-downstream-ledger.ts --all` and
  * `measure-splits.ts` overall and `--subset=slow`, against the baseline.
  *
+ * MEASURED DURING THE RUNS (a limit of this harness, not a setting): a Note the
+ * tracker opens outside `begin()` — the harmony change mid-ring
+ * (`beginHarmonic`) and the deep lane's re-segmentation — has no fast-lane
+ * opening in the precomputed table, so the gate abstains on it. At theta 0
+ * (nothing withheld) that is 6 of 215 Notes on the two quarters takes; the
+ * "no reading" count on each run's eval line is the whole figure (60 of
+ * 1,808 Notes at theta 0.15, about 3%).
+ *
  * Environment:
  *   BP_GATE_MODE      "all" | "samepitch"
  *   BP_GATE_THETA     the operating point

@@ -45,7 +45,6 @@ export function resample(x: Float32Array, inRate: number, outRate: number): Floa
   const g = gcd(inRate, outRate);
   const up = outRate / g; // output samples per `down` input samples
   const down = inRate / g;
-  const ratio = inRate / outRate; // input samples per output sample
   // Low-pass at CUTOFF of the lower Nyquist, expressed in cycles per INPUT sample.
   const fc = (0.5 * CUTOFF * Math.min(inRate, outRate)) / inRate;
   // Half-width in input samples: ZERO_CROSSINGS zero crossings of the cutoff sinc.
@@ -88,6 +87,5 @@ export function resample(x: Float32Array, inRate: number, outRate: number): Floa
     }
     out[n] = acc;
   }
-  void ratio;
   return out;
 }

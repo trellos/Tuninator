@@ -1,0 +1,89 @@
+diff --git a/src/engine/tracker/note-tracker.ts b/src/engine/tracker/note-tracker.ts
+index 2f21446..9a75b27 100644
+--- a/src/engine/tracker/note-tracker.ts
++++ b/src/engine/tracker/note-tracker.ts
+@@ -1198,6 +1198,8 @@ export class NoteTracker {
+         if (burstContactAt !== null && this.config.tracking.burstContactRingOutOnContact) {
+           active.ringOutFrom = burstContactAt;
+         }
++        // DEV-ONLY Phase 3 gate harness (training/basic-pitch); never committed.
++        if (splitSamePitchDip !== null) (active as unknown as Record<string, unknown>).__bpSamePitchChild = true;
+         const fraction = rateFragmentSpanFraction(
+           splitSamePitchDip,
+           splitSamePitchRise,
+@@ -3046,6 +3048,8 @@ export class NoteTracker {
+     this.notes.set(record.id, record);
+     this.openings.push({ at, id: record.id });
+     if (this.openings.length > RATE_GAPS * 4) this.openings.shift();
++    // DEV-ONLY Phase 3 gate harness (training/basic-pitch); never committed.
++    (record as unknown as Record<string, unknown>).__bpOpenedAt = at;
+     if (this.trace !== null) {
+       this.trace({ kind: "opened", at, noteId: record.id, trigger });
+     }
+@@ -3182,6 +3186,7 @@ export class NoteTracker {
+         // started: a Note in release still ages, so a 24ms blip could otherwise
+         // cross a 45ms stability gate purely by sitting in its release grace.
+         if (record.announceSoundedMs < record.announceThresholdMs) continue;
++        if (this.bpWithhold(record)) continue; // DEV-ONLY Phase 3 gate harness
+         record.announced = true;
+         record.lastEmitted = {
+           label: record.currentLabel(),
+@@ -3421,6 +3426,28 @@ export class NoteTracker {
+     return true;
+   }
+ 
++  /**
++   * DEV-ONLY Phase 3 gate harness (training/basic-pitch); never committed.
++   * Asks a gate installed on `globalThis` once per Note, at its first chance to
++   * be announced; a Note it names is withheld for the rest of its life (its
++   * announce bar becomes infinite, so `end()` drops it).
++   */
++  private bpWithhold(record: NoteRecord): boolean {
++    const g = globalThis as Record<string, unknown>;
++    const gate = g.__bpGate as
++      | ((takeKey: unknown, startMs: number, label: string | null, samePitchChild: boolean) => boolean)
++      | undefined;
++    if (gate === undefined) return false;
++    const r = record as unknown as Record<string, unknown>;
++    if (r.__bpAsked !== true) {
++      r.__bpAsked = true;
++      const opened = typeof r.__bpOpenedAt === "number" ? r.__bpOpenedAt : record.startTime;
++      r.__bpWithheld = gate(g.__bpTakeKey, opened, record.currentLabel(), r.__bpSamePitchChild === true);
++      if (r.__bpWithheld === true) record.rateFragmentBarMs = Number.POSITIVE_INFINITY;
++    }
++    return r.__bpWithheld === true;
++  }
++
+   private end(record: NoteRecord, at: SourceTimeMs, out: TrackerEmission[]): void {
+     this.notes.delete(record.id);
+     const endAt = Math.max(at, record.startTime);
+@@ -3448,6 +3475,11 @@ export class NoteTracker {
+         this.retractOpening(record);
+         return;
+       }
++      // DEV-ONLY Phase 3 gate harness (training/basic-pitch); never committed.
++      if (this.bpWithhold(record)) {
++        this.retractOpening(record);
++        return;
++      }
+       record.announced = true;
+       record.lastEmitted = {
+         label: record.currentLabel(),
+diff --git a/src/offline/analyzer.ts b/src/offline/analyzer.ts
+index 15f35e5..832226e 100644
+--- a/src/offline/analyzer.ts
++++ b/src/offline/analyzer.ts
+@@ -98,6 +98,13 @@ function run(
+   options?.overrideConfig?.(config);
+   const engine = new RecognitionEngine(sampleRate, config);
+   if (options?.trackerTrace !== undefined) engine.setTrackerTrace(options.trackerTrace);
++  // DEV-ONLY Phase 3 gate harness (training/basic-pitch); never committed.
++  // Names the take for the gate exactly as `phase3-readings.ts` `takeKey` does.
++  {
++    let s = 0;
++    for (let i = 0; i < samples.length; i++) s += Math.abs(samples[i] as number);
++    (globalThis as Record<string, unknown>).__bpTakeKey = `${samples.length}:${Math.round(s * 1e3)}`;
++  }
+ 
+   const frames: PitchFrame[] = [];
+   const trace: TraceRow[] = [];

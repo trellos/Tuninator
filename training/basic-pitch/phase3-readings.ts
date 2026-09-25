@@ -32,11 +32,15 @@ import { SAMPLE_RATE } from "./framing.js";
 import { resample } from "./resample.js";
 import { loadModel } from "./runtime.js";
 
-/** Identifies a take by the samples the engine is given. Mirrored in the dev patch. */
+/**
+ * Identifies a take by the samples the engine is given: their count and the
+ * sum of their magnitudes over the whole take (a DI render and its amped twin
+ * can share a length and a silent opening). Mirrored in the dev patch.
+ */
 export function takeKey(samples: Float32Array): string {
   let s = 0;
-  for (let i = 0; i < Math.min(samples.length, 4096); i++) s += Math.abs(samples[i] as number);
-  return `${samples.length}:${Math.round(s * 1e4)}`;
+  for (let i = 0; i < samples.length; i++) s += Math.abs(samples[i] as number);
+  return `${samples.length}:${Math.round(s * 1e3)}`;
 }
 
 const i = process.argv.indexOf("--dir");

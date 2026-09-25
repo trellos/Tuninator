@@ -17,12 +17,13 @@
  * 156 itself is centred on T and reads zeros for its second half; that loss is
  * the cost being measured, not hidden.
  *
- * The resampler (`resample.ts`) reads 32 zero crossings either side, 1.45ms at
- * 22050Hz; that sliver of look-ahead is below one frame and is not removed.
+ * The resampler (`resample.ts`) reads 32 zero crossings of its cutoff either
+ * side, about 1.5ms of input; that sliver of look-ahead is below one frame and
+ * is not removed.
  */
 
 import { HOP, SAMPLE_RATE } from "./framing.js";
-import { N_NOTES, WINDOW_FRAMES, WINDOW_SAMPLES, type Model } from "./runtime.js";
+import { N_NOTES, WINDOW_SAMPLES, type Model } from "./runtime.js";
 
 /** The frame the decision time sits on. */
 export const DECISION_FRAME = 156;
@@ -67,4 +68,3 @@ export async function readCausal(model: Model, audio: Float32Array, atMsList: re
 
 export const cell = (m: Float32Array, frame: number, bin: number, width = N_NOTES): number =>
   m[frame * width + bin] as number;
-void WINDOW_FRAMES;

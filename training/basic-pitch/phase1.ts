@@ -376,7 +376,6 @@ const filterSamples = (bin: number): number => {
   const row = bin - (topFirst - level * BPO);
   return rowLen(row) * 2 ** level;
 };
-const HARMONICS = [0.5, 1, 2, 3, 4, 5, 6, 7];
 const shift = (hm: number): number => Math.round(BPO * Math.log2(hm));
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const binOfMidi = (midi: number): number => (midi - 21) * CONTOUR_BPS;
@@ -401,7 +400,6 @@ for (const midi of STRINGS) {
       `${(cells[0] as string).padStart(7)}     ${(cells[1] as string).padStart(7)}     ${sub.padStart(7)}`,
   );
 }
-void HARMONICS;
 
 // ---------------------------------------------------------------------------
 // 5. Parameters, from the ONNX initializers
