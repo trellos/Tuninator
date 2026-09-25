@@ -91,3 +91,10 @@ the same code path.
 - The twelve 140bpm held-out takes are never loaded by anything in this
   directory. They are scored once, at the end, by the falsifier-3 ledger run,
   and that read is spent.
+
+## Also here
+
+- `solitito-phase1.ts` — the Phase 1 record for `greblus/solitito-ai`
+  (DECISION-085): the published model's time resolution, read from its own
+  source and DSP kernel at pinned revisions. It needs no weights, touches no
+  network and imports nothing from `src/`; its header has the fetch commands.

@@ -8170,3 +8170,195 @@ Folding it in removes it and the held-out amped power-chord take's one
 ghost of the same shape (fp 63 → 62). No labelled note is lost anywhere.
 The earlier Note is held back from `noteEnded` only while such a quiet
 successor is sounding: 9 Notes across all 27 takes.
+
+## A published guitar model read as a boundary witness: `greblus/solitito-ai`, stopped at its deciding fact (DECISION-085)
+
+The recognizer's remaining errors are about where notes begin and end, not
+what they are called: one played note emitted as two (`measure-splits.ts`),
+Notes with no label behind them (`npm run eval`'s extras), and sixteenths at
+140bpm that the onset kernel sees and the tracker absorbs
+(`measure-downstream-ledger.ts --all`). The question put to
+`greblus/solitito-ai`, a published 7.4M-parameter guitar model with an onset
+head of its own, was whether it carries boundary information the engine's
+witnesses lack, everywhere or in conditions that can be named. The brief fixed
+the deciding fact before anything was measured: what the model outputs over
+time — (a) onset activations, (b) a per-frame pitch including "no note", or
+(c) one label per clip — and at what resolution. A model that cannot resolve a
+107ms sixteenth cannot witness these boundaries, so (c), or anything coarser
+than about 50ms, stops the line at Phase 1.
+
+It stopped there. `training/solitito-phase1.ts` reads the model's own source
+and DSP kernel at pinned revisions and prints the architecture, parameter
+count, time axis and front-end windows below. The repository, runtime,
+training data and published results in the first table, and the author's
+measurements after the second, are cited from the author's repository, not
+reproduced. Nothing was read on the corpus.
+
+### What the model is
+
+```
+repository     huggingface.co/greblus/solitito-ai @ 96f63770 (2026-08-22), MIT; the code,
+               trainer and docs at github.com/greblus/solitito @ 57a433d (2026-09-16), MIT
+purpose        the recognizer of a real-time guitar trainer: a Rust app running ONNX Runtime
+               (the `ort` crate) on the CPU, one forward pass every 40ms, 39ms per pass on
+               the author's machine
+architecture   InstanceNorm, four conv blocks with squeeze-and-excitation that pool
+               frequency only, a 384-wide projection per frame, a CLS token, a four-layer
+               Transformer encoder (8 heads, feed-forward 768, pre-norm), four heads
+parameters     7,286,038 with three heads, 7,442,194 with the onset head, counted from the
+               trainer's classes; the two ONNX files differ by 630,773 bytes, against the
+               onset head's 624,624 bytes of float32. 298x this repository's 25,000 cap
+input          16kHz mono, 48 frames x 168 features at a 256-sample (16ms) hop: 144 CQT
+               bins (24 per octave from C1), 12 chroma, 12 bass-energy bins, each frame
+               log-normalised over 80dB
+features       training: librosa.cqt, centred frames, each bin its own Hann filter (Q 34.6);
+               the app: the LAST 8192 samples (512ms) under a Hann window, an FFT, and a
+               sparse pseudo-CQT kernel whose filters sit in the middle of that chunk
+heads          root 13 (12 classes + Noise), quality 11, pitch 12 (sigmoid, "sounding"),
+               onset 12 (sigmoid, "struck in the last 6 frames"); no head has an octave
+training data  a synthetic set the author generated (394 six-second blocks of chords plus
+               all 96 single notes, exported as DI from a Guitar Pro file and rendered
+               through two NAM amp captures, clean and edge of breakup) and GuitarSet
+               (360 recordings); the onset head was trained alone, trunk frozen, on
+               GuitarSet's solo recordings
+published      root 98.1%, pitch F1 0.909, exact chord 92.4%, onset F1 0.812, on a
+               validation split grouped by source recording, solo windows excluded
+```
+
+### The deciding fact: (c)
+
+Every forward pass returns one vector. Root, quality and pitch are read off the
+CLS token, and the trainer defines the pitch target over the whole window: a
+class is "sounding" if it sounds for at least a quarter of it. The onset head
+reads the newest frame's token and raw spectrum against those of the frame six
+frames earlier, and its target is "this class was struck inside the last six
+frames".
+The model's whole time axis, from the script:
+
+```
+                                                         ms    against 50ms / 107ms
+feature hop                                              16    fine enough
+root / quality / pitch answer (one per window)          768    coarser than a sixteenth
+pitch target: least a class must sound to be labelled   192    coarser than a sixteenth
+onset target: struck within                              96    coarser than 50ms
+onset head's comparison lookback                         96    coarser than 50ms
+app frame (every bin reads inside it)                   512    coarser than a sixteenth
+app bin centre behind the newest sample                 256    coarser than a sixteenth
+```
+
+The finest thing any head is trained to answer is a 96ms bin: coarser than
+50ms, and within one hop of the 107ms sixteenth it would have to separate. The
+brief's rule fires on that alone.
+
+What the trained heads do with that design, as their author measured it on
+real recordings (the repository's `docs/how-it-works.md`, its project summary
+§5.3, §8.12 and §9, and comments in `src/audio.rs`):
+
+- the onset head's first answer comes 202ms after the strike, the fastest path
+  in the app against 676ms for the others, and 0.2 to 0.5s after it in general;
+- at a threshold of 0.02 that answer then stays up for a median of one second
+  after the attack. Under a strummed chord left ringing it hovers at 0.11–0.29
+  for a whole second, so the app re-arms a note only once the answer falls
+  under 0.3 of the peak that counted the last strike;
+- it spreads an attack onto the classes of neighbouring strings (the first
+  run's false credits sat 5, 7 and 9 semitones away);
+- on a scale at 0.6s per note the pitch head named the note being played in 7%
+  of windows and the note before it in 79% — "the model is reporting both notes
+  it heard, because both were in the window";
+- the app's own single-frame estimator names a new note 560ms after the strike,
+  against the model's 620ms: "the two paths sit on the same floor, and that
+  floor is the window."
+
+By those measurements the trained onset head is an order of magnitude coarser
+in time than its own 96ms target.
+
+### What the front end would have allowed
+
+The window is the design's, not the audio's. The CQT is multi-resolution.
+Reconstructed from `dsp_weights.json`, each of the app's bins is the inner
+product of the Hann-windowed 8192-sample chunk with a complex filter centred in
+it, so all 144 bins read audio centred 256ms behind the newest sample, each as
+wide as its own filter:
+
+```
+note    Hz     training filter (FWHM)   app window FWHM
+E2      82.4   420ms (210)              167ms
+A2     110.0   315ms (157)              137ms
+D3     146.8   236ms (118)              109ms
+G3     196.0   177ms  (88)               84ms
+B3     246.9   140ms  (70)               68ms
+E4     329.6   105ms  (53)               52ms
+A4     440.0    79ms  (39)               39ms
+E5     659.3    53ms  (26)               26ms
+E6    1318.5    26ms  (13)               13ms
+```
+
+Above E4 (52ms), and on the upper partials of every lower note, the input
+resolves better than 50ms. A model trained against a one-frame strike label
+could have been a candidate. This one was trained to answer about its window, which its author
+says first when explaining how it works. In the app it would also answer 256ms
+late. The deep lane could wait for that (its ring is 4s and holds the ~1.3s of
+audio the model needs); the fast lane could not.
+
+### What was not done, and why
+
+- **Step 3, reproducing the model's own published results, was not run.** Both
+  ONNX files are served from `us.aws.cdn.hf.co`, which this environment's
+  egress policy refused (403 on CONNECT, 2026-09-25). `huggingface.co` itself,
+  the README, `dsp_weights.json` and the GitHub source were reachable. The brief
+  says to stop and name a blocked host. The verdict rests on the targets the
+  model was trained to answer, which no weight file can change; the weights
+  would let the author's timing measurements above be reproduced rather than
+  cited.
+- **Overlap.** The model is trained on GuitarSet, so any GuitarSet-based
+  reading of it would be contaminated. None of this repository's 27 fixtures
+  is a GuitarSet recording or one of the author's synthetic renders. The prior
+  was low regardless: DECISION-072's small models, trained on 106,905
+  GuitarSet rows, learned the task there (0.96–0.97 on held-out players) and
+  read 0.794 on this corpus against the rate feature's 0.790.
+
+### The four questions, and the bars they would have been held to
+
+As the brief set them. None was run. Neither the derivation takes nor the
+held-out 140bpm takes were read, so the once-only held-out read is unspent.
+
+- **Q1, ghosts** (outcome-shaped: is this emitted Note surplus?). Bar: AUC ≥
+  0.80 on the derivation takes, for "a note is sounding" or for the pitch
+  agreeing with the Note. Not run. A ghost here is the label's own pitch class
+  butted against the Note it was cut from (294 of 318 at DECISION-030). The
+  768ms window over a ghost and over the Note beside it holds the same played
+  note, so the pitch head's target is the same for both, and "agreeing with the
+  Note" can only mean the pitch class, since no head has an octave. The one
+  head whose target differs between them is the onset head, which is Q2.
+- **Q2, same-pitch splits** (boundary-shaped: should this cut have been made?).
+  Bar: above 0.698 AUC as a boundary witness, and a conditional AUC above
+  chance on the rows DECISION-030's rate gate lets through. Not run. A cut and
+  the pick that opened its Note are one Note's length apart (at the loop's
+  baseline the median shortest and longest Notes of a split event were 93ms
+  and 227ms). A perfect head with a 96ms bin could tell a re-pick at the cut
+  from a pick more than 96ms before it, so from the longer of those cases. By
+  its author's measurements, though, the trained head answers 0.2–0.5s after a
+  strike and stays up for about a second, which puts both picks inside one
+  answer.
+- **Q3, lost fast notes.** Bar: at least half the misses of some ledger branch
+  caught, at a false-alarm rate on matched labels stated in advance. Not run.
+  A 140bpm sixteenth is a seventh of the answer window. By the time the onset
+  head answers for one, two to five more have been played, and its answer
+  spreads onto the neighbouring strings' classes.
+- **Q4, pitch** (secondary). Not run, and half of it cannot be: exact pitch is
+  not an output of any head. Pitch class comes as one answer per 768ms window,
+  which cannot be read on the deep lane's 85ms window.
+
+No 2×2 agreement table exists, because no reading was taken.
+
+### Verdict
+
+Closed at Phase 1 on a design fact: one answer per 0.77s window, and a finest
+target of 96ms. The model's author names the same wall — "the hop is what is
+short, not the window" — the error class AGENTS.md §3 warns about, caught here
+before a number was built on it. Nothing won, so nothing ships. At 7.4M
+parameters, a win would only ever have named a feature for the engine's own
+kernels to compute. The model's one time-local input, the onset head's positive
+rise per pitch class over 96ms, is a magnitude spectral flux folded onto twelve
+classes: the witness family this record has measured most (the onset kernel
+itself, the attack band, DECISION-013 and -014, ledger row C2a).
