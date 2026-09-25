@@ -98,3 +98,10 @@ the same code path.
   (DECISION-085): the published model's time resolution, read from its own
   source and DSP kernel at pinned revisions. It needs no weights, touches no
   network and imports nothing from `src/`; its header has the fetch commands.
+- `muscriptor/phase1.ts` — the Phase 1 record for
+  `MuScriptor/muscriptor-small` (DECISION-086): its token time grid, chunking,
+  front end and parameter count, read from its own source at pinned revisions.
+  Its weights are gated and were not fetched; the script needs none, touches
+  no network, and imports only `DEFAULT_ENGINE_CONFIG` (for the deep lane's
+  ring). Its header has the fetch commands, including the sparse checkout that
+  keeps the source's own TypeScript out of this repository's typecheck.

@@ -8362,3 +8362,228 @@ kernels to compute. The model's one time-local input, the onset head's positive
 rise per pitch class over 96ms, is a magnitude spectral flux folded onto twelve
 classes: the witness family this record has measured most (the onset kernel
 itself, the attack band, DECISION-013 and -014, ledger row C2a).
+
+## A published transcription model read as a boundary witness: `MuScriptor/muscriptor-small`, fine enough on paper, stopped at its licence gate (DECISION-086)
+
+The question DECISION-085 put to `greblus/solitito-ai`, put to a second
+published model by the same brief (`docs/external-models-eval-prompt.md`):
+does it carry boundary information the engine's witnesses lack, for splits,
+ghosts and the 140bpm sixteenths the tracker absorbs, everywhere or in
+conditions that can be named? The deciding fact was fixed before anything was
+read: what the model outputs over time, the time resolution of the target that
+output was trained on, and whether it answers promptly. (c), or a target
+coarser than about 50ms, stops the line at Phase 1.
+
+This model passes that rule on paper. It stopped at Phase 1 anyway, on a block
+rather than a design fact: its weights are gated behind a licence, and its
+runtime comes from PyPI, which this environment refuses.
+`training/muscriptor/phase1.ts` reads the model card and the source at pinned
+revisions and prints everything below except the training-data, published and
+licence lines, which are cited from the model cards. Nothing was read on the
+corpus.
+
+### What the model is
+
+```
+repository     huggingface.co/MuScriptor/muscriptor-small @ 8c127f60 (2026-07-10), gated ("gated:
+               auto"); code at github.com/muscriptor/muscriptor @ 7f213af (2026-09-04), MIT. No
+               training code is published
+purpose        general multi-instrument transcription of recordings to MIDI; a Python package with
+               a CLI, a web UI and an HTTP server
+architecture   decoder-only Transformer: 14 pre-norm layers, width 768, 12 heads, GELU feed-forward
+               3072, linear layers without biases, sinusoidal positions. The log-mel spectrogram is
+               projected to 768 and put in front of the tokens as a prefix, with an instrument-group
+               and a dataset embedding. Greedy decoding by default
+parameters     102,441,984 learned, counted from the code's classes. With the 526,848 fixed
+               front-end values stored alongside, 102,968,832 tensor elements: exactly the float32
+               count the hub reads from the weights file's header (411,888,600 bytes, 13,272 of them
+               header). 4,098x the 25,000 cap
+input          16kHz mono, 5s chunks back to back (the last one zero-padded). STFT 2048 samples
+               (128ms) under a periodic Hann window, hop 160 (10ms), centred frames with reflect
+               padding; magnitude, 512 HTK mel bins 0-8000Hz, log. 500 frames kept per chunk
+output         MT3-like tokens, 1,393 of them: shift 0..1000 (10ms ticks, absolute within the
+               chunk), pitch 0-127, note on/off, tie, program, drum. 36 instrument groups
+               (MT3_FULL_PLUS; guitar is groups 4, 5 and 6). No velocity. At most 2,000 tokens a chunk
+training data  not in the code. The card: skews to pop and Western classical; piano, guitar, bass and
+               drums are the most frequent instruments. The released weights add synthetic
+               pre-training and RL post-training to real audio (D_Synth + D_Real + D_RL, per the
+               large variant's card). The paper (arXiv 2607.08168, linked from the source's README)
+               would name the sets; arxiv.org is refused here
+published      the small model trained on D_Real only (the card's scaling ablation, CFG 2): onset F1
+               51.2, frame 67.2, offset 38.7 on D_Test (372 multi-instrument tracks), mir_eval,
+               instrument-agnostic. No guitar figure, and no score for the released small checkpoint
+licence        code MIT; weights CC BY-NC 4.0 plus conditions of use (users warrant their rights to
+               what they transcribe and indemnify the authors)
+runtime        PyTorch through the `muscriptor` package (torch >= 2.3, einops, safetensors,
+               huggingface_hub, soundfile, beat-this, ...), from PyPI
+```
+
+### The deciding fact: note events on a 10ms grid, not (c)
+
+The model writes note-on and note-off events per instrument group and pitch,
+with the octave. That is (a) with offsets, and (b) with them, since the roll
+between an on and its off is what the card's frame F1 scores; they are
+decisions, not activations. The vocabulary's shift tokens are ticks at a frame
+rate of 100. The published encoder (kept as a test helper; the tokenizer says
+the training encoder has its layout) rounds every note time to a tick and
+writes the ticks since the chunk's start, and the decoder reads them back the
+same way, so no finer target is possible in this vocabulary. The spectrogram
+is a prefix and attention is causal over the whole sequence, so every token is
+written with all 500 frames of its chunk in view. From the script:
+
+```
+                                                          ms    against 50ms / 107ms
+what the tokens resolve
+  token time grid: one shift step (absolute in chunk)     10    fine enough
+  closest two onsets of one pitch (one tick)              10    fine enough
+  shortest note the decoder keeps                         10    fine enough
+what each frame reads
+  mel frame hop                                           10    fine enough
+  STFT window, every mel bin                             128    coarser than a sixteenth
+  STFT window, Hann width at half maximum                 64    coarser than 50ms
+  newest frame's reach past a chunk's end                 54    mirrored audio, not future audio
+when an answer exists
+  one token sequence per chunk                          5000    coarser than a sixteenth
+  wait from an event to its chunk's end (native)      0-5000    coarser than a sixteenth
+  constant lag on every event, per the code               25    fine enough (removed afterwards)
+  deep lane ring (DEFAULT_ENGINE_CONFIG.deep)           4000    1000ms short of a chunk
+```
+
+The target is five times finer than the rule asks, and each event keeps its
+own tick, so the answer is late rather than blurred: the opposite of
+solitito, whose answers each described a whole window. Two attacks 107ms apart
+share STFT frames at the window's full width (128ms) but not at half its
+maximum (64ms); whether the trained model separates them is a Phase 2
+question.
+
+### When an answer exists
+
+Natively, a chunk's tokens begin only once its last sample has arrived: 0 to
+5s after an event, plus decoding. Neither lane can wait for that, but both
+could read the model on audio they hold:
+
+- **A fast-lane read** is the 5s ending at the decision point, with the event
+  under decision in the newest frames. The newest kept frame is centred 10ms
+  before the decision point, and its window reads 54ms past it into reflect
+  padding: a mirror of the audio just before, not future audio. A decision
+  taken x ms after an attack gives the model x ms of that attack. The published
+  inference code reads every chunk's last ~64ms this way, and an onset belongs
+  to the chunk it falls in, so an event at a chunk's edge is a condition the
+  model meets on every chunk it transcribes. It is also the part of a chunk
+  with the least context.
+- **A deep-lane read** is the ring: 4,000ms (`deep.ringSeconds`) against a
+  5,000ms input, so 1,000ms of every read is padding; the inference code pads a
+  file's last chunk with zeros after the audio. A region (at most 1,200ms) is
+  analysed once 200ms of audio has followed its last Note, so its Notes would
+  have at least 200ms of real audio after them and up to about 2.6s before.
+  That is closer to the native condition than the fast-lane read, but no
+  published score covers a padded chunk.
+
+### A same-pitch re-pick, in tokens
+
+Open notes are keyed by program and pitch, with one program per instrument
+group. At one tick the encoder writes offsets before onsets, so re-picking a
+sounding pitch is an off and an on on the same 10ms tick; the decoder also
+takes a bare on for an open key as a retrigger that ends the old note on that
+tick (the upstream test `test_retrigger_closes_previous`). So the split
+question, one note or a new articulation at a cut, is exactly what the tokens
+say. What the card says they cannot represent, two notes of one pitch and
+instrument sounding at once, is a unison across two strings, which the split
+problem is not. A pitch decoded under two guitar groups would be two keys, so
+a Phase 2 read would restrict the instruments to one group with the package's
+hard instrument mask.
+
+### What was not done, and why
+
+- **Step 3, reproducing the model's own example, was not run.** Three things
+  block it:
+  - the gate: `config.json` and `model.safetensors` at 8c127f60 answer HTTP
+    401, `x-error-code: GatedRepo`, to a client without a token from an account
+    that has accepted the conditions, and this environment has none;
+  - the runtime: the package and PyTorch come from pypi.org and
+    files.pythonhosted.org, which the egress policy refused (403, 2026-09-25);
+  - probably the download host as well: the hub lists the weights with a Xet
+    hash, and serves such files through `cas-bridge.xethub.hf.co`, also
+    refused. The 401 comes before any redirect, so this could not be confirmed.
+
+  Even unblocked, only a structural check is possible. No reference output is
+  published; the upstream integration tests assert structure on a song that is
+  not in the repository; and the card's Python example calls
+  `transcribe_to_midi`, which the source removed at e34b397 (2026-08-20). The
+  CLI example still matches.
+- **What would unblock Phase 2:** the owner accepting the conditions at
+  huggingface.co/MuScriptor/muscriptor-small (access is granted automatically;
+  the terms are CC BY-NC 4.0 plus a rights warranty and an indemnity, which are
+  the owner's to judge); a read token from that account in the environment's
+  settings as `HF_TOKEN`, which the package reads; and network access to
+  pypi.org and files.pythonhosted.org, or a setup script that preinstalls torch
+  and the package, and probably to `cas-bridge.xethub.hf.co`.
+- **Overlap.** Whether GuitarSet is in its training data is unknown: neither
+  card nor the code names a dataset, and the paper is behind a refused host.
+  The card lists guitar among its four most frequent instruments, so treat any
+  GuitarSet-based reading of it as possibly contaminated. None of this
+  repository's 27 fixtures can be in it: they are the owner's own unpublished
+  recordings. DECISION-072's prior applies regardless: small models trained on
+  GuitarSet read 0.96–0.97 on its held-out players and 0.794 on this corpus,
+  against the rate feature's 0.790.
+
+### The four questions, and the bars they would have been held to
+
+As the brief set them. None was run. Neither the derivation takes nor the
+held-out 140bpm takes were read, so the once-only held-out read is unspent.
+The read conditions a Phase 2 would fix before looking:
+- fast-lane questions read the 5s ending at the decision point; deep-lane
+  questions read the 4s ring plus 1s of zeros;
+- instruments are restricted to one guitar group per signal path;
+- the guidance coefficient is fixed (the card's scores use 2, the code's
+  default is 1);
+- the constant lag is measured on derivation takes and removed, with every
+  tolerance under 107ms;
+- the graded score is the model's own probability of an onset of the Note's
+  pitch at the ticks in question, with its transcription up to there
+  teacher-forced. The package computes these logits in `_compute_logits`.
+
+The questions:
+- **Q1, ghosts** (outcome-shaped: is this emitted Note surplus?). Bar: AUC ≥
+  0.80 on the derivation takes. The model has the octave and a 10ms roll, so
+  "this pitch is sounding" can be read. But most ghosts are the label's own
+  pitch class butted against the Note they were cut from (294 of 318 at
+  DECISION-030), where it is true of both. The separating reading there is
+  whether the model starts a new note at the ghost's start, which its tokens
+  can say; for the other 24, "sounding" could witness directly.
+- **Q2, same-pitch splits** (boundary-shaped: should this cut have been made?).
+  Bar: above 0.698 AUC as a boundary witness, and a conditional AUC above
+  chance on the rows DECISION-030's rate gate lets through. This is what the
+  tokens are built to say: at a cut, either the note continues or an off and an
+  on land on that tick. At the loop's baseline the median shortest and longest
+  Notes of a split event were 93ms and 227ms: resolved at the window's half
+  maximum (64ms), shared at its full width (128ms).
+- **Q3, lost fast notes.** Bar: at least half the misses of some ledger branch
+  caught, at a false-alarm rate on matched labels stated in advance. A 140bpm
+  sixteenth is about 11 ticks; a catch is an onset of the label's pitch inside
+  its span. Its only published onset F1, 51.2, is on dense mixes and says
+  nothing about solo guitar.
+- **Q4, pitch** (secondary). Exact and pitch-class accuracy against the deep
+  lane's on identical windows, by signal path, single note against chord, and
+  register. The model names the MIDI pitch with its octave on any window. Its
+  FFT bins are 7.8Hz apart, wider than a semitone below 131Hz, so for the
+  guitar's lowest nine semitones (E2–C3) its pitch must come from harmonics.
+
+No 2×2 agreement table exists, because no reading was taken.
+
+### Verdict
+
+Stopped at Phase 1 on a block, not on a design fact. On paper this is the
+first model read here whose output could witness these boundaries: each note
+event on its own 10ms tick, and a same-pitch re-pick said in one tick. Three
+things stand against it before any number:
+- it answers once per 5s chunk and was scored only on whole chunks, so any read
+  the lanes can take (the event in a chunk's newest frames, or the 4s ring
+  padded to 5s) is a condition its published scores do not describe;
+- its 128ms analysis window is wider than a sixteenth;
+- at 102M learned parameters, 4,098 times the cap, a win could only ever name a
+  feature for the engine's own kernels to compute.
+
+Nothing won, so nothing ships. Lifting the gate is the owner's call. The
+brief's rule forbids routing around a block, and the weights were not sought
+anywhere else.

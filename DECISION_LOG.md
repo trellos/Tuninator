@@ -7,6 +7,63 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-086]: `MuScriptor/muscriptor-small` is not read as a boundary witness: its 10ms note events pass Phase 1 on paper, but its weights are gated
+* **Date:** 2026-09-25
+* **Status:** Proposed (stopped at Phase 1 on a block, not on its design; the owner decides whether to lift the block)
+* **Owner:** Detection architecture (the project owner's brief, 2026-09-25); the project owner decides whether to accept the model's licence and open the hosts it needs
+* **Context:** The brief `docs/external-models-eval-prompt.md` put
+  DECISION-085's question to three more published models, one subagent each.
+  Does the model carry boundary information the engine's witnesses lack, for
+  splits (`measure-splits.ts`), ghosts (the extras in `npm run eval`) and
+  140bpm sixteenths the tracker absorbs (`measure-downstream-ledger.ts
+  --all`)? `MuScriptor/muscriptor-small` is a general multi-instrument
+  transcriber from Mirelo and Kyutai. It is a decoder-only Transformer with
+  102,441,984 learned parameters that writes MT3-like note tokens from a 5s
+  log-mel prefix; its code is MIT, and its weights are CC BY-NC 4.0 behind an
+  automatic licence gate. Phase 1's rule: (c), or a target coarser than about
+  50ms, stops the line, and the model must answer promptly.
+* **Decision:** **Stopped at Phase 1; nothing read on the corpus; engine
+  unchanged.** Read from the model's own source at pinned revisions
+  (`training/muscriptor/phase1.ts`, which needs no weights):
+  - its output is note-on and note-off events per instrument group and pitch,
+    with the octave, each on an absolute 10ms tick within a 5s chunk. That is
+    finer than the 50ms rule, so it passes on paper, the first model in this
+    line to do so;
+  - a same-pitch re-pick is an off and an on on one tick, so the tokens can say
+    exactly what the split question asks;
+  - it answers once per 5s chunk, each token written with the whole chunk in
+    view. The deep lane's ring is 4s, and a fast-lane read would put the event
+    in a chunk's newest frames: conditions no published score covers;
+  - its STFT window is 128ms (64ms at half maximum), wider than a 140bpm
+    sixteenth.
+
+  Step 3 and Phase 2 need the weights, and the weights are gated:
+  `config.json` and `model.safetensors` answer HTTP 401 `GatedRepo` without a
+  token from an account that has accepted the conditions, and this environment
+  has none. The runtime, PyTorch through the `muscriptor` package, comes from
+  PyPI, which the egress policy refuses. The weights were not sought anywhere
+  else.
+* **Alternatives Considered:** (a) **Fetching the weights from a mirror or
+  another repository**: rejected. That routes around the gate and its licence
+  conditions, which the brief forbids. (b) **Reimplementing its inference in
+  TypeScript**: rejected. The weights are the block, not the runtime, and a
+  100M-parameter decoder is nothing this repository would run or ship. (c)
+  **Closing it as DECISION-085 closed solitito**: rejected. Its design passes
+  the rule solitito failed, so this line is blocked, not answered.
+* **Consequences:** Positive: whether it is worth unblocking is answered from
+  source alone, at the cost of reading code, with the parameter count matched
+  exactly to the element count the hub reads from the weights file's header.
+  Negative: the one design in this line that passes Phase 1 on paper is
+  untested. Its known costs stand before any number: 4,098 times the 25,000
+  cap, so a win could only name a feature for the engine's own kernels; a 5s
+  chunk against a 4s ring; and a 128ms analysis window. What would reopen it:
+  - the owner accepting the conditions at huggingface.co;
+  - a read token from that account in the environment's secrets as `HF_TOKEN`;
+  - network access to pypi.org and files.pythonhosted.org, and probably
+    `cas-bridge.xethub.hf.co`, which serves such files.
+
+---
+
 #### [DECISION-085]: `greblus/solitito-ai` is not read as a boundary witness: it answers once per 0.77s window, and its finest target is 96ms
 * **Date:** 2026-09-25
 * **Status:** Rejected

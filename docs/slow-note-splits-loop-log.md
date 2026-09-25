@@ -207,6 +207,7 @@ is half a beat short at the median.
 | C28 | A re-pick after a damp whose transient lands on a hop the amplitude gate refuses, on a Note still open because its tail kept a pitch reading: `rearticulation.ts` returns `gated` unread and the next hop, back at full level, has no broadband transient, so the pick is lost. Candidate: hold the refusal one articulation when the envelope had fallen (dip at most a bar) and split at it when the level comes back by `releaseRiseRatio` | tracker | DECISION-050 (the release read on a gated hop, for an unsettled contact-opened Note only); C7 (lowering the gate itself turns gated misses into splits) | on the tuning takes: the count of settled same-pitch `gated` refusals and how many sit on a label; then `p2c3q4` and `e843` found at +0 derivation missed lost, fp not up, slow DI not worse, amped bit-identical | **kept, iteration 20** (DECISION-081), with C11: 70 such refusals, 62 on the DI same-pitch takes, none amped; `tracking.gatedRepickDipRatio` 0.25; derivation missed 113 → 97, fp 204 → 203, slow DI 9 → 7; held-out fp 65 → 66 |
 | C29 | The fine witness delivers a contact 65ms late, so a release that lands under the gate is refused on the Note before and only then does the contact open the stroke's Note, 56 to 61ms early; a second fine onset splits it again (`e5`, `e25`, quarters DI) | tracker | DECISION-052 (the release on the frame that opens a fine-opened Note, and after; never before) | `e5` and `e25` cleared at +0 derivation missed, fp not up, amped bit-identical | **kept, iteration 21** (DECISION-082): `tracking.releaseBeforeFineContact`; slow DI 7 → 5, fp 203 → 201, missed flat, held-out unchanged |
 | C30 | A published pretrained model, `greblus/solitito-ai` (7.44M parameters, CNN + Transformer, ONNX; heads for root, chord quality, pitch classes sounding, and pitch classes struck in the last 96ms), read on the corpus as a witness for ghosts (outcome target), same-pitch splits (boundary target, beside DECISION-030's gate) and lost 140bpm sixteenths, with pitch secondary | deep (the app reads it 256ms behind the newest sample, and its onset answer comes 0.2–0.5s after the strike) | C3 / DECISION-070, -072 and DECISION-021: learned models trained here, on the corpus and on GuitarSet. This one is read as published, with an onset head of its own | Phase 1, before any corpus read: an output defined per frame at 50ms or finer. Then Q1 AUC ≥ 0.80 on derivation; Q2 above 0.698 as a boundary witness, plus a conditional AUC above chance on the rows the rate gate lets through; Q3 at least half the misses of some ledger branch, at a false-alarm rate stated in advance | **closed at Phase 1, 2026-09-25** (DECISION-085): (c), one answer per 768ms window. The finest target any head is trained on is the onset head's 96ms bin, and its author measures that head answering 0.2–0.5s after a strike and staying up for a median of one second. Nothing read on the corpus; held-out unspent. The weights sit behind `us.aws.cdn.hf.co`, refused by the egress policy, and the verdict does not need them. 298x the 25,000 cap |
+| C31 | A published pretrained model, `MuScriptor/muscriptor-small` (102.4M parameters, a decoder-only Transformer writing MT3-like note-on and note-off tokens from a 5s log-mel prefix; code MIT, weights CC BY-NC 4.0 behind a gate), read on the corpus as a witness for ghosts (outcome target), same-pitch splits (boundary target, beside DECISION-030's gate) and lost 140bpm sixteenths, with pitch secondary | deep (one token sequence per 5s chunk, longer than the 4s ring); a fast-lane read would put the event in a chunk's newest frames | C30 / DECISION-085, a published model stopped at Phase 1 on its time axis; C3 / DECISION-070, -072, models trained here | Phase 1, before any corpus read: an output defined per event or frame at 50ms or finer. Then Q1 AUC ≥ 0.80 on derivation; Q2 above 0.698 as a boundary witness, plus a conditional AUC above chance on the rows the rate gate lets through; Q3 at least half the misses of some ledger branch, at a false-alarm rate stated in advance | **stopped at Phase 1, 2026-09-25** (DECISION-086): passes on paper, since its tokens put note-ons and note-offs on an absolute 10ms tick and a same-pitch re-pick is one tick, but it answers once per 5s chunk against a 4s ring, and its weights are gated (HTTP 401 `GatedRepo`) with a PyTorch runtime from PyPI, which the egress policy refuses. Nothing read on the corpus; held-out unspent. 4,098x the 25,000 cap. Reopens only if the owner accepts its licence and the environment gets a token and the hosts |
 
 ## Owner-side blockers (living)
 
@@ -1819,3 +1820,37 @@ happen at the scale of a tenth of a second: a sixteenth note at 140bpm, or a
 short false note split off a real one. So the model cannot tell us where one
 note ends and the next begins. I stopped there, as the brief said to, without
 running it on your recordings. Nothing in the engine changed.
+
+## Three more external models as boundary witnesses — 2026-09-25 (DECISION-086 onward)
+
+The owner's brief (`docs/external-models-eval-prompt.md`) put DECISION-085's
+question to three more published models, one subagent each, run in parallel.
+Not loop iterations: each ran the brief's own phases, with a stop rule at the
+first. They are recorded here in the order they were written up, which is
+also the order of their decision IDs and ledger rows.
+
+### `MuScriptor/muscriptor-small` (DECISION-086, C31)
+
+- Phase 1's deciding fact: it writes note-on and note-off events, each on an
+  absolute 10ms tick inside a 5s chunk, and a same-pitch re-pick is an off and
+  an on on one tick. That passes the 50ms rule on paper. It answers once per
+  chunk, and the deep lane's ring (4s) is shorter than a chunk.
+- `training/muscriptor/phase1.ts` prints all of it from the model's own source
+  at pinned revisions, and its parameter count matches the published weights
+  file's header exactly. It needs no weights.
+- Not done: everything that needs the weights. They are gated (HTTP 401
+  `GatedRepo`, and there is no token here), and the runtime comes from PyPI,
+  which the egress policy refuses.
+- Nothing read on the corpus; held-out unspent; engine unchanged.
+- Findings section: "A published transcription model read as a boundary
+  witness"; DECISION-086. Ledger: C31 stopped.
+
+**In plain words, for the owner.** This one writes down each note with its own
+start and end to a hundredth of a second, and it marks a re-picked note as a
+new one, which is exactly what the engine gets wrong. So on paper it could
+help. But its trained model is locked behind a sign-in and a non-commercial
+licence on Hugging Face, and it needs Python packages this environment cannot
+download, so it was not run on your recordings. It also answers in five-second
+blocks, longer than the four seconds the engine keeps. To have it tested:
+accept its licence on Hugging Face, add a token to the environment, and allow
+PyPI.
