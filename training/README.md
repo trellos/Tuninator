@@ -105,3 +105,15 @@ the same code path.
   no network, and imports only `DEFAULT_ENGINE_CONFIG` (for the deep lane's
   ring). Its header has the fetch commands, including the sparse checkout that
   keeps the source's own TypeScript out of this repository's typecheck.
+- `hft-transformer/` — the full record for `cstr/hft-transformer-GGUF`
+  (DECISION-087), Phases 1 to 3.
+  - `build.sh` fetches every pinned input and builds CrispASR's CLI and the
+    activation reader `hft-read.cpp` with the local toolchain.
+  - `read-ckpt.py` and `ckpt-vs-gguf.ts` check the weights against their
+    source checkpoint. The first is stdlib Python with a restricted unpickler,
+    and it checks the file's SHA-256 before reading it.
+  - `phase1.ts` prints the time axis; `phase2.ts` holds the pre-registered
+    questions.
+  - `phase3.ts`, `phase3-hook.patch` and `phase3-summary.ts` are the end-to-end
+    veto. The hook is applied, run and reverted, and never committed to `src/`.
+  - Outputs go to `training/out/hft-transformer/`.

@@ -36,3 +36,22 @@ parameters, some 4,000 times what the engine can ship, a good result could
 only ever point at what the engine's own detectors should measure. Testing it
 needs the owner to accept its licence on Hugging Face, add a token to the
 environment, and allow its download and package hosts.
+
+## `cstr/hft-transformer-GGUF` — 2026-09-25 — does not fit, measured end to end (DECISION-087)
+
+hFT-Transformer is a piano transcriber that, unlike solitito's model, really
+does answer every 16 milliseconds: on a clean test tone it keeps four repeats
+of one note played a sixteenth apart as four notes. Two things stop it helping
+Tuninator. It needs between about 0.6 and 2.6 seconds of sound after a moment
+before it will say what happened there, so only the slower, second-guessing
+half of the recognizer could ever ask it, and by then the answer is usually
+missing some of what it wanted to hear. And on the guitar recordings it does
+not tell a real re-pick from a phantom split any better than the recognizer's
+own attack measurements do. It looked slightly better on the practice takes
+only with every recording pooled together, did worse within any one signal
+path, and did worse than a coin toss on the 140bpm test takes. Wired in to
+veto the recognizer's same-pitch splits, it removed 120 phantom notes from the
+practice takes but deleted 144 real ones, and broke the required clean-lead
+test. It also hears new notes inside nearly half of the notes the recognizer
+already gets right, names pitch worse than the recognizer through an amp, and
+at 5.5 million parameters is about 220 times too large to ship anyway.

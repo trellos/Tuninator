@@ -208,6 +208,7 @@ is half a beat short at the median.
 | C29 | The fine witness delivers a contact 65ms late, so a release that lands under the gate is refused on the Note before and only then does the contact open the stroke's Note, 56 to 61ms early; a second fine onset splits it again (`e5`, `e25`, quarters DI) | tracker | DECISION-052 (the release on the frame that opens a fine-opened Note, and after; never before) | `e5` and `e25` cleared at +0 derivation missed, fp not up, amped bit-identical | **kept, iteration 21** (DECISION-082): `tracking.releaseBeforeFineContact`; slow DI 7 → 5, fp 203 → 201, missed flat, held-out unchanged |
 | C30 | A published pretrained model, `greblus/solitito-ai` (7.44M parameters, CNN + Transformer, ONNX; heads for root, chord quality, pitch classes sounding, and pitch classes struck in the last 96ms), read on the corpus as a witness for ghosts (outcome target), same-pitch splits (boundary target, beside DECISION-030's gate) and lost 140bpm sixteenths, with pitch secondary | deep (the app reads it 256ms behind the newest sample, and its onset answer comes 0.2–0.5s after the strike) | C3 / DECISION-070, -072 and DECISION-021: learned models trained here, on the corpus and on GuitarSet. This one is read as published, with an onset head of its own | Phase 1, before any corpus read: an output defined per frame at 50ms or finer. Then Q1 AUC ≥ 0.80 on derivation; Q2 above 0.698 as a boundary witness, plus a conditional AUC above chance on the rows the rate gate lets through; Q3 at least half the misses of some ledger branch, at a false-alarm rate stated in advance | **closed at Phase 1, 2026-09-25** (DECISION-085): (c), one answer per 768ms window. The finest target any head is trained on is the onset head's 96ms bin, and its author measures that head answering 0.2–0.5s after a strike and staying up for a median of one second. Nothing read on the corpus; held-out unspent. The weights sit behind `us.aws.cdn.hf.co`, refused by the egress policy, and the verdict does not need them. 298x the 25,000 cap |
 | C31 | A published pretrained model, `MuScriptor/muscriptor-small` (102.4M parameters, a decoder-only Transformer writing MT3-like note-on and note-off tokens from a 5s log-mel prefix; code MIT, weights CC BY-NC 4.0 behind a gate), read on the corpus as a witness for ghosts (outcome target), same-pitch splits (boundary target, beside DECISION-030's gate) and lost 140bpm sixteenths, with pitch secondary | deep (one token sequence per 5s chunk, longer than the 4s ring); a fast-lane read would put the event in a chunk's newest frames | C30 / DECISION-085, a published model stopped at Phase 1 on its time axis; C3 / DECISION-070, -072, models trained here | Phase 1, before any corpus read: an output defined per event or frame at 50ms or finer. Then Q1 AUC ≥ 0.80 on derivation; Q2 above 0.698 as a boundary witness, plus a conditional AUC above chance on the rows the rate gate lets through; Q3 at least half the misses of some ledger branch, at a false-alarm rate stated in advance | **stopped at Phase 1, 2026-09-25** (DECISION-086): passes on paper, since its tokens put note-ons and note-offs on an absolute 10ms tick and a same-pitch re-pick is one tick, but it answers once per 5s chunk against a 4s ring, and its weights are gated (HTTP 401 `GatedRepo`) with a PyTorch runtime from PyPI, which the egress policy refuses. Nothing read on the corpus; held-out unspent. 4,098x the 25,000 cap. Reopens only if the owner accepts its licence and the environment gets a token and the hosts |
+| C32 | A published pretrained model, `cstr/hft-transformer-GGUF` (5.5M parameters, a hierarchical frequency-time Transformer for piano trained on MAESTRO v3, run through CrispASR's ggml runtime; the weights are a community rewrite's checkpoint, bit-identical), read on the corpus as a witness for ghosts (outcome target), same-pitch splits (boundary target, beside DECISION-030's gate) and lost 140bpm sixteenths, with pitch secondary | deep (each answer needs 576–2,608ms of audio after its frame; read at the deep lane's rulings with the look-ahead cut) | C30 / DECISION-085 and C31 / DECISION-086, published models stopped at Phase 1; C2a, the onset-family witnesses at the boundary; C3 / DECISION-070, -072 | Phase 1: an output defined per frame at 50ms or finer. Q1 AUC ≥ 0.80 on derivation; Q2 above 0.698 as a boundary witness and a gate-passed bootstrap lower bound above 0.5; Q3 at least half the misses of a branch of five or more, false alarms at most 2%; Phase 3's win: derivation extras down with missed not up | **closed through Phase 3, 2026-09-25** (DECISION-087): the targets pass (a 48ms onset triangle on 16ms frames), but at least 576ms of look-ahead leaves only the deep lane. Q2's cut witness reads 0.710 pooled on derivation (0.651 within path, against `sharpness` at 0.711) and 0.440 held out. As a veto at 0.5: derivation false positives 191 → 71 and missed 100 → 244, and `clean-lead-120bpm` (required) fails. Q1 0.691; Q3 false alarms 47.7%. 221x the 25,000 cap |
 
 ## Owner-side blockers (living)
 
@@ -1854,3 +1855,27 @@ download, so it was not run on your recordings. It also answers in five-second
 blocks, longer than the four seconds the engine keeps. To have it tested:
 accept its licence on Hugging Face, add a token to the environment, and allow
 PyPI.
+
+### `cstr/hft-transformer-GGUF` (DECISION-087, C32)
+
+- Phase 1: per-key onset, offset and frame outputs on 16ms frames, trained on
+  a 48ms onset triangle. It passes, but every answer needs at least 576ms of
+  audio after its frame, so only deep-lane decisions were read, at the deep
+  lane's own rulings.
+- Phase 2 on the tuning takes, pre-registered: Q1 0.691 (fail); Q3 false alarms
+  47.7% (fail); Q2 0.710 against 0.698 (pass, pooled), but 0.651 within a signal
+  path, under the engine's own `sharpness` at 0.711.
+- Held out, read once: Q2 0.440.
+- Phase 3, Q2 as a veto on same-pitch cuts: derivation false positives 191 →
+  71, missed 100 → 244, `clean-lead-120bpm` (required) fails. The dev-only hook
+  is in `training/hft-transformer/phase3-hook.patch`; `src/` unchanged.
+- Findings section: "A published piano transcriber read as a boundary
+  witness"; DECISION-087. Ledger: C32 closed.
+
+**In plain words, for the owner.** This piano model really does look at the
+sound 60 times a second, but it needs up to two and a half seconds of what
+comes after a note before it answers, so only the slow half of the engine
+could use it. On your recordings it did no better than the engine's own
+attack measurements at telling a real re-pick from a phantom split, and on the
+140bpm test takes it did worse than chance. Used to veto splits, it removed
+120 phantom notes and 144 real ones. Nothing in the engine changed.

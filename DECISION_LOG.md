@@ -7,6 +7,63 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-087]: `cstr/hft-transformer-GGUF` is not a boundary witness: its same-pitch reading clears 0.698 only pooled on the tuning takes, reads 0.440 held out, and as a deep-lane veto costs 144 played notes for 120 phantoms
+* **Date:** 2026-09-25
+* **Status:** Rejected
+* **Owner:** Detection architecture (the project owner's brief, 2026-09-25)
+* **Context:** The brief `docs/external-models-eval-prompt.md`, as in
+  DECISION-086. `cstr/hft-transformer-GGUF` is Toyama et al.'s hierarchical
+  frequency-time Transformer for piano transcription (ISMIR 2023): 5,518,116
+  parameters, trained on MAESTRO v3, published as a GGUF for CrispASR's ggml
+  runtime. Its tensors are bit-identical to a community rewrite's checkpoint
+  (`ddPn08/hft-transformer-rewrite`), not a file Sony published, although the
+  card names Sony's. Per key and per 16ms frame it outputs onset, offset and
+  frame activations, trained on a 48ms onset triangle, so it passes Phase 1 on
+  its targets. It is not causal: every answer needs 576–2,608ms of audio after
+  its frame.
+* **Decision:** **Rejected through Phase 3; nothing ships; `src/` unchanged.**
+  The model was read at the deep lane's own rulings, with only the audio the
+  ring holds; the fast lane can never ask it. The bars were pre-registered in
+  `training/hft-transformer/phase2.ts` before any take was read:
+  - Q1, ghosts (outcome target): S1b 0.691 against a bar of 0.80. Fail.
+  - Q2, same-pitch cuts (boundary target): 0.710 against 0.698, and a
+    gate-passed lower bound of 0.674 against 0.5, so a pass as stated. But
+    within a signal path it reads 0.651, below the engine's own `sharpness` at
+    0.711, and on the held-out takes, read once, 0.440.
+  - Q3, lost fast notes: recall met in six ledger branches, but it hears an
+    onset inside 47.7% of matched labels against a bar of 2%. Fail.
+  - Q4, pitch: exact 86.1% against the engine's 97.5% on single notes; worst
+    through an amp and above MIDI 60.
+  - Phase 3, Q2 as a veto at the model's own 0.5, fixed before the held-out
+    read: derivation false positives 191 → 71 and missed 100 → 244; held-out
+    false positives 63 → 34 and missed 27 → 80; `clean-lead-120bpm`
+    (required) fails, so eval fails. The dev-only hook stays in
+    `training/hft-transformer/phase3-hook.patch`.
+* **Alternatives Considered:** (a) **Sweeping the veto threshold** for a point
+  that costs no played note: rejected. The gate was fixed in advance at the
+  model's own threshold; a threshold chosen on the numbers is a fit to them,
+  and the witness reads below chance held out. (b) **Taking the pooled Q2 pass
+  as the result**: rejected. Stratified, it is the model telling takes and
+  signal paths apart, not re-picks from phantoms. (c) **Acting on Q1's
+  held-out 0.808**: rejected. The verdict is on the derivation takes, where it
+  reads 0.691; a question passed only on held-out data is not a derivation
+  result. (d) **The fast lane**: not possible. The encoder fixes 576ms of
+  look-ahead. (e) **The quantised q4_0 file**: used only for the card's own
+  example; every measurement is on f32, the model itself.
+* **Consequences:** Positive: the first published model this line has run on
+  the corpus, closed end to end, with every number reproducible from pinned
+  inputs (`build.sh` fetches and builds everything; no host was refused). It
+  confirms from outside that an onset activation read at the boundary does not
+  beat the engine's own at-boundary witnesses once takes are held apart,
+  consistent with the ceiling DECISION-028 recorded. Negative: about 34 minutes
+  of CPU per derivation pass at two threads; a parity check that missed its own
+  end-to-end bar (4.0e-4 against 1e-4, traced to the runtime's float32 front
+  end, with no activation crossing 0.5); and the card's MusicNet figures not
+  reproduced. Its provenance, a community retraining that the card attributes
+  to Sony's checkpoint, is recorded for anyone who reads the card.
+
+---
+
 #### [DECISION-086]: `MuScriptor/muscriptor-small` is not read as a boundary witness: its 10ms note events pass Phase 1 on paper, but its weights are gated
 * **Date:** 2026-09-25
 * **Status:** Proposed (stopped at Phase 1 on a block, not on its design; the owner decides whether to lift the block)

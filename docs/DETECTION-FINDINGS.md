@@ -8587,3 +8587,349 @@ things stand against it before any number:
 Nothing won, so nothing ships. Lifting the gate is the owner's call. The
 brief's rule forbids routing around a block, and the weights were not sought
 anywhere else.
+
+## A published piano transcriber read as a boundary witness: `cstr/hft-transformer-GGUF`, through Phase 3 (DECISION-087)
+
+The same brief's question, put to Toyama et al.'s hierarchical frequency-time
+Transformer for piano transcription, published as a GGUF for the ggml runtime
+in CrispASR. It is the first model in this line to be run on the corpus.
+- **Phase 1:** passes on its targets. It is not causal, so only deep-lane
+  decisions can read it.
+- **Phase 2**, on the fifteen tuning takes: Q1 and Q3 fail. Q2, the same-pitch
+  cut, clears its bar as stated, but only pooled across takes.
+- **Held out:** Q2 reads 0.440.
+- **Phase 3**, as a deep-lane veto on same-pitch cuts: it removes 120 false
+  positives from the derivation takes at a cost of 144 played notes, and fails
+  a required fixture.
+
+Nothing ships. No host was refused.
+
+Phase 2 was pre-registered in `training/hft-transformer/phase2.ts`, committed
+before any take was read and unchanged since. Phase 3's gate was committed
+before the held-out read.
+
+### What the model is
+
+```
+repository     huggingface.co/cstr/hft-transformer-GGUF @ 17d72a24 (2026-09-23); the card says MIT.
+               hft-transformer-f32.gguf 22,816,096 B, sha256 577652db…ffaca935 (every measurement);
+               hft-transformer-q4_0.gguf 4,681,056 B, sha256 c72a56b9…0987dc3 (the card's example only)
+provenance     not a file Sony published. The GGUF's 153 mapped tensors are bit-identical to
+               epoch=9-step=46600.ckpt in huggingface.co/ddPn08/hft-transformer-rewrite @ 9c0f9836
+               (66,440,296 B, sha256 7b7b575c…52e9d12, uploaded 2024-08-17): a training run of
+               github.com/ddPn08/hft-transformers-rewrite @ 53c2033b, which rewrites
+               github.com/sony/hFT-Transformer @ 71a2ee06 (MIT). Exported to ONNX by a flutter_tuner
+               kernel (github.com/CrispStrobe/flutter_tuner @ 8cb104ab), converted by CrispASR. The card
+               names Sony's checkpoint. Its fused front end is within 4.3e-8 of the fusion recomputed
+               from the checkpoint's own conv and embedding
+purpose        piano transcription (Toyama et al., ISMIR 2023): per-key onset, offset, frame, velocity -> notes
+architecture   hierarchical frequency-time Transformer. Per 16ms frame, each of 256 mel bins reads its own
+               65-frame (+-512ms) window through Conv2d(1,4,(1,5)) + Linear(244,256); a 3-layer
+               Transformer across the 256 bins; 88 key queries cross-attending to them in 3 layers
+               (stage A); a 3-layer Transformer across the 128 frames of a pass, per key (stage B, the
+               published output). Hidden 256, 4 heads of 64, feed-forward 512
+parameters     5,518,116 in the checkpoint (counted by read-ckpt.py; reconstructed from the GGUF's own
+               tensors and asserted equal by phase1.ts). The GGUF carries 5,437,059 (conv fused, stage-A
+               and pedal heads dropped) plus 264,448 front-end constants. 221x this repository's 25,000 cap
+input          16kHz mono; STFT n_fft = window 2048 (128ms, periodic Hann, centred, zero padding), hop 256
+               (16ms); 256 mel bins (HTK, slaney norm, 0-8kHz), log(mel + 1e-8). One pass reads
+               32+128+32 frames (3.07s) and answers the middle 128 (2.05s)
+heads          per key (88, A0-C8), per frame: onset, offset, frame (key down), velocity (128 bins); three
+               pedal heads the GGUF drops. Logits (BCEWithLogits), the sigmoid applied at inference
+training data  MAESTRO v3 (Yamaha Disklavier solo piano), per the rewrite's preprocess_maestro_v3.py. The
+               checkpoint's loop state, step 46,600 in the tenth epoch at 4,999 batches an epoch, fits
+               the full train split at an effective batch of about 56 (the batch is not recorded)
+licence        the GGUF card: MIT (Sony's code licence). The rewrite's repository and the checkpoint's
+               hub repository declare none
+runtime        CrispASR @ 0864a3e0 (C++/ggml @ 2f5a80d2), `crispasr --piano`, built here with cmake/g++
+               (static, CPU): 3.4-4.2s wall per 2.048s pass on 2 threads, about 2x slower than real time
+published      MusicNet test split (the card): note F1 52.21%, 70.52% on solo piano; f32 = the ONNX export
+```
+
+### The deciding fact: (a) and (b), with 0.6 to 2.6s of look-ahead
+
+Read from the rewrite's `preprocess/midi.py`, which uses Sony's label code for
+onsets. Every head is per key and per 16ms frame:
+- the onset target is a triangle peaked at the exact onset and zero 3 frames
+  (48ms) either side;
+- the offset target is the same triangle at the key's release, suppressed where
+  the same key is re-struck;
+- the frame target is binary, from onset to release.
+
+No target is coarser than 50ms. The model is not causal. Stage A reads ±32
+frames, so it needs a fixed 576ms of audio after a frame. Stage B attends
+across its whole 128-frame pass, so it needs 576 to 2,608ms. The fast lane can
+never use it; the deep lane can, with the look-ahead cut near its rulings.
+From `phase1.ts`, with the last row measured in Phase 2:
+
+```
+                                                          ms    against 50ms / 107ms
+feature hop                                               16    fine enough
+STFT analysis window                                     128    coarser than a sixteenth
+  its full width at half maximum                          64    coarser than 50ms
+onset target: zero this far from the onset                48    fine enough
+onset target: >= 0.5 within +-                            24    fine enough
+offset target: zero this far from the release             48    fine enough
+frame target: one value per                               16    fine enough
+stage A receptive field (its frames, plus the STFT)     1152    coarser than a sixteenth
+stage A look-ahead                                       576    coarser than a sixteenth
+stage B look-ahead, last frame of a pass                 576    coarser than a sixteenth
+stage B look-ahead, first frame of a pass               2608    coarser than a sixteenth
+answer latency in the model's own block-wise use    576-2608    coarser than a sixteenth
+audio held past a cut when the deep lane rules (meas.)   213    median; 82% of cuts under 576
+```
+
+### Step 3, parity, and overlap
+
+- **The advertised example.** The card's own command, `crispasr --piano -m
+  hft-transformer-q4_0.gguf -f input.wav`, and the same with the f32 file, run
+  on a synthetic clip made here (`synth-test-signal.ts`). The clip has 15
+  struck-string tones, four of them A4 re-strikes 107ms apart; nothing from the
+  corpus.
+  - Both files give the same 14 of 15 notes; the G4 at 1.0s is dropped.
+  - Onsets land 5–14ms early.
+  - All four 107ms re-strikes come out as separate notes.
+  - q4_0 and f32 onsets agree within 2ms.
+- **No reference output is published.** The card's own parity check needs
+  onnxruntime and an ONNX file that is not published, so three checks stand in:
+  - *Weights:* the GGUF is bit-identical to the checkpoint. The fused front end
+    is within 4.3e-8, and the window and filterbank within 3.0e-8 and 5.0e-8 of
+    torchaudio's formulas.
+  - *Arithmetic:* `reference-forward.ts` is an independent TypeScript
+    implementation of the checkpoint's unfused architecture and of torchaudio's
+    front end, run on one 192-frame window.
+    - On the runtime's own log-mel, the B heads agree to 4.4e-7 (onset), 1.3e-7
+      (offset) and 5.4e-7 (frame); no cell of 11,264 crosses 0.5.
+    - End to end with a float64 front end they agree to 4.0e-4, 7.2e-5 and
+      2.1e-4, still with no cell crossing 0.5. That misses the pre-stated 1e-4.
+      The excess is the runtime's float32 front end: 1.8e-3 in log-mel on bins
+      within 60dB of each frame's peak.
+  - *The reader:* `hft-read`, which every measurement used, compiles the pinned
+    `hft_transformer.cpp` unmodified and agrees with the CLI note for note on
+    the same 16-bit input.
+
+  The card's MusicNet F1 was not reproduced.
+- **Overlap.** MAESTRO v3 is solo piano: no guitar, no GuitarSet, none of the
+  owner's recordings. No overlap is possible; the model never heard a guitar in
+  training.
+
+### Phase 2 on the tuning takes
+
+How the model was read, fixed before any take was:
+- **Rows** come from the engine's own trace (`collectFixture` and `classify`
+  from the measurement scripts).
+- **Every bar is judged on a deep reading.** The deep lane's rulings were
+  observed by wrapping `DeepLane.prototype.drain` from the script, with `src/`
+  unedited. There were 734 rulings, a median 0.49s apart. Each row takes the
+  first ruling holding audio 40ms past its anchor. The model is handed only
+  what the ring holds at that ruling (at most 4s, nothing after) and answers
+  the 128 frames ending there.
+- **A full-take reading**, look-ahead intact, is diagnostic only.
+- **Audio:** the engine's own 48kHz samples, decimated to 16kHz with
+  torchaudio's default resampler (Hann-windowed sinc, 6 zero crossings, roll-off
+  0.99), the one the model's training pipeline used.
+- **Windows:**
+  - the ±40ms onset window is 80ms wide, and a pick 107ms away has its onset
+    triangle end 59ms from the anchor, outside it;
+  - the 70ms label margin is the ledger's own;
+  - the model's 128ms STFT window is wider than a sixteenth. That is flagged,
+    and its cost is what the numbers measure.
+- **Signal paths** are the label files' own `instrument`; "clean" is
+  `guitar-clean`, the five originals.
+
+**Q1, ghosts** (outcome-shaped).
+- Rows: every emitted Note, 1,133 paired and 191 extra.
+- S1a is the mean over the Note's frames of the largest frame activation over
+  all 88 keys: a note is sounding.
+- S1b is the same over the keys of the Note's pitch classes: the model agrees
+  with the Note's pitch.
+- Bar: AUC ≥ 0.80 for either.
+
+```
+                        deep   95% CI           full    bar 0.80
+S1a sounding           0.671   [0.627, 0.716]   0.642   fail
+S1b pitch agreement    0.691   [0.646, 0.733]   0.710   fail
+  S1b by path: clean 0.753 (76/8), DI 0.780 (509/5), amp 0.678 (548/178)
+2x2, S1b >= 0.5 says "real":
+    path    only model  only engine   both  neither   rows
+    clean            1            1     75        7     84
+    DI               0            7    502        5    514
+    amp             59           48    500      119    726
+    all             60           56   1077      131   1324
+```
+
+Fail. The extras are mostly same-pitch fragments of a note that really is
+sounding, so "sounding" and "agrees" both say real.
+
+**Q2, same-pitch splits** (boundary-shaped).
+- Rows: every accepted, settled, same-pitch cut: 1,100, of which 807 have
+  y_b = 1 and 908 were let through by DECISION-030's gate.
+- S2 is the largest onset activation within ±40ms of the cut, over the keys of
+  the cut's pitch classes.
+- Bar: (i) AUC(S2, y_b) above 0.698 over all cuts, and (ii) the 95% bootstrap
+  lower bound of the same AUC above 0.5 on the gate-passed cuts.
+
+```
+(i)  S2 on y_b, all cuts          0.710  [0.677, 0.742]   full 0.728   bar > 0.698: PASS
+(ii) S2 on y_b, 908 gate-passed   0.712  [0.674, 0.748]   full 0.727   lower bound > 0.5: PASS
+outcome target beside it (not compared): 0.686 all, 0.732 gate-passed
+engine witnesses, same rows, y_b / y_o: sharpness 0.683/0.665, fluxRatio 0.689/0.661,
+  -dipRatio 0.600/0.650, child span over local IOI 0.472/0.826
+stratified, descriptive (q2-strata.ts):  pooled  within path  within take
+  model S2, deep                          0.710      0.651        0.592
+  model S2, full                          0.728      0.688        0.631
+  sharpness                               0.683      0.711        0.658
+  fluxRatio                               0.689      0.662        0.619
+per take (model / fluxRatio): E5 eighths-16ths amped 0.909/0.548, DI 0.711/0.547; A3 eighths DI
+  0.886/0.934, amped 0.531/0.612; quarters amped 0.411/0.730, DI 0.360/0.349; held-then-picked amped
+  0.564/0.658, DI 0.441/0.252
+2x2, S2 >= 0.5 says "new articulation" (the engine cut every row; right iff y_b = 1):
+    path    only model  only engine   both  neither   rows
+    clean           14           14     18        2     48
+    DI               1            2    320       48    371
+    amp            130          170    283       98    681
+    all            145          186    621      148   1100
+```
+
+Pass, as stated, and that started Phase 3. But the pass does not survive
+stratification. With the signal path held fixed the model reads 0.651, under
+the engine's own `sharpness` at 0.711. Most of the pooled margin is the model
+ranking whole takes and signal paths against each other, not cuts within them:
+the pooling trap DECISION-031 named, where a figure pooled across takes
+rewards telling the takes apart.
+
+**Q3, lost fast notes.**
+- Rows: 100 missed and 1,133 matched labels.
+- The model "sees" a label when an onset local maximum of at least 0.5 at one
+  of the label's pitch classes falls within ±40ms of its start, nearer that
+  label than any other.
+- A false alarm is such a maximum inside a matched label's interior, 70ms in
+  from either edge.
+- Bar: some ledger branch holding at least 5 misses in which the model sees at
+  least half, with false alarms at most 2%.
+
+```
+false alarms on matched labels: 368 of 772 with an interior = 47.7% (full 298); bar <= 2%
+  DI 47.8%, amp 51.3%, clean 28.4%; held-then-picked amped 87/118, DI 56/118; A3 eighths DI 54/81
+branch                                            misses  seen deep  seen full
+no transient within the window                        43   26 (60%)       22
+never announced                                       14   10 (71%)       11
+rejected: no-energy-not-sharp                          8    8 (100%)       8
+rejected: ring-out-not-sharp                           7    7 (100%)       7
+split made; successor paired with a neighbour          7    4 (57%)        7
+band-only transient                                    7    4 (57%)        5
+(eight smaller branches, 14 misses)
+matched labels the model also sees: 67.0% deep, 76.0% full
+2x2 (engine right iff matched; model right iff it sees the label):
+    path    only model  only engine   both  neither   rows
+    clean            0           35     41        2     78
+    DI              48           85    424       23    580
+    amp             19          254    294        8    575
+    all             67          374    759       33   1233
+```
+
+Fail. The recall half is met in six branches, but the model hears a new onset
+inside nearly half of the notes the engine already has right, 24 times the
+stated rate. A recovery rule built on it would split them.
+
+**Q4, pitch** (secondary, no bar). Matched single notes; the model's pitch is
+the argmax key of its mean frame activation over the Note. On chord labels the
+model holds, on average, 0.826 of each label's pitch classes at 0.5 or above.
+
+```
+                    n     exact engine/model   pitch class engine/model
+single notes      1098      97.5% / 86.1%          99.3% / 94.4%
+  clean             41      75.6% / 63.4%          82.9% / 63.4%
+  DI               509     100.0% / 99.8%         100.0% / 100.0%
+  amp              548      96.9% / 75.0%          99.8% / 91.6%
+  below MIDI 60    501      96.4% / 99.6%          99.8% / 99.8%
+  MIDI 60 and up   597      98.5% / 74.7%          98.8% / 89.9%
+2x2 on pitch class (only model / only engine / both / neither):
+  clean 1/9/25/6, DI 0/0/509/0, amp 1/46/501/0, all 2/55/1035/6
+```
+
+**What cutting the look-ahead costs.** At the rulings, 82–84% of rows have
+less than 576ms of audio after them. Deep against full: Q2 0.710 against 0.728;
+S1b 0.691 against 0.710; matched labels seen, 67% against 76%. The cut costs a
+little, and with its full look-ahead the model fails the same bars.
+
+### HELD OUT: the twelve 140bpm takes, read once
+
+Read after the bars and the Phase 3 design were committed, with 198 rulings:
+
+```
+Q1  S1a 0.783 [0.723, 0.837] (full 0.746); S1b 0.808 [0.745, 0.862] (full 0.829); 354 paired / 63 extra
+    S1b by path: DI 0.852, amp 0.830, mic 0.731   (the verdict stands on derivation, 0.691; noted, not acted on)
+Q2  (i)  0.440 [0.363, 0.516]  full 0.428   fail;  (ii) gate-passed 0.503 [0.414, 0.595]   fail
+    by path: DI 0.482, amp 0.447, mic 0.425; within path 0.449, within take 0.442
+    engine on the same 277 cuts: sharpness 0.653, fluxRatio 0.598, -dipRatio 0.668 (0.703 within path)
+    outcome target beside it: S2 0.703, child span over IOI 0.912
+Q3  27 misses; false alarms 64 of 232 = 27.6% (fail); "too young to be ended" 7/9 seen
+Q4  single notes (all MIDI >= 60): exact engine 96.5% / model 79.1%; pitch class 96.5% / 85.5%
+2x2 (only model / only engine / both / neither):
+  Q1  DI 4/6/119/7    amp 22/23/90/8    mic 9/9/107/13    all 35/38/316/28
+  Q2  DI 9/27/39/14   amp 11/49/20/8    mic 16/51/21/12   all 36/127/80/34
+  Q3  DI 1/11/114/1   amp 9/33/80/5     mic 7/34/82/4     all 17/78/276/10
+  Q4  DI 1/12/88/0    amp 1/19/68/1     mic 5/7/78/2      all 7/38/234/3
+```
+
+The Q2 witness that cleared 0.698 pooled on the tuning takes reads below chance
+on the held-out cuts, where the engine's own witnesses read 0.60–0.67.
+
+### Phase 3: Q2 as a deep-lane veto
+
+- **Gate, fixed in advance:** refuse an accepted, settled, same-pitch cut when
+  S2 is under 0.5, the model's own threshold, not swept. S2 is precomputed per
+  take from the baseline run's deep readings at the ruling 40ms past the cut.
+- **Pre-stated win condition:** derivation extras fall and derivation missed
+  labels do not rise.
+- **The hook** is `phase3-hook.patch`: `note-tracker.ts` and `analyzer.ts`,
+  with gate files keyed by the audio's SHA-256. It was applied, run and
+  reverted. With it applied and the gate unset, the eval output was
+  byte-identical to the baseline and its report identical but for its
+  timestamp. `src/` and `fixtures/` are unchanged.
+
+```
+                                        derivation          held-out
+                                     before    after     before    after
+npm run eval   Notes                   1324     1060        417      335
+               matched                 1133      989        354      301
+               missed                   100      244         27       80
+               false positives          191       71         63       34
+measure-splits events split             173       75         59       29
+               extra Notes              204       81         61       29
+  --subset=slow events split            148       57         31       15
+               extra Notes              177       63         31       15
+ledger: rejected: hft-veto                0       61          0       40
+        rejected: chord-past-muted-window 1       57          0        0
+whole corpus: missed 127 -> 324, fp 254 -> 105; split 232 -> 104 of 1,614, extras 265 -> 110;
+  slow 179 -> 72 of 774, extras 208 -> 78
+eval PASS -> FAIL: clean-lead-120bpm (required) pitch class 85.0% -> 54.3%, missed 2 -> 10
+per take, missed: held-then-picked amped 2 -> 87 (fp 48 -> 10), A3 eighths amped 9 -> 45 (fp 38 -> 9),
+  quarters amped 2 -> 12 (fp 67 -> 29), lead-line mic 16ths 10 -> 23; every derivation DI take unchanged
+```
+
+A finding, not a win. The veto removes 120 derivation false positives at a
+cost of 144 played notes: 61 vetoed directly, and the rest lost to later
+rejections of the Note it kept alive (`chord-past-muted-window` 1 → 57). It
+fails a required fixture. On the direct input it agrees with the engine, so
+nothing changes there; through an amp or a room mic it refuses real re-picks
+along with the phantoms.
+
+### Verdict
+
+Closed through Phase 3. Nothing won, so nothing ships.
+- The targets are fine enough: a 48ms onset triangle on 16ms frames.
+- But every answer needs at least 576ms of audio after its frame, so only the
+  deep lane could ever ask.
+- On the one question it cleared, its reading at the boundary is an onset
+  activation. That is the witness family this record has measured most. Once
+  takes are held apart it reads below the engine's own `sharpness` (0.651
+  against 0.711 within path), and below chance on held-out.
+- At 5.5M parameters (221 times the cap), a win could only have named a feature
+  for the engine's kernels, and the one it rests on is one they already
+  compute.
+
+The provenance finding stands on its own: the weights the card attributes to
+Sony's checkpoint are a community rewrite's training run, verified tensor by
+tensor.

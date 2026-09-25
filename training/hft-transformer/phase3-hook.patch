@@ -1,0 +1,109 @@
+diff --git a/src/engine/tracker/note-tracker.ts b/src/engine/tracker/note-tracker.ts
+index 2f21446..8f2b2a0 100644
+--- a/src/engine/tracker/note-tracker.ts
++++ b/src/engine/tracker/note-tracker.ts
+@@ -50,6 +50,15 @@ import type { HypothesisTransition } from "./hypotheses.js";
+ import { NoteRecord, type HarmonyVote } from "./note-record.js";
+ import { classifyHarmonyChange, classifyPitchChange } from "./revision.js";
+ 
++/**
++ * DEV-ONLY HOOK, never committed: phase 3 of an external model's evaluation
++ * (training/hft-transformer/phase3.ts). When set, it is asked about every
++ * accepted, settled, same-pitch cut and refuses it by returning true.
++ */
++export const devCutVeto: { fn: ((atMs: number, pitchClasses: readonly number[] | null) => boolean) | null } = {
++  fn: null,
++};
++
+ export type TrackerEmission =
+   | { type: "started"; note: Note }
+   | { type: "changed"; note: Note; change: NoteChange }
+@@ -897,7 +906,7 @@ export class NoteTracker {
+         active.harmonyBloomed,
+         active.ringOutSoundedMs
+       );
+-      const rearticulated = verdict.accepted;
++      let rearticulated = verdict.accepted;
+       // A harmonically-named Note has proved it is a chord, and a chord's own
+       // ring-out is full of transient-looking energy for hundreds of
+       // milliseconds. A Note that has only ever been a single pitch has no such
+@@ -906,13 +915,24 @@ export class NoteTracker {
+         active.harmonyLabel !== null
+           ? active.lastSeenAt - active.startTime >= config.transient.minRestrumMs
+           : active.soundedMs >= config.tracking.minStableMs;
++      let vetoed = false;
++      if (rearticulated && settled && !pitchDiffers && devCutVeto.fn !== null) {
++        const pcs =
++          active.harmonyPitches.length > 0
++            ? active.harmonyPitches.map((p) => ((p.midi % 12) + 12) % 12)
++            : sounding !== null
++              ? [((sounding % 12) + 12) % 12]
++              : null;
++        vetoed = devCutVeto.fn(frame.attack.at, pcs);
++        if (vetoed) rearticulated = false;
++      }
+       if (this.trace !== null) {
+         this.trace({
+           kind: "rearticulation",
+           at: frame.attack.at,
+           noteId: active.id,
+           accepted: rearticulated,
+-          reason: verdict.reason,
++          reason: vetoed ? "hft-veto" : verdict.reason,
+           settled,
+           soundedMs: active.soundedMs,
+           settleBarMs:
+diff --git a/src/offline/analyzer.ts b/src/offline/analyzer.ts
+index 15f35e5..631d4f6 100644
+--- a/src/offline/analyzer.ts
++++ b/src/offline/analyzer.ts
+@@ -10,6 +10,9 @@
+  */
+ 
+ import type { Note, PitchFrame, RecognizerOptions } from "../types.js";
++import { createHash } from "node:crypto";
++import { existsSync, readFileSync } from "node:fs";
++import { devCutVeto } from "../engine/tracker/note-tracker.js";
+ import { RecognitionEngine } from "../engine/engine.js";
+ import { RENDER_QUANTUM, resolveEngineConfig, type EngineConfig } from "../engine/config.js";
+ import type { RigCalibration } from "../engine/rig-profile.js";
+@@ -96,6 +99,39 @@ function run(
+   });
+   if (options?.calibration !== undefined) config.calibration = { ...options.calibration };
+   options?.overrideConfig?.(config);
++  // DEV-ONLY HOOK, never committed (training/hft-transformer/phase3.ts): gate
++  // same-pitch cuts on a model's precomputed deep-lane readings, found by the
++  // take's own samples.
++  devCutVeto.fn = null;
++  const gateDir = process.env.HFT_GATE_DIR;
++  if (gateDir !== undefined && gateDir !== "") {
++    const sha = createHash("sha256")
++      .update(Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength))
++      .digest("hex");
++    const path = `${gateDir}/${sha}.json`;
++    if (existsSync(path)) {
++      const gate = JSON.parse(readFileSync(path, "utf8")) as {
++        rulings: Array<{ held: number; first: number; pcMax: number[] }>;
++      };
++      devCutVeto.fn = (at, pcs) => {
++        const need = Math.ceil(((at + 40) / 1000) * sampleRate);
++        const r = gate.rulings.find((x) => x.held >= need) ?? gate.rulings[gate.rulings.length - 1];
++        if (r === undefined) return false;
++        let s2 = 0;
++        for (let f = Math.ceil((at - 40) / 16); f * 16 <= at + 40; f++) {
++          const i = f - r.first;
++          if (i < 0 || i >= 128) continue;
++          for (let pc = 0; pc < 12; pc++) {
++            if (pcs !== null && !pcs.includes(pc)) continue;
++            s2 = Math.max(s2, r.pcMax[i * 12 + pc] ?? 0);
++          }
++        }
++        return s2 < 0.5;
++      };
++    } else {
++      process.stderr.write(`HFT_GATE_DIR: no gate data for this take (${sha.slice(0, 12)})\n`);
++    }
++  }
+   const engine = new RecognitionEngine(sampleRate, config);
+   if (options?.trackerTrace !== undefined) engine.setTrackerTrace(options.trackerTrace);
+ 
