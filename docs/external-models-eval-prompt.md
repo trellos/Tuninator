@@ -1,5 +1,22 @@
 # Brief: evaluate three external models as boundary witnesses, one subagent each
 
+> **STATUS: RUN (2026-09-25)** on `claude/fervent-noether-158e0t`.
+> - `MuScriptor/muscriptor-small` stopped at Phase 1 on its licence gate and on
+>   PyPI, which the environment refuses (DECISION-086). It reopens only if the
+>   owner lifts both.
+> - `cstr/hft-transformer-GGUF` ran through Phase 3 and is rejected
+>   (DECISION-087).
+> - `spotify/basic-pitch` ran through Phase 3: its ghost reading cleared, and
+>   no gate on it won end to end (DECISION-088).
+>
+> Findings are in `docs/DETECTION-FINDINGS.md`, one-paragraph verdicts in
+> `docs/external-models-log.md`, ledger rows C31–C33 in
+> `docs/slow-note-splits-loop-log.md`, and the code in `training/muscriptor/`,
+> `training/hft-transformer/` and `training/basic-pitch/`. **Do not re-run it
+> for these three models**: the held-out read is spent for two of them. It is
+> kept as the record of what was asked and what the bars were, and it can
+> serve as a template for other models.
+
 You are the ORCHESTRATOR. Read `AGENTS.md` in full, then
 `docs/external-models-log.md` and the section "A published guitar model read
 as a boundary witness" in `docs/DETECTION-FINDINGS.md` (DECISION-085). That

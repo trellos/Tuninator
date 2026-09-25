@@ -1,0 +1,10 @@
+{
+  "name": "tuninator-basic-pitch-eval",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Out-of-library evaluation of a published transcription model as a note-boundary witness. Never imported by src/.",
+  "type": "module",
+  "dependencies": {
+    "onnxruntime-node": "1.30.0"
+  }
+}

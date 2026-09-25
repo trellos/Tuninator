@@ -7,6 +7,74 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-088]: `spotify/basic-pitch` hears the pick behind a real Note, but no gate on it lowers both error counts; nothing ships
+* **Date:** 2026-09-25
+* **Status:** Rejected
+* **Owner:** Detection architecture (the project owner's brief, 2026-09-25)
+* **Context:** The brief `docs/external-models-eval-prompt.md`, as in
+  DECISION-086 and -087. `spotify/basic-pitch` is Spotify's
+  instrument-agnostic transcription CNN (ICASSP 2022): 16,702 weights over a
+  harmonic-stacked CQT, Apache-2.0, with GuitarSet among its training data. Its
+  onset, note and contour outputs sit on 11.6ms frames trained on one-frame
+  targets. It is the only model in this line under the 25,000-parameter cap.
+  Its documented runtime is a Python package from PyPI, which the egress policy
+  refuses. It was run instead as the repository's own `nmp.onnx` under
+  onnxruntime-node from npm, matching the authors' published reference outputs
+  to 1.6e-5 for the network and 3.9e-3 end to end.
+* **Decision:** **Rejected through Phase 3; nothing ships; `src/` unchanged.**
+  The bars were committed before any take was read, and the Phase 3 plan
+  before the held-out read:
+  - Q1, ghosts (outcome target): the onset at a Note's start separates surplus
+    Notes, 0.853 on the tuning takes (0.786 within the amped path, which holds
+    178 of the 191 extras) and 0.883 held out, every path above 0.80. It
+    clears.
+  - Q2a, the same-pitch cut as a boundary witness: 0.757 read 200ms late, but
+    chance at the fast lane's own decision (0.496), and 0.457 held out. There,
+    most of the engine's "same-pitch" cuts are onto a pitch that has not yet
+    settled.
+  - Q2b, the children DECISION-030's gate lets through (outcome target): 0.806,
+    then 0.728 held out, behind the engine's own rate feature at 0.793 on those
+    rows.
+  - Q3, lost notes: clears by its letter on one branch whose boundary the
+    tracker had already made; 0 of 27 held out.
+  - Q4, pitch: 99% exact on single notes against the engine's 97%, and 100%
+    through an amp against 95%.
+  - Phase 3, a gate that withholds a Note on the reading, at operating points
+    fixed on the tuning takes. At zero cost there (0.15) it withholds 4 Notes
+    (false positives 254 → 250). At the model's own 0.5 it trades 135 false
+    positives for 86 missed labels (same-pitch children alone, 110 for 62), one
+    for one held out, and `clean-lead-120bpm` (required) fails.
+* **Alternatives Considered:** (a) **A threshold between 0.15 and 0.5**:
+  rejected. The derivation sweep already withholds paired Notes from 0.20 on (6
+  surplus for 4 paired), and a point chosen from the end-to-end numbers would
+  be a fit to them. (b) **Gating the fast-lane cut (Q2a) directly**: not run.
+  The model reads chance at the cut, which lands on the pick's first hop, and
+  Q2a failed held out. (c) **Shipping the model as a kernel**: not taken,
+  since nothing won. It fits the cap, but it needs a 9-octave CQT, a causal
+  substitute for its per-window normalisation, and about 245M multiply-adds a
+  second of audio. (d) **Treating the pooled Q1 pass as holding within a
+  path**: rejected. On the tuning takes the amped path reads 0.786, so the
+  pooled figure is flattered by the direct input, although every path clears
+  held out.
+* **Consequences:** Positive: the only positive reading this line of external
+  models has produced, and a clean record of why it does not become a rule.
+  The separation is real (0.883 held out), but its low tail holds real Notes.
+  It names a feature for the engine's own kernels: an onset read on the
+  harmonics of the Note's own pitch, 50–70ms after its start. No witness in
+  this record reads that; the measured onset family is broadband or
+  band-limited. It is worth building only beside a second witness that
+  separates the real notes it confuses with ghosts, as the envelope dip does
+  for DECISION-030's rate test. Negative:
+  - the documented Python path was not run, because PyPI is refused, and the
+    paper's tables were not read, because arxiv.org is refused;
+  - the Q2 bars here and in DECISION-087 take different targets on the
+    conditional half, and the Q3 bars differ in branch size and false-alarm
+    rate, so the two models' Q2 and Q3 figures are not on one scale;
+  - the Phase 3 harness abstains on 60–65 of about 1,800 Notes, those opened
+    outside the fast lane's `begin()`.
+
+---
+
 #### [DECISION-087]: `cstr/hft-transformer-GGUF` is not a boundary witness: its same-pitch reading clears 0.698 only pooled on the tuning takes, reads 0.440 held out, and as a deep-lane veto costs 144 played notes for 120 phantoms
 * **Date:** 2026-09-25
 * **Status:** Rejected

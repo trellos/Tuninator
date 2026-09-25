@@ -117,3 +117,16 @@ the same code path.
   - `phase3.ts`, `phase3-hook.patch` and `phase3-summary.ts` are the end-to-end
     veto. The hook is applied, run and reverted, and never committed to `src/`.
   - Outputs go to `training/out/hft-transformer/`.
+- `basic-pitch/` — the full record for `spotify/basic-pitch` (DECISION-088),
+  Phases 1 to 3.
+  - It is its own npm project: `onnxruntime-node` at an exact version, install
+    scripts off. Run `npm ci` inside it; the root `npm ci` does not install it.
+  - `runtime.ts` is the one place that runtime is loaded, through a dynamic
+    import, so the root typecheck passes without it, as in CI.
+  - `phase1.ts` prints the time axis from the pinned source and weights, and
+    `parity.ts` reproduces the authors' two published reference outputs.
+  - `phase2-rows.ts` and `phase2.ts` hold the pre-registered questions; the
+    held-out read is `--heldout`, once.
+  - `phase3-*.ts` and `phase3-hook.patch` are the end-to-end gate. The hook is
+    applied, run and reverted, and never committed to `src/`.
+  - Outputs go to `training/out/basic-pitch/`.

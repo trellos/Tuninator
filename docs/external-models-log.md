@@ -55,3 +55,26 @@ practice takes but deleted 144 real ones, and broke the required clean-lead
 test. It also hears new notes inside nearly half of the notes the recognizer
 already gets right, names pitch worse than the recognizer through an amp, and
 at 5.5 million parameters is about 220 times too large to ship anyway.
+
+## `spotify/basic-pitch` — 2026-09-25 — hears something real, but no rule built on it helps (DECISION-088)
+
+Basic Pitch is Spotify's small, open note-transcription model. Every 12
+milliseconds it says, for each piano-key pitch, whether a note is sounding and
+whether one has just been struck. Unlike solitito, it answers about that
+moment rather than the last second, and at about 17,000 parameters it is
+within the engine's size limit. On test plucks it placed each attack within a
+few milliseconds and kept apart two picks of one string a sixteenth apart. On
+Tuninator's recordings it does hear something useful: a ghost Note usually has
+no fresh pick under it. The model ranks a ghost below a real note 85–90% of
+the time, on the practice takes and again on the 140bpm test takes, and it
+knows this about 70ms after the pick, which is when the engine announces a
+Note anyway. But too many real notes look like ghosts to it for that to be
+usable. Set so that it costs no real note, it removes 4 of the 254 ghost
+Notes. At its own default it removes 135 but loses 86 played notes and fails a
+required recording, and on the test takes that trade is one for one. At the
+moment the engine decides to cut a note it has not yet heard enough of the
+pick to say anything, and it cannot recover the notes the tracker loses
+without also hearing extra picks inside a quarter to two fifths of the notes
+already caught. So it does not help as it stands. What it hears, a fresh
+attack on a note's own pitch, is something the engine could measure itself,
+beside a second clue.

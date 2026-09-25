@@ -8605,8 +8605,9 @@ in CrispASR. It is the first model in this line to be run on the corpus.
 Nothing ships. No host was refused.
 
 Phase 2 was pre-registered in `training/hft-transformer/phase2.ts`, committed
-before any take was read and unchanged since. Phase 3's gate was committed
-before the held-out read.
+at f8346d6 before any take was read and byte-identical since. Phase 3's gate
+was committed at 6793f05, before the held-out read. Both commits are in this
+branch's history.
 
 ### What the model is
 
@@ -8933,3 +8934,437 @@ Closed through Phase 3. Nothing won, so nothing ships.
 The provenance finding stands on its own: the weights the card attributes to
 Sony's checkpoint are a community rewrite's training run, verified tensor by
 tensor.
+
+## A published transcription model read as a boundary witness: `spotify/basic-pitch` hears the pick behind a real Note, and no gate turns that into fewer errors (DECISION-088)
+
+The third model the brief (`docs/external-models-eval-prompt.md`) sent for
+DECISION-085's question, and the only one of the four read so far that is
+small enough to ship.
+- **Phase 1:** passes. Every output is on 11.6ms frames with one-frame targets.
+- **Phase 2**, on the tuning takes: an onset read at a Note's start separates
+  surplus Notes from real ones (Q1, 0.853), and holds held out (0.883).
+- **Phase 3:** no gate built on that reading lowers both error counts. At zero
+  cost on the tuning takes it withholds 4 Notes. At the model's own threshold
+  it trades 135 false positives for 86 missed labels, one for one held out,
+  and fails a required fixture.
+- **The other questions:** the same-pitch cut (Q2a) and the lost notes (Q3)
+  fail held out.
+
+Nothing ships.
+
+The runtime is the repository's own `nmp.onnx` under onnxruntime-node from npm.
+The documented Python package comes from PyPI, which the egress policy
+refuses; parity with the authors' published reference outputs is below. The
+bars were committed in `training/basic-pitch/phase2.ts` before any take was
+read (ed190c6), and the Phase 3 plan before the held-out read (7b0eb39); both
+commits are in this branch's history. The only later additions are report
+code and two notes, each labelled as added afterwards.
+
+### What the model is
+
+```
+repository     huggingface.co/spotify/basic-pitch @ 3cf4f083 (2023-09-12): the card only (README.md and
+               .gitattributes), Apache-2.0. Code, trainer and weights: github.com/spotify/basic-pitch
+               @ fa5997a (2025-11-13), Apache-2.0; reference outputs also from the TypeScript port
+               github.com/spotify/basic-pitch-ts @ 2d498f8
+purpose        instrument-agnostic polyphonic audio-to-MIDI with pitch bends (ICASSP 2022, Bittner et al.)
+weights        basic_pitch/saved_models/icassp_2022/nmp.onnx, 230,444 bytes, a plain git blob, sha256
+               2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec (the same checkpoint
+               also ships as SavedModel, TFLite and CoreML)
+architecture   CQT front end: 9 octaves by decimation, 36 bins/octave from A0 (27.5Hz), 309 bins, Q 51.4,
+               Hann; log power normalised to 0..1 by the min and max over the whole 2s window; batch
+               norm; harmonic stacking of 8 shifted copies (0.5, 1..7) -> 264 bins x 8 channels. Six
+               learned convolutions: contour 3x39 (8) -> 5x5 -> sigmoid; note 7x7 at frequency stride 3
+               (32) over the contour -> 7x3 -> sigmoid; onset 5x5 at stride 3 (32) over the stack,
+               concatenated with the note output -> 3x3 -> sigmoid
+parameters     16,702 learned values counted from the ONNX initializers (batch norm folded in; 16,782
+               trainable in the Keras model), plus 19,038 fixed front-end constants (CQT kernels,
+               decimation filter). 67% of this repository's 25,000 cap
+input          22050Hz mono. One call: 43,844 samples (1988ms) in, 172 frames out at a 256-sample hop
+               (11.61ms), every frame at once. The package windows a file with 30 frames of overlap and
+               discards 15 at each end (174ms)
+outputs        onset 88 (A0..C8) and note 88, sigmoid per frame; contour 264 (1/3 semitone)
+training data  GuitarSet (its mic recordings, all six strings' notes), iKala, MAESTRO, MedleyDB-Pitch,
+               Slakh (card tags and the trainer's dataset modules); targets built by mirdata 1.0.0
+licence        Apache-2.0 (code, weights, card)
+runtime        documented: the Python package from PyPI (TensorFlow, TFLite, CoreML or ONNX Runtime),
+               refused here. Run instead: the repository's own nmp.onnx under onnxruntime-node 1.30.0
+               (npm, CPU, 2 threads), the package's windowing re-implemented in TypeScript, and the
+               engine's own 48kHz decode resampled to 22050Hz by a Kaiser-sinc resampler written here
+published      the card publishes no figures; the paper's tables were not read (arxiv.org is refused)
+```
+
+### The deciding fact: (a) and (b), with 11.6ms targets
+
+From the trainer and the mirdata version it pins:
+- the onset output is trained on one frame per note, the frame nearest the
+  annotated onset;
+- the note output is trained on every frame from there to the frame nearest the
+  offset, with all zeros meaning "no note";
+- the contour output is trained on nearest-neighbour f0s;
+- the loss is per-cell BCE with label smoothing 0.2, which squeezes a target to
+  0.1/0.9 but does not spread it in time. Nothing dilates, pools or blurs a
+  target.
+
+The answer is not causal: the network, the centred CQT filters and the 2s
+normalisation all read audio after the frame. Measured, the blur is small: a
+read with the future zeroed holds 87–98% of the final onset peak 46ms after a
+pluck. Phase 2 therefore read every decision three ways:
+- FAST: the model's window ends at the engine's own decision time, zeros after;
+- DEEP: the same, 200ms later, the deep lane's `regionSettleMs`;
+- WHOLE: the package's own windowing, not buildable, and no bar may be met
+  with it.
+
+```
+the time axis                                                  ms   against 50ms / 107ms
+frame hop (every output)                                       12   fine enough
+onset target: one frame at the annotated onset                 12   fine enough
+note target: edges at the nearest frame                        12   fine enough
+contour target: nearest-neighbour f0 grid                      12   fine enough
+look-ahead of the CNN at the contour output                    35   fine enough
+look-ahead of the CNN at the note output                      104   coarser than 50ms
+look-ahead of the CNN at the onset output                     116   coarser than a sixteenth
+CQT half-filter at E2's 7th harmonic (577Hz)                   45   fine enough
+CQT half-filter at E2's fundamental                           313   coarser than a sixteenth
+CQT filter at E2's fundamental, whole                         627   coarser than a sixteenth
+log normalisation: min and max over the window               1988   coarser than a sixteenth
+package windowing: audio kept after a window's last frame     174   coarser than a sixteenth
+-- measured on synthetic plucks (probe.ts) --
+onset peak against the pluck, whole-take reading               -2   fine enough
+onset half-peak span, G3 and B3 (E2: 105)                      47   fine enough
+causal read 46ms after the pluck: share of the final peak  87-98%
+two picks of one pitch 107ms apart: peaks / trough   0.84-0.96 / 0.02-0.17   resolved
+-- the engine, from its own rows --
+fast-lane announce after a Note's start (median)               67   (p90 93; held-out p90 120)
+same-pitch cut decision after the child's start                 0
+```
+
+### Step 3, parity, and overlap
+
+- **The advertised example**, `basic-pitch <out> <audio>` or `predict()`, needs
+  the pip package, and PyPI is refused. The model was instead reproduced
+  against the two reference outputs its authors publish; the note-event
+  decoding (`note_creation.py`) is not used here and was not reproduced. The
+  runtime takes 28.9ms per 1988ms window at batch 1 on two threads.
+
+```
+reference                                            runtime vs reference, max |d| (mean |d|)
+                                                     note              onset             contour
+A1 basic-pitch-ts vocal-da-80bpm.json: the Python    5.3e-6 (5.7e-8)   1.6e-5 (2.5e-7)   1.3e-5 (1.1e-7)
+   pipeline's own 8 input windows, 1,032 frames
+   (the network alone)
+A2 the same, windows rebuilt from the 16-bit WAV     2.2e-3 (3.3e-5)   3.7e-3 (2.5e-4)   3.4e-3 (7.6e-5)
+   by framing.ts (inputs differ by one 16-bit step)
+B  basic-pitch tests/resources/vocadito_10,          1.4e-3 (2.1e-5)   3.9e-3 (5.5e-5)   2.4e-3 (3.6e-5)
+   model_output.npz: 44.1kHz resampled by
+   resample.ts, 787 frames (reference: 787)
+```
+
+  The network alone matches to 1.6e-5, inside the Python test's own 1e-4. With
+  the windowing and a different resampler no cell differs by more than 3.9e-3,
+  inside the TypeScript port's 5e-3. A one-step 16-bit input difference
+  already moves outputs by up to 3.7e-3 through the per-window normalisation,
+  so the resampler's error is at the scale of quantisation.
+- **Overlap.** GuitarSet is in its training data: the trainer reads its mic
+  recordings with all six strings' notes as targets, so any GuitarSet-based
+  reading of this model is contaminated. Nothing here uses GuitarSet. None of
+  the 27 fixtures, the owner's own recordings, is in any of its datasets.
+
+### Phase 2 on the tuning takes
+
+Rows come from the engine's own trace, matcher and ledger (1,235 labels, 1,324
+Notes, 6,519 causal windows). The features:
+- **O(S)**, the largest onset over the Note's pitch class in every octave from
+  E2 to E6, within ±40ms of S. The window is 80ms wide, inside a sixteenth.
+- **N**, the mean of the per-frame maximum note activation.
+- **P**, whether the dominant note's pitch class agrees.
+
+The 2×2 tables use the package's own operating points (onset 0.5, note 0.3).
+AUCs carry a take-cluster bootstrap 95% interval.
+
+**Q1, ghosts** (outcome-shaped). Every final Note, paired (y=0) or left
+unpaired (y=1); a low O, a low N or a disagreeing P means surplus. Bar: DEEP
+AUC ≥ 0.80 for O, N or P.
+
+```
+Q1, derivation: 1,324 Notes (191 extra, 1,133 matched)
+feature (low = surplus)       FAST (at announce)     DEEP (+200ms)          WHOLE (not buildable)
+O onset at the Note's start   0.857 [0.745, 0.943]   0.853 [0.763, 0.935]   0.859 [0.768, 0.941]
+N sounding at its pitch       0.612 [0.434, 0.858]   0.616 [0.459, 0.875]   0.604 [0.450, 0.881]
+P pitch class agrees (1,290)  0.521 [0.500, 0.585]   0.523 [0.506, 0.606]   0.524 [0.508, 0.606]
+
+DEEP by path   rows  extra      O      N      P
+DI              514      5  0.979  0.770  0.500
+amped           726    178  0.786  0.528  0.519
+clean            84      8  0.715  0.758  0.717
+
+2x2 by path; engine right = the Note is matched; model right = O DEEP < 0.5 exactly on an extra
+path   rows  only model  only engine  both  neither
+DI      514           1            4   505        4
+amped   726          73           34   514      105
+clean    84           4           15    61        4
+all    1324          78           53  1080      113
+
+gate sweep, O DEEP (rows withheld below theta: surplus / paired)
+theta    0.10    0.15    0.20    0.25     0.30     0.40     0.50
+all     0 / 0   3 / 0   6 / 4  12 / 9  21 / 13  50 / 28  78 / 53
+```
+
+Clears, on O, in both lanes; N and P do not. The pass is pooled, though. Within
+the amped path, which holds 178 of the 191 extras, O reads 0.786, just under
+the bar (per amped take: quarters 0.745, A3 eighths 0.641, held-then-picked
+0.807, E5 eighths and sixteenths 0.863). It clears within every path held out
+(below). The sweep says at the outset what Phase 3 then measured: under 0.15
+there are three extras to take, and every step above takes real Notes with
+them.
+
+**Q2a, same-pitch cuts as a boundary witness** (boundary-shaped). The rows of
+`measure-decision-separability.ts` `collectFixture` that are accepted, settled
+and same-pitch and opened a child, with that script's own target. O is read at
+the child's start. Bar: AUC above 0.698, FAST or DEEP.
+
+```
+Q2a, derivation: 1,100 rows (807 with a label to cut for, 293 without)
+witness, same rows                 AUC    95% (take bootstrap)
+model O, FAST (at the decision)    0.496  [0.406, 0.566]
+model O, DEEP (+200ms)             0.757  [0.573, 0.858]
+model O, WHOLE (not buildable)     0.748  [0.571, 0.844]
+engine sharpness (high = cut)      0.683  [0.552, 0.763]
+engine fluxRatio (high = cut)      0.689  [0.560, 0.770]
+engine dipRatio (low = cut)        0.600  [0.472, 0.704]
+
+by path  rows  positives  O FAST  O DEEP  sharpness  dipRatio
+DI        371        322   0.477   0.584      0.517     0.442
+amped     681        453   0.444   0.755      0.741     0.512
+clean      48         32   0.529   0.605      0.582     0.664
+
+2x2; the engine cut every row (engine right = a label was there); model right = O DEEP >= 0.5 exactly when one was
+path   rows  only model  only engine  both  neither
+DI      371          15            6   316       34
+amped   681          68           31   422      160
+clean    48          11           19    13        5
+all    1100          94           56   751      199
+```
+
+Clears in DEEP only. FAST is at chance because the fast lane cuts on the pick's
+own hop, 0ms into the child, before the model has heard the pick.
+
+**Q2b, the children DECISION-030's gate lets through** (outcome-shaped, the
+brief's conditional AUC). The Q2a rows whose child reached the final Notes;
+target, the child left unpaired. Bar: conditional AUC ≥ 0.70.
+
+```
+Q2b, derivation: 885 rows (141 surplus, 744 paired; 215 children the gate or announce bar had dropped)
+witness, same rows                                 AUC    95% (take bootstrap)
+model O, FAST (at the child's announce)            0.819  [0.667, 0.913]
+model O, DEEP (+200ms)                             0.806  [0.705, 0.885]
+model O, WHOLE (not buildable)                     0.814  [0.707, 0.890]
+engine: child span / local IOI (low = surplus)     0.627  [0.543, 0.780]   814 rows; model DEEP 0.805 on them
+engine: dipRatio (high = surplus)                  0.691  [0.552, 0.853]
+
+by path  rows  surplus  O FAST  O DEEP  span/IOI
+DI        302        4   0.949   0.957     0.658
+amped     541      132   0.757   0.745     0.646
+clean      42        5   0.422   0.427     0.700
+
+2x2; the engine kept every row (engine right = the child is paired); model right = O DEEP < 0.5 exactly on a surplus child
+path   rows  only model  only engine  both  neither
+DI      302           1            6   292        3
+amped   541          44           31   378       88
+clean    42           3           21    16        2
+all     885          48           58   686       93
+```
+
+Clears. Q2 as a whole clears on the tuning takes. This Q2 is not the one
+DECISION-087 ran: that reading took the conditional half on the boundary
+target, and this one on the outcome target, so the two figures are not on one
+scale (DECISION-032).
+
+**Q3, lost notes.** The ledger's missed labels by branch.
+- A label is "seen" when the DEEP read, 200ms after its start, holds an onset at
+  its pitch class that is a local maximum of at least θ, centred within 40ms of
+  the start and nearer it than any other label's.
+- A false alarm is the same rule inside a matched label's interior.
+- θ is 0.5, unless that fires on more than 10% of interiors; then it is the
+  smallest of 0.55 to 0.95 at or under 10%.
+- Bar: a branch of at least four misses with half of them seen.
+
+At 0.5 the interiors fire on 38.7% of matched labels, so θ rose to 0.95, at
+7.3% false alarms.
+
+```
+Q3, derivation: 100 missed labels; false alarms on 1,117 matched labels' interiors; theta 0.95
+ledger branch                                           misses  seen DEEP  seen WHOLE  seen at 0.5 (not the bar)
+no transient within the window                              43          0           0           26
+never announced                                             14          3           4           11
+rejected: no-energy-not-sharp                                8          3           4            8
+rejected: ring-out-not-sharp                                 7          2           4            7
+split made; successor paired with a neighbouring label       7    4 (57%)           1            6
+band-only transient                                          7          0           0            5
+eight more branches, 1-3 misses each                        14          2           3            9
+
+2x2 over every label at theta; model right = sees the note; engine right = matched it
+path   rows  only model  only engine  both  neither
+DI      580           7          153   356       64
+amped   575           7          396   152       20
+clean    78           0           76     0        2
+all    1233          14          625   508       86
+```
+
+Clears by the letter only. The one qualifying branch (4 of 7) is one where the
+tracker had already made the boundary and the miss is the matcher's pairing,
+so there is no tracker decision for a reading to change; the WHOLE read sees 1
+of those 7. The bar differs from DECISION-087's: four misses and 10% false
+alarms here, five and 2% there. Each evaluation stated its own, in advance.
+
+**Q4, pitch** (secondary, no bar). The DEEP read over each matched label's span:
+
+```
+labels                        n     model exact  model pitch class  engine exact  engine pitch class
+single notes, all            1098   99%          99%                97%           99%
+  DI                          509   100%         100%               100%          100%
+  amped                       548   100%         100%               95%           100%
+  clean                        41   66%          68%                76%           83%
+  register E2-D#3              96   100%         100%               93%           100%
+  register E3-D#4             445   100%         100%               96%           100%
+  register E4 and up          557   97%          98%                98%           99%
+chords (model: bass = root)    35   -            54%                74%           86%
+
+2x2: single notes exact; chords pitch class (model bass vs root, engine pitch class)
+                     rows  only model  only engine  both  neither
+single notes  DI      509           0            0   509        0
+              amped   548          25            0   523        0
+              clean    41           3            7    24        7
+              all    1098          28            7  1056        7
+chords        clean    35           0           11    19        5
+```
+
+On single notes through an amp the model names the exact pitch every time
+where the engine does 95%, the 25 notes in the 2×2's "only model" column.
+
+### HELD OUT: the twelve 140bpm takes, read once
+
+Read after the Phase 3 plan was committed (381 labels, 417 Notes, 1,899 causal
+windows), with every operating point, θ 0.95 included, carried over unchanged.
+
+```
+question  witness                                  derivation            held-out
+Q1        O onset at start, DEEP                   0.853                 0.883 [0.786, 0.945]
+          O, FAST (at announce)                    0.857                 0.898 [0.804, 0.961]
+          N sounding at pitch, DEEP                0.616                 0.874 [0.782, 0.933]
+          P pitch class agrees, DEEP               0.523                 0.688 [0.515, 0.779]
+          O DEEP by path                           DI .979 amped .786    DI .932 amped .929 mic .811
+                                                   clean .715
+Q2a       O, FAST (at the cut)                     0.496                 0.485 [0.395, 0.594]
+          O, DEEP                                  0.757                 0.457 [0.389, 0.552]
+          engine sharpness / dipRatio              0.683 / 0.600         0.653 / 0.668
+Q2b       O, FAST (at the child's announce)        0.819                 0.736 [0.562, 0.867]
+          O, DEEP                                  0.806                 0.728 [0.552, 0.858]
+          engine span / local IOI, same rows       0.627 (model 0.805)   0.793 (model 0.721), 163 rows
+Q3        misses seen at theta 0.95                10 of 100             0 of 27
+          seen at 0.5 (not the bar)                72 of 100             20 of 27
+          interior false alarms at 0.95 (at 0.5)   7.3% (38.7%)          0.0% (25.4%)
+Q4        single notes, model / engine exact       99% / 97%             98% / 95%
+          chords, model bass = root / engine pc    54% / 86%             78% / 88%
+verdict                                            Q1 Q2a Q2b Q3 clear   Q1 clears; Q2a and Q3 fail; Q2b
+                                                                         clears its letter but trails the
+                                                                         engine's own rate feature
+
+2x2 by path (only model / only engine / both / neither)
+Q1  O DEEP < 0.5 = surplus      DI 6/4/121/5     amped 22/9/104/8    mic 14/28/88/8    all 42/41/313/21
+Q2a O DEEP >= 0.5 = new artic.  DI 8/24/42/15    amped 9/40/29/10    mic 15/50/22/13   all 32/114/93/38
+Q2b O DEEP < 0.5 = surplus      DI 3/12/50/2     amped 17/10/27/4    mic 6/31/29/5     all 26/53/106/11
+Q3  seen at theta 0.95          DI 0/40/85/2     amped 0/80/33/14    mic 0/116/0/11    all 0/236/118/27
+Q4  single notes exact          all 12/4/265/1;  chords pitch class  all 3/10/53/6
+```
+
+Why Q2a collapses held out (a diagnosis after the read; nothing re-tuned): 112
+of the 207 real cuts the engine called same-pitch land on a different labelled
+pitch class from the Note they split, because the new pitch has not settled at
+the decision hop. The feature asks about the parent's pitch class, and the
+model correctly says no (median O 0.292). On the 57 cuts that really are the
+same pitch class it reads 0.904, as on the tuning takes (0.939 on 769 such
+cuts).
+
+### Phase 3: withholding a Note on the model's reading
+
+- **The hook** (`phase3-hook.patch`) withholds a Note: it sets the announce bar
+  to infinity and `end()` drops the Note, DECISION-030's own mechanism. Read
+  DEEP, it is a deep-lane retraction about 240ms after the start, which
+  DECISION-030's alternative (c) measured to score the same as never
+  announcing.
+- **The gates:** Q1's decision is every Note; Q2b's is a same-pitch child.
+  Each ran at two operating points fixed from the tuning takes before any run:
+  - 0.15, the largest θ that withholds no paired Note there: the candidate;
+  - 0.50, the package's own threshold: run to price the trade, not as a
+    candidate.
+- **Q2a and Q3 were not run end to end.** Q2a's decision is the fast-lane cut
+  at 0ms, where FAST is at chance. Q3's one qualifying branch has no decision
+  left to gate.
+- **Controls.** With no gate installed, the patched engine reproduced HEAD's
+  eval totals, ledger and split counts exactly, and so did an eval after the
+  revert.
+
+```
+config                        deriv        held-out     split events / extra Notes      ledger  eval         gate on the eval run
+                              missed / FP  missed / FP  derivation  held-out  slow      MISSED
+ungated (= HEAD)              100 / 191    27 / 63      173 / 204   59 / 61   179 / 208    127  PASS         -
+every Note, 0.15 (zero cost)  100 / 188    27 / 62      173 / 202   58 / 60   178 / 205    127  PASS         withheld 4 of 1,808; no reading 60
+every Note, 0.50 (package)    147 /  93    66 / 26       97 / 106   22 / 23    89 /  97    213  FAIL (req.)  withheld 209 of 1,773; no reading 65
+same-pitch child, 0.15        100 / 191    27 / 63      173 / 204   59 / 61   179 / 208    127  PASS         withheld 0 of 1,084
+same-pitch child, 0.50        134 / 110    55 / 34      113 / 123   29 / 30   107 / 116    189  FAIL (req.)  withheld 150 of 1,062; no reading 5
+
+required clean-lead-120bpm, pitch-class accuracy (bar 90%): 92.9% -> 56.7% (every Note, 0.50), 70.0% (same-pitch, 0.50)
+informational mic sixteenths (bar 70%): 70.2% -> 46.8% / 51.1%
+ledger, all 27 takes: "never announced" 16 -> 74 (every Note, 0.50) and 59 (same-pitch, 0.50); MISSED 127 -> 213 / 189
+```
+
+Nothing wins.
+- **The zero-cost points are inert.** The every-Note gate withholds 4 Notes, all
+  surplus (false positives 254 → 250 over the corpus, misses unchanged); the
+  same-pitch gate withholds none.
+- **At 0.5 both gates trade one error for the other.**
+  - Every Note: 135 false positives removed for 86 missed labels (98 for 47 on
+    the tuning takes, 37 for 39 held out).
+  - Same-pitch children: 110 for 62 (81 for 34, and 29 for 28).
+  - Held out that is about one for one, and both fail the required clean-lead
+    take.
+- **Where it cuts.** False positives fall on the ghost-heavy amped takes
+  (quarters 67 → 21, amped triplets 24 → 4). Misses rise on the clean and mic
+  takes (clean-lead 2 → 18, mic sixteenths 10 → 25, mic triplets 1 → 15): Q1's
+  weakest paths.
+- **A harness limit.** The gate abstains on Notes opened outside `begin()`
+  (`beginHarmonic`, the deep lane's re-segmentation): 60–65 of about 1,800
+  Notes.
+
+### Verdict, and what shipping would have taken
+
+Nothing won end to end, so nothing ships.
+- **The model does carry something the engine lacks.** A ghost Note usually has
+  no fresh pick under it, and the model hears that about 70ms after the Note's
+  start, when the engine announces a Note anyway (0.853 on the tuning takes,
+  0.883 held out, every path above 0.80 held out).
+- **Too many real Notes look the same to it,** so a threshold that takes the
+  ghosts takes played notes with them.
+- **What shipping it would take.** At 16,702 weights it fits the cap. A
+  plain-TypeScript port needs:
+  - a 9-octave CQT by decimation;
+  - a causal substitute for the per-window min/max normalisation, which reads
+    2s ahead and would change its inputs;
+  - about 2.8M multiply-adds per frame, some 245M a second of audio. The 3×39
+    contour convolution is 2.0M of that per frame, and the onset head reads the
+    note head, so all of it is needed.
+- **The feature, if anything, is for the engine's own kernels:** an onset read
+  on the harmonics of the Note's own pitch, 50–70ms after its start.
+  - The onset witnesses this record has measured read broadband or
+    band-limited energy: the onset kernel, its frequency-axis max filter
+    (DECISION-013), whitening (DECISION-014), the percussive flux of C2a and
+    the 1–6kHz band of C2b.
+  - Its one pitch-synchronous witness, cycle dissimilarity (DECISION-015),
+    compares waveform periods.
+  - None reads onset energy on the Note's own harmonics. C2a's 0.58 on the
+    amped column was read on different rows from Q1's, so the gap is
+    suggestive, not measured.
+- **It is worth building only beside a second witness** that separates the real
+  notes it confuses with ghosts, as the envelope dip does for DECISION-030's
+  rate test. On its own, Phase 3 is what it does.
