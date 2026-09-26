@@ -1,7 +1,8 @@
 # Brief: send `noteEnded` when the sound ends
 
 > **STATUS: CLOSED 2026-09-26 — Part A shipped as 0.3.0 (DECISION-086);
-> Part B built, measured, and not shipped (DECISION-087).** Written from
+> Part B missed its stated bar by 20ms and then shipped in 0.3.0 on the
+> owner's acceptance of 220ms (DECISION-087).** Written from
 > GOATerizer (`trellos/goaterizer`, on `tuninator@0.2.1`) on 2026-09-25, from a
 > read of `main` at `fecc0e4`. The figures in §1–§6 were measured at that
 > commit and are kept as written. The hand-back follows, and the numbers in it
@@ -42,9 +43,10 @@
 >
 > Cases 4 and 6 are Part B's. With it (branch `claude/timely-note-end-part-b`,
 > `304e5be`): case 4 reports 73ms after the damp with no phantom, and case 6
-> reports 220ms after the damp with no phantom. The bar was 200ms, so B is not
-> in 0.3.0 (DECISION-087; `docs/DETECTION-FINDINGS.md`). On the corpus it is
-> inert: every eval figure, split and ledger row is identical with it.
+> reports 220ms after the damp with no phantom. The bar was 200ms. B was held
+> back, then shipped in 0.3.0 once the owner accepted 220ms (DECISION-087;
+> `docs/DETECTION-FINDINGS.md`). On the corpus it is inert: every eval figure,
+> split and ledger row is identical with it.
 >
 > **Contract as shipped:** §4 items 1–6 hold. `noteEnded` goes out in the
 > `processChunk` call in which the fast lane ends the Note, carrying its best
@@ -64,7 +66,7 @@
 >   deliberate path). It never does on the 27 takes. It is documented as
 >   possible in `docs/API.md`, and `NoteLifecycle` already calls `"resolved"`
 >   revisable.
-> - **B** is not shipped: it missed its bar (above).
+> - **B** missed its bar (above) and ships anyway, on the owner's decision.
 
 Read `AGENTS.md` in full before your first edit, and hold to it — especially
 §3 (the evaluation harness, derivation against held-out, `fixtures/` read-only),

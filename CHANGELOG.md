@@ -31,9 +31,17 @@ wait for `noteResolved` instead.
   taken at `noteResolved`, so every scored figure is unchanged.
 - `scripts/measure-end-latency.ts`, `measure-end-latency-fixtures.ts` and
   `measure-after-end.ts` measure all of this. DECISION-086.
-- Unchanged: a damp over something that stays above the gate (a sympathetic
-  string, hum, a gate close to the floor) still holds its Note open. A rule
-  for it was built and measured, and is not in this release (DECISION-087).
+- A damp over something that stays above the gate — a sympathetic string,
+  hum, an amp's noise, a gate set close to the floor — now ends the Note at
+  the damp, without waiting for the gate: once the damp has reached its
+  depth and what follows has held above the gate for 150ms, or at once if
+  what follows is a pitch step to something far quieter. That residual opens
+  no Note of its own until a real pick. At a calibrated gate (`rmsGate`
+  0.0008) an A3 damped over a ringing open E is reported 73ms after the damp
+  instead of the E becoming 13 phantom Notes; over hum, 220ms after instead
+  of 1.5s. At the default gate it never fires on the 27 fixture takes, and
+  every scored figure is unchanged. `tracking.dampEndsAboveGate`;
+  DECISION-087.
 
 ## 0.2.1 — 2026-09-25
 

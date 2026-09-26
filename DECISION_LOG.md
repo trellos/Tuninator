@@ -7,10 +7,10 @@ are what keep later work from repeating them.
 
 ---
 
-#### [DECISION-087]: A damp over a residual above the gate ends its Note at the damp — built, inert on the corpus, and not shipped: it missed its latency bar by 20ms
+#### [DECISION-087]: A damp over a residual above the gate ends its Note at the damp — inert on the corpus, shipped on the owner's acceptance of 220ms
 * **Date:** 2026-09-26
-* **Status:** Rejected
-* **Owner:** The project owner (the GOATerizer brief `docs/timely-note-end-prompt.md`, §0 B: "if it misses its bar, record the finding and ship A alone"); detection architecture
+* **Status:** Accepted (first recorded as Rejected: it missed its stated latency bar by 20ms; the owner then accepted the 220ms, 2026-09-26)
+* **Owner:** The project owner (the GOATerizer brief `docs/timely-note-end-prompt.md`, §0 B; on reading the finding, "ok, do it"); detection architecture
 * **Context:** A Note ends only after `tracking.releaseGraceMs` of gated
   hops, and a quiet opening inside a damp is absorbed only once it has
   itself gone silent (DECISION-073, -074). Anything that holds above the
@@ -20,7 +20,10 @@ are what keep later work from repeating them.
   re-segments into 13), and over 50Hz hum the A3 does not end until the
   region lane cuts it 1,540ms after the damp, its tail becoming a second
   A3 (`scripts/measure-end-latency.ts`, cases 4 and 6).
-* **Decision:** Not shipped. **Falsifier, stated before measuring:** (1) at
+* **Decision:** Shipped in 0.3.0, on the owner's decision, after first
+  being held back for missing its bar. The bar is recorded unchanged below
+  as it was stated, and the miss stands: the hum case reports 220ms after
+  the damp, not 200. **Falsifier, stated before measuring:** (1) at
   gate 0.0008, in the open-E and hum cases, A3's `endTime` within 100ms
   after the damp, its `noteEnded` no more than 200ms after the damp, and
   no other Note announced; the other five synthetic cases unchanged; (2)
@@ -73,15 +76,16 @@ are what keep later work from repeating them.
   (c) **A pick during a residual opened as a re-articulation of the damped
   Note**, inheriting its decay: would let the hold shrink, but is a second
   detection change on the fast lane's opening path, not measured here. (d)
-  **Ship it anyway**: the owner's instruction for a missed bar is to ship A
-  alone. The code, with its three tests, is on the branch above; taking it
-  means accepting a 220ms bound on the hum case, and flipping this entry.
-* **Consequences:** 0.3.0 ships DECISION-086 alone. At a calibrated gate a
-  damp over a residual that never reaches the gate still ends late or not
-  until `stop()`, and a sympathetic string can still be announced as a
-  Note. `noteEnded` now arrives as soon as the fast lane decides, so where
-  it does decide, a consumer hears it promptly. What the brief asked for is
-  a branch merge away, if the owner accepts 220ms.
+  **Ship A alone**, as the brief said to for a missed bar: done at first,
+  then reversed by the owner, who accepted a 220ms bound on the hum case.
+* **Consequences:** At a calibrated gate a damp over a residual that never
+  reaches the gate now ends the Note at the damp, reported within about
+  220ms of it, and a quiet residual (a sympathetic string) is no longer
+  announced as a Note. On the 27 takes at the default gate the rule never
+  fires. A residual is held back from opening a Note until a pick louder
+  than `dampFallDb` under the damped Note, a level back within half that,
+  or `releaseGraceMs` of gate: a genuinely quiet re-pick inside that window
+  is not opened by the fast lane. Off with `tracking.dampEndsAboveGate`.
 
 ---
 
@@ -179,8 +183,8 @@ are what keep later work from repeating them.
   treated `noteEnded` as final must wait for `noteResolved` instead: a
   breaking change, shipped as 0.3.0. A damp over a residual that never
   goes under the gate still ends late or never (the synthetic hum and
-  open-E cases); that is detection, measured separately and not shipped
-  (DECISION-087).
+  open-E cases); that is detection, measured separately and shipped
+  with it (DECISION-087).
 
 ---
 

@@ -8427,5 +8427,6 @@ re-articulation of the damped Note, so that ending at the damp costs the
 fast lane nothing it had before. That is a second change to the opening
 path and was not built.
 
-Not shipped (§0 B of the brief). The branch carries the rule and its three
-synthetic tests; taking it means accepting 220ms on the hum case.
+Not shipped at first (§0 B of the brief). *2026-09-26:* the owner accepted
+220ms on the hum case, and the rule ships in 0.3.0, on by default. The miss
+against the stated bar stands as recorded.

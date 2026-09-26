@@ -260,6 +260,15 @@ const DAMP_END_DB = 6;
 const DAMP_FLOOR_DB = -55;
 /** How close a Note must follow the end of the one before to have been opened in its damp. */
 const DAMP_GHOST_GAP_MS = 1;
+/**
+ * How long what a damp leaves must hold above the gate, once the damp has
+ * reached `tracking.dampDepthDb`, before the Note ends without the gate. See
+ * `tracking.dampEndsAboveGate`. On the derivation takes a damped ring that
+ * does reach the gate gets there at most 133ms after the depth
+ * (`rest-repick-g2-60-120bpm-amped`); a residual that has held longer is not
+ * one of those rings. DECISION-087.
+ */
+const DAMP_RESIDUAL_MS = 150;
 
 /**
  * How close to its own peak a Note must still be for the transient that ends it
@@ -527,7 +536,7 @@ export class NoteTracker {
    * Whether the fast lane heard a pitch on each recent hop, and the hop's
    * level, oldest first. See `unvoicedFractionIn` and `levelFallIn`.
    */
-  private readonly voicedLog: { at: SourceTimeMs; voiced: boolean; rms: number }[] = [];
+  private readonly voicedLog: { at: SourceTimeMs; voiced: boolean; rms: number; gated: boolean }[] = [];
   /** The newest entry of `attackRises` still owed the next hop's rise, or null. */
   private pendingRise: RegionTransient | null = null;
   /**
@@ -569,6 +578,17 @@ export class NoteTracker {
   private harmonicSince: SourceTimeMs | null = null;
   /** End of the most recently closed Note, so backdating cannot overlap it. */
   private lastEndedAt: SourceTimeMs | null = null;
+  /**
+   * What a damp left sounding above the gate, after it ended the Note it
+   * damped: nothing opens on it but a pick louder than `pickFloorRms` or a
+   * level back over `recoverRms`. See `tracking.dampEndsAboveGate`.
+   */
+  private dampResidual: {
+    noteId: string;
+    pickFloorRms: number;
+    recoverRms: number;
+    gatedSince: SourceTimeMs | null;
+  } | null = null;
 
   /**
    * When each Note opened, oldest first, for the local-rate estimate.
@@ -614,6 +634,7 @@ export class NoteTracker {
     this.actedAttackTimes.length = 0;
     this.contactTimes.length = 0;
     this.lastEndedAt = null;
+    this.dampResidual = null;
     this.contextHarmonic = 0;
     this.contextUpdatedAt = null;
     this.harmonicSince = null;
@@ -628,9 +649,18 @@ export class NoteTracker {
     return out;
   }
 
-  /** Ids of every Note still open, for the deep lane to queue work against. */
+  /**
+   * Ids of every Note still open, for the deep lane to queue work against —
+   * and of a Note a damp ended above the gate, while its residual sounds. The
+   * deep lane read a Note's ring-out for as long as the gate kept it open,
+   * and the room's harmonic context is built from those readings.
+   */
   activeNoteIds(): string[] {
-    return [...this.notes.keys()];
+    const ids = [...this.notes.keys()];
+    if (this.dampResidual !== null && !this.notes.has(this.dampResidual.noteId)) {
+      ids.push(this.dampResidual.noteId);
+    }
+    return ids;
   }
 
   getNote(id: string): Note | undefined {
@@ -663,9 +693,15 @@ export class NoteTracker {
     const pitchChange = this.pitchChange.observe(frame);
     const gliding = this.pitchChange.isGliding();
 
-    this.voicedLog.push({ at: t, voiced: frame.pitch.frequencyHz !== null, rms: frame.rms });
+    this.voicedLog.push({ at: t, voiced: frame.pitch.frequencyHz !== null, rms: frame.rms, gated: frame.gated });
     while (this.voicedLog.length > 0 && (this.voicedLog[0] as { at: SourceTimeMs }).at < t - VOICED_LOG_MS) {
       this.voicedLog.shift();
+    }
+    // A damp's residual that has itself stopped is no longer anything's.
+    if (this.dampResidual !== null) {
+      if (!frame.gated) this.dampResidual.gatedSince = null;
+      else if (this.dampResidual.gatedSince === null) this.dampResidual.gatedSince = t;
+      else if (t - this.dampResidual.gatedSince >= config.tracking.releaseGraceMs) this.dampResidual = null;
     }
 
     // Every transient, gated or not. The amplitude gate exists to stop the fast
@@ -1164,22 +1200,29 @@ export class NoteTracker {
         at = attack.at;
         atSample = attack.atSample;
       }
-      const previous = active;
-      this.end(active, at, out);
-      active = this.begin(
-        "pitchChange",
-        frame,
-        { at, atSample, frequencyHz: pitchChange.toHz },
-        previous,
-        pitchStillArriving
-      );
+      // A step to something far quieter, inside a damp already evident, is
+      // what the damp left ringing — a sympathetic string, an amp's hum
+      // finding a pitch — not the next note. The Note ends at the damp.
+      if (this.endAtResidualStep(active, frame, pitchChange.at, out)) {
+        active = null;
+      } else {
+        const previous = active;
+        this.end(active, at, out);
+        active = this.begin(
+          "pitchChange",
+          frame,
+          { at, atSample, frequencyHz: pitchChange.toHz },
+          previous,
+          pitchStillArriving
+        );
+      }
     }
 
     /* (c) Nothing is sounding and something just happened. */
     if (active === null) {
       const voiced = frame.pitch.frequencyHz !== null;
       const struck = frame.attack !== null && !frame.gated;
-      if (voiced || struck) {
+      if ((voiced || struck) && this.residualOpens(frame, struck)) {
         active = this.begin(
           struck ? "attack" : "pitchChange",
           frame,
@@ -1215,7 +1258,9 @@ export class NoteTracker {
       const silent = frame.gated;
       const unvoiced = frame.pitch.frequencyHz === null;
 
-      if (silent || unvoiced) {
+      if (!silent && this.endAboveGate(active, frame, out)) {
+        active = null;
+      } else if (silent || unvoiced) {
         if (active.silentSince === null && silent) active.silentSince = t;
         if (!silent) active.silentSince = null;
         if (active.unvoicedSince === null) active.unvoicedSince = t;
@@ -1853,6 +1898,7 @@ export class NoteTracker {
       // have followed the transient — a hand brushing a string between
       // chords makes flux and no rebound.
       if (onset.reboundDb < config.transient.fineOnsetReboundDb) return;
+      if (!this.residualOpens(frame, true)) return;
       let start = at;
       if (this.lastEndedAt !== null && start < this.lastEndedAt) start = this.lastEndedAt;
       const opened = this.begin(
@@ -3315,7 +3361,7 @@ export class NoteTracker {
   private dampedAt(
     record: NoteRecord,
     silentSince: SourceTimeMs
-  ): { end: SourceTimeMs; fell: SourceTimeMs } | null {
+  ): { end: SourceTimeMs; fell: SourceTimeMs; medianDb: number } | null {
     const { dampFallDb: fall, dampDepthDb: depth } = this.config.tracking;
     if (fall <= 0) return null;
     const log = this.voicedLog;
@@ -3342,7 +3388,11 @@ export class NoteTracker {
       if (recovered || !reached) continue;
       let j = i;
       while (j > first + 1 && db(j - 1) < median - DAMP_END_DB) j--;
-      return { end: Math.max(at(j), record.startTime) as SourceTimeMs, fell: at(i) as SourceTimeMs };
+      return {
+        end: Math.max(at(j), record.startTime) as SourceTimeMs,
+        fell: at(i) as SourceTimeMs,
+        medianDb: median,
+      };
     }
     return null;
   }
@@ -3380,7 +3430,13 @@ export class NoteTracker {
    * the time the ghost opened. The ghost is then absorbed and the Note before
    * ends at the damp.
    */
-  private absorbDampGhost(ghost: NoteRecord, silentSince: SourceTimeMs, out: TrackerEmission[]): boolean {
+  private absorbDampGhost(
+    ghost: NoteRecord,
+    silentSince: SourceTimeMs,
+    out: TrackerEmission[],
+    /** Still sounding: absorbed only if it never came within the fall of the Note before. */
+    sounding = false
+  ): boolean {
     if (this.config.tracking.dampFallDb <= 0) return false;
     const before = this.closing.find(
       (record) =>
@@ -3395,6 +3451,12 @@ export class NoteTracker {
     if (own !== null && mine !== null && Math.abs(own - mine) > DAMP_STEP_SEMITONES) return false;
     const damp = this.dampedAt(before, silentSince);
     if (damp === null || damp.fell > ghost.startTime) return false;
+    if (sounding) {
+      if (20 * Math.log10(Math.max(ghost.maxRms, 1e-9)) > damp.medianDb - this.config.tracking.dampFallDb) {
+        return false;
+      }
+      this.holdResidual(before, damp.medianDb);
+    }
 
     ghost.merged = true;
     this.retractOpening(ghost);
@@ -3425,6 +3487,94 @@ export class NoteTracker {
       },
     });
     return true;
+  }
+
+  /**
+   * End a Note at its damp while something the damp left is still above the
+   * gate. See `tracking.dampEndsAboveGate`.
+   *
+   * The same evidence `dampedAt` reads when a Note ends in silence — a fall
+   * `dampFallDb` under the recent median, `dampDepthDb` reached soon after,
+   * never climbing back — held for `releaseGraceMs`, the time silence would
+   * have had to hold. A strummed chord that has lost its periodicity is
+   * untouched: it has not fallen, and the fall is what is read, not the
+   * pitch. A Note opened inside the damp of the Note before it, and never
+   * within the fall of it, is absorbed on the same evidence rather than once
+   * it falls silent (`absorbDampGhost`).
+   */
+  private endAboveGate(active: NoteRecord, frame: FastFrame, out: TrackerEmission[]): boolean {
+    const tracking = this.config.tracking;
+    if (!tracking.dampEndsAboveGate || tracking.dampFallDb <= 0) return false;
+    const t = frame.at;
+    if (this.heldAboveGate(active.startTime, t) && this.absorbDampGhost(active, t, out, true)) {
+      return true;
+    }
+    // Cheap first: a damped Note is well under its own peak.
+    if (frame.rms > active.maxRms * 10 ** (-tracking.dampFallDb / 40)) return false;
+    const damp = this.dampedAt(active, t);
+    if (damp === null) return false;
+    const floor = damp.medianDb - tracking.dampDepthDb;
+    const reached = this.voicedLog.find(
+      (entry) => entry.at >= damp.fell && 20 * Math.log10(Math.max(entry.rms, 1e-9)) <= floor
+    );
+    if (reached === undefined || !this.heldAboveGate(reached.at, t)) return false;
+    this.end(active, damp.end, out);
+    this.holdResidual(active, damp.medianDb);
+    return true;
+  }
+
+  /**
+   * A pitch step inside a damp already evident, to a level `dampFallDb` under
+   * the Note's median: the damp's residual. The Note ends at the damp and the
+   * residual opens nothing.
+   */
+  private endAtResidualStep(
+    active: NoteRecord,
+    frame: FastFrame,
+    stepAt: SourceTimeMs,
+    out: TrackerEmission[]
+  ): boolean {
+    const tracking = this.config.tracking;
+    if (!tracking.dampEndsAboveGate || tracking.dampFallDb <= 0) return false;
+    if (frame.rms > active.maxRms * 10 ** (-tracking.dampFallDb / 20)) return false;
+    const damp = this.dampedAt(active, frame.at);
+    if (damp === null || damp.fell > stepAt) return false;
+    if (20 * Math.log10(Math.max(frame.rms, 1e-9)) > damp.medianDb - tracking.dampFallDb) return false;
+    this.end(active, damp.end, out);
+    this.holdResidual(active, damp.medianDb);
+    return true;
+  }
+
+  /** Whether every hop from `from` to `to` was over the gate, and there were `DAMP_RESIDUAL_MS` of them. */
+  private heldAboveGate(from: SourceTimeMs, to: SourceTimeMs): boolean {
+    if (to - from < DAMP_RESIDUAL_MS) return false;
+    for (let i = this.voicedLog.length - 1; i >= 0; i--) {
+      const entry = this.voicedLog[i] as { at: SourceTimeMs; gated: boolean };
+      if (entry.at < from) break;
+      if (entry.gated) return false;
+    }
+    return true;
+  }
+
+  private holdResidual(damped: NoteRecord, medianDb: number): void {
+    const fall = this.config.tracking.dampFallDb;
+    this.dampResidual = {
+      noteId: damped.id,
+      pickFloorRms: 10 ** ((medianDb - fall) / 20),
+      recoverRms: 10 ** ((medianDb - fall / 2) / 20),
+      gatedSince: null,
+    };
+  }
+
+  /** Whether this frame may open a Note over a damp's residual. */
+  private residualOpens(frame: FastFrame, struck: boolean): boolean {
+    const residual = this.dampResidual;
+    if (residual === null) return true;
+    if (frame.rms > residual.recoverRms || (struck && frame.rms > residual.pickFloorRms)) {
+      this.dampResidual = null;
+      return true;
+    }
+    return false;
   }
 
   private end(record: NoteRecord, at: SourceTimeMs, out: TrackerEmission[]): void {
