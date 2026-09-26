@@ -847,6 +847,18 @@ export type EngineConfig = {
     dampFallDb: number;
     /** How deep under the median a damp must reach within 300ms; see `dampFallDb`. */
     dampDepthDb: number;
+    /**
+     * A damp ends a Note even when something stays above the gate after it —
+     * a sympathetic string, hum, an amp's noise, a gate set close to the
+     * floor. Once the damp `dampFallDb` describes has held for
+     * `releaseGraceMs` with the level never climbing back, the Note ends at
+     * the damp without waiting for the gate; a pitch step to something
+     * `dampFallDb` quieter inside an evident damp is the damp's residual, not
+     * a Note. Until the residual stops, or the level comes back, it opens a
+     * Note only on a pick louder than `dampFallDb` under the damped Note.
+     * Off: a Note ends only once the gate closes. See DECISION-087.
+     */
+    dampEndsAboveGate: boolean;
     bendThresholdCents: number;
     /** How long after an attack a new Note may still be backdated onto it. */
     backdateWindowMs: number;
@@ -1255,6 +1267,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
     releaseGraceMs: 90,
     dampFallDb: 10,
     dampDepthDb: 25,
+    dampEndsAboveGate: true,
     bendThresholdCents: 45,
     backdateWindowMs: 120,
     endedNoteHistory: 64,

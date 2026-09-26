@@ -125,3 +125,58 @@ describe("stop()", () => {
     }
   });
 });
+
+describe("a damp that leaves something above a calibrated gate", () => {
+  // The gate a consumer measured on a quiet direct input: 8x a 1e-4 floor.
+  const GATE = 0.0008;
+  const damped = [{ midi: 57, at: 1.0, damp: 1.5 }];
+
+  function notes(residuals: Residual[], dampEndsAboveGate = true): { started: TrackerEmission[]; ended: TrackerEmission[]; at: number[] } {
+    const samples = render(6, damped, residuals);
+    const config = resolveEngineConfig({ rmsGate: GATE });
+    config.tracking.dampEndsAboveGate = dampEndsAboveGate;
+    const engine = new RecognitionEngine(SR, config);
+    const started: TrackerEmission[] = [];
+    const ended: TrackerEmission[] = [];
+    const at: number[] = [];
+    const block = new Float32Array(RENDER_QUANTUM);
+    for (let offset = 0; offset < samples.length; offset += RENDER_QUANTUM) {
+      block.fill(0);
+      block.set(samples.subarray(offset, Math.min(samples.length, offset + RENDER_QUANTUM)));
+      for (const e of engine.processChunk(block, offset).emissions) {
+        if (e.type === "started") started.push(e);
+        if (e.type === "ended") {
+          ended.push(e);
+          at.push(((offset + RENDER_QUANTUM) / SR) * 1000);
+        }
+      }
+    }
+    return { started, ended, at };
+  }
+
+  it("an open string ringing on: the Note ends at the damp, and the string opens nothing", () => {
+    const { started, ended, at } = notes([{ at: 1.5, hz: 82.41, level: 0.0012 }]);
+    expect(started).toHaveLength(1);
+    expect(ended).toHaveLength(1);
+    expect(ended[0]?.note.endTime).toBeGreaterThan(1500);
+    expect(ended[0]?.note.endTime).toBeLessThan(1600);
+    expect(at[0]).toBeLessThan(1500 + 250);
+  });
+
+  it("hum that is never a pitch: the Note ends at the damp while the take is running", () => {
+    const { started, ended, at } = notes([
+      { at: 1.5, hz: 50, level: 0.0015 },
+      { at: 1.5, hz: 150, level: 0.0005 },
+    ]);
+    expect(started).toHaveLength(1);
+    expect(ended).toHaveLength(1);
+    expect(ended[0]?.note.endTime).toBeGreaterThan(1500);
+    expect(ended[0]?.note.endTime).toBeLessThan(1600);
+    expect(at[0]).toBeLessThan(1500 + 250);
+  });
+
+  it("with the rule off, the hum holds the Note open well past the damp", () => {
+    const { ended } = notes([{ at: 1.5, hz: 50, level: 0.0015 }, { at: 1.5, hz: 150, level: 0.0005 }], false);
+    expect(ended.every((e) => (e.note.endTime ?? 0) > 2000)).toBe(true);
+  });
+});
