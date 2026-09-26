@@ -106,8 +106,10 @@ In more detail — two events, two meanings:
   `note.lifecycle` reads `"ended"`.
 
   Something that stays above the gate after a damp — a sympathetic string, hum, a gate set close to
-  the noise floor — holds the Note open: it ends only when the level finally drops, when the region
-  lane cuts it, or at `stop()`. Set `rmsGate` with that margin in mind.
+  the noise floor — does not hold the Note open. Once the damp has reached its depth and the
+  residual has held above the gate for 150ms, the Note ends at the damp, so `noteEnded` arrives
+  about 220ms after the damp (a pitch step to a much quieter residual ends it at once). The residual
+  opens no Note of its own until a real pick or the level coming back.
 - **`noteResolved` — the answer is settled.** The deep lane has re-analysed the region the Note
   lives in, and nothing more is expected to change. It follows `noteEnded` by 240ms at the median
   on the fixture corpus and 750ms at p90: the region is analysed once it has been quiet for
