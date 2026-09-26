@@ -59,7 +59,7 @@ recognizer.on("error", (error) => console.error(error.code, error.message));
 await recognizer.start();
 
 // When you're done:
-await recognizer.stop();     // every open Note still gets its noteEnded
+await recognizer.stop();     // every open Note still gets its noteEnded and noteResolved
 await recognizer.dispose();  // stop, then release the mic and worklet
 ```
 
@@ -71,12 +71,17 @@ await recognizer.dispose();  // stop, then release the mic and worklet
 |---|---|
 | `noteStarted` | `(note: Note)` |
 | `noteChanged` | `(note: Note, change: NoteChange)` |
-| `noteResolved` | `(note: Note)` — once, when the answer settles |
-| `noteEnded` | `(note: Note)` |
+| `noteEnded` | `(note: Note)` — when the sound stops; later corrections arrive as `noteChanged` |
+| `noteResolved` | `(note: Note)` — once, after `noteEnded`, when the answer settles |
 | `pitchFrame` | `(frame: PitchFrame)` — diagnostic, off unless `diagnostics.pitchFrames` |
 | `stateChange` | `(state: RecognizerState)` — `idle`/`starting`/`listening`/`stopping`/`error` |
 | `status` | `(message: string)` |
 | `error` | `(error: RecognizerError)` |
+
+`noteEnded` fires as soon as the sound stops, with the best `endTime` known then. The Note can
+still change after it — a moved end, a new name, an absorption into its neighbour — and each change
+arrives as `noteChanged`. `noteResolved` follows, once, when nothing more is expected to change.
+`stop()` ends and then resolves every open Note. [The contract in full](https://github.com/trellos/Tuninator/blob/main/docs/API.md#when-a-note-ends-and-when-it-is-final).
 
 ## Docs
 

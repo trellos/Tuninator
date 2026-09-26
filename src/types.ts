@@ -135,15 +135,25 @@ export type Hypothesis = {
 /* Notes                                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Where a Note is in its life, in the order it moves through them:
+ * `started → enriching → ended → resolved`.
+ */
 export type NoteLifecycle =
   /** Something was played; the recognizer is still working out what. */
   | "started"
   /** Evidence is still arriving and still changing the answer. */
   | "enriching"
-  /** The answer has settled. It can still be revised, but not cheaply. */
-  | "resolved"
-  /** The sound is over. */
-  | "ended";
+  /**
+   * The sound is over; set when `noteEnded` fires. The deep lane may still
+   * rename the Note or move its boundaries, each as a `noteChanged`.
+   */
+  | "ended"
+  /**
+   * The deep lane has ruled and the answer has settled; set when
+   * `noteResolved` fires. It can still be revised, but not cheaply.
+   */
+  | "resolved";
 
 export type NoteChangeType =
   | "confidenceUpdate"
@@ -207,7 +217,12 @@ export type NoteOriginTrigger = "attack" | "pitchChange" | "rearticulation";
 export type Note = {
   id: string;
   startTime: SourceTimeMs;
-  /** Null while the Note is still sounding. */
+  /**
+   * Null while the Note is still sounding. Set when `noteEnded` fires, to the
+   * fast lane's best estimate; a later `structuralRevision` may move it (it
+   * has only ever moved earlier), and the `noteResolved` snapshot carries the
+   * final one.
+   */
   endTime: SourceTimeMs | null;
   lifecycle: NoteLifecycle;
 
@@ -424,8 +439,20 @@ export type RecognizerErrorLike = Error & {
 export type RecognizerEventMap = {
   noteStarted: (note: Note) => void;
   noteChanged: (note: Note, change: NoteChange) => void;
-  /** The answer has settled. Fires at most once per Note, before `noteEnded`. */
+  /**
+   * The answer has settled: the deep lane has ruled on this Note and nothing
+   * more is expected to change. Fires once per Note, after its `noteEnded`
+   * (and, for a Note absorbed into another, once the absorption is delivered,
+   * with no `noteEnded` after it). A consumer that wants only final answers
+   * waits for this.
+   */
   noteResolved: (note: Note) => void;
+  /**
+   * The sound is over. Fires as soon as the fast lane decides so — after
+   * `tracking.releaseGraceMs` of silence, or on the hop that opens the next
+   * Note — never held for the deep lane. What the deep lane later changes
+   * arrives as `noteChanged` on the ended Note, until `noteResolved`.
+   */
   noteEnded: (note: Note) => void;
   /** Diagnostic; only emitted when `diagnostics.pitchFrames` is set. */
   pitchFrame: (frame: PitchFrame) => void;
@@ -445,7 +472,7 @@ export interface Recognizer {
   start(): Promise<void>;
   /**
    * Stops listening and flushes both lanes, so every Note still open gets its
-   * `noteEnded` before this resolves.
+   * `noteEnded` and then its `noteResolved` before this resolves.
    */
   stop(): Promise<void>;
   /** `stop()` plus releasing the microphone, worklet and any context we made. */

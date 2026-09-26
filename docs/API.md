@@ -67,12 +67,73 @@ off();
 Shutting down:
 
 ```ts
-await recognizer.stop();     // flushes both lanes; every open Note gets noteEnded
+await recognizer.stop();     // flushes both lanes; every open Note gets noteEnded, then noteResolved
 await recognizer.dispose();  // stop, then release the mic, worklet and any context it created
 ```
 
 `stop()` is `async` because the flush is real: a Note still sounding when you stop still gets its
-`noteEnded`, with a real `endTime`, before the promise settles.
+`noteEnded`, with a real `endTime`, and then its `noteResolved`, before the promise settles.
+
+## When a Note ends, and when it is final
+
+The contract, since 0.3.0:
+
+1. `noteEnded` fires when the fast lane ends the Note, in the same `processChunk` call. It is
+   never held for the deep lane. Its delay from the `endTime` it carries is only what the fast lane
+   needed to decide: a hop or two for an ending made by the next Note, `tracking.releaseGraceMs`
+   of gated audio for a silence.
+2. `noteEnded` carries the fast lane's best `endTime`.
+3. After `noteEnded`, anything that changes the Note arrives as `noteChanged` on that Note: a
+   boundary as `structuralRevision` with the new `endTime`/`startTime` in the snapshot; a name as
+   `pitchCorrection`, `harmonyCorrection` or a refinement; an absorption as `structuralRevision`
+   with `relation: "absorbed"` on the survivor, naming it.
+4. `noteResolved` fires once per Note, after its `noteEnded`, when the deep lane has ruled and
+   nothing more is expected to change. A consumer that wants only final answers waits for it; no
+   setting restores the old timing.
+5. `stop()` flushes: every open Note gets `noteEnded` and then `noteResolved` before it settles.
+6. The inline and worker hosts produce the same emissions, in the same order.
+
+In more detail — two events, two meanings:
+
+- **`noteEnded` — the sound is over.** It fires in the same audio block in which the fast lane
+  decides the Note has stopped, and is never held for the deep lane. How long after the Note's
+  `endTime` that is depends on how it ended: a Note ended by the next attack or pitch step is ended
+  on the hop that opens its successor (a hop or two); a Note ended by silence waits until the level
+  has spent `tracking.releaseGraceMs` under the gate. A damp on a direct input is reported about
+  140ms after the damp; through an amp, whose ring holds the gate open for a while after the damp,
+  about 0.4s. Either way the `endTime` it carries is the damp. On the 27 fixture takes the delay
+  from `endTime` to `noteEnded` is 0ms at the median, 93ms at p90 and 160ms at p95.
+  `note.lifecycle` reads `"ended"`.
+
+  Something that stays above the gate after a damp — a sympathetic string, hum, a gate set close to
+  the noise floor — holds the Note open: it ends only when the level finally drops, when the region
+  lane cuts it, or at `stop()`. Set `rmsGate` with that margin in mind.
+- **`noteResolved` — the answer is settled.** The deep lane has re-analysed the region the Note
+  lives in, and nothing more is expected to change. It follows `noteEnded` by 240ms at the median
+  on the fixture corpus and 750ms at p90: the region is analysed once it has been quiet for
+  `deep.regionSettleMs` or has grown to `deep.maxRegionMs`, so on dense material resolutions come in
+  batches about a second apart. It waits longer while a much quieter Note that opened at this one's
+  end is still sounding, in case the damp opened it (DECISION-074). `note.lifecycle` reads
+  `"resolved"`. A consumer that wants only final answers waits for this.
+
+Between the two, anything the deep lane changes arrives as `noteChanged` on the ended Note:
+
+| What changed | How it arrives |
+|---|---|
+| Its end or start | `structuralRevision`, with the new `endTime`/`startTime` in the snapshot. An end has only ever moved earlier. |
+| Its name | `pitchCorrection`, `harmonyCorrection`, or a refinement/enrichment, as for a sounding Note |
+| It was part of another Note after all | `structuralRevision` with `relation: "absorbed"` on the survivor, naming it |
+
+On the fixture corpus about one Note in sixteen gets any of these after its `noteEnded`: 44 of
+1,807 an earlier end, 8 a new name, 64 an absorption.
+
+A Note absorbed into another gets no `noteEnded` after the absorption — the survivor's
+`structuralRevision` is its last word — and is resolved at once. One absorbed after its
+`noteEnded` is retracted by that revision in the same way.
+
+`noteResolved` is a settled answer, not a sealed one: in one rare path the region lane can still
+correct the name of a Note it had already let go, as a `pitchCorrection`. On the fixture corpus it
+never does.
 
 ## `NoteChange.type`
 
@@ -88,10 +149,11 @@ The distinction the whole Note model is built on — see
 | `pitchAdded`, `pitchRemoved` | The set of pitches believed to be sounding changed. |
 | `hypothesisPromoted`, `hypothesisDiscredited`, `hypothesisIncorporated` | A candidate interpretation changed state. |
 | `confidenceUpdate` | Same answer, different confidence. |
-| `resolved` | The answer has settled. |
+| `resolved` | The answer has settled — the change that accompanies `noteResolved`. |
 
 `change.at` is when the *evidence* is from, which may precede delivery — the deep lane analyses
-audio the fast lane already reported on.
+audio the fast lane already reported on. Any of these can arrive on a Note after its `noteEnded`
+and before its `noteResolved`; see [above](#when-a-note-ends-and-when-it-is-final).
 
 ## Timestamps
 

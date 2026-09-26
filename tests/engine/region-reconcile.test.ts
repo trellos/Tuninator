@@ -210,11 +210,15 @@ describe("a boundary the fast lane missed", () => {
     const started = out.find((e) => e.type === "started");
     expect(started).toBeDefined();
     expect(started?.note.startTime).toBeCloseTo(250, 0);
-    // A consumer must never see a Note finish it was never told about.
+    // A consumer must never see a Note finish it was never told about. Its
+    // audio is already in the past, so it ends at once, right after it starts.
+    const ended = out.findIndex((e) => e.type === "ended" && e.note.id === started?.note.id);
+    expect(ended).toBeGreaterThan(out.indexOf(started as TrackerEmission));
     const released: TrackerEmission[] = [];
     tracker.releaseClosed(new Set<string>(), released);
-    const ends = released.filter((e) => e.type === "ended").map((e) => e.note.id);
-    expect(ends).toContain(started?.note.id);
+    const resolved = released.filter((e) => e.type === "resolved").map((e) => e.note.id);
+    expect(resolved).toContain(started?.note.id);
+    expect(released.some((e) => e.type === "ended")).toBe(false);
   });
 
   it("leaves the original ending where the second event began", () => {
@@ -227,8 +231,8 @@ describe("a boundary the fast lane missed", () => {
     );
     const released: TrackerEmission[] = [];
     tracker.releaseClosed(new Set<string>(), released);
-    const ended = released.filter((e) => e.type === "ended").map((e) => e.note);
-    const original = ended.find((n) => n.id === "n1");
+    const resolved = released.filter((e) => e.type === "resolved").map((e) => e.note);
+    const original = resolved.find((n) => n.id === "n1");
     expect(original?.endTime).toBeCloseTo(250, 0);
   });
 
@@ -302,16 +306,17 @@ describe("a region the fast lane over-segmented", () => {
   });
 });
 
-describe("a Note that has already ended", () => {
+describe("a Note that has already resolved", () => {
   it("can still be corrected", () => {
-    // Its extent is history and cannot be rewritten, but its name is a belief,
-    // and a lane allowed to be late may arrive after the fact knowing better.
+    // Its extent is settled, but its name is a belief, and a lane allowed to
+    // be late may arrive after the fact knowing better. (A Note that has only
+    // ended is revised as a matter of course: see "after its noteEnded".)
     const { tracker } = trackerWithNotes([{ midi: 74, hops: 30 }], {
       regionCorrectPitch: true,
     });
     const released: TrackerEmission[] = [];
     tracker.releaseClosed(new Set<string>(), released, true);
-    expect(released.some((e) => e.type === "ended")).toBe(true);
+    expect(released.some((e) => e.type === "resolved")).toBe(true);
 
     const out = tracker.applySegmentation(
       segmentation([segment(0, 600, 69, "regionStart")])
@@ -377,27 +382,51 @@ describe("determinism", () => {
     for (let i = 0; i < 4; i++) expect(once()).toBe(reference);
   });
 
-  it("never lets a Note finish before the region it lives in has been ruled on", () => {
-    // The hold is what makes the whole thing possible: once a Note is gone from
-    // `closing` there is nothing left to correct.
-    const signal = new Float32Array(SAMPLE_RATE);
+  it("never lets a Note resolve before the region it lives in has been ruled on, and never holds its ended", () => {
+    // The hold is what lets the region reach back over a Note and revise it:
+    // `closing` is its working set, and leaving it is what `resolved`
+    // announces. It holds the resolution only; `ended` goes out in the block
+    // in which the fast lane ends the Note (DECISION-086).
+    const signal = new Float32Array(SAMPLE_RATE * 2);
     const period = SAMPLE_RATE / 440;
     for (let i = 0; i < SAMPLE_RATE / 2; i++) {
       signal[i] = 0.4 * Math.exp(-i / (0.3 * SAMPLE_RATE)) * (2 * ((i % period) / period) - 1);
     }
     const engine = new RecognitionEngine(SAMPLE_RATE, DEFAULT_ENGINE_CONFIG);
-    const ended: string[] = [];
+    let decided: string[] = [];
+    engine.setTrackerTrace((event) => {
+      if (event.kind === "ended") decided.push(event.noteId);
+    });
+    const decidedAt = new Map<string, number>();
+    const endedAt = new Map<string, number>();
+    const endTime = new Map<string, number>();
+    const resolvedAt = new Map<string, number>();
     for (let offset = 0; offset < signal.length; offset += RENDER_QUANTUM) {
       const block = new Float32Array(RENDER_QUANTUM);
       block.set(signal.subarray(offset, Math.min(offset + RENDER_QUANTUM, signal.length)));
-      for (const emission of engine.processChunk(block, offset).emissions) {
-        if (emission.type === "ended") ended.push(emission.note.id);
+      decided = [];
+      const emissions = engine.processChunk(block, offset).emissions;
+      for (const id of decided) if (!decidedAt.has(id)) decidedAt.set(id, offset);
+      for (const emission of emissions) {
+        if (emission.type === "ended") {
+          endedAt.set(emission.note.id, offset);
+          endTime.set(emission.note.id, emission.note.endTime as number);
+        }
+        if (emission.type === "resolved") resolvedAt.set(emission.note.id, offset);
       }
     }
-    for (const emission of engine.flush().emissions) {
-      if (emission.type === "ended") ended.push(emission.note.id);
+    expect(endedAt.size).toBeGreaterThan(0);
+    for (const [id, at] of endedAt) {
+      // Not held: told in the very block the fast lane decided.
+      expect(at).toBe(decidedAt.get(id));
+      // Held: resolved only once its region has settled and been ruled on.
+      const resolved = resolvedAt.get(id);
+      expect(resolved).toBeDefined();
+      expect(resolved as number).toBeGreaterThan(at);
+      expect(((resolved as number) / SAMPLE_RATE) * 1000).toBeGreaterThanOrEqual(
+        (endTime.get(id) as number) + DEFAULT_ENGINE_CONFIG.deep.regionSettleMs
+      );
     }
-    expect(ended.length).toBeGreaterThan(0);
     expect(engine.droppedDeepRegionCount).toBe(0);
   });
 });
@@ -561,5 +590,85 @@ describe("the string under the hand", () => {
     ).toHaveLength(0);
     const carved = out.filter((e) => e.type === "started").map((e) => e.note);
     expect(carved.some((n) => Math.abs(n.startTime - carvedFrom) < 1)).toBe(true);
+  });
+});
+
+describe("after its noteEnded", () => {
+  /** Every emission about `id`, in order. */
+  const about = (emissions: readonly TrackerEmission[], id: string): TrackerEmission[] =>
+    emissions.filter((e) => e.note.id === id);
+
+  it("a Note has been told it ended before the region rules on it", () => {
+    const { emissions } = trackerWithNotes([{ midi: 74, hops: 40 }]);
+    const mine = about(emissions, "n1");
+    expect(mine.map((e) => e.type)).toContain("ended");
+    expect(mine.some((e) => e.type === "resolved")).toBe(false);
+    const ended = mine.find((e) => e.type === "ended");
+    expect(ended?.note.lifecycle).toBe("ended");
+    expect(ended?.note.endTime).not.toBeNull();
+  });
+
+  it("a Note the region cuts short gets a revision carrying its new end, and no second ended", () => {
+    const { tracker, emissions } = trackerWithNotes([{ midi: 74, hops: 40 }]);
+    const endedAt = about(emissions, "n1").find((e) => e.type === "ended")?.note.endTime as number;
+    expect(endedAt).toBeGreaterThan(250);
+
+    const out = tracker.applySegmentation(
+      segmentation([segment(0, 250, 74, "regionStart"), segment(250, 600, 69, "pitchChange")])
+    );
+    const revision = about(out, "n1").find(
+      (e) => e.type === "changed" && e.change.type === "structuralRevision"
+    );
+    expect(revision?.note.endTime).toBeCloseTo(250, 0);
+    const released: TrackerEmission[] = [];
+    tracker.releaseClosed(new Set<string>(), released);
+    const later = [...out, ...released];
+    expect(about(later, "n1").filter((e) => e.type === "ended")).toHaveLength(0);
+    const resolved = about(released, "n1").filter((e) => e.type === "resolved");
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]?.note.endTime).toBeCloseTo(250, 0);
+    expect(resolved[0]?.note.lifecycle).toBe("resolved");
+  });
+
+  it("a Note absorbed after its ended is retracted through the survivor, and ends no second time", () => {
+    const events = [
+      { midi: 74, hops: 14 },
+      { midi: 74, hops: 14 },
+      { midi: 74, hops: 14 },
+    ];
+    const { tracker, emissions } = trackerWithNotes(events, { regionMerge: true });
+    const endedBefore = new Set(emissions.filter((e) => e.type === "ended").map((e) => e.note.id));
+    const out = tracker.applySegmentation(segmentation([segment(0, 1000, 74, "regionStart")]));
+    const revision = out.find((e) => e.type === "changed" && e.change.type === "structuralRevision");
+    if (revision?.type !== "changed") throw new Error("expected an absorption");
+    expect(revision.change.relation).toBe("absorbed");
+    const absorbed = revision.change.relatedNoteIds ?? [];
+    expect(absorbed.length).toBeGreaterThan(0);
+    // Each had already been told it ended; the survivor's end moved over them.
+    for (const id of absorbed) expect(endedBefore.has(id)).toBe(true);
+    expect(revision.note.endTime).toBeGreaterThan(30 * HOP_MS);
+
+    const released: TrackerEmission[] = [];
+    tracker.releaseClosed(new Set<string>(), released);
+    const later = [...out, ...released];
+    for (const id of [revision.note.id, ...absorbed]) {
+      expect(about(later, id).filter((e) => e.type === "ended")).toHaveLength(0);
+      expect(about(later, id).filter((e) => e.type === "resolved")).toHaveLength(1);
+    }
+  });
+
+  it("a Note renamed after its ended hears it as a change, before it resolves", () => {
+    const { tracker } = trackerWithNotes([{ midi: 74, hops: 30 }], { regionCorrectPitch: true });
+    const out = tracker.applySegmentation(segmentation([segment(0, 600, 69, "regionStart")]));
+    const correction = about(out, "n1").find(
+      (e) => e.type === "changed" && e.change.type === "pitchCorrection"
+    );
+    if (correction?.type !== "changed") throw new Error("expected a correction");
+    expect(correction.note.lifecycle).toBe("ended");
+    expect(correction.note.pitch.current?.name).toBe("A4");
+    const released: TrackerEmission[] = [];
+    tracker.releaseClosed(new Set<string>(), released);
+    const resolved = about(released, "n1").find((e) => e.type === "resolved");
+    expect(resolved?.note.pitch.current?.name).toBe("A4");
   });
 });

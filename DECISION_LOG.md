@@ -7,6 +7,183 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-087]: A damp over a residual above the gate ends its Note at the damp — built, inert on the corpus, and not shipped: it missed its latency bar by 20ms
+* **Date:** 2026-09-26
+* **Status:** Rejected
+* **Owner:** The project owner (the GOATerizer brief `docs/timely-note-end-prompt.md`, §0 B: "if it misses its bar, record the finding and ship A alone"); detection architecture
+* **Context:** A Note ends only after `tracking.releaseGraceMs` of gated
+  hops, and a quiet opening inside a damp is absorbed only once it has
+  itself gone silent (DECISION-073, -074). Anything that holds above the
+  gate after a damp defeats both: at a consumer's calibrated gate
+  (`rmsGate` 0.0008, 8x a 1e-4 floor) an A3 damped over an open E ringing
+  on at -32dB leaves the E announced as a Note only `flush()` ends (and
+  re-segments into 13), and over 50Hz hum the A3 does not end until the
+  region lane cuts it 1,540ms after the damp, its tail becoming a second
+  A3 (`scripts/measure-end-latency.ts`, cases 4 and 6).
+* **Decision:** Not shipped. **Falsifier, stated before measuring:** (1) at
+  gate 0.0008, in the open-E and hum cases, A3's `endTime` within 100ms
+  after the damp, its `noteEnded` no more than 200ms after the damp, and
+  no other Note announced; the other five synthetic cases unchanged; (2)
+  on the derivation takes, missed not up, extras not up, exact not down,
+  splits and extra Notes not up, ledger MISSED not up; (3) the held-out
+  set, read once afterwards, no net loss; (4) corpus `noteEnded` latency
+  p90 no worse than DECISION-086's 93ms.
+  **The rule as last built** (`tracking.dampEndsAboveGate`, on branch
+  `claude/timely-note-end-part-b`, commit `304e5be`): once `dampedAt`'s
+  evidence has reached `dampDepthDb` and what follows has held above the
+  gate for 150ms, the Note ends at the damp; a pitch step to something
+  `dampFallDb` quieter inside an evident damp is the damp's residual, and
+  the Note ends at the damp with nothing opened; a Note opened in the damp
+  of the Note before, held as long and never within the fall of it, is
+  absorbed on that evidence; until the residual is gated for
+  `releaseGraceMs` it opens a Note only on a pick louder than `dampFallDb`
+  under the damped Note, and the deep lane keeps reading the damped Note.
+  **Numbers:** (1) open E: A3 ends at 1533ms (damp 1500), `noteEnded` at
+  1573ms, 73ms after the damp, no other Note (was: 13 phantom Notes). Hum:
+  ends at 1533ms, `noteEnded` at 1720ms — **220ms after the damp, against
+  200** — no other Note (was: an end 1,540ms late and a phantom A3). The
+  other five cases are byte-identical. (2)–(4): every figure of `npm run
+  eval`, derivation and held-out, byte-identical to DECISION-086; splits
+  and ledger identical; hence latency identical. The rule never fires on
+  the 27 takes at the default gate.
+  **How it got there, all on derivation:** draft 1 ended the Note once the
+  damp had held for `releaseGraceMs` with no hold above the gate. Missed
+  100 → 101, exact 1,089 → 1,086, extras 191 → 190, from two knock-ons,
+  not from the rule misfiring. (a) `rest-repick-g2-60-120bpm-amped`,
+  23.16s: ending the Note ~360ms before its ring reached the gate stopped
+  the deep lane reading that ring. That moved the room's harmonic context,
+  and a spurious pitch step then split the next Note at 24.2s (+3 extras,
+  one label ending 881ms early). Fixed by keeping the deep lane on the
+  damped Note while its residual sounds. (b)
+  `held-then-picked-six-strings-120bpm-amped`, 65.77s: the damp's ring
+  reached the gate two hops before the next pick. Ending at the damp made
+  that pick open a fresh Note instead of re-articulating the damped one,
+  so it did not inherit the decay model. The held run after it then split
+  differently: one label lost, exact −3, extras −4. So the rule has to
+  leave alone every damped ring that does reach the gate. On the
+  derivation takes, over the 17 Notes that end on a damp in silence, the
+  gate comes at most 133ms after the depth (`rest-repick-amped`, 53–133ms);
+  150ms is the hold that clears them. The hum case's 220ms is that hold
+  plus the ~30ms the damp takes to reach its depth, plus a block.
+* **Alternatives Considered:** (a) **A hold under 133ms**: collides with
+  the derivation rings; the bar would be met by fitting it to them. (b)
+  **The pitch having gone as a second witness**, as the brief suggested:
+  the held-then-picked ring at 65.77s is unvoiced for 200ms above the gate
+  before the pick, so it does not separate the case that broke draft 1.
+  (c) **A pick during a residual opened as a re-articulation of the damped
+  Note**, inheriting its decay: would let the hold shrink, but is a second
+  detection change on the fast lane's opening path, not measured here. (d)
+  **Ship it anyway**: the owner's instruction for a missed bar is to ship A
+  alone. The code, with its three tests, is on the branch above; taking it
+  means accepting a 220ms bound on the hum case, and flipping this entry.
+* **Consequences:** 0.3.0 ships DECISION-086 alone. At a calibrated gate a
+  damp over a residual that never reaches the gate still ends late or not
+  until `stop()`, and a sympathetic string can still be announced as a
+  Note. `noteEnded` now arrives as soon as the fast lane decides, so where
+  it does decide, a consumer hears it promptly. What the brief asked for is
+  a branch merge away, if the owner accepts 220ms.
+
+---
+
+#### [DECISION-086]: `noteEnded` goes out when the fast lane ends the Note; `noteResolved` is the verdict
+* **Date:** 2026-09-26
+* **Status:** Accepted
+* **Owner:** The project owner (the GOATerizer brief `docs/timely-note-end-prompt.md`, §0 A, C, D and E, accepted as written); API contract
+* **Context:** `noteEnded` carried two meanings: *the sound is over* (what
+  `NoteLifecycle`'s `"ended"` said) and *this answer is final* (what
+  `noteResolved` said). `end()` put a Note in `closing` and
+  `releaseClosed()` emitted `resolved` and then `ended` only once the deep
+  lane had nothing queued for it, its region had been re-segmented and no
+  quiet successor was sounding (`quietSuccessor`, DECISION-074 part 1). The
+  region is queued `deep.regionSettleMs` after its last Note ended or once
+  it spans `deep.maxRegionMs`, so on dense material endings arrived in
+  batches about 1.2s apart. GOATerizer draws a note until `noteEnded` and
+  judges a release by it; its designer reported bars running on after the
+  note stopped. Measured on `main` (`fecc0e4`) with the brief's
+  `scripts/measure-end-latency-fixtures.ts`, over the 1,736 announced,
+  unabsorbed Notes that ended while their take ran: `noteEnded` arrived
+  p50 253ms / p90 760ms / max 1,493ms after the `endTime` it carried; the
+  hold alone was p50 240 / p90 747ms; and it changed the payload for 51
+  Notes (2.9%): 44 ends moved, all earlier, 7 labels. 58 of 66 absorbed
+  Notes were absorbed after the fast lane had ended them.
+* **Decision:** Move the event, not the logic.
+  - `end()` emits `ended` (lifecycle `"ended"`) for an announced Note in
+    the call in which the fast lane ends it, and still pushes it to
+    `closing`, the region's working set. A Note already absorbed gets no
+    `ended` (the damp ghost is marked `merged` before `end()`).
+  - `releaseClosed()` keeps its three conditions and now emits only
+    `resolved` (lifecycle `"resolved"`). So `quietSuccessor` now holds a
+    Note's **resolution**, not its ending: DECISION-074 part (1) changes
+    meaning. **This entry reverses DECISION-074's rejected alternative (b)**,
+    "revise the earlier Note after its `noteEnded`: a consumer has already
+    been told it is finished". The rule it stated — a Note is not revised
+    after its `noteEnded`, and `noteResolved` comes first — no longer holds
+    anywhere: a Note is revised after `noteEnded` by design, and
+    `noteResolved` comes after it. DECISION-074 is marked superseded in part.
+  - Order is `started → enriching → ended → resolved`.
+  - An absorbed Note is resolved at once (its `resolved` is emitted
+    without leaving `closing`, so nothing internal moves), and never gets
+    an `ended` after its absorption. One absorbed after its `ended` is
+    retracted by the survivor's `structuralRevision`, as before. Owner's
+    choice D left `noteResolved` for an absorbed Note to this session:
+    it gets one, so every announced Note gets exactly one, and the offline
+    analyzer's `notes` (now taken at `resolved`) stay the same set.
+  - A new name for an ended, unresolved Note is emitted as `noteChanged`:
+    the two harmony guards that required `endTime === null` now require
+    only that the Note is announced, not absorbed and not resolved; and a
+    name reached by a path that emits nothing of its own (a pitch vote
+    attributed late through `pitch.voteLagMs`) is announced from
+    `publish()` and before `resolved` (`announceLateLabel`).
+  - `WorkerEngineHost.mirror()` keys on the Note's own `endTime`, so a
+    `changed` or `resolved` after `ended` does not put it back among the
+    active Notes; `getNote` keeps the latest snapshot.
+  - The eval's gated `final` projection and `analyzeSamples().notes` are
+    taken at `resolved`, whose snapshot is the one `ended` used to carry.
+  **Falsifiers, stated before measuring:** `npm run eval` identical to
+  `main` in every scored figure and `check-readme-eval.ts` clean without
+  `--write`, with only the revision counters allowed to rise, by the label
+  changes now emitted after an ending; ledger and splits identical;
+  `late` falls to `main`'s `early` (p50 0, p90 93, p95 160ms) and `hold`
+  is gone; about 51 + 58 Notes revised or absorbed after their `ended`,
+  of about 1,800; fixtures untouched, typecheck and tests green.
+  **Numbers:** eval identical in every accuracy figure, `check-readme-eval`
+  clean; `revisions.changes` +8 (chords-a-bm 110 → 111, cowboy-amped 124 →
+  126, held-then-picked-amped 829 → 834), and `timeToFinalLabelMs` gains 6
+  entries, strictly additive (Notes whose final name was never emitted
+  before their held `ended`); the only median that moved is chords-a-bm,
+  200.0 → 186.7ms. Ledger and splits byte-identical (232 / 265 / 12).
+  `late` p10/p50/p90/p95/max 227/253/760/920/1,493 → 0/0/93/160/1,013ms;
+  `hold` → 0; over 250ms 58.4% → 3.3%, over 500ms 23.3% → 0.6%, over 1s
+  3.2% → 0.1%; 1,740 Notes ended live (4 that only the flush used to end).
+  `scripts/measure-after-end.ts`: of 1,807 announced Notes, 116 are
+  revised after `ended` (end moved 44, renamed 8, absorbed 64), none gets
+  two `ended`s or two `resolved`s, and nothing at all arrives after a
+  `resolved`. Synthetic (`measure-end-latency.ts`): a damp is reported
+  93ms after its end instead of 253ms; detached sixteenths 0ms instead of
+  batches up to 1,107ms late; an A3 damped over a ringing open E at a
+  calibrated gate 13ms instead of 3,987ms. 567 tests.
+* **Alternatives Considered:** (a) **A setting that restores the old
+  timing**: the brief rules it out, and `noteResolved` already is that
+  option. (b) **Emit `ended` early but keep the Note out of the region's
+  working set**: the region could then no longer correct it, which is the
+  internal half of the hold and the part that stays. (c) **Suppress the
+  region's correction of an already-resolved Note** (`correctPitch` over
+  `this.ended`), so that nothing can ever follow `resolved`: it never
+  fires on the corpus, the path is deliberate ("a name is a belief"), and
+  `NoteLifecycle` already documents `"resolved"` as revisable; left as is
+  and documented in `docs/API.md`.
+* **Consequences:** A consumer hears an ending when the fast lane decides
+  it — a hop or two for a legato ending, `tracking.releaseGraceMs` after a
+  damp — and about one Note in sixteen is revised afterwards, always as a
+  `noteChanged` it already handles for sounding Notes. A consumer that
+  treated `noteEnded` as final must wait for `noteResolved` instead: a
+  breaking change, shipped as 0.3.0. A damp over a residual that never
+  goes under the gate still ends late or never (the synthetic hum and
+  open-E cases); that is detection, measured separately and not shipped
+  (DECISION-087).
+
+---
+
 #### [DECISION-085]: `greblus/solitito-ai` is not read as a boundary witness: it answers once per 0.77s window, and its finest target is 96ms
 * **Date:** 2026-09-25
 * **Status:** Rejected
@@ -286,7 +463,7 @@ are what keep later work from repeating them.
 
 #### [DECISION-074]: A Note opened inside the damp that stopped the Note before it is absorbed into it
 * **Date:** 2026-09-24
-* **Status:** Accepted
+* **Status:** Superseded in part by DECISION-086 (part (1) now holds `noteResolved`, not `noteEnded`; alternative (b) is reversed)
 * **Owner:** The project owner (asked for the amped rest-and-repick take's extra Notes to be fixed, and chose "Go on" to fixing the damp splits, 2026-09-24); detection architecture carries the rule
 * **Context:** On `rest-repick-g2-60-120bpm-amped` the damp at 18.1s
   opened a G2 Note at 18.33s. The level was already 22dB under the

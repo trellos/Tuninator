@@ -9,9 +9,10 @@
  *
  * Two projections come out of one run:
  *
- *  - **final** — the Note as it stood when it ended, after every correction the
- *    deep lane made. This is what the accuracy gates score, because it is what
- *    a consumer who waited for `noteEnded` would have seen.
+ *  - **final** — the Note as it stood when it resolved, after every correction
+ *    the deep lane made. This is what the accuracy gates score, because it is
+ *    what a consumer who waited for `noteResolved` would have seen. (`noteEnded`
+ *    goes out when the sound stops, before the deep lane has ruled.)
  *  - **fast**  — the Note as it stood at `noteStarted`, before any deep-lane
  *    revision. Reported, never gated: it is the honest measure of how good the
  *    first guess is, and the gap between the two is the value the deep lane
@@ -28,7 +29,7 @@ import type { TrackerEmission } from "../engine/tracker/note-tracker.js";
 import type { DetectedEvent } from "./matcher.js";
 
 export type EvalProjections = {
-  /** One entry per ended Note, in start order. */
+  /** One entry per resolved Note, in start order. */
   final: DetectedEvent[];
   fast: DetectedEvent[];
   /** Per-Note revision statistics, reported alongside accuracy. */
@@ -125,7 +126,7 @@ export function projectEmissions(emissions: readonly TrackerEmission[]): EvalPro
         }
         break;
       }
-      case "ended": {
+      case "resolved": {
         const label = labelOf(note);
         final.push(toDetection(note, label, note.endTime));
         const history = labelHistory.get(note.id) ?? [];

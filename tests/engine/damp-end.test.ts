@@ -107,8 +107,9 @@ function notes(dampFallDb: number, levels: number[], struck: number[] = [0]): { 
   );
   for (let i = 0; i < 80; i++) feed({ voiced: false, rms: 0.001 });
   tracker.releaseClosed(new Set(), emissions, true);
+  // Each Note as it stood when it resolved: its final state.
   for (const emission of emissions) {
-    if (emission.type === "ended") {
+    if (emission.type === "resolved") {
       ended.push({ id: emission.note.id, start: emission.note.startTime, end: emission.note.endTime as number });
     }
   }

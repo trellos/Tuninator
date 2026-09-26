@@ -228,13 +228,22 @@ export class WorkerEngineHost implements EnginePort {
 
   /** Keep the main-thread view of the Note timeline in step with the worker. */
   private mirror(emission: TrackerEmission): void {
-    if (emission.type === "ended") {
-      this.active.delete(emission.note.id);
-      this.recent.push(emission.note);
-      if (this.recent.length > RECENT_NOTES) this.recent.shift();
+    const note = emission.note;
+    // Keyed on the Note's own end rather than on `ended`: a Note is still
+    // revised and then resolved after its `ended`, and none of that may put it
+    // back among the active ones.
+    if (note.endTime === null) {
+      this.active.set(note.id, note);
       return;
     }
-    this.active.set(emission.note.id, emission.note);
+    this.active.delete(note.id);
+    const held = this.recent.findIndex((candidate) => candidate.id === note.id);
+    if (held >= 0) {
+      this.recent[held] = note;
+      return;
+    }
+    this.recent.push(note);
+    if (this.recent.length > RECENT_NOTES) this.recent.shift();
   }
 
   push(samples: Float32Array, startSample: number, meters?: ChannelMeters): void {

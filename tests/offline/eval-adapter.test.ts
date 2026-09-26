@@ -83,12 +83,12 @@ describe("labelOf / kindOf", () => {
 });
 
 describe("projectEmissions", () => {
-  it("produces one final detection per ended Note, in start order", () => {
+  it("produces one final detection per resolved Note, in start order", () => {
     const emissions: TrackerEmission[] = [
       { type: "started", note: pitched("n2", "B4", 500, null) },
       { type: "started", note: pitched("n1", "A4", 100, null) },
-      { type: "ended", note: pitched("n1", "A4", 100, 400) },
-      { type: "ended", note: pitched("n2", "B4", 500, 900) },
+      { type: "resolved", note: pitched("n1", "A4", 100, 400) },
+      { type: "resolved", note: pitched("n2", "B4", 500, 900) },
     ];
     const { final } = projectEmissions(emissions);
     expect(final.map((d) => d.id)).toEqual(["n1", "n2"]);
@@ -104,7 +104,7 @@ describe("projectEmissions", () => {
         note: pitched("n1", "A#4", 100, null),
         change: { type: "pitchCorrection", at: 200, revisionNumber: 1 },
       },
-      { type: "ended", note: pitched("n1", "A#4", 100, 400) },
+      { type: "resolved", note: pitched("n1", "A#4", 100, 400) },
     ];
     const { fast, final, revisions } = projectEmissions(emissions);
     expect(fast[0]?.label.name).toBe("A4");
@@ -116,20 +116,44 @@ describe("projectEmissions", () => {
   it("both projections span the same timeline, so only the labels differ", () => {
     const emissions: TrackerEmission[] = [
       { type: "started", note: pitched("n1", "A4", 100, null) },
-      { type: "ended", note: pitched("n1", "A4", 100, 400) },
+      { type: "resolved", note: pitched("n1", "A4", 100, 400) },
     ];
     const { fast, final } = projectEmissions(emissions);
     expect(fast[0]?.startedAt).toBe(final[0]?.startedAt);
     expect(fast[0]?.endedAt).toBe(final[0]?.endedAt);
   });
 
-  it("drops a fast detection for a Note that never ended", () => {
+  it("drops a fast detection for a Note that never resolved", () => {
     const emissions: TrackerEmission[] = [
       { type: "started", note: pitched("n1", "A4", 100, null) },
     ];
     const { fast, final } = projectEmissions(emissions);
     expect(final).toHaveLength(0);
     expect(fast).toHaveLength(0);
+  });
+
+  it("scores the Note as it resolved, not as it ended", () => {
+    // `ended` goes out when the sound stops; the deep lane may still rename
+    // the Note or move its end before it resolves.
+    const emissions: TrackerEmission[] = [
+      { type: "started", note: pitched("n1", "A4", 100, null) },
+      { type: "ended", note: pitched("n1", "A4", 100, 600) },
+      {
+        type: "changed",
+        note: pitched("n1", "A4", 100, 450),
+        change: { type: "structuralRevision", at: 450, revisionNumber: 1, relation: "split" },
+      },
+      {
+        type: "changed",
+        note: pitched("n1", "B4", 100, 450),
+        change: { type: "pitchCorrection", at: 450, revisionNumber: 2 },
+      },
+      { type: "resolved", note: pitched("n1", "B4", 100, 450) },
+    ];
+    const { final } = projectEmissions(emissions);
+    expect(final).toHaveLength(1);
+    expect(final[0]?.label.name).toBe("B4");
+    expect(final[0]?.endedAt).toBe(450);
   });
 
   it("measures how long a Note took to reach the answer it kept", () => {
@@ -140,7 +164,7 @@ describe("projectEmissions", () => {
         note: pitched("n1", "B4", 100, null),
         change: { type: "pitchCorrection", at: 260, revisionNumber: 1 },
       },
-      { type: "ended", note: pitched("n1", "B4", 100, 500) },
+      { type: "resolved", note: pitched("n1", "B4", 100, 500) },
     ];
     const { revisions } = projectEmissions(emissions);
     expect(revisions.timeToFinalLabelMs).toEqual([160]);

@@ -1418,7 +1418,7 @@ export class NoteTracker {
       const previous = record.currentLabel();
       record.oneString = oneString;
       const label = record.currentLabel();
-      if (record.announced && record.endTime === null && label !== record.lastEmitted.label) {
+      if (this.speaksFor(record) && label !== record.lastEmitted.label) {
         const revisionNumber = record.bump("harmonyCorrection");
         record.lastEmitted.label = label;
         out.push({
@@ -1533,7 +1533,9 @@ export class NoteTracker {
     }
 
     const label = record.currentLabel();
-    if (record.announced && record.endTime === null && label !== record.lastEmitted.label) {
+    // An ended Note's new name is announced too, until it is resolved: `ended`
+    // no longer waits for the deep lane, so this is how its answer arrives.
+    if (this.speaksFor(record) && label !== record.lastEmitted.label) {
       const revisionNumber = record.bump(type);
       const change: NoteChange = { type, at, revisionNumber };
       if (bloomed && previousLabel !== null && type === "harmonyCorrection") {
@@ -2329,8 +2331,8 @@ export class NoteTracker {
       if (inRegion(record)) candidates.push(record);
     }
     // Notes that have already been let go are still open to being *corrected*.
-    // Their extent is history and cannot be rewritten — the `ended` for them
-    // has been delivered — but a name is a belief, and the region saw the whole
+    // Their extent is history and cannot be rewritten — the `resolved` for
+    // them has been delivered — but a name is a belief, and the region saw the whole
     // event where the hops each saw 43ms straddling its edges. This is the same
     // path `applyHarmony` has always taken for a Note whose chord resolved
     // after it stopped sounding.
@@ -2575,7 +2577,9 @@ export class NoteTracker {
    * Rename a Note the region disagrees with.
    *
    * Not a structural claim and not gated on the Note still being open: an
-   * already-ended Note's extent is history, but its name is a belief, and the
+   * ended Note is renamed like a sounding one (its `ended` does not close it
+   * to correction), and even a resolved Note's name — whose extent is
+   * settled — is a belief, and the
    * whole point of a lane that is allowed to be late is that it may arrive
    * after the fact with better evidence. A Note that has bloomed into a chord
    * is left alone — a chord is not named from one fundamental.
@@ -2871,7 +2875,7 @@ export class NoteTracker {
    *
    * The audio is already in the past, so there is nothing to observe hop by
    * hop: the segment IS the evidence. It goes through the ordinary closing path
-   * so that its `started`, `resolved` and `ended` come out in the same shape and
+   * so that its `started`, `ended` and `resolved` come out in the same shape and
    * the same order as every other Note's.
    *
    * A child of a Note that had bloomed into an unnamed chord inherits that
@@ -2947,11 +2951,11 @@ export class NoteTracker {
   }
 
   /**
-   * Stop every Note that is still sounding, without letting any of them go.
+   * End every Note that is still sounding, without resolving any of them.
    *
-   * Separate from `releaseClosed` so the engine can close the take's last
+   * Separate from `releaseClosed` so the engine can end the take's last
    * Notes, have the deep lane rule on the region they live in, and only then
-   * release them. The last event of a recording is exactly the one whose
+   * resolve them. The last event of a recording is exactly the one whose
    * region has not settled, and it should not be the one event that never gets
    * a verdict.
    */
@@ -3264,6 +3268,8 @@ export class NoteTracker {
       };
       out.push({ type: "changed", note: record.snapshot(), change });
     }
+
+    for (const record of this.closing) this.announceLateLabel(record, out);
   }
 
   /**
@@ -3459,15 +3465,31 @@ export class NoteTracker {
       this.claimPrefix(record, out);
     }
 
-    // The sound is over, but the recognizer may not have finished thinking. A
-    // chord's identity is routinely settled by deep analysis that started
-    // before the strum stopped, so the closing events wait for it — otherwise
-    // the answer a consumer keeps is the one from before the evidence arrived.
+    // The sound is over, and a consumer is told so now: `ended` means the
+    // sound stopped, not that the answer is final. A Note already absorbed
+    // into another is not told — the survivor's `structuralRevision` was its
+    // last word.
+    if (!record.merged) {
+      record.lifecycle = "ended";
+      out.push({ type: "ended", note: record.snapshot() });
+    }
+
+    // The ending goes out now, but the answer keeps improving. A chord's
+    // identity is routinely settled by deep analysis that started before the
+    // strum stopped, and the region lane may yet move this Note's boundaries
+    // or absorb it. So it joins `closing`, the region's working set, and
+    // everything the deep lane changes reaches the consumer as `changed` on
+    // the ended Note, until `resolved` says it is done (DECISION-086).
     this.closing.push(record);
   }
 
   /**
-   * Emit the held closing events for every Note the deep lane is done with.
+   * Resolve every ended Note the deep lane is done with.
+   *
+   * This holds a Note's resolution, never its ending: the `ended` went out
+   * when the sound stopped (`end`). `closing` is the region's working set,
+   * and a Note leaving it is what `resolved` announces — the deep lane has
+   * ruled, and nothing more is expected to change.
    *
    * @param busy ids the deep lane still has queued work for
    * @param force release even Notes nobody has ruled on — the end of a take
@@ -3476,31 +3498,66 @@ export class NoteTracker {
     // Backwards, so the `splice` below leaves the indices still to visit valid.
     for (let i = this.closing.length - 1; i >= 0; i--) {
       const record = this.closing[i] as NoteRecord;
+      // An absorbed Note has had its last word, the survivor's revision, and
+      // is resolved at once. It stays in the working set for as long as it
+      // always has: only what the consumer hears changes.
+      if (record.merged) this.resolve(record, out);
       if (!force) {
         if (busy.has(record.id)) continue;
-        // A Note nobody has re-analysed is not finished, whatever the queue
-        // says. Holding it here is what makes the region reach back over it:
-        // once it is gone from `closing` there is nothing left to correct.
+        // A Note nobody has re-analysed is not resolved, whatever the queue
+        // says. Keeping it in `closing` is what lets the region reach back
+        // over it and revise it through `changed`; leaving `closing` is what
+        // `resolved` announces.
         if (!record.deepResolved) continue;
         // Nor is one cut by a Note that opened far under it, which may yet
         // turn out to have been opened by its damp. See `absorbDampGhost`.
+        // This holds the Note's resolution, not its ending (DECISION-086).
         if (this.quietSuccessor(record)) continue;
       }
       this.closing.splice(i, 1);
-
-      if (!record.resolvedAnnounced) {
-        record.resolvedAnnounced = true;
-        record.lifecycle = "resolved";
-        record.bump("resolved");
-        out.push({ type: "resolved", note: record.snapshot() });
-      }
-
-      record.lifecycle = "ended";
-      out.push({ type: "ended", note: record.snapshot() });
+      this.announceLateLabel(record, out);
+      this.resolve(record, out);
 
       this.ended.push(record);
       if (this.ended.length > this.config.tracking.endedNoteHistory) this.ended.shift();
     }
+  }
+
+  private resolve(record: NoteRecord, out: TrackerEmission[]): void {
+    if (record.resolvedAnnounced) return;
+    record.resolvedAnnounced = true;
+    record.lifecycle = "resolved";
+    record.bump("resolved");
+    out.push({ type: "resolved", note: record.snapshot() });
+  }
+
+  /**
+   * Whether a Note's name may still be announced: it has been announced, it
+   * has not been absorbed, and it has not been resolved.
+   */
+  private speaksFor(record: NoteRecord): boolean {
+    return record.announced && !record.merged && !record.resolvedAnnounced;
+  }
+
+  /**
+   * Announce a name an ended Note came to by a path that emits nothing of its
+   * own — a pitch vote attributed to it late (`pitch.voteLagMs`) or a harmony
+   * reading applied after its end. Before `ended` went out at the end of the
+   * sound, such a name reached the consumer only inside the held `ended`.
+   */
+  private announceLateLabel(record: NoteRecord, out: TrackerEmission[]): void {
+    if (!this.speaksFor(record) || record.endTime === null) return;
+    const previous = record.lastEmitted.label;
+    const label = record.currentLabel();
+    if (label === previous) return;
+    const type: NoteChangeType = record.harmonyBloomed
+      ? "harmonyCorrection"
+      : classifyPitchChange(previous, label, false);
+    const revisionNumber = record.bump(type);
+    record.lastEmitted.label = label;
+    const change: NoteChange = { type, at: record.endTime, revisionNumber };
+    if (type === "pitchCorrection" || type === "harmonyCorrection") change.previous = { label: previous };
+    out.push({ type: "changed", note: record.snapshot(), change });
   }
 
   /**

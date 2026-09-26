@@ -7,7 +7,8 @@
  *
  * Three commitments are visible in its shape:
  *  - `stop()` is async and flushes, so a Note still sounding gets its
- *    `noteEnded` instead of being silently dropped.
+ *    `noteEnded` and then its `noteResolved` instead of being silently
+ *    dropped.
  *  - `dispose()` only closes an `AudioContext` this file created — a
  *    caller-supplied context belongs to the caller.
  *  - every rejection is a real `RecognizerError`, so it can be thrown, caught
@@ -168,7 +169,8 @@ class BrowserRecognizer implements Recognizer {
     if (this.state === "idle") return;
     this.setState("stopping");
     // Flush BEFORE tearing the graph down, so every open Note gets its
-    // `noteEnded` while there is still an engine to produce it. The old
+    // `noteEnded` and `noteResolved` while there is still an engine to
+    // produce them. The old
     // synchronous `stop()` dropped whatever was in flight.
     await this.engine?.flush();
     await this.teardown();
