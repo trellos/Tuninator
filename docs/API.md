@@ -81,10 +81,16 @@ Two events, two meanings:
 - **`noteEnded` — the sound is over.** It fires in the same audio block in which the fast lane
   decides the Note has stopped, and is never held for the deep lane. How long after the Note's
   `endTime` that is depends on how it ended: a Note ended by the next attack or pitch step is ended
-  on the hop that opens its successor (a hop or two); a Note ended by silence waits out
-  `tracking.releaseGraceMs` of gated audio, so a damp is reported about a quarter-second after it.
-  On the 27 fixture takes the delay is 0ms at the median, 93ms at p90 and 160ms at p95.
+  on the hop that opens its successor (a hop or two); a Note ended by silence waits until the level
+  has spent `tracking.releaseGraceMs` under the gate. A damp on a direct input is reported about
+  140ms after the damp; through an amp, whose ring holds the gate open for a while after the damp,
+  about 0.4s. Either way the `endTime` it carries is the damp. On the 27 fixture takes the delay
+  from `endTime` to `noteEnded` is 0ms at the median, 93ms at p90 and 160ms at p95.
   `note.lifecycle` reads `"ended"`.
+
+  Something that stays above the gate after a damp — a sympathetic string, hum, a gate set close to
+  the noise floor — holds the Note open: it ends only when the level finally drops, when the region
+  lane cuts it, or at `stop()`. Set `rmsGate` with that margin in mind.
 - **`noteResolved` — the answer is settled.** The deep lane has re-analysed the region the Note
   lives in, and nothing more is expected to change. It follows `noteEnded` by 240ms at the median
   on the fixture corpus and 750ms at p90: the region is analysed once it has been quiet for

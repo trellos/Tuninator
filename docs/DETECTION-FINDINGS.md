@@ -8362,3 +8362,62 @@ kernels to compute. The model's one time-local input, the onset head's positive
 rise per pitch class over 96ms, is a magnitude spectral flux folded onto twelve
 classes: the witness family this record has measured most (the onset kernel
 itself, the attack band, DECISION-013 and -014, ledger row C2a).
+
+## A damp over a residual that never reaches the gate: built, inert on the corpus, 20ms over its bar (DECISION-087)
+
+The shape comes from a consumer's calibrated gate (`rmsGate` 0.0008, 8x a
+1e-4 floor) in `scripts/measure-end-latency.ts`. An A3 is damped over
+something that stays above the gate: an open E ringing on at −32dB, or 50Hz
+hum that is never a pitch. The Note either ends into a quiet successor that
+never ends itself (13 phantom Notes out of the flush), or it does not end
+until the region lane cuts it 1,540ms after the damp.
+
+**Bar, stated first:** in both cases A3 ends within 100ms after the damp,
+its `noteEnded` arrives no more than 200ms after the damp, and nothing else
+is announced; the derivation takes lose nothing on missed, extras, exact,
+splits or ledger; held-out, read once, no net loss.
+
+**The rule** (branch `claude/timely-note-end-part-b`, `304e5be`). The same
+evidence `dampedAt` reads for a Note ending in silence — a fall
+`dampFallDb` under the recent median, `dampDepthDb` reached, never climbing
+back — and then what follows must hold above the gate for 150ms. A pitch
+step to something `dampFallDb` quieter inside an evident damp is the damp's
+residual. A damp ghost that holds as long is absorbed on the same evidence.
+The residual opens nothing but a real pick.
+
+**What the corpus said about the hold.** Draft 1 had none: it waited out
+`releaseGraceMs`, as silence would. It was worse on two derivation takes,
+and neither loss came from the rule misfiring:
+
+- `rest-repick-g2-60-120bpm-amped`, 23.16s. The Note correctly ended at its
+  damp about 360ms before its ring reached the gate, and the deep lane
+  stopped reading that ring. The room's harmonic context is built from those
+  readings. Without them, a spurious three-octave step split the *next*
+  Note at 24.2s, for three extras. The deep lane now keeps reading the damped
+  Note while its residual sounds, which restores the take exactly.
+- `held-then-picked-six-strings-120bpm-amped`, 65.77s. The damp's ring
+  reached the gate two hops before the next pick. On `main` that pick
+  re-articulated the still-open Note and inherited its decay model. Ended at
+  the damp, the Note let the pick open a fresh Note with no decay model,
+  and the held run after it split differently: one label lost, exact −3,
+  extras −4.
+
+So the rule has to leave alone every damped ring that does reach the gate.
+Over the derivation takes' damp endings, the gate arrives at most 133ms
+after the damp reaches its depth (`rest-repick-amped`, 53–133ms). A 150ms
+hold clears every one. With it, the whole eval — derivation and held-out —
+splits and ledger are byte-identical to the build without the rule.
+
+**Where it missed.** Open E: `noteEnded` 73ms after the damp, no phantom.
+Hum: 220ms after the damp, no phantom, and the Note ends at the damp. That
+is 20ms over the bar: the 150ms hold, plus the ~30ms a damp takes to reach
+its depth, plus a block. A hold short enough to meet the bar sits under
+133ms, which is fitting it to the derivation rings. The pitch having gone
+does not separate the case either: the 65.77s ring is unvoiced for 200ms
+above the gate. What might is opening a pick during a residual as a
+re-articulation of the damped Note, so that ending at the damp costs the
+fast lane nothing it had before. That is a second change to the opening
+path and was not built.
+
+Not shipped (§0 B of the brief). The branch carries the rule and its three
+synthetic tests; taking it means accepting 220ms on the hum case.
