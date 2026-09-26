@@ -745,6 +745,10 @@ a Note only reaches `Resolved` once it has been compared against a re-analysis
 of its own audio. Closing Notes are held until then; without that hold there is
 nothing left to correct by the time the verdict arrives.
 
+> *2026-09-26:* since DECISION-086 the hold delays `noteResolved`, not
+> `noteEnded`. A closing Note has already been told it ended; the region's
+> corrections reach it as `noteChanged` until it resolves.
+
 Two witnesses, decided from the window sequence alone:
 
 - **the leader moved and stayed moved** — compared by pitch class, held for two
@@ -8170,6 +8174,10 @@ Folding it in removes it and the held-out amped power-chord take's one
 ghost of the same shape (fp 63 → 62). No labelled note is lost anywhere.
 The earlier Note is held back from `noteEnded` only while such a quiet
 successor is sounding: 9 Notes across all 27 takes.
+
+> *2026-09-26:* since DECISION-086 this hold delays `noteResolved`, not
+> `noteEnded`. The earlier Note's `noteEnded` goes out at once, and the
+> absorption, with the moved end, reaches it as a `structuralRevision`.
 
 ## A published guitar model read as a boundary witness: `greblus/solitito-ai`, stopped at its deciding fact (DECISION-085)
 

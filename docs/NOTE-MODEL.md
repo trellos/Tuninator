@@ -37,6 +37,23 @@ of the Note beside it. Each of those arrives as a `noteChanged` on the ended Not
 `structuralRevision` for a boundary or an absorption, a correction or refinement for a name — the
 same way the deep lane's answers about a sounding Note always have. Then `noteResolved` fires.
 
+The contract, in full ([API](API.md#when-a-note-ends-and-when-it-is-final)):
+
+1. `noteEnded` fires when the fast lane ends the Note, in the same `processChunk` call. It is
+   never held for the deep lane. Its delay from the `endTime` it carries is only what the fast lane
+   needed to decide: a hop or two for an ending made by the next Note, `tracking.releaseGraceMs`
+   of gated audio for a silence.
+2. `noteEnded` carries the fast lane's best `endTime`.
+3. After `noteEnded`, anything that changes the Note arrives as `noteChanged` on that Note: a
+   boundary as `structuralRevision` with the new `endTime`/`startTime` in the snapshot; a name as
+   `pitchCorrection`, `harmonyCorrection` or a refinement; an absorption as `structuralRevision`
+   with `relation: "absorbed"` on the survivor, naming it.
+4. `noteResolved` fires once per Note, after its `noteEnded`, when the deep lane has ruled and
+   nothing more is expected to change. A consumer that wants only final answers waits for it; no
+   setting restores the old timing.
+5. `stop()` flushes: every open Note gets `noteEnded` and then `noteResolved` before it settles.
+6. The inline and worker hosts produce the same emissions, in the same order.
+
 So a consumer that draws a note until it stops listens for `noteEnded` and adjusts on the few
 revisions that follow; one that wants only final answers waits for `noteResolved`. On the fixture
 corpus about one Note in sixteen is revised between the two.

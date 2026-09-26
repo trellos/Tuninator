@@ -5,6 +5,9 @@
 > mechanism was refuted" in `docs/DETECTION-FINDINGS.md`. Nothing in `src/`
 > changed.
 >
+> **Since 0.3.0 (DECISION-086), the answer to "may a revision be emitted
+> against a Note that has already ended?" (below) is yes, by design.**
+>
 > Three things this brief got right and one it got wrong, worth reading before
 > acting on anything below.
 >
