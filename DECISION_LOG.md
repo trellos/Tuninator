@@ -7,6 +7,100 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-086]: `noteEnded` goes out when the fast lane ends the Note; `noteResolved` is the verdict
+* **Date:** 2026-09-26
+* **Status:** Accepted
+* **Owner:** The project owner (the GOATerizer brief `docs/timely-note-end-prompt.md`, §0 A, C, D and E, accepted as written); API contract
+* **Context:** `noteEnded` carried two meanings: *the sound is over* (what
+  `NoteLifecycle`'s `"ended"` said) and *this answer is final* (what
+  `noteResolved` said). `end()` put a Note in `closing` and
+  `releaseClosed()` emitted `resolved` and then `ended` only once the deep
+  lane had nothing queued for it, its region had been re-segmented and no
+  quiet successor was sounding (`quietSuccessor`, DECISION-074 part 1). The
+  region is queued `deep.regionSettleMs` after its last Note ended or once
+  it spans `deep.maxRegionMs`, so on dense material endings arrived in
+  batches about 1.2s apart. GOATerizer draws a note until `noteEnded` and
+  judges a release by it; its designer reported bars running on after the
+  note stopped. Measured on `main` (`fecc0e4`) with the brief's
+  `scripts/measure-end-latency-fixtures.ts`, over the 1,736 announced,
+  unabsorbed Notes that ended while their take ran: `noteEnded` arrived
+  p50 253ms / p90 760ms / max 1,493ms after the `endTime` it carried; the
+  hold alone was p50 240 / p90 747ms; and it changed the payload for 51
+  Notes (2.9%): 44 ends moved, all earlier, 7 labels. 58 of 66 absorbed
+  Notes were absorbed after the fast lane had ended them.
+* **Decision:** Move the event, not the logic.
+  - `end()` emits `ended` (lifecycle `"ended"`) for an announced Note in
+    the call in which the fast lane ends it, and still pushes it to
+    `closing`, the region's working set. A Note already absorbed gets no
+    `ended` (the damp ghost is marked `merged` before `end()`).
+  - `releaseClosed()` keeps its three conditions and now emits only
+    `resolved` (lifecycle `"resolved"`). So `quietSuccessor` now holds a
+    Note's **resolution**, not its ending: DECISION-074 part (1) changes
+    meaning, and its alternative (b), "revise the earlier Note after its
+    `noteEnded`", is what now happens.
+  - Order is `started → enriching → ended → resolved`.
+  - An absorbed Note is resolved at once (its `resolved` is emitted
+    without leaving `closing`, so nothing internal moves), and never gets
+    an `ended` after its absorption. One absorbed after its `ended` is
+    retracted by the survivor's `structuralRevision`, as before. Owner's
+    choice D left `noteResolved` for an absorbed Note to this session:
+    it gets one, so every announced Note gets exactly one, and the offline
+    analyzer's `notes` (now taken at `resolved`) stay the same set.
+  - A new name for an ended, unresolved Note is emitted as `noteChanged`:
+    the two harmony guards that required `endTime === null` now require
+    only that the Note is announced, not absorbed and not resolved; and a
+    name reached by a path that emits nothing of its own (a pitch vote
+    attributed late through `pitch.voteLagMs`) is announced from
+    `publish()` and before `resolved` (`announceLateLabel`).
+  - `WorkerEngineHost.mirror()` keys on the Note's own `endTime`, so a
+    `changed` or `resolved` after `ended` does not put it back among the
+    active Notes; `getNote` keeps the latest snapshot.
+  - The eval's gated `final` projection and `analyzeSamples().notes` are
+    taken at `resolved`, whose snapshot is the one `ended` used to carry.
+  **Falsifiers, stated before measuring:** `npm run eval` identical to
+  `main` in every scored figure and `check-readme-eval.ts` clean without
+  `--write`, with only the revision counters allowed to rise, by the label
+  changes now emitted after an ending; ledger and splits identical;
+  `late` falls to `main`'s `early` (p50 0, p90 93, p95 160ms) and `hold`
+  is gone; about 51 + 58 Notes revised or absorbed after their `ended`,
+  of about 1,800; fixtures untouched, typecheck and tests green.
+  **Numbers:** eval identical in every accuracy figure, `check-readme-eval`
+  clean; `revisions.changes` +8 (chords-a-bm 110 → 111, cowboy-amped 124 →
+  126, held-then-picked-amped 829 → 834), and `timeToFinalLabelMs` gains 6
+  entries, strictly additive (Notes whose final name was never emitted
+  before their held `ended`); the only median that moved is chords-a-bm,
+  200.0 → 186.7ms. Ledger and splits byte-identical (232 / 265 / 12).
+  `late` p10/p50/p90/p95/max 227/253/760/920/1,493 → 0/0/93/160/1,013ms;
+  `hold` → 0; over 250ms 58.4% → 3.3%, over 500ms 23.3% → 0.6%, over 1s
+  3.2% → 0.1%; 1,740 Notes ended live (4 that only the flush used to end).
+  `scripts/measure-after-end.ts`: of 1,807 announced Notes, 116 are
+  revised after `ended` (end moved 44, renamed 8, absorbed 64), none gets
+  two `ended`s or two `resolved`s, and nothing at all arrives after a
+  `resolved`. Synthetic (`measure-end-latency.ts`): a damp is reported
+  93ms after its end instead of 253ms; detached sixteenths 0ms instead of
+  batches up to 1,107ms late; an A3 damped over a ringing open E at a
+  calibrated gate 13ms instead of 3,987ms. 567 tests.
+* **Alternatives Considered:** (a) **A setting that restores the old
+  timing**: the brief rules it out, and `noteResolved` already is that
+  option. (b) **Emit `ended` early but keep the Note out of the region's
+  working set**: the region could then no longer correct it, which is the
+  internal half of the hold and the part that stays. (c) **Suppress the
+  region's correction of an already-resolved Note** (`correctPitch` over
+  `this.ended`), so that nothing can ever follow `resolved`: it never
+  fires on the corpus, the path is deliberate ("a name is a belief"), and
+  `NoteLifecycle` already documents `"resolved"` as revisable; left as is
+  and documented in `docs/API.md`.
+* **Consequences:** A consumer hears an ending when the fast lane decides
+  it — a hop or two for a legato ending, `tracking.releaseGraceMs` after a
+  damp — and about one Note in sixteen is revised afterwards, always as a
+  `noteChanged` it already handles for sounding Notes. A consumer that
+  treated `noteEnded` as final must wait for `noteResolved` instead: a
+  breaking change, shipped as 0.3.0. A damp over a residual that never
+  goes under the gate still ends late or never (the synthetic hum and
+  open-E cases); that is detection, handled separately (DECISION-087).
+
+---
+
 #### [DECISION-085]: `greblus/solitito-ai` is not read as a boundary witness: it answers once per 0.77s window, and its finest target is 96ms
 * **Date:** 2026-09-25
 * **Status:** Rejected

@@ -51,7 +51,11 @@ export type AnalyzeOptions = Pick<RecognizerOptions, "engine" | "diagnostics"> &
 };
 
 export type AnalyzeResult = {
-  /** Every Note that ended, in start order. Includes the flush. */
+  /**
+   * Every Note, as it stood when it resolved, in start order. Includes the
+   * flush. That is its final state: a Note's `ended` goes out when the sound
+   * stops, before the deep lane has ruled on it.
+   */
   notes: Note[];
   /** Every emission in order, for consumers that care about the trajectory. */
   emissions: TrackerEmission[];
@@ -116,7 +120,7 @@ function run(
     });
     for (const emission of output.emissions) {
       emissions.push(emission);
-      if (emission.type === "ended") notes.push(emission.note);
+      if (emission.type === "resolved") notes.push(emission.note);
     }
   };
 

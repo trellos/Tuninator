@@ -321,7 +321,7 @@ describe("wiring", () => {
 });
 
 describe("the Note stream", () => {
-  it("delivers started / resolved / ended in that order for one Note", async () => {
+  it("delivers started / ended / resolved in that order for one Note", async () => {
     const recognizer = createRecognizer();
     const order: string[] = [];
     recognizer.on("noteStarted", () => order.push("started"));
@@ -333,7 +333,7 @@ describe("the Note stream", () => {
     await recognizer.stop();
 
     expect(order[0]).toBe("started");
-    expect(order.slice(-2)).toEqual(["resolved", "ended"]);
+    expect(order.slice(-2)).toEqual(["ended", "resolved"]);
   });
 
   it("timestamps from the source clock, not from AudioContext.currentTime", async () => {

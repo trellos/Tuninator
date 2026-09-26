@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.0 — unreleased
+
+**Breaking: `noteEnded` now means the sound is over, not that the answer is
+final.** A consumer that treated `noteEnded` as the last word on a Note should
+wait for `noteResolved` instead.
+
+- `noteEnded` fires in the same `processChunk` call in which the fast lane
+  ends the Note — on the hop that opens the next Note, or once the level has
+  spent `tracking.releaseGraceMs` under the gate — and carries the fast
+  lane's best `endTime`. It used to wait for the deep lane to re-segment the
+  Note's region, a median 240ms (p90 750ms, up to 1.5s on dense material).
+  On the fixture corpus it now arrives 0ms after the `endTime` it carries at
+  the median, 93ms at p90, 160ms at p95; 3.3% arrive more than 250ms late,
+  against 58.4% before.
+- What the deep lane changes after that arrives as `noteChanged` on the ended
+  Note: a moved end or start as `structuralRevision` (an end has only ever
+  moved earlier), a new name as a correction or refinement, an absorption as
+  `structuralRevision` with `relation: "absorbed"` on the survivor. About one
+  Note in sixteen on the corpus gets one.
+- `noteResolved` now follows `noteEnded`; the order is `started → enriching →
+  ended → resolved`, and `note.lifecycle` reads `"ended"` from `noteEnded`
+  and `"resolved"` from `noteResolved`. It fires once per Note. A Note
+  absorbed into another gets no `noteEnded` after its absorption and is
+  resolved at once.
+- `stop()` still ends and then resolves every open Note before it settles.
+- The worker host's `getActiveNotes()` no longer returns a Note that has
+  ended but is still being revised.
+- `analyzeSamples()`'s `notes` and the evaluation's scored projection are
+  taken at `noteResolved`, so every scored figure is unchanged.
+- `scripts/measure-end-latency.ts`, `measure-end-latency-fixtures.ts` and
+  `measure-after-end.ts` measure all of this. DECISION-086.
+
 ## 0.2.1 — 2026-09-25
 
 The version 0.21.0, published on 2026-09-24, was meant to be 0.2.1; this

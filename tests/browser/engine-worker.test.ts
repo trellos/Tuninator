@@ -12,7 +12,8 @@
  * protocol under test and not the browser's worker loader.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { WorkerEngineHost } from "../../src/browser/engine-host.js";
 import { DEFAULT_ENGINE_CONFIG } from "../../src/engine/config.js";
 import { RecognitionEngine } from "../../src/engine/engine.js";
 import {
@@ -158,5 +159,76 @@ describe("the engine in a worker", () => {
     // that if it does, the host is told rather than left waiting forever.
     const errors = port.sent.filter((message) => message.type === "error");
     if (errors.length > 0) expect(errors[0]).toHaveProperty("message");
+  });
+});
+
+/**
+ * A `Worker` that runs `serveEngine` in-process, so `WorkerEngineHost`'s own
+ * main-thread mirror is what is under test.
+ */
+class InProcessWorker {
+  onmessage: ((event: MessageEvent<EngineWorkerMessage>) => void) | null = null;
+  onerror: (() => void) | null = null;
+  private readonly port: {
+    postMessage: (message: EngineWorkerMessage) => void;
+    onmessage: ((event: MessageEvent<EngineWorkerCommand>) => void) | null;
+  };
+
+  constructor() {
+    this.port = {
+      postMessage: (message: EngineWorkerMessage): void => {
+        this.onmessage?.({ data: message } as MessageEvent<EngineWorkerMessage>);
+      },
+      onmessage: null,
+    };
+    serveEngine(this.port);
+  }
+
+  postMessage(command: EngineWorkerCommand): void {
+    this.port.onmessage?.({ data: command } as MessageEvent<EngineWorkerCommand>);
+  }
+
+  terminate(): void {}
+}
+
+describe("the worker host's mirror", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("never reports a Note that has ended as active, though it is revised and resolved afterwards", async () => {
+    // A Note's `ended` goes out when the sound stops; its `changed` and
+    // `resolved` can follow it, and none of them may put it back.
+    vi.stubGlobal("Worker", InProcessWorker);
+    const audio = phrase();
+    const host = new WorkerEngineHost("engine.js", SAMPLE_RATE, DEFAULT_ENGINE_CONFIG);
+    const inline = new RecognitionEngine(SAMPLE_RATE, DEFAULT_ENGINE_CONFIG);
+    const after: TrackerEmission[] = [];
+    const ended = new Set<string>();
+    host.onOutput((output) => {
+      for (const emission of output.emissions) {
+        if (emission.type === "ended") ended.add(emission.note.id);
+        else if (ended.has(emission.note.id)) after.push(emission);
+      }
+    });
+
+    for (let at = 0; at + HOP <= audio.length; at += HOP) {
+      inline.processChunk(audio.slice(at, at + HOP), at);
+      host.push(audio.slice(at, at + HOP), at);
+      const active = host.getActiveNotes();
+      expect(active.every((note) => note.endTime === null)).toBe(true);
+      expect(active.map((note) => note.id).sort()).toEqual(
+        inline.getActiveNotes().map((note) => note.id).sort()
+      );
+    }
+    await host.flush();
+
+    // The case the mirror has to survive actually happened.
+    expect(after.some((emission) => emission.type === "resolved")).toBe(true);
+    expect(host.getActiveNotes()).toHaveLength(0);
+    for (const id of ended) {
+      expect(host.getNote(id)?.lifecycle).toBe("resolved");
+    }
+    await host.dispose();
   });
 });

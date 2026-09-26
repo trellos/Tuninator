@@ -59,7 +59,7 @@ recognizer.on("error", (error) => console.error(error.code, error.message));
 await recognizer.start();
 
 // When you're done:
-await recognizer.stop();     // every open Note still gets its noteEnded
+await recognizer.stop();     // every open Note still gets its noteEnded and noteResolved
 await recognizer.dispose();  // stop, then release the mic and worklet
 ```
 
@@ -71,8 +71,8 @@ await recognizer.dispose();  // stop, then release the mic and worklet
 |---|---|
 | `noteStarted` | `(note: Note)` |
 | `noteChanged` | `(note: Note, change: NoteChange)` |
-| `noteResolved` | `(note: Note)` — once, when the answer settles |
-| `noteEnded` | `(note: Note)` |
+| `noteEnded` | `(note: Note)` — when the sound stops; later corrections arrive as `noteChanged` |
+| `noteResolved` | `(note: Note)` — once, after `noteEnded`, when the answer settles |
 | `pitchFrame` | `(frame: PitchFrame)` — diagnostic, off unless `diagnostics.pitchFrames` |
 | `stateChange` | `(state: RecognizerState)` — `idle`/`starting`/`listening`/`stopping`/`error` |
 | `status` | `(message: string)` |
