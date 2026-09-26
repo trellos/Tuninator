@@ -31,6 +31,9 @@ wait for `noteResolved` instead.
   taken at `noteResolved`, so every scored figure is unchanged.
 - `scripts/measure-end-latency.ts`, `measure-end-latency-fixtures.ts` and
   `measure-after-end.ts` measure all of this. DECISION-086.
+- Unchanged: a damp over something that stays above the gate (a sympathetic
+  string, hum, a gate close to the floor) still holds its Note open. A rule
+  for it was built and measured, and is not in this release (DECISION-087).
 
 ## 0.2.1 — 2026-09-25
 

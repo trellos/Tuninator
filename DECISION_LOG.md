@@ -7,6 +7,84 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-087]: A damp over a residual above the gate ends its Note at the damp — built, inert on the corpus, and not shipped: it missed its latency bar by 20ms
+* **Date:** 2026-09-26
+* **Status:** Rejected
+* **Owner:** The project owner (the GOATerizer brief `docs/timely-note-end-prompt.md`, §0 B: "if it misses its bar, record the finding and ship A alone"); detection architecture
+* **Context:** A Note ends only after `tracking.releaseGraceMs` of gated
+  hops, and a quiet opening inside a damp is absorbed only once it has
+  itself gone silent (DECISION-073, -074). Anything that holds above the
+  gate after a damp defeats both: at a consumer's calibrated gate
+  (`rmsGate` 0.0008, 8x a 1e-4 floor) an A3 damped over an open E ringing
+  on at -32dB leaves the E announced as a Note only `flush()` ends (and
+  re-segments into 13), and over 50Hz hum the A3 does not end until the
+  region lane cuts it 1,540ms after the damp, its tail becoming a second
+  A3 (`scripts/measure-end-latency.ts`, cases 4 and 6).
+* **Decision:** Not shipped. **Falsifier, stated before measuring:** (1) at
+  gate 0.0008, in the open-E and hum cases, A3's `endTime` within 100ms
+  after the damp, its `noteEnded` no more than 200ms after the damp, and
+  no other Note announced; the other five synthetic cases unchanged; (2)
+  on the derivation takes, missed not up, extras not up, exact not down,
+  splits and extra Notes not up, ledger MISSED not up; (3) the held-out
+  set, read once afterwards, no net loss; (4) corpus `noteEnded` latency
+  p90 no worse than DECISION-086's 93ms.
+  **The rule as last built** (`tracking.dampEndsAboveGate`, on branch
+  `claude/timely-note-end-part-b`, commit `304e5be`): once `dampedAt`'s
+  evidence has reached `dampDepthDb` and what follows has held above the
+  gate for 150ms, the Note ends at the damp; a pitch step to something
+  `dampFallDb` quieter inside an evident damp is the damp's residual, and
+  the Note ends at the damp with nothing opened; a Note opened in the damp
+  of the Note before, held as long and never within the fall of it, is
+  absorbed on that evidence; until the residual is gated for
+  `releaseGraceMs` it opens a Note only on a pick louder than `dampFallDb`
+  under the damped Note, and the deep lane keeps reading the damped Note.
+  **Numbers:** (1) open E: A3 ends at 1533ms (damp 1500), `noteEnded` at
+  1573ms, 73ms after the damp, no other Note (was: 13 phantom Notes). Hum:
+  ends at 1533ms, `noteEnded` at 1720ms — **220ms after the damp, against
+  200** — no other Note (was: an end 1,540ms late and a phantom A3). The
+  other five cases are byte-identical. (2)–(4): every figure of `npm run
+  eval`, derivation and held-out, byte-identical to DECISION-086; splits
+  and ledger identical; hence latency identical. The rule never fires on
+  the 27 takes at the default gate.
+  **How it got there, all on derivation:** draft 1 ended the Note once the
+  damp had held for `releaseGraceMs` with no hold above the gate. Missed
+  100 → 101, exact 1,089 → 1,086, extras 191 → 190, from two knock-ons,
+  not from the rule misfiring. (a) `rest-repick-g2-60-120bpm-amped`,
+  23.16s: ending the Note ~360ms before its ring reached the gate stopped
+  the deep lane reading that ring. That moved the room's harmonic context,
+  and a spurious pitch step then split the next Note at 24.2s (+3 extras,
+  one label ending 881ms early). Fixed by keeping the deep lane on the
+  damped Note while its residual sounds. (b)
+  `held-then-picked-six-strings-120bpm-amped`, 65.77s: the damp's ring
+  reached the gate two hops before the next pick. Ending at the damp made
+  that pick open a fresh Note instead of re-articulating the damped one,
+  so it did not inherit the decay model. The held run after it then split
+  differently: one label lost, exact −3, extras −4. So the rule has to
+  leave alone every damped ring that does reach the gate. On the
+  derivation takes, over the 17 Notes that end on a damp in silence, the
+  gate comes at most 133ms after the depth (`rest-repick-amped`, 53–133ms);
+  150ms is the hold that clears them. The hum case's 220ms is that hold
+  plus the ~30ms the damp takes to reach its depth, plus a block.
+* **Alternatives Considered:** (a) **A hold under 133ms**: collides with
+  the derivation rings; the bar would be met by fitting it to them. (b)
+  **The pitch having gone as a second witness**, as the brief suggested:
+  the held-then-picked ring at 65.77s is unvoiced for 200ms above the gate
+  before the pick, so it does not separate the case that broke draft 1.
+  (c) **A pick during a residual opened as a re-articulation of the damped
+  Note**, inheriting its decay: would let the hold shrink, but is a second
+  detection change on the fast lane's opening path, not measured here. (d)
+  **Ship it anyway**: the owner's instruction for a missed bar is to ship A
+  alone. The code, with its three tests, is on the branch above; taking it
+  means accepting a 220ms bound on the hum case, and flipping this entry.
+* **Consequences:** 0.3.0 ships DECISION-086 alone. At a calibrated gate a
+  damp over a residual that never reaches the gate still ends late or not
+  until `stop()`, and a sympathetic string can still be announced as a
+  Note. `noteEnded` now arrives as soon as the fast lane decides, so where
+  it does decide, a consumer hears it promptly. What the brief asked for is
+  a branch merge away, if the owner accepts 220ms.
+
+---
+
 #### [DECISION-086]: `noteEnded` goes out when the fast lane ends the Note; `noteResolved` is the verdict
 * **Date:** 2026-09-26
 * **Status:** Accepted
@@ -97,7 +175,8 @@ are what keep later work from repeating them.
   treated `noteEnded` as final must wait for `noteResolved` instead: a
   breaking change, shipped as 0.3.0. A damp over a residual that never
   goes under the gate still ends late or never (the synthetic hum and
-  open-E cases); that is detection, handled separately (DECISION-087).
+  open-E cases); that is detection, measured separately and not shipped
+  (DECISION-087).
 
 ---
 

@@ -1,12 +1,70 @@
 # Brief: send `noteEnded` when the sound ends
 
-> **STATUS: IN PROGRESS.** Part A shipped (DECISION-086); Part B under
-> measurement. Written from GOATerizer (`trellos/goaterizer`, on
-> `tuninator@0.2.1`) on 2026-09-25, from a read of `main` at `fecc0e4`. Every
-> figure below was measured at that commit with the scripts in §9; re-run them
-> before building on any of it. Kept as `docs/timely-note-end-prompt.md` with
-> this banner, as the other briefs in `docs/` are kept; the banner is updated
-> when it closes.
+> **STATUS: CLOSED 2026-09-26 — Part A shipped as 0.3.0 (DECISION-086);
+> Part B built, measured, and not shipped (DECISION-087).** Written from
+> GOATerizer (`trellos/goaterizer`, on `tuninator@0.2.1`) on 2026-09-25, from a
+> read of `main` at `fecc0e4`. The figures in §1–§6 were measured at that
+> commit and are kept as written. The hand-back follows, and the numbers in it
+> were measured on the branch that ships.
+>
+> **Version:** `package.json` is 0.3.0. Not tagged; the tag is the owner's.
+>
+> **`scripts/measure-end-latency-fixtures.ts`**, 27 takes, default config
+> (ms, Notes ended live and not absorbed: 1,736 before, 1,740 after — four
+> that only the flush used to end):
+>
+> | | p10 | p50 | p90 | p95 | max |
+> |---|---:|---:|---:|---:|---:|
+> | `late` before | 227 | 253 | 760 | 920 | 1,493 |
+> | `late` after | 0 | 0 | 93 | 160 | 1,013 |
+> | `hold` before | 53 | 240 | 747 | 920 | 1,160 |
+> | `hold` after | 0 | 0 | 0 | 0 | 0 |
+>
+> Over 250ms late: 58.4% → 3.3%. Over 500ms: 23.3% → 0.6%. Over 1s: 3.2% →
+> 0.1%. The slowest take now is `rest-repick-g2-60-120bpm-amped` (p50 427ms):
+> its damps are placed on the damp, but the amp's ring holds the gate open.
+> After `noteEnded`, 116 of 1,807 announced Notes are revised
+> (`scripts/measure-after-end.ts`): 44 have their end moved, 8 are renamed and
+> 64 are absorbed. None gets two `noteEnded`s or two `noteResolved`s, and
+> nothing arrives after a `noteResolved`.
+>
+> **`scripts/measure-end-latency.ts`**, worst live `late` per case (ms):
+>
+> | Case | before | after |
+> |---|---:|---:|
+> | 1. A3 damped on the beat | 253 | 93 |
+> | 2. detached quarters, 120bpm | 253 | 93 |
+> | 3. detached sixteenths, 100bpm | 1,107 | 93 (0 for 15 of 16) |
+> | 4. open E rings on, gate 0.0008 | 3,987 | 13 — but the E is still announced, and the flush still makes 13 Notes of it |
+> | 5. as 4, default gate | 253 | 93 |
+> | 6. 50Hz hum, gate 0.0008 | 360 | 307 — A3 still ends 1,540ms after the damp, and its tail is still a second A3 |
+> | 7. as 6, default gate | 253 | 93 |
+>
+> Cases 4 and 6 are Part B's. With it (branch `claude/timely-note-end-part-b`,
+> `304e5be`): case 4 reports 73ms after the damp with no phantom, and case 6
+> reports 220ms after the damp with no phantom. The bar was 200ms, so B is not
+> in 0.3.0 (DECISION-087; `docs/DETECTION-FINDINGS.md`). On the corpus it is
+> inert: every eval figure, split and ledger row is identical with it.
+>
+> **Contract as shipped:** §4 items 1–6 hold. `noteEnded` goes out in the
+> `processChunk` call in which the fast lane ends the Note, carrying its best
+> `endTime`. After it, boundaries arrive as `structuralRevision`, names as
+> corrections or refinements, and absorptions as today. `noteResolved` fires
+> once per announced Note, after `noteEnded`. `stop()` ends and then resolves
+> every open Note. The two hosts produce identical emissions. The lifecycle
+> order is `started → enriching → ended → resolved`.
+>
+> **Decided differently from §0, or left open by it:**
+> - **D:** an absorbed Note **does** get `noteResolved`, once, as soon as its
+>   absorption is delivered. So every announced Note gets exactly one, and
+>   the offline analyzer's `notes`, now taken at `resolved`, stay the same
+>   set.
+> - **§4.4 "nothing more will change":** the region lane can still rename a
+>   Note it has already let go (`correctPitch` over resolved Notes, a
+>   deliberate path). It never does on the 27 takes. It is documented as
+>   possible in `docs/API.md`, and `NoteLifecycle` already calls `"resolved"`
+>   revisable.
+> - **B** is not shipped: it missed its bar (above).
 
 Read `AGENTS.md` in full before your first edit, and hold to it — especially
 §3 (the evaluation harness, derivation against held-out, `fixtures/` read-only),
