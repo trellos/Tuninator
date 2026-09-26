@@ -114,8 +114,12 @@ are what keep later work from repeating them.
   - `releaseClosed()` keeps its three conditions and now emits only
     `resolved` (lifecycle `"resolved"`). So `quietSuccessor` now holds a
     Note's **resolution**, not its ending: DECISION-074 part (1) changes
-    meaning, and its alternative (b), "revise the earlier Note after its
-    `noteEnded`", is what now happens.
+    meaning. **This entry reverses DECISION-074's rejected alternative (b)**,
+    "revise the earlier Note after its `noteEnded`: a consumer has already
+    been told it is finished". The rule it stated — a Note is not revised
+    after its `noteEnded`, and `noteResolved` comes first — no longer holds
+    anywhere: a Note is revised after `noteEnded` by design, and
+    `noteResolved` comes after it. DECISION-074 is marked superseded in part.
   - Order is `started → enriching → ended → resolved`.
   - An absorbed Note is resolved at once (its `resolved` is emitted
     without leaving `closing`, so nothing internal moves), and never gets
@@ -459,7 +463,7 @@ are what keep later work from repeating them.
 
 #### [DECISION-074]: A Note opened inside the damp that stopped the Note before it is absorbed into it
 * **Date:** 2026-09-24
-* **Status:** Accepted
+* **Status:** Superseded in part by DECISION-086 (part (1) now holds `noteResolved`, not `noteEnded`; alternative (b) is reversed)
 * **Owner:** The project owner (asked for the amped rest-and-repick take's extra Notes to be fixed, and chose "Go on" to fixing the damp splits, 2026-09-24); detection architecture carries the rule
 * **Context:** On `rest-repick-g2-60-120bpm-amped` the damp at 18.1s
   opened a G2 Note at 18.33s. The level was already 22dB under the

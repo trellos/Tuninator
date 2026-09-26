@@ -2623,7 +2623,9 @@ export class NoteTracker {
    * Rename a Note the region disagrees with.
    *
    * Not a structural claim and not gated on the Note still being open: an
-   * already-ended Note's extent is history, but its name is a belief, and the
+   * ended Note is renamed like a sounding one (its `ended` does not close it
+   * to correction), and even a resolved Note's name — whose extent is
+   * settled — is a belief, and the
    * whole point of a lane that is allowed to be late is that it may arrive
    * after the fact with better evidence. A Note that has bloomed into a chord
    * is left alone — a chord is not named from one fundamental.
@@ -3622,19 +3624,22 @@ export class NoteTracker {
       out.push({ type: "ended", note: record.snapshot() });
     }
 
-    // But the recognizer may not have finished thinking. A chord's identity is
-    // routinely settled by deep analysis that started before the strum
-    // stopped, and the region lane may yet move this Note's boundaries, so it
-    // stays in the working set until they have ruled; what they change reaches
-    // the consumer as `changed`, and `resolved` says when they are done.
+    // The ending goes out now, but the answer keeps improving. A chord's
+    // identity is routinely settled by deep analysis that started before the
+    // strum stopped, and the region lane may yet move this Note's boundaries
+    // or absorb it. So it joins `closing`, the region's working set, and
+    // everything the deep lane changes reaches the consumer as `changed` on
+    // the ended Note, until `resolved` says it is done (DECISION-086).
     this.closing.push(record);
   }
 
   /**
    * Resolve every ended Note the deep lane is done with.
    *
-   * Its `ended` went out when the sound stopped (`end`); this is the other
-   * half, `resolved`, which says nothing more will change.
+   * This holds a Note's resolution, never its ending: the `ended` went out
+   * when the sound stopped (`end`). `closing` is the region's working set,
+   * and a Note leaving it is what `resolved` announces — the deep lane has
+   * ruled, and nothing more is expected to change.
    *
    * @param busy ids the deep lane still has queued work for
    * @param force release even Notes nobody has ruled on — the end of a take
@@ -3649,9 +3654,10 @@ export class NoteTracker {
       if (record.merged) this.resolve(record, out);
       if (!force) {
         if (busy.has(record.id)) continue;
-        // A Note nobody has re-analysed is not finished, whatever the queue
-        // says. Holding it here is what makes the region reach back over it:
-        // once it is gone from `closing` there is nothing left to correct.
+        // A Note nobody has re-analysed is not resolved, whatever the queue
+        // says. Keeping it in `closing` is what lets the region reach back
+        // over it and revise it through `changed`; leaving `closing` is what
+        // `resolved` announces.
         if (!record.deepResolved) continue;
         // Nor is one cut by a Note that opened far under it, which may yet
         // turn out to have been opened by its damp. See `absorbDampGhost`.

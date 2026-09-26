@@ -78,6 +78,11 @@ await recognizer.dispose();  // stop, then release the mic and worklet
 | `status` | `(message: string)` |
 | `error` | `(error: RecognizerError)` |
 
+`noteEnded` fires as soon as the sound stops, with the best `endTime` known then. The Note can
+still change after it — a moved end, a new name, an absorption into its neighbour — and each change
+arrives as `noteChanged`. `noteResolved` follows, once, when nothing more is expected to change.
+`stop()` ends and then resolves every open Note. [The contract in full](https://github.com/trellos/Tuninator/blob/main/docs/API.md#when-a-note-ends-and-when-it-is-final).
+
 ## Docs
 
 - [**API reference**](https://github.com/trellos/Tuninator/blob/main/docs/API.md) — methods, options, error codes, `PitchFrame`, timestamps,

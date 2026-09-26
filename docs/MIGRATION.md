@@ -26,7 +26,7 @@ states, and inventing data is worse than a compile error.
 | `musicEventStart` | `noteStarted` | renamed |
 | `musicEventUpdate` | `noteChanged(note, change)` | gains a typed `NoteChange` second argument |
 | `musicEventEnd` | `noteEnded` | renamed |
-| — | `noteResolved` | **new.** Fires once, when the answer settles, before `noteEnded` |
+| — | `noteResolved` | **new.** Fires once, when the answer settles. Since 0.3.0 it comes *after* `noteEnded` (before 0.3.0 it came first) |
 | `MusicEvent.state` (`attack`…`ended`) | `Note.lifecycle` + `NoteChange.type` | envelope states become a recognition lifecycle |
 | `MusicEvent.label.name` | `Note.pitch.current.name` or `Note.harmony.chordName` | one field became two, because a Note can be either |
 | `MusicEvent.primaryPitch` | `Note.pitch.current` | `DetectedPitch` requires `midi`/`name`/`pitchClass`/`octave`; the old `EventPitch` had them all optional |
@@ -37,7 +37,7 @@ states, and inventing data is worse than a compile error.
 | `MusicEvent.startedAt/updatedAt/endedAt` | `Note.startTime` / `Note.endTime` | `updatedAt` is gone; use `revision.revisionNumber` |
 | `setMode()` / `getMode()` / `TuninatorMode` | **removed** | see below |
 | `TuninatorOptions.analysis` / `.tracking` | `RecognizerOptions.engine` (`EngineTuning`) | one flat tuning object |
-| `stop(): void` | `stop(): Promise<void>` | now flushes; awaiting it guarantees every open Note got its `noteEnded` |
+| `stop(): void` | `stop(): Promise<void>` | now flushes; awaiting it guarantees every open Note got its `noteEnded` (and, since 0.3.0, its `noteResolved` after it) |
 | — | `dispose(): Promise<void>` | **new.** Releases the microphone, worklet and any context the recognizer created |
 | `getActiveEvents()` (0 or 1) | `getActiveNotes()` | genuinely plural — Notes can overlap now |
 | — | `getNote(id)` | **new.** Answers for active Notes and recently ended ones |
@@ -173,7 +173,10 @@ recognizer.on("noteChanged", (note, change) => {
 
 Fires once per Note, when the answer has settled and further evidence would have
 to actively contradict it. This is the moment to commit a UI element from
-"provisional" to "final", and it always precedes `noteEnded`.
+"provisional" to "final". Since 0.3.0 it follows `noteEnded`: `noteEnded` says
+the sound is over, the deep lane may still revise the Note through
+`noteChanged`, and `noteResolved` is the settled answer. (In 0.2.x it came
+first, and `noteEnded` waited for it.)
 
 ```ts
 recognizer.on("noteResolved", (note) => markSettled(note.id));
@@ -188,6 +191,10 @@ tuninator.on("musicEventEnd", (event) => closeRow(event.id, event.endedAt));
 // 0.2
 recognizer.on("noteEnded", (note) => closeRow(note.id, note.endTime));
 ```
+
+Since 0.3.0 `noteEnded` fires when the sound stops, and a later
+`structuralRevision` may still move `endTime`. Take the final one from
+`noteResolved`.
 
 ### `pitchFrame`
 
@@ -219,7 +226,7 @@ recognizer.on("error", (error) => {
 // 0.1
 button.onclick = () => { tuninator.stop(); };   // in-flight events lost
 
-// 0.2 — await it, and every open Note gets its noteEnded first
+// 0.2 — await it, and every open Note gets its noteEnded (then, since 0.3.0, its noteResolved) first
 button.onclick = async () => { await recognizer.stop(); };
 window.addEventListener("pagehide", () => { void recognizer.dispose(); });
 ```

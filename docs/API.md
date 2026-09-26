@@ -76,7 +76,24 @@ await recognizer.dispose();  // stop, then release the mic, worklet and any cont
 
 ## When a Note ends, and when it is final
 
-Two events, two meanings:
+The contract, since 0.3.0:
+
+1. `noteEnded` fires when the fast lane ends the Note, in the same `processChunk` call. It is
+   never held for the deep lane. Its delay from the `endTime` it carries is only what the fast lane
+   needed to decide: a hop or two for an ending made by the next Note, `tracking.releaseGraceMs`
+   of gated audio for a silence.
+2. `noteEnded` carries the fast lane's best `endTime`.
+3. After `noteEnded`, anything that changes the Note arrives as `noteChanged` on that Note: a
+   boundary as `structuralRevision` with the new `endTime`/`startTime` in the snapshot; a name as
+   `pitchCorrection`, `harmonyCorrection` or a refinement; an absorption as `structuralRevision`
+   with `relation: "absorbed"` on the survivor, naming it.
+4. `noteResolved` fires once per Note, after its `noteEnded`, when the deep lane has ruled and
+   nothing more is expected to change. A consumer that wants only final answers waits for it; no
+   setting restores the old timing.
+5. `stop()` flushes: every open Note gets `noteEnded` and then `noteResolved` before it settles.
+6. The inline and worker hosts produce the same emissions, in the same order.
+
+In more detail — two events, two meanings:
 
 - **`noteEnded` — the sound is over.** It fires in the same audio block in which the fast lane
   decides the Note has stopped, and is never held for the deep lane. How long after the Note's

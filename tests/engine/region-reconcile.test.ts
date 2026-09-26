@@ -306,10 +306,11 @@ describe("a region the fast lane over-segmented", () => {
   });
 });
 
-describe("a Note that has already ended", () => {
+describe("a Note that has already resolved", () => {
   it("can still be corrected", () => {
-    // Its extent is history and cannot be rewritten, but its name is a belief,
-    // and a lane allowed to be late may arrive after the fact knowing better.
+    // Its extent is settled, but its name is a belief, and a lane allowed to
+    // be late may arrive after the fact knowing better. (A Note that has only
+    // ended is revised as a matter of course: see "after its noteEnded".)
     const { tracker } = trackerWithNotes([{ midi: 74, hops: 30 }], {
       regionCorrectPitch: true,
     });
@@ -381,28 +382,51 @@ describe("determinism", () => {
     for (let i = 0; i < 4; i++) expect(once()).toBe(reference);
   });
 
-  it("never lets a Note resolve before the region it lives in has been ruled on", () => {
-    // The hold is what makes the whole thing possible: once a Note is gone from
-    // `closing` there is nothing left to correct. It holds the resolution; the
-    // `ended` went out when the sound stopped.
-    const signal = new Float32Array(SAMPLE_RATE);
+  it("never lets a Note resolve before the region it lives in has been ruled on, and never holds its ended", () => {
+    // The hold is what lets the region reach back over a Note and revise it:
+    // `closing` is its working set, and leaving it is what `resolved`
+    // announces. It holds the resolution only; `ended` goes out in the block
+    // in which the fast lane ends the Note (DECISION-086).
+    const signal = new Float32Array(SAMPLE_RATE * 2);
     const period = SAMPLE_RATE / 440;
     for (let i = 0; i < SAMPLE_RATE / 2; i++) {
       signal[i] = 0.4 * Math.exp(-i / (0.3 * SAMPLE_RATE)) * (2 * ((i % period) / period) - 1);
     }
     const engine = new RecognitionEngine(SAMPLE_RATE, DEFAULT_ENGINE_CONFIG);
-    const ended: string[] = [];
+    let decided: string[] = [];
+    engine.setTrackerTrace((event) => {
+      if (event.kind === "ended") decided.push(event.noteId);
+    });
+    const decidedAt = new Map<string, number>();
+    const endedAt = new Map<string, number>();
+    const endTime = new Map<string, number>();
+    const resolvedAt = new Map<string, number>();
     for (let offset = 0; offset < signal.length; offset += RENDER_QUANTUM) {
       const block = new Float32Array(RENDER_QUANTUM);
       block.set(signal.subarray(offset, Math.min(offset + RENDER_QUANTUM, signal.length)));
-      for (const emission of engine.processChunk(block, offset).emissions) {
-        if (emission.type === "resolved") ended.push(emission.note.id);
+      decided = [];
+      const emissions = engine.processChunk(block, offset).emissions;
+      for (const id of decided) if (!decidedAt.has(id)) decidedAt.set(id, offset);
+      for (const emission of emissions) {
+        if (emission.type === "ended") {
+          endedAt.set(emission.note.id, offset);
+          endTime.set(emission.note.id, emission.note.endTime as number);
+        }
+        if (emission.type === "resolved") resolvedAt.set(emission.note.id, offset);
       }
     }
-    for (const emission of engine.flush().emissions) {
-      if (emission.type === "resolved") ended.push(emission.note.id);
+    expect(endedAt.size).toBeGreaterThan(0);
+    for (const [id, at] of endedAt) {
+      // Not held: told in the very block the fast lane decided.
+      expect(at).toBe(decidedAt.get(id));
+      // Held: resolved only once its region has settled and been ruled on.
+      const resolved = resolvedAt.get(id);
+      expect(resolved).toBeDefined();
+      expect(resolved as number).toBeGreaterThan(at);
+      expect(((resolved as number) / SAMPLE_RATE) * 1000).toBeGreaterThanOrEqual(
+        (endTime.get(id) as number) + DEFAULT_ENGINE_CONFIG.deep.regionSettleMs
+      );
     }
-    expect(ended.length).toBeGreaterThan(0);
     expect(engine.droppedDeepRegionCount).toBe(0);
   });
 });

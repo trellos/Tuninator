@@ -22,6 +22,11 @@
  * That is exactly the set of Notes that would need a revision after
  * `noteEnded` if the hold were removed.
  *
+ * Written against `fecc0e4`, when `noteEnded` was held in `releaseClosed()`.
+ * Since 0.3.0 (DECISION-086) it is not: `hold` reads 0 and `late` equals
+ * `early`, and the revisions this script counts arrive as `noteChanged`
+ * after `noteEnded`.
+ *
  * Usage: npx tsx scripts/measure-end-latency-fixtures.ts
  */
 import { readdirSync, readFileSync } from "node:fs";
