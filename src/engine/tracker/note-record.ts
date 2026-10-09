@@ -75,6 +75,21 @@ export class NoteRecord {
   /** This Note absorbed a stub that a pitch step shed. See `announceSoundedMs`. */
   absorbedRenaming = false;
   /**
+   * Where this Note's own evidence begins, when a pick lent it an earlier
+   * start; null otherwise.
+   *
+   * The lender is a pick the pitch estimator renamed: an unannounced stub an
+   * attack opened, ended by this Note's own pitch arriving after the pick had
+   * already peaked. The reported start is the pick; every test of what this
+   * Note's own hops showed (`soundedMs`, `evidenceDurationMs`, the Note in
+   * front of it, whether the region lane's boundary is one the fast lane
+   * already made) reads from here, which is where it read from before the
+   * loan, so the loan moves the boundary and nothing that decides what
+   * happens to the Note next. Carried to a Note that absorbs this one.
+   * DECISION-089.
+   */
+  lentStartEvidence: SourceTimeMs | null = null;
+  /**
    * The release test moved this Note's start off the contact the fine witness
    * opened it on. The announce clock keeps reading from that contact: the
    * witness decided the stroke was a Note, and the move only places its
@@ -389,7 +404,17 @@ export class NoteRecord {
 
   /** How long the Note has actually sounded, not how long ago it began. */
   get soundedMs(): number {
-    return Math.max(this.lastVoicedAt, this.lastAudibleAt) - this.startTime;
+    return Math.max(this.lastVoicedAt, this.lastAudibleAt) - this.evidenceStartTime;
+  }
+
+  /** Where this Note's own evidence begins: see `lentStartEvidence`. */
+  get evidenceStartTime(): SourceTimeMs {
+    return this.lentStartEvidence ?? this.startTime;
+  }
+
+  /** `durationMs` over this Note's own evidence: see `lentStartEvidence`. */
+  get evidenceDurationMs(): number {
+    return (this.endTime ?? this.lastSeenAt) - this.evidenceStartTime;
   }
 
   /**

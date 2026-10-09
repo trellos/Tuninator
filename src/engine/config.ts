@@ -21,7 +21,11 @@ export type EngineConfig = {
   analysis: {
     minFrequencyHz: number;
     maxFrequencyHz: number;
-    /** Requested fast hop; the engine snaps it to whole 128-sample quanta. */
+    /**
+     * Requested fast hop; the engine snaps it to whole 128-sample quanta at
+     * `ANALYSIS_SAMPLE_RATE`. The default 12 runs as 640 samples, 13.3ms, at
+     * every capture rate — the hop the corpus was tuned at.
+     */
     hopMs: number;
     /**
      * Loudest the gate may ever be, and what it was before it could move.
@@ -58,9 +62,12 @@ export type EngineConfig = {
   };
 
   pitch: {
-    /** Long YIN window, in samples. Sized for two periods of low E (82.4Hz). */
+    /**
+     * Long YIN window, in samples at `ANALYSIS_SAMPLE_RATE` (42.7ms). Sized
+     * for two periods of low E (82.4Hz).
+     */
     longWindow: number;
-    /** Short YIN window, in samples. ~4x better time resolution. */
+    /** Short YIN window, in samples at `ANALYSIS_SAMPLE_RATE`. ~4x better time resolution. */
     shortWindow: number;
     /** Above this frequency a confident short-window result is preferred. */
     shortWindowMinHz: number;
@@ -103,6 +110,7 @@ export type EngineConfig = {
   };
 
   transient: {
+    /** Flux window and FFT length, samples at `ANALYSIS_SAMPLE_RATE` (21.3ms). */
     fluxFftSize: number;
     /** Multiplier on the adaptive median. Higher = fewer flux onsets. */
     fluxSensitivity: number;
@@ -869,6 +877,7 @@ export type EngineConfig = {
   };
 
   harmony: {
+    /** Deep-lane window and FFT length, samples at `ANALYSIS_SAMPLE_RATE` (85.3ms). */
     fftSize: number;
     /** Minimum top-1 template score for a confident chord label. */
     floor: number;
@@ -1002,7 +1011,8 @@ export type EngineConfig = {
      */
     latencyMs: number;
     /**
-     * Samples between successive windows when the deep lane walks a region.
+     * Samples between successive windows when the deep lane walks a region,
+     * at `ANALYSIS_SAMPLE_RATE`.
      *
      * A quarter of the 4096-point window: enough overlap that a boundary is
      * localised to about 21ms, cheap enough that a second of audio is fifty
@@ -1177,6 +1187,20 @@ export type EngineConfig = {
 
 /** Matches the AudioWorklet render quantum. Do not change to "go faster". */
 export const RENDER_QUANTUM = 128;
+
+/**
+ * The one sample rate the engine analyses at, whatever the host captures at.
+ *
+ * Every count in samples, FFT bins or hops in this file and in the kernels —
+ * `pitch.longWindow`, `transient.fluxFftSize`, `harmony.fftSize`,
+ * `deep.regionHopSamples`, `transient.fluxMedianWindow`, the snapped hop,
+ * and the many module constants that count render quanta, bins or hops —
+ * was tuned on the fixture corpus decoded to 48kHz, and means what it says
+ * only at 48kHz. `RecognitionEngine` resamples its input to this rate
+ * (`resampler.ts`), so a 44.1kHz or 96kHz AudioContext gets the same Notes
+ * as a 48kHz one. Changing it re-tunes the whole recognizer.
+ */
+export const ANALYSIS_SAMPLE_RATE = 48000;
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   analysis: {

@@ -68,6 +68,19 @@ in the same 128-sample render quanta the `AudioWorklet` delivers. A change that
 only "works" because it reaches into browser globals will fail this test, not
 quietly diverge between live and offline behaviour.
 
+### One analysis rate: 48kHz
+
+Every window, FFT length, hop and per-hop rate in the engine was tuned on the
+corpus decoded to 48kHz, and dozens of them are counted in samples, bins, hops
+or render quanta rather than in milliseconds. `RecognitionEngine` therefore
+resamples whatever the host captures at to `ANALYSIS_SAMPLE_RATE`
+(`src/engine/resampler.ts`) before anything else sees it; at 48kHz the audio
+passes through untouched, so the eval is bit-identical. A count in this tree is
+a count at 48kHz. Fed directly at 44.1kHz the same constants lost 43 more
+labels on the corpus (DECISION-088). `tests/engine/sample-rate.test.ts` and
+`scripts/measure-sample-rate-invariance.ts` (a CI step) hold 44.1, 88.2 and
+96kHz to the 48kHz Notes.
+
 ### Two lanes over one source-sample timeline
 
 **The fast lane** (`src/engine/fast/`) is causal and answers within tens of
@@ -204,6 +217,7 @@ scripts/measure-downstream-ledger.ts --all   every missed label + the exact bran
 scripts/measure-splits.ts                    events that came out as more than one Note
 scripts/measure-onset-coverage.ts            what the onset kernel saw, before the tracker decided anything
 scripts/verify-fixtures.ts                   is each label actually audible/attack-aligned/pitch-supported
+scripts/measure-triplet-onset-lag.ts         synthetic same-register triplets: how late each pluck's Note starts
 ```
 
 Several more exist for specific investigations (`measure-decision-separability.ts`,
@@ -353,6 +367,7 @@ number from a harness that isolates a kernel from the tracker.
 ```bash
 npx tsc --noEmit && npm test
 npm run eval                          # PASS, 0 required failures
+npx tsx scripts/measure-sample-rate-invariance.ts   # PASS: same Notes at 44.1/88.2/96kHz
 git diff --stat -- fixtures/          # must be EMPTY
 ```
 

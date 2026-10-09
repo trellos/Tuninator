@@ -59,6 +59,14 @@ jobs:
       - name: Evaluation docs match the eval report
         run: npx tsx scripts/check-readme-eval.ts
 
+      # The same audio must give the same Notes at any capture rate. The
+      # engine's constants are tuned at 48kHz and it resamples to that; this
+      # scores the corpus decoded to 44.1, 88.2 and 96kHz against the 48kHz
+      # run (DECISION-088). tests/engine/sample-rate.test.ts is the strict
+      # synthetic half of the same gate.
+      - name: Sample-rate invariance
+        run: npx tsx scripts/measure-sample-rate-invariance.ts
+
       - name: Build
         run: npm run build
 

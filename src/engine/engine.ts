@@ -17,10 +17,11 @@
 
 import type { Note, PitchFrame, SourceTimeMs, Timebase } from "../types.js";
 import { SampleClock } from "./clock.js";
-import type { EngineConfig } from "./config.js";
+import { ANALYSIS_SAMPLE_RATE, type EngineConfig } from "./config.js";
 import type { FastFrame } from "./contracts.js";
 import { DeepLane } from "./deep/deep-lane.js";
 import { FastLane } from "./fast/fast-lane.js";
+import { Resampler } from "./resampler.js";
 import { AudioRing } from "./ring-buffer.js";
 import {
   NoteTracker,
@@ -41,8 +42,20 @@ export type EngineOutput = {
 };
 
 export class RecognitionEngine {
+  /**
+   * The analysis timeline, at `ANALYSIS_SAMPLE_RATE` whatever the capture
+   * rate. Sample indices inside the engine are on this clock; milliseconds
+   * are source time either way.
+   */
   readonly clock: SampleClock;
   readonly config: EngineConfig;
+  /** The rate audio arrives at, as passed to the constructor. */
+  readonly sampleRate: number;
+
+  /** Null when the capture rate already is the analysis rate. */
+  private readonly resampler: Resampler | null;
+  /** Capture-rate samples received, the unit `processChunk`'s `startSample` is in. */
+  private received = 0;
 
   private readonly ring: AudioRing;
   private readonly fast: FastLane;
@@ -55,21 +68,28 @@ export class RecognitionEngine {
   private droppedDeepRegions = 0;
 
   constructor(sampleRate: number, config: EngineConfig, originContextTime?: number) {
-    this.clock = new SampleClock(sampleRate, originContextTime);
+    // Validates the capture rate before anything is sized from it.
+    new SampleClock(sampleRate);
+    this.sampleRate = sampleRate;
+    // Every constant in `config` is tuned at the analysis rate, so audio at
+    // any other rate is converted on the way in rather than the constants on
+    // the way out. See `ANALYSIS_SAMPLE_RATE`. A context's rate is a whole
+    // number of Hz in practice; a fractional one is rounded for the ratio.
+    this.resampler =
+      sampleRate === ANALYSIS_SAMPLE_RATE
+        ? null
+        : new Resampler(Math.max(1, Math.round(sampleRate)), ANALYSIS_SAMPLE_RATE);
+    this.clock = new SampleClock(ANALYSIS_SAMPLE_RATE, originContextTime);
     this.config = config;
-    this.ring = new AudioRing(Math.ceil(config.deep.ringSeconds * sampleRate));
+    this.ring = new AudioRing(Math.ceil(config.deep.ringSeconds * ANALYSIS_SAMPLE_RATE));
     this.fast = new FastLane(this.clock, config);
     this.deep = new DeepLane(this.clock, config);
     this.tracker = new NoteTracker(this.clock, config);
   }
 
-  get sampleRate(): number {
-    return this.clock.sampleRate;
-  }
-
-  /** Samples processed so far. The engine's whole notion of "now". */
+  /** Capture-rate samples received so far. */
   get position(): number {
-    return this.ring.writeIndex;
+    return this.received;
   }
 
   get now(): SourceTimeMs {
@@ -77,7 +97,10 @@ export class RecognitionEngine {
   }
 
   getTimebase(): Timebase {
-    return this.clock.timebase();
+    const origin = this.clock.originContextTime;
+    return origin === undefined
+      ? { sampleRate: this.sampleRate }
+      : { sampleRate: this.sampleRate, originContextTime: origin };
   }
 
   getActiveNotes(): Note[] {
@@ -97,6 +120,8 @@ export class RecognitionEngine {
   }
 
   reset(): void {
+    this.resampler?.reset();
+    this.received = 0;
     this.ring.reset();
     this.fast.reset();
     this.deep.clear();
@@ -122,20 +147,20 @@ export class RecognitionEngine {
    * everything after it is the worst possible response.
    */
   processChunk(block: Float32Array, startSample?: number): EngineOutput {
-    if (startSample !== undefined && startSample !== this.ring.writeIndex) {
-      const gap = startSample - this.ring.writeIndex;
+    if (startSample !== undefined && startSample !== this.received) {
+      const gap = startSample - this.received;
       if (gap > 0) {
         // Fill the hole with silence so time stays honest. A Note over the gap
         // ends in its release grace rather than absorbing the missing audio.
-        const filler = new Float32Array(Math.min(gap, this.ring.capacity));
-        this.ring.write(filler);
-        this.fast.advance(this.ring, filler.length, this.scratch);
+        const filler = new Float32Array(
+          Math.min(gap, Math.ceil((this.ring.capacity * this.sampleRate) / ANALYSIS_SAMPLE_RATE))
+        );
+        this.analyse(this.resample(filler));
       }
     }
 
-    this.ring.write(block);
     this.scratch.length = 0;
-    this.fast.advance(this.ring, block.length, this.scratch);
+    this.analyse(this.resample(block));
 
     const emissions: TrackerEmission[] = [];
     const frames: PitchFrame[] = [];
@@ -156,7 +181,26 @@ export class RecognitionEngine {
     return { emissions, frames, fast };
   }
 
-  /** Ends every open Note. Idempotent. */
+  /** Capture-rate audio to analysis-rate audio; the same array at 48kHz. */
+  private resample(block: Float32Array): Float32Array {
+    this.received += block.length;
+    return this.resampler === null ? block : this.resampler.push(block);
+  }
+
+  /** Analysis-rate audio into the ring and the fast lane; frames to `scratch`. */
+  private analyse(samples: Float32Array): void {
+    if (samples.length === 0) return;
+    this.ring.write(samples);
+    this.fast.advance(this.ring, samples.length, this.scratch);
+  }
+
+  /**
+   * Ends every open Note. Idempotent.
+   *
+   * The resampler is not drained: away from 48kHz its last `halfWidth`
+   * capture samples (0.36ms at 44.1kHz) are still in the filter, and what is
+   * sounding ends where the analysed audio does.
+   */
   flush(): EngineOutput {
     const emissions: TrackerEmission[] = [];
     // Stop what is still sounding FIRST, so the take's last Notes are inside

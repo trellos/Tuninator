@@ -7,6 +7,199 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-089]: A pick the pitch estimator renamed lends its start to the Note its pitch arrives in
+* **Date:** 2026-10-09
+* **Status:** Accepted
+* **Owner:** Detection architecture, on GOATerizer's report that its synthetic-pluck autoplay reads fast same-register notes as misses or wrong notes
+* **Context:** On eighth-note triplets in G2-G3 (synthetic plucks:
+  harmonics 1-6 at 1/h, 3ms attack, exp(-6t) decay, 50ms release, 90% of
+  the interval) the flux onset opens a Note on time, but YIN's 42.7ms
+  window still reads the previous pitch. The step to the new pitch confirms
+  four hops (53.3ms) later, the attack Note has sounded under
+  `tracking.minStableMs` (55ms) and is dropped unannounced, and the Note the
+  step opens starts 53-68ms after the pluck. Since DECISION-088 this
+  happens at every capture rate. Lowering `minStableMs` to 50 removes the
+  lag but adds 11 extra Notes and 10 wrong pitches in 110 at 120bpm. The
+  tracker already has the repair for this shape: `pitchStillArriving`
+  offers the stub to `absorbArticulationFragment()`, which gives the
+  step's Note the stub's start. Traced on the bench, it did not fire for
+  two reasons. **(A)** In 10 of the 12 late plucks at 120bpm,
+  `already-falling` declined the stub: a pluck peaks within milliseconds
+  and has fallen to 0.89-0.94 of its peak by the step, under
+  `STILL_RISING_FRACTION` (0.95). That test asks whether a *second pick*
+  interrupted the stub, and nothing but the estimator interrupted this one.
+  **(B)** In the other 2, the stub's last reading was B2, a pitch neither
+  note has, under an F#3 answered by an E3. That B2 is neither the
+  predecessor's name nor between the two pitches, so `cannotDefendReading`
+  said the stub could defend it and nothing was offered.
+* **Decision:** Two rules in `note-tracker.ts`, and one new field.
+  (1) `already-falling` is not asked of a stub that an attack opened, was
+  never announced, did not open on a pick's contact (`isContactOpening`),
+  and was ended by a renaming step. (2) A Note an attack opened, which
+  never held a reading and whose dominant vote is the predecessor's name,
+  cannot defend its last reading when the step goes to another pitch class.
+  (3) The new field, `NoteRecord.lentStartEvidence`: a start lent under
+  rule (1) moves the reported boundary and nothing else. The Note's own
+  evidence still reads from where it read before the loan:
+  - `soundedMs`;
+  - `evidenceDurationMs`, the `too-long` span when the Note is itself
+    offered as a stub;
+  - the Note in front of it, for `cannotDefendReading`;
+  - whether a region-lane boundary is one the fast lane already made.
+
+  The field carries through a further absorption. No constant was added
+  or changed. `scripts/measure-triplet-onset-lag.ts` is the bench, and
+  `tests/engine/renamed-pick.test.ts` holds the 120bpm score (the old
+  engine fails it).
+  **Bars, stated before measuring** (A first, then B; B′ after B failed):
+  - bench: 120bpm lag p90 ≤ 25ms, late (>40ms) over six tempos at least
+    halved, and for B′ ≤ 12 of 660, with no extra, wrong or missed added;
+  - derivation: eval missed and fp not up, exact not down, ledger MISSED
+    and splits (corpus and slow subset) not up;
+  - held-out read once, afterwards.
+
+  **Numbers.**
+  - **Bench** (6 tempos × 110 notes, the LCG seeded with the bpm):
+    late 39 → 9 of 660. At 120bpm, p90 67 → 20ms and late 12 → 1.
+    Missed 7, extra 0 and wrong 4 are all unchanged. The same at 44.1kHz.
+    The 9 left are all same-pitch repeats (rule (2) deliberately excludes
+    them).
+  - **Derivation:** eval missed / fp / exact 100 / 191 / 1,089, identical
+    fixture by fixture. Ledger identical; splits 173 split / 204 extras and
+    slow 148 / 177, identical. One matched onset moves: E5 amped s1687,
+    −9 → −36ms.
+  - **Held-out, read once:** eval 27 / 63 / 320 identical, ledger
+    identical. The room-mic lead triplet take loses one split event
+    (11 → 10). Matched onsets over 40ms late go 41 → 38.
+
+  The sample-rate invariance gate passes; 586 tests.
+* **Alternatives Considered:**
+  - **`minStableMs` 55 → 50.** Rejected: +11 extras and +10 wrong pitches
+    in 110 (DECISION-088).
+  - **(A) Rule (1) alone**, with the absorption moving every evidence
+    clock. Rejected: derivation missed 100 → 102.
+    - `clean-lead` s7: the stub had been announced (66.7ms), and absorbing
+      it retracted the B4 that matched the label.
+    - E5 amped s1688: the lent start moved the survivor's own
+      `cannotDefendReading` lookup past the dropped stub. The next young
+      step went unabsorbed, and a label went with it.
+  - **A′ (A plus "never announced").** Rejected: missed 101.
+  - **A plus evidence clocks from the own start, without the contact
+    exclusion.** Rejected: counts identical, but 8 matched onsets moved,
+    every one on a stub opened by a pick's contact on the amped takes:
+    5 nearer the label, 3 pulled 27-40ms early onto the contact. That is
+    not the shape this decision is about.
+  - **(B) Rule (2) without the pitch-class condition.** Rejected:
+    - bench late 18 → 0;
+    - derivation missed 100 → 102 and fp 191 → 183, all on the amped
+      same-pitch takes. There, a re-pick's stub always votes for its
+      predecessor's name, so the test separates nothing.
+  - **Making the evidence clock universal for every `absorbedRenaming`
+    Note.** Not taken: it changes Notes the old path already handled, and
+    nothing here measured it.
+* **Consequences:** On fast same-register picking a Note's `startTime` is
+  the pick, not the moment YIN caught up. The announcement does not move:
+  the survivor still has to clear its bar from its own start, so a
+  consumer judging on when `noteStarted` *arrives* rather than on the
+  `startTime` it carries sees no change. On the bench `noteStarted`
+  arrives 108ms after the pluck at p50 and 116ms at p90, before and after,
+  for every Note rather than only the late ones (the 55ms bar, from a
+  pitch that takes about 50ms to read). Same-pitch repeats keep the 64-68ms lag (9
+  of 660 on the bench). Separating that shape needs something other than
+  the vote, and the amped same-pitch takes say so. The real-guitar corpus
+  is unchanged on both axes, so this rests on the bench and on the
+  mechanism, not on corpus gain. Nothing here was tested with a real
+  guitar beyond the existing recorded corpus. **Process note:** while
+  reading candidate A, a whole-file diff of `measure-splits.ts` showed its
+  held-out rows before the derivation verdict. A was rejected on its
+  derivation miss count, and no constant is involved in what shipped.
+
+---
+
+#### [DECISION-088]: The engine analyses at 48kHz whatever the capture rate, and resamples to get there
+* **Date:** 2026-10-09
+* **Status:** Accepted
+* **Owner:** Detection architecture, on the GOATerizer brief "recognition gets worse at 48 kHz than at 44.1 kHz"
+* **Context:** GOATerizer's autoplay (synthetic plucks, eighth-note triplets
+  in G2-G3) scored worse at 48kHz than at 44.1kHz: onsets reported 89ms
+  late at p90 against 39ms. The brief took 44.1kHz as the tuned rate and
+  asked for every duration to be re-expressed in milliseconds so 48kHz
+  would match it, with 44.1kHz behaviour and the evals unmoved. Measured
+  first, two premises did not hold. (1) **The corpus is decoded to 48kHz**
+  (`scripts/decode-fixtures.ts`), so every constant was tuned at 48kHz: a
+  640-sample, 13.3ms hop, a 42.7ms long YIN window, 46.9Hz flux bins. The
+  44.1kHz behaviour is the de-tuned one. The same takes decoded to each rate
+  and scored on the old engine (derivation missed / extras / exact; held-out
+  likewise): 48kHz 100 / 191 / 1,089 and 27 / 63 / 320; 44.1kHz 143 / 189 /
+  1,044 and 36 / 62 / 315; 96kHz 185 / 235 / 1,003 and 32 / 75 / 307. On
+  real guitar 48kHz is the better rate by 43 labels. (2) **Milliseconds
+  cannot reproduce it.** The 13.3ms hop is 588 samples at 44.1kHz, not a
+  whole number of 128-sample quanta, so the nearest hops are 11.6 or 14.5ms;
+  and beyond the config's sample-counted fields, the kernels count render
+  quanta (`fine-onset.ts`'s reference, median and peak-pick spans), FFT bins
+  (`onset.ts`'s `BAND_MIN_BINS`, `chroma.ts`'s envelope and harmonic-match
+  widths), and decay per hop (`REPORTED_REFERENCE_DECAY`,
+  `RMS_BASELINE_ALPHA`), each of which would round differently. The
+  synthetic case reproduced (120bpm triplets: start lag p90 21ms at 44.1kHz,
+  67ms at 48kHz, 23 and 21ms at 88.2 and 96kHz). The mechanism at 48kHz: the
+  flux onset opens a Note on time, YIN still reads the previous pitch, the
+  pitch step confirms four hops (53.3ms) later, the attack Note is under
+  `minStableMs` (55ms) and is dropped, and the pitch-change Note it leaves
+  starts 67ms late. With 11.6ms hops the same Note lives 58ms and survives.
+* **Decision:** `RecognitionEngine` resamples its input to
+  `ANALYSIS_SAMPLE_RATE` (48000) with a streaming Kaiser-windowed sinc
+  (`src/engine/resampler.ts`: 16 zero crossings, cutoff 0.95 of the lower
+  Nyquist, exact integer position stepping, per-phase unit DC gain), and
+  everything downstream runs on a 48kHz clock. At 48kHz the input passes
+  through untouched. Output sample n is the input at n/48000 seconds, so
+  Note times are source time at any rate; the latency added is the filter's
+  half-width, 0.36ms at 44.1kHz. `sampleRate`, `position`, `processChunk`'s
+  `startSample` and `getTimebase()` stay in the capture rate; `clock` is the
+  analysis clock. No constant is retuned. `hopMs` keeps its default of 12
+  and its nearest-quantum rounding, now at 48kHz only, where it has always
+  produced the 13.3ms hop the corpus was tuned at: rounding at or below, as
+  the brief asked, would have moved the eval to a 10.7ms hop. Gates:
+  `tests/engine/sample-rate.test.ts` (an analytic score at 44.1, 48, 88.2 and
+  96kHz must give the same Notes, pitches equal, starts and ends within
+  3ms; the old engine fails it) and
+  `scripts/measure-sample-rate-invariance.ts` in CI (the corpus decoded to
+  each rate, at most 1% of the 48kHz Notes unmatched, p99 start and end
+  within 3ms). **The bar:** the 48kHz eval report byte-identical, a hard
+  requirement since nothing is retuned. No falsifier was stated in advance
+  for the other rates; the corpus gate's 1% was set after the first run,
+  about 70 times under what the old engine leaves unmatched. **Numbers:** 48kHz byte-identical. Derivation at 44.1 / 88.2 /
+  96kHz: missed 100 / 100 / 100, extras 193 / 192 / 192, exact 1,088 / 1,088
+  / 1,089; held-out 27 / 63 / 320 at every rate. Notes unmatched against
+  48kHz: 1,310 / 1,569 / 1,601 of 1,807 before, 10 / 5 / 3 after, every
+  matched start identical. The residual is the recordings: ffmpeg's
+  resampler, not the engine's, makes the other-rate takes, and one chord
+  and four same-pitch boundaries sit close enough to tip. Taken to 44.1kHz
+  and back by the engine's own resampler, the chord does not split.
+* **Alternatives Considered:** (a) The brief's route: every window and count
+  in milliseconds, converted at the capture rate, FFT lengths from
+  durations. Rejected: no quantum-aligned hop at 44.1kHz equals 13.3ms, the
+  kernel constants above would each need a conversion and a rounding, and
+  each rounding is a small de-tune the eval would have to re-litigate; the
+  result could only approach invariance. (b) Making 44.1kHz the reference,
+  as the brief assumed. Rejected: the corpus is at 48kHz and would lose 43
+  derivation labels and 9 held-out ones. (c) Decoupling the hop from the
+  render quantum (a 588-sample hop at 44.1kHz). Rejected: it fixes the hop
+  and nothing in the kernels.
+* **Consequences:** The same audio gives the same Notes at any capture
+  rate, and the 48kHz behaviour, the one the corpus measures, is what every
+  rate gets. Real playing captured at 44.1kHz should gain what the corpus
+  gained (43 derivation labels). **GOATerizer's synthetic-pluck autoplay at
+  44.1kHz will now score like its 48kHz runs: the late p90 onsets on 120bpm
+  triplets are the tuned recognizer's behaviour on that material, and this
+  does not fix them.** Lowering `minStableMs` to 50 removes the lag on that
+  bench (p90 67 to 20ms) but adds 11 extra Notes and 10 wrong pitches in
+  110, so it is accuracy work with a trade-off, not a sample-rate fix, and
+  is left to its own brief. Costs: a 34-tap filter per output sample at
+  44.1kHz (68 at 96kHz), small next to YIN. A count anywhere in `src/engine/` is a count at
+  48kHz; `ANALYSIS_SAMPLE_RATE` says so where the constants live.
+
+---
+
 #### [DECISION-087]: A damp over a residual above the gate ends its Note at the damp — inert on the corpus, shipped on the owner's acceptance of 220ms
 * **Date:** 2026-09-26
 * **Status:** Accepted (first recorded as Rejected: it missed its stated latency bar by 20ms; the owner then accepted the 220ms, 2026-09-26)

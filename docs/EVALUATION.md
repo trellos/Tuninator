@@ -46,6 +46,12 @@ The three triplet takes score no accuracy because every section of them is marke
 `fixtures/eval.config.json`; the gated subset is empty by configuration, so the check is reported
 as not applicable rather than failed.
 
+The corpus is decoded to 48kHz, the rate every constant was tuned at, and the engine resamples
+any other capture rate to it. `scripts/measure-sample-rate-invariance.ts` decodes the same takes
+to 44.1, 88.2 and 96kHz and requires the 48kHz Notes back: at most 1% unmatched, matched starts
+and ends within 3ms. Measured: 10, 5 and 3 of 1,807 Notes unmatched, every matched start
+identical. Before the engine resampled, 44.1kHz missed 43 more derivation labels than 48kHz.
+
 ## What is good and what is not
 
 **Good.** Every chord fixture on every signal path finds all of its labels. Onset timing is well

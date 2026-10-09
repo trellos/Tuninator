@@ -166,6 +166,10 @@ near 0, every time, regardless of how long the `AudioContext` had been alive.
 Both lanes, the pitch frames, the Notes and the hypothesis trail share this one clock, which is
 what makes an offline run over a WAV and a live run over the same audio directly comparable.
 
+Any `AudioContext` rate works, and gives the same Notes: the engine resamples what it captures to
+48kHz, the rate it is tuned at, before analysing it. A Note's times are where it is in the audio
+whatever the capture rate, and `getTimebase().sampleRate` is the context's own rate.
+
 To relate it to the audio context's own clock:
 
 ```ts
@@ -230,7 +234,7 @@ createRecognizer({
 |---|---|---|
 | `engine.minFrequencyHz` | `70` | Below E2 (82.4Hz), with headroom for flat tuning. |
 | `engine.maxFrequencyHz` | `1400` | Above E6 (1319Hz). |
-| `engine.hopMs` | `12` | Snapped to whole 128-sample render quanta. |
+| `engine.hopMs` | `12` | Snapped to whole 128-sample quanta of the 48kHz analysis rate: `12` runs as 13.3ms at any context rate. |
 | `engine.rmsGate` | `0.008` | A *ceiling*: the working gate is derived from the rig's own measured noise floor and can only go below this. |
 | `engine.confidenceGate` | `0.35` | Measured, not guessed: at `0.5` the recognizer dropped frames mid-note on decaying low strings, which read as note-offs and split notes in two. |
 | `engine.minStableMs` | `55` | How long a Note must sound before it is announced. |
