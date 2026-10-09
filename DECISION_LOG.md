@@ -7,6 +7,90 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-088]: The engine analyses at 48kHz whatever the capture rate, and resamples to get there
+* **Date:** 2026-10-09
+* **Status:** Accepted
+* **Owner:** Detection architecture, on the GOATerizer brief "recognition gets worse at 48 kHz than at 44.1 kHz"
+* **Context:** GOATerizer's autoplay (synthetic plucks, eighth-note triplets
+  in G2-G3) scored worse at 48kHz than at 44.1kHz: onsets reported 89ms
+  late at p90 against 39ms. The brief took 44.1kHz as the tuned rate and
+  asked for every duration to be re-expressed in milliseconds so 48kHz
+  would match it, with 44.1kHz behaviour and the evals unmoved. Measured
+  first, two premises did not hold. (1) **The corpus is decoded to 48kHz**
+  (`scripts/decode-fixtures.ts`), so every constant was tuned at 48kHz: a
+  640-sample, 13.3ms hop, a 42.7ms long YIN window, 46.9Hz flux bins. The
+  44.1kHz behaviour is the de-tuned one. The same takes decoded to each rate
+  and scored on the old engine (derivation missed / extras / exact; held-out
+  likewise): 48kHz 100 / 191 / 1,089 and 27 / 63 / 320; 44.1kHz 143 / 189 /
+  1,044 and 36 / 62 / 315; 96kHz 185 / 235 / 1,003 and 32 / 75 / 307. On
+  real guitar 48kHz is the better rate by 43 labels. (2) **Milliseconds
+  cannot reproduce it.** The 13.3ms hop is 588 samples at 44.1kHz, not a
+  whole number of 128-sample quanta, so the nearest hops are 11.6 or 14.5ms;
+  and beyond the config's sample-counted fields, the kernels count render
+  quanta (`fine-onset.ts`'s reference, median and peak-pick spans), FFT bins
+  (`onset.ts`'s `BAND_MIN_BINS`, `chroma.ts`'s envelope and harmonic-match
+  widths), and decay per hop (`REPORTED_REFERENCE_DECAY`,
+  `RMS_BASELINE_ALPHA`), each of which would round differently. The
+  synthetic case reproduced (120bpm triplets: start lag p90 21ms at 44.1kHz,
+  67ms at 48kHz, 23 and 21ms at 88.2 and 96kHz). The mechanism at 48kHz: the
+  flux onset opens a Note on time, YIN still reads the previous pitch, the
+  pitch step confirms four hops (53.3ms) later, the attack Note is under
+  `minStableMs` (55ms) and is dropped, and the pitch-change Note it leaves
+  starts 67ms late. With 11.6ms hops the same Note lives 58ms and survives.
+* **Decision:** `RecognitionEngine` resamples its input to
+  `ANALYSIS_SAMPLE_RATE` (48000) with a streaming Kaiser-windowed sinc
+  (`src/engine/resampler.ts`: 16 zero crossings, cutoff 0.95 of the lower
+  Nyquist, exact integer position stepping, per-phase unit DC gain), and
+  everything downstream runs on a 48kHz clock. At 48kHz the input passes
+  through untouched. Output sample n is the input at n/48000 seconds, so
+  Note times are source time at any rate; the latency added is the filter's
+  half-width, 0.36ms at 44.1kHz. `sampleRate`, `position`, `processChunk`'s
+  `startSample` and `getTimebase()` stay in the capture rate; `clock` is the
+  analysis clock. No constant is retuned. `hopMs` keeps its default of 12
+  and its nearest-quantum rounding, now at 48kHz only, where it has always
+  produced the 13.3ms hop the corpus was tuned at: rounding at or below, as
+  the brief asked, would have moved the eval to a 10.7ms hop. Gates:
+  `tests/engine/sample-rate.test.ts` (an analytic score at 44.1, 48, 88.2 and
+  96kHz must give the same Notes, pitches equal, starts and ends within
+  3ms; the old engine fails it) and
+  `scripts/measure-sample-rate-invariance.ts` in CI (the corpus decoded to
+  each rate, at most 1% of the 48kHz Notes unmatched, p99 start and end
+  within 3ms). **The bar:** the 48kHz eval report byte-identical, a hard
+  requirement since nothing is retuned. No falsifier was stated in advance
+  for the other rates; the corpus gate's 1% was set after the first run,
+  about 70 times under what the old engine leaves unmatched. **Numbers:** 48kHz byte-identical. Derivation at 44.1 / 88.2 /
+  96kHz: missed 100 / 100 / 100, extras 193 / 192 / 192, exact 1,088 / 1,088
+  / 1,089; held-out 27 / 63 / 320 at every rate. Notes unmatched against
+  48kHz: 1,310 / 1,569 / 1,601 of 1,807 before, 10 / 5 / 3 after, every
+  matched start identical. The residual is the recordings: ffmpeg's
+  resampler, not the engine's, makes the other-rate takes, and one chord
+  and four same-pitch boundaries sit close enough to tip. Taken to 44.1kHz
+  and back by the engine's own resampler, the chord does not split.
+* **Alternatives Considered:** (a) The brief's route: every window and count
+  in milliseconds, converted at the capture rate, FFT lengths from
+  durations. Rejected: no quantum-aligned hop at 44.1kHz equals 13.3ms, the
+  kernel constants above would each need a conversion and a rounding, and
+  each rounding is a small de-tune the eval would have to re-litigate; the
+  result could only approach invariance. (b) Making 44.1kHz the reference,
+  as the brief assumed. Rejected: the corpus is at 48kHz and would lose 43
+  derivation labels and 9 held-out ones. (c) Decoupling the hop from the
+  render quantum (a 588-sample hop at 44.1kHz). Rejected: it fixes the hop
+  and nothing in the kernels.
+* **Consequences:** The same audio gives the same Notes at any capture
+  rate, and the 48kHz behaviour, the one the corpus measures, is what every
+  rate gets. Real playing captured at 44.1kHz should gain what the corpus
+  gained (43 derivation labels). **GOATerizer's synthetic-pluck autoplay at
+  44.1kHz will now score like its 48kHz runs: the late p90 onsets on 120bpm
+  triplets are the tuned recognizer's behaviour on that material, and this
+  does not fix them.** Lowering `minStableMs` to 50 removes the lag on that
+  bench (p90 67 to 20ms) but adds 11 extra Notes and 10 wrong pitches in
+  110, so it is accuracy work with a trade-off, not a sample-rate fix, and
+  is left to its own brief. Costs: a 34-tap filter per output sample at
+  44.1kHz (68 at 96kHz), small next to YIN. A count anywhere in `src/engine/` is a count at
+  48kHz; `ANALYSIS_SAMPLE_RATE` says so where the constants live.
+
+---
+
 #### [DECISION-087]: A damp over a residual above the gate ends its Note at the damp — inert on the corpus, shipped on the owner's acceptance of 220ms
 * **Date:** 2026-09-26
 * **Status:** Accepted (first recorded as Rejected: it missed its stated latency bar by 20ms; the owner then accepted the 220ms, 2026-09-26)

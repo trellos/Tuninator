@@ -354,7 +354,11 @@ export type PitchFrame = {
 export type EngineTuning = {
   minFrequencyHz?: number;
   maxFrequencyHz?: number;
-  /** Fast-lane hop. Snapped to a whole number of 128-sample render quanta. */
+  /**
+   * Fast-lane hop. Snapped to a whole number of 128-sample quanta at the
+   * engine's 48kHz analysis rate, whatever the context runs at: the default
+   * 12 runs as 13.3ms.
+   */
   hopMs?: number;
   /** Amplitude below which the input is treated as silence. */
   rmsGate?: number;

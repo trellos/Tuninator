@@ -27,10 +27,25 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(HERE, "..");
 export const LABELS_DIR = join(REPO_ROOT, "fixtures", "labels");
 export const CACHE_DIR = join(REPO_ROOT, ".cache");
-export const WAV_DIR = join(CACHE_DIR, "fixtures");
-
-const MANIFEST_PATH = join(WAV_DIR, "manifest.json");
-export const TARGET_SAMPLE_RATE = 48000;
+/**
+ * The rate the corpus is decoded to, and so the rate `npm run eval` runs the
+ * engine at. 48kHz by default; `TUNINATOR_EVAL_RATE` decodes the same sources
+ * to another rate, into a cache of its own, so the corpus can be scored at
+ * 44.1, 88.2 or 96kHz as well (`scripts/measure-sample-rate-invariance.ts`).
+ */
+export const DEFAULT_SAMPLE_RATE = 48000;
+export const TARGET_SAMPLE_RATE = Number(process.env.TUNINATOR_EVAL_RATE ?? DEFAULT_SAMPLE_RATE);
+if (!Number.isInteger(TARGET_SAMPLE_RATE) || TARGET_SAMPLE_RATE < 8000) {
+  throw new Error(`TUNINATOR_EVAL_RATE must be a sample rate in Hz, not ${process.env.TUNINATOR_EVAL_RATE}`);
+}
+/** Where the corpus decoded to `sampleRate` lives; 48kHz keeps the original path. */
+export function wavDirFor(sampleRate: number): string {
+  return join(
+    CACHE_DIR,
+    sampleRate === DEFAULT_SAMPLE_RATE ? "fixtures" : `fixtures-${sampleRate}`
+  );
+}
+export const WAV_DIR = wavDirFor(TARGET_SAMPLE_RATE);
 
 export type LabelFile = {
   version: number;
@@ -69,7 +84,7 @@ type ManifestEntry = { audioPath: string; mtimeMs: number; size: number };
  * Discover fixtures from the label files. The label is the source of truth for
  * where its audio lives; nothing here ever guesses a filename.
  */
-export function discoverFixtures(): Fixture[] {
+export function discoverFixtures(sampleRate: number = TARGET_SAMPLE_RATE): Fixture[] {
   const files = readdirSync(LABELS_DIR)
     .filter((name) => name.endsWith(".json"))
     .sort();
@@ -90,14 +105,14 @@ export function discoverFixtures(): Fixture[] {
       throw new Error(`${name}: sourceAudio not found at ${audioPath}`);
     }
 
-    return { stem, labelPath, audioPath, wavPath: join(WAV_DIR, `${stem}.wav`), label };
+    return { stem, labelPath, audioPath, wavPath: join(wavDirFor(sampleRate), `${stem}.wav`), label };
   });
 }
 
-function readManifest(): Record<string, ManifestEntry> {
-  if (!existsSync(MANIFEST_PATH)) return {};
+function readManifest(path: string): Record<string, ManifestEntry> {
+  if (!existsSync(path)) return {};
   try {
-    return JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) as Record<string, ManifestEntry>;
+    return JSON.parse(readFileSync(path, "utf8")) as Record<string, ManifestEntry>;
   } catch {
     return {};
   }
@@ -113,7 +128,12 @@ export type DecodeOutcome = Fixture & {
   durationMs: number;
 };
 
-export function decodeFixtures(options: { force?: boolean; quiet?: boolean } = {}): DecodeOutcome[] {
+export function decodeFixtures(
+  options: { force?: boolean; quiet?: boolean; sampleRate?: number } = {}
+): DecodeOutcome[] {
+  const sampleRate = options.sampleRate ?? TARGET_SAMPLE_RATE;
+  const wavDir = wavDirFor(sampleRate);
+  const manifestPath = join(wavDir, "manifest.json");
   const bin = ffmpegPath;
   if (!bin) {
     throw new Error(
@@ -122,9 +142,9 @@ export function decodeFixtures(options: { force?: boolean; quiet?: boolean } = {
     );
   }
 
-  mkdirSync(WAV_DIR, { recursive: true });
-  const manifest = readManifest();
-  const fixtures = discoverFixtures();
+  mkdirSync(wavDir, { recursive: true });
+  const manifest = readManifest(manifestPath);
+  const fixtures = discoverFixtures(sampleRate);
   const outcomes: DecodeOutcome[] = [];
 
   for (const fixture of fixtures) {
@@ -150,7 +170,7 @@ export function decodeFixtures(options: { force?: boolean; quiet?: boolean } = {
         "-ac",
         "1",
         "-ar",
-        String(TARGET_SAMPLE_RATE),
+        String(sampleRate),
         "-f",
         "wav",
         "-acodec",
@@ -181,10 +201,8 @@ export function decodeFixtures(options: { force?: boolean; quiet?: boolean } = {
     const frames = Math.floor(wav.samples.length / Math.max(1, wav.channels));
     const durationMs = (frames / wav.sampleRate) * 1000;
 
-    if (wav.sampleRate !== TARGET_SAMPLE_RATE) {
-      throw new Error(
-        `${fixture.stem}: decoded to ${wav.sampleRate}Hz, expected ${TARGET_SAMPLE_RATE}Hz`
-      );
+    if (wav.sampleRate !== sampleRate) {
+      throw new Error(`${fixture.stem}: decoded to ${wav.sampleRate}Hz, expected ${sampleRate}Hz`);
     }
 
     outcomes.push({
@@ -206,7 +224,7 @@ export function decodeFixtures(options: { force?: boolean; quiet?: boolean } = {
     }
   }
 
-  writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   return outcomes;
 }
 

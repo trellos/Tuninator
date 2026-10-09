@@ -52,7 +52,9 @@ import { downmixToMono, readWav } from "../src/offline/wav.js";
 import type { EngineConfig } from "../src/engine/config.js";
 import {
   CACHE_DIR,
+  DEFAULT_SAMPLE_RATE,
   REPO_ROOT,
+  TARGET_SAMPLE_RATE,
   decodeFixtures,
   type DecodeOutcome,
 } from "./decode-fixtures.js";
@@ -593,7 +595,14 @@ function main(): number {
   }
 
   /* Reports on disk */
-  const reportPath = join(CACHE_DIR, "eval-report.json");
+  // A run at another rate (TUNINATOR_EVAL_RATE) keeps its own report, so it
+  // never stands in for the 48kHz one `check-readme-eval.ts` reads.
+  const reportPath = join(
+    CACHE_DIR,
+    TARGET_SAMPLE_RATE === DEFAULT_SAMPLE_RATE
+      ? "eval-report.json"
+      : `eval-report-${TARGET_SAMPLE_RATE}.json`
+  );
   writeFileSync(
     reportPath,
     `${JSON.stringify(
@@ -614,7 +623,12 @@ function main(): number {
     .filter((report) => report.corrections.length > 0)
     .map((report) => ({ fixture: report.stem, disagreements: report.corrections }));
 
-  const correctionsPath = join(CACHE_DIR, "proposed-label-corrections.json");
+  const correctionsPath = join(
+    CACHE_DIR,
+    TARGET_SAMPLE_RATE === DEFAULT_SAMPLE_RATE
+      ? "proposed-label-corrections.json"
+      : `proposed-label-corrections-${TARGET_SAMPLE_RATE}.json`
+  );
   writeFileSync(
     correctionsPath,
     `${JSON.stringify(

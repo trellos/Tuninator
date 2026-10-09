@@ -1,6 +1,43 @@
 # Changelog
 
-## 0.3.0 — unreleased
+## 0.3.1 — unreleased
+
+**Fixed: recognition depended on the `AudioContext` sample rate.** The same
+audio gave different Notes at 44.1, 48, 88.2 and 96kHz, because dozens of
+the engine's windows, FFT lengths, hops and per-hop rates are counted in
+samples, bins or hops, and they were tuned at one rate: 48kHz, the rate the
+fixture corpus is decoded to. At 48kHz the snapped hop is 13.3ms; at
+44.1kHz it was 11.6ms, the YIN window 46ms instead of 43ms, and so on down
+every kernel.
+
+- The engine now resamples its input to 48kHz before analysing it, so every
+  capture rate gets the recognizer the corpus measures. At 48kHz nothing
+  changes: the eval report is byte-identical. Note times stay in source
+  time at every rate, and `getTimebase().sampleRate` is still the context's
+  rate. Added latency: 0.36ms at 44.1kHz. No public API changed.
+- Before, the same takes decoded to each rate (derivation missed / extras /
+  exact): 48kHz 100 / 191 / 1,089; 44.1kHz 143 / 189 / 1,044; 96kHz 185 /
+  235 / 1,003. After: 100 / 191 / 1,089 at 48kHz; 100 / 193 / 1,088 at
+  44.1; 100 / 192 / 1,088 at 88.2; 100 / 192 / 1,089 at 96. Held-out after:
+  27 / 63 / 320 at every rate (44.1kHz was 36 / 62 / 315). Against the
+  48kHz Notes, 1,310 of 1,807 were unmatched at 44.1kHz before and 10 after,
+  with every matched start identical.
+- **What it means for GOATerizer's autoplay:** its synthetic pluck triplets
+  were doing better at 44.1kHz than at 48kHz, which is the opposite of what
+  the guitar recordings show. Every rate now behaves like 48kHz. On a
+  bench like it (120bpm eighth-note triplets, G2-G3), onset lag p90 was 21ms
+  at 44.1kHz and 67ms at 48kHz; it is now 67ms at every rate. The late ones
+  are attack Notes that YIN still hears as the previous pitch: the pitch
+  step confirms 53ms in, under the 55ms `minStableMs`, and the Note that
+  replaces them starts 67ms late. That is an accuracy question with a
+  trade-off (lowering the bar to 50ms fixes the lag but adds 11 extra Notes
+  and 10 wrong pitches in 110), not a sample-rate one, and this release does not change it.
+- `tests/engine/sample-rate.test.ts` and
+  `scripts/measure-sample-rate-invariance.ts` (now a CI step) hold 44.1,
+  88.2 and 96kHz to the 48kHz Notes. `npm run eval` runs at another rate
+  with `TUNINATOR_EVAL_RATE`. DECISION-088.
+
+## 0.3.0 — 2026-09-26
 
 **Breaking: `noteEnded` now means the sound is over, not that the answer is
 final.** A consumer that treated `noteEnded` as the last word on a Note should
