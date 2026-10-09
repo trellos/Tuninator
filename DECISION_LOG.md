@@ -7,6 +7,115 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-089]: A pick the pitch estimator renamed lends its start to the Note its pitch arrives in
+* **Date:** 2026-10-09
+* **Status:** Accepted
+* **Owner:** Detection architecture, on GOATerizer's report that its synthetic-pluck autoplay reads fast same-register notes as misses or wrong notes
+* **Context:** On eighth-note triplets in G2-G3 (synthetic plucks:
+  harmonics 1-6 at 1/h, 3ms attack, exp(-6t) decay, 50ms release, 90% of
+  the interval) the flux onset opens a Note on time, but YIN's 42.7ms
+  window still reads the previous pitch. The step to the new pitch confirms
+  four hops (53.3ms) later, the attack Note has sounded under
+  `tracking.minStableMs` (55ms) and is dropped unannounced, and the Note the
+  step opens starts 53-68ms after the pluck. Since DECISION-088 this
+  happens at every capture rate. Lowering `minStableMs` to 50 removes the
+  lag but adds 11 extra Notes and 10 wrong pitches in 110 at 120bpm. The
+  tracker already has the repair for this shape: `pitchStillArriving`
+  offers the stub to `absorbArticulationFragment()`, which gives the
+  step's Note the stub's start. Traced on the bench, it did not fire for
+  two reasons. **(A)** In 10 of the 12 late plucks at 120bpm,
+  `already-falling` declined the stub: a pluck peaks within milliseconds
+  and has fallen to 0.89-0.94 of its peak by the step, under
+  `STILL_RISING_FRACTION` (0.95). That test asks whether a *second pick*
+  interrupted the stub, and nothing but the estimator interrupted this one.
+  **(B)** In the other 2, the stub's last reading was B2, a pitch neither
+  note has, under an F#3 answered by an E3. That B2 is neither the
+  predecessor's name nor between the two pitches, so `cannotDefendReading`
+  said the stub could defend it and nothing was offered.
+* **Decision:** Two rules in `note-tracker.ts`, and one new field.
+  (1) `already-falling` is not asked of a stub that an attack opened, was
+  never announced, did not open on a pick's contact (`isContactOpening`),
+  and was ended by a renaming step. (2) A Note an attack opened, which
+  never held a reading and whose dominant vote is the predecessor's name,
+  cannot defend its last reading when the step goes to another pitch class.
+  (3) The new field, `NoteRecord.lentStartEvidence`: a start lent under
+  rule (1) moves the reported boundary and nothing else. The Note's own
+  evidence still reads from where it read before the loan:
+  - `soundedMs`;
+  - `evidenceDurationMs`, the `too-long` span when the Note is itself
+    offered as a stub;
+  - the Note in front of it, for `cannotDefendReading`;
+  - whether a region-lane boundary is one the fast lane already made.
+
+  The field carries through a further absorption. No constant was added
+  or changed. `scripts/measure-triplet-onset-lag.ts` is the bench, and
+  `tests/engine/renamed-pick.test.ts` holds the 120bpm score (the old
+  engine fails it).
+  **Bars, stated before measuring** (A first, then B; B′ after B failed):
+  - bench: 120bpm lag p90 ≤ 25ms, late (>40ms) over six tempos at least
+    halved, and for B′ ≤ 12 of 660, with no extra, wrong or missed added;
+  - derivation: eval missed and fp not up, exact not down, ledger MISSED
+    and splits (corpus and slow subset) not up;
+  - held-out read once, afterwards.
+
+  **Numbers.**
+  - **Bench** (6 tempos × 110 notes, the LCG seeded with the bpm):
+    late 39 → 9 of 660. At 120bpm, p90 67 → 20ms and late 12 → 1.
+    Missed 7, extra 0 and wrong 4 are all unchanged. The same at 44.1kHz.
+    The 9 left are all same-pitch repeats (rule (2) deliberately excludes
+    them).
+  - **Derivation:** eval missed / fp / exact 100 / 191 / 1,089, identical
+    fixture by fixture. Ledger identical; splits 173 split / 204 extras and
+    slow 148 / 177, identical. One matched onset moves: E5 amped s1687,
+    −9 → −36ms.
+  - **Held-out, read once:** eval 27 / 63 / 320 identical, ledger
+    identical. The room-mic lead triplet take loses one split event
+    (11 → 10). Matched onsets over 40ms late go 41 → 38.
+
+  The sample-rate invariance gate passes; 586 tests.
+* **Alternatives Considered:**
+  - **`minStableMs` 55 → 50.** Rejected: +11 extras and +10 wrong pitches
+    in 110 (DECISION-088).
+  - **(A) Rule (1) alone**, with the absorption moving every evidence
+    clock. Rejected: derivation missed 100 → 102.
+    - `clean-lead` s7: the stub had been announced (66.7ms), and absorbing
+      it retracted the B4 that matched the label.
+    - E5 amped s1688: the lent start moved the survivor's own
+      `cannotDefendReading` lookup past the dropped stub. The next young
+      step went unabsorbed, and a label went with it.
+  - **A′ (A plus "never announced").** Rejected: missed 101.
+  - **A plus evidence clocks from the own start, without the contact
+    exclusion.** Rejected: counts identical, but 8 matched onsets moved,
+    every one on a stub opened by a pick's contact on the amped takes:
+    5 nearer the label, 3 pulled 27-40ms early onto the contact. That is
+    not the shape this decision is about.
+  - **(B) Rule (2) without the pitch-class condition.** Rejected:
+    - bench late 18 → 0;
+    - derivation missed 100 → 102 and fp 191 → 183, all on the amped
+      same-pitch takes. There, a re-pick's stub always votes for its
+      predecessor's name, so the test separates nothing.
+  - **Making the evidence clock universal for every `absorbedRenaming`
+    Note.** Not taken: it changes Notes the old path already handled, and
+    nothing here measured it.
+* **Consequences:** On fast same-register picking a Note's `startTime` is
+  the pick, not the moment YIN caught up. The announcement does not move:
+  the survivor still has to clear its bar from its own start, so a
+  consumer judging on when `noteStarted` *arrives* rather than on the
+  `startTime` it carries sees no change. On the bench `noteStarted`
+  arrives 108ms after the pluck at p50 and 116ms at p90, before and after,
+  for every Note rather than only the late ones (the 55ms bar, from a
+  pitch that takes about 50ms to read). Same-pitch repeats keep the 64-68ms lag (9
+  of 660 on the bench). Separating that shape needs something other than
+  the vote, and the amped same-pitch takes say so. The real-guitar corpus
+  is unchanged on both axes, so this rests on the bench and on the
+  mechanism, not on corpus gain. Nothing here was tested with a real
+  guitar beyond the existing recorded corpus. **Process note:** while
+  reading candidate A, a whole-file diff of `measure-splits.ts` showed its
+  held-out rows before the derivation verdict. A was rejected on its
+  derivation miss count, and no constant is involved in what shipped.
+
+---
+
 #### [DECISION-088]: The engine analyses at 48kHz whatever the capture rate, and resamples to get there
 * **Date:** 2026-10-09
 * **Status:** Accepted

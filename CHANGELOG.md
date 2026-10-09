@@ -31,11 +31,32 @@ every kernel.
   step confirms 53ms in, under the 55ms `minStableMs`, and the Note that
   replaces them starts 67ms late. That is an accuracy question with a
   trade-off (lowering the bar to 50ms fixes the lag but adds 11 extra Notes
-  and 10 wrong pitches in 110), not a sample-rate one, and this release does not change it.
+  and 10 wrong pitches in 110), not a sample-rate one; the entry below
+  fixes it without that trade-off.
 - `tests/engine/sample-rate.test.ts` and
   `scripts/measure-sample-rate-invariance.ts` (now a CI step) hold 44.1,
   88.2 and 96kHz to the 48kHz Notes. `npm run eval` runs at another rate
   with `TUNINATOR_EVAL_RATE`. DECISION-088.
+
+**Fixed: a fast pick whose pitch arrived late started late.** On fast
+same-register picking, the attack opened a Note on time while YIN still
+heard the previous note. That Note was dropped when the new pitch
+confirmed four hops later, and the Note that replaced it started 53-68ms
+after the pick. The replacing Note now takes the pick's start.
+
+- **Bench.** Synthetic plucks, eighth-note triplets in G2-G3 at
+  90-140bpm, 660 notes: Notes starting more than 40ms late go from 39 to 9.
+  At 120bpm the onset lag p90 goes from 67ms to 20ms. Extra Notes, wrong
+  pitches and misses are unchanged.
+- **What is left.** The 9 still late are all the same pitch picked twice
+  in a row.
+- **Recorded corpus.** Missed, extras, exact, ledger and splits are
+  unchanged on the derivation takes; on the held-out takes there is one
+  fewer split event.
+- **Announcement timing.** `noteStarted` still arrives when it did, about
+  108ms after the pick on the bench. What moved is the `startTime` it
+  carries.
+- `scripts/measure-triplet-onset-lag.ts`; DECISION-089.
 
 ## 0.3.0 — 2026-09-26
 

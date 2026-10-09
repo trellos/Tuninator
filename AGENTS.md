@@ -217,6 +217,7 @@ scripts/measure-downstream-ledger.ts --all   every missed label + the exact bran
 scripts/measure-splits.ts                    events that came out as more than one Note
 scripts/measure-onset-coverage.ts            what the onset kernel saw, before the tracker decided anything
 scripts/verify-fixtures.ts                   is each label actually audible/attack-aligned/pitch-supported
+scripts/measure-triplet-onset-lag.ts         synthetic same-register triplets: how late each pluck's Note starts
 ```
 
 Several more exist for specific investigations (`measure-decision-separability.ts`,

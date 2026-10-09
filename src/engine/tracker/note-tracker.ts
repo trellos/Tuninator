@@ -2098,7 +2098,7 @@ export class NoteTracker {
     // through an amp that can take 130ms. See `NoteRecord.heldReading`.
     const contact = this.isLoudContact(predecessor, survivor);
     if (
-      predecessor.durationMs > this.config.transient.articulationMs &&
+      predecessor.evidenceDurationMs > this.config.transient.articulationMs &&
       !(survivor.absorbedRenaming && !predecessor.heldReading) &&
       !contact
     ) {
@@ -2110,9 +2110,21 @@ export class NoteTracker {
     // when it dies, while a note answered by a second pick had peaked and
     // started to fall. Duration cannot separate those at two tempos; this is
     // the same claim made about the Note against itself.
-    if (predecessor.rms < predecessor.maxRms * STILL_RISING_FRACTION) {
-      return decline("already-falling");
-    }
+    //
+    // Not asked of a pick the estimator renamed: an attack opened the stub,
+    // nothing interrupted it, it was never announced, and the step that ended
+    // it is the pick's own pitch arriving (`pitchStillArriving`). A plucked
+    // note peaks within milliseconds, so by the time the step confirms — four
+    // hops on a same-register triplet — it has fallen, and refusing it starts
+    // the Note at the step, 67ms after the pick. Such a stub lends the start
+    // and nothing else: see `NoteRecord.lentStartEvidence`. DECISION-089.
+    const falling = predecessor.rms < predecessor.maxRms * STILL_RISING_FRACTION;
+    const pickRenamed =
+      survivor.absorbedRenaming &&
+      predecessor.trigger === "attack" &&
+      !predecessor.announced &&
+      !isContactOpening(predecessor);
+    if (falling && !pickRenamed) return decline("already-falling");
     // Contiguous by construction when the split ended the predecessor here, but
     // checked rather than assumed: a gap means silence, and silence means two
     // separate events.
@@ -2158,6 +2170,10 @@ export class NoteTracker {
       }
       return;
     }
+    // A start the stub was itself lent comes with the evidence clock it lent.
+    survivor.lentStartEvidence = falling
+      ? survivor.startTime
+      : predecessor.lentStartEvidence;
     survivor.startTime = predecessor.startTime;
     survivor.startSample = predecessor.startSample;
   }
@@ -2435,7 +2451,8 @@ export class NoteTracker {
       if (!this.isRealBoundary(owner, segment)) continue;
       const from = Math.max(segment.from, owner.startTime);
       // The fast lane already put a boundary here; the region agrees with it.
-      if (from - owner.startTime < min) continue;
+      // A lent start is not where the fast lane's own boundary is.
+      if (from - owner.evidenceStartTime < min) continue;
 
       const end = owner.endTime as SourceTimeMs;
       if (end - from >= min) {
@@ -3728,13 +3745,29 @@ export class NoteTracker {
    * hops are the attack transient, which is the least periodic part of a note.
    */
   private cannotDefendReading(active: NoteRecord, fromHz: number, toHz: number): boolean {
-    const predecessor = this.recordSoundingAt((active.startTime - 1) as SourceTimeMs);
+    const predecessor = this.recordSoundingAt((active.evidenceStartTime - 1) as SourceTimeMs);
     if (predecessor === undefined || predecessor.id === active.id) return true;
     const name = predecessor.dominantMidi();
     if (name === null) return true;
     const from = describeFrequency(fromHz).midi;
     if (((((from - name) % 12) + 12) % 12) === 0) return true;
     const to = describeFrequency(toHz).midi;
+    // A pick that has only ever voted for the Note in front of it holds no
+    // reading of its own, so whatever it read last is the estimator still
+    // catching up — on same-register plucks, a pitch neither note has (B2,
+    // under an F#3 answered by an E3) — and a step out of it to
+    // another pitch is that pick's pitch arriving. Not to the same pitch: on a
+    // same-pitch re-pick every stub votes for its predecessor's name, and the
+    // test separates nothing there (it cost two labels on the amped
+    // same-pitch takes). DECISION-089.
+    if (
+      active.trigger === "attack" &&
+      !active.heldReading &&
+      active.dominantMidi() === name &&
+      ((((to - name) % 12) + 12) % 12) !== 0
+    ) {
+      return true;
+    }
     return from > Math.min(name, to) && from < Math.max(name, to);
   }
 

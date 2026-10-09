@@ -8430,3 +8430,74 @@ path and was not built.
 Not shipped at first (§0 B of the brief). *2026-09-26:* the owner accepted
 220ms on the hum case, and the rule ships in 0.3.0, on by default. The miss
 against the stated bar stands as recorded.
+
+## A pick the estimator renamed, and what a lent start must not lend (DECISION-089)
+
+GOATerizer's synthetic plucks are eighth-note triplets in G2-G3 at 90-140bpm.
+They came out with a Note in nine starting 53-68ms late.
+`scripts/measure-triplet-onset-lag.ts` reproduces it: 39 of 660 plucks late
+by more than 40ms over six tempos, 12 of 110 at 120bpm, where p90 is 67ms.
+`--detail` prints the tracker trace around each one. Every late pluck has
+the same story. An attack opens a Note on time, YIN still reads the
+previous pitch, a step confirms four hops later, and the attack Note is
+dropped at 53ms against a 55ms bar. The repair already existed
+(`pitchStillArriving` → `absorbArticulationFragment`). Two tests kept it
+from firing:
+
+- **`already-falling`**, 10 of the 12. A pluck peaks within milliseconds and
+  sits at 0.89-0.94 of its peak when the step lands. That test asks whether
+  a second pick interrupted the stub, and nothing but the estimator
+  interrupted this one.
+- **`cannotDefendReading`**, the other 2. The stub's last reading was B2,
+  under an F#3 answered by an E3: neither name, and not between them.
+
+**Bars, stated first.**
+- Bench: 120bpm p90 ≤ 25ms, and late at least halved over six tempos; for
+  the second rule, ≤ 12 of 660. No extra, wrong or missed added.
+- Derivation: missed, fp, exact, ledger and splits not worse.
+- Held-out read once, at the end.
+
+**What the derivation takes taught, in order.** Exempting the stub from
+`already-falling` meets the bench, but it costs two derivation labels
+(missed 100 → 102). Neither loss is a misfire; each comes from the start
+moving.
+
+- **An announced stub.** On `clean-lead` s7 the stub had cleared its bar at
+  66.7ms. It was the B4 that matched the label, and absorbing it took the
+  label with it.
+- **A chain.** Absorbing a stub moved the survivor's start, which the
+  survivor's own next young step reads to find "the Note in front".
+  Behind the moved start there was a real E5 instead of a nameless stub,
+  so the next stub went unabsorbed and an E5 amped label was lost. The
+  same move made a later stub 107ms long instead of 67ms, past `too-long`,
+  so a phantom D6 survived on `held-then-picked` amped. It also put a
+  region-lane boundary 98ms from the start instead of 58ms, past
+  `minSegmentMs`, so the deep lane split the Note again.
+
+The record already states the rule all three break:
+`absorbedRenaming`'s announce clock is there because "a step-split stub
+lends its boundary but not its evidence". So the loan is made explicit.
+`NoteRecord.lentStartEvidence` keeps the Note's own start, and the Note's
+own-evidence tests read from it: `soundedMs`, the `too-long` span, the
+`cannotDefendReading` lookup, and the region lane's "already a boundary
+here". It is carried through a further absorption. With it, the derivation
+counts are identical.
+
+Eight matched onsets still moved, every one a stub opened by a pick's
+**contact** on the amped takes. Five moved nearer their labels and three
+were pulled 27-40ms early onto the contact. That is a different shape, and
+`isContactOpening` already names it, so it is excluded. What is left
+changes one derivation onset, by 27ms.
+
+The second rule took the bench to 0 late. On the derivation takes it lost
+two labels for eight fewer extras, all on the amped same-pitch takes. A
+same-pitch re-pick's stub always votes for its predecessor's name, so
+"its votes are its predecessor's" separates nothing there. Restricted to a
+step to another pitch class, it passes.
+
+**Result.** Bench 39 → 9 late of 660, 120bpm p90 67 → 20ms, no extra, wrong
+or missed added. The 9 left are all same-pitch repeats. Derivation eval,
+ledger and splits are identical. Held-out, read once: identical eval and
+ledger; one fewer split event on the room-mic triplet take; matched onsets
+over 40ms late 41 → 38. `noteStarted` still arrives 108ms (p50) after a
+pluck on this bench, as before; what moved is the `startTime` it carries.
