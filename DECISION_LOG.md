@@ -51,8 +51,10 @@ are what keep later work from repeating them.
 * **Consequences:** `npm run eval` PASS, 0 required failures, before and
   after. `clean-lead-120bpm` (required): gated pitch class 92.9% unchanged
   against the 90% floor, gated onset median 46 to 28ms (limit 100), overall
-  onset median 53 to 32ms, confidently wrong 2 to 0, 43 to 44 labels with the
-  new `s13` missed (missed 2 to 3). Power chords (required): onset median 93
+  onset median 53 to 32ms, confidently wrong 2 to 0, 43 to 44 labels, missed
+  2 to 3 (s4 and s8 before; s8, s10 and s12 after: the short A4 and C#5 notes
+  of the sixteenth run; s13 pairs with a B5 detection 98ms early, octave off).
+  Power chords (required): onset median 93
   to 54ms (limit 120), exact 100% as before. Held DI: onset median 81 to 17ms
   and p90 154 to 47ms, but the end error median goes 58 to 78ms, so the labels'
   ends now sit further from where the engine ends the notes. Held amped:
@@ -66,6 +68,24 @@ are what keep later work from repeating them.
   `scripts/retime-gridded-labels.ts` no longer reproduces these files. The
   two same-pitch takes still differ outside the two edited windows (about 150
   amped labels untouched).
+  What the corrected labels show about the engine, read from the eval report
+  before and after (the relabel hid or blurred all of it before):
+  (1) Onset on the DI render is a flat +13 to +15ms across strings 3 to 6
+  (before: +50, +92, +125, +159ms, the label drift); on the amped render of
+  the same notes it is -2, -8, -38 and -44ms, so the engine's start on the
+  amp-sim render comes up to about 57ms earlier than on the DI. (2) Ends:
+  on the DI strings 5 and 6 the engine ends the note about 115ms before the
+  label's end (strings 3 and 4 within 13ms); the labels' ends run to the next
+  pick, so this may be a labelling convention rather than an engine error,
+  and the label data cannot say which. (3) Same-pitch DI: 61 of 187 labels
+  missed, 13% when the labels are 140ms or more apart and 52-58% when closer,
+  unchanged by the relabel; the amped render of the same performance misses 6
+  but has 37 false positives, and the held amped take has 48 false positives
+  (the string's own pitch, about half within 150ms of a label) against 2 on
+  the DI. (4) Clean lead: the pitch errors left after the relabel cluster in
+  the E5/D5 triplets (t4 E4, t5 E5, t10 D5, t6/t16/t17 unknown) and the short
+  A4 and C#5 notes of the sixteenth run (s4, s8, s10, s12 missed or paired
+  with the wrong note).
 
 ---
 
