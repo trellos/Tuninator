@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 2.155s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 2.155s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. CORRECTED 2026-10-26 (the owner's listening pass, through an editor and listening pages that drew the recording's waveform with the labels on it; Tuninator was not used to place any label): s1631-s1655 (24.0-27.0s) re-timed onto the picks; s16106-s16111 re-timed and s16105 and s16112 removed at the end of the take (s16112 lay over silence).",
   "events": [
     {
       "id": "e81",
@@ -1430,8 +1430,8 @@
     },
     {
       "id": "s1631",
-      "startMs": 23925,
-      "endMs": 24050,
+      "startMs": 23915,
+      "endMs": 24040,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1444,8 +1444,8 @@
     },
     {
       "id": "s1632",
-      "startMs": 24050,
-      "endMs": 24175,
+      "startMs": 24045,
+      "endMs": 24150,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1458,8 +1458,8 @@
     },
     {
       "id": "s1633",
-      "startMs": 24175,
-      "endMs": 24300,
+      "startMs": 24155,
+      "endMs": 24260,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1472,8 +1472,8 @@
     },
     {
       "id": "s1634",
-      "startMs": 24300,
-      "endMs": 24425,
+      "startMs": 24275,
+      "endMs": 24370,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1486,8 +1486,8 @@
     },
     {
       "id": "s1635",
-      "startMs": 24425,
-      "endMs": 24550,
+      "startMs": 24380,
+      "endMs": 24505,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1500,8 +1500,8 @@
     },
     {
       "id": "s1636",
-      "startMs": 24550,
-      "endMs": 24675,
+      "startMs": 24515,
+      "endMs": 24625,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1514,8 +1514,8 @@
     },
     {
       "id": "s1637",
-      "startMs": 24675,
-      "endMs": 24800,
+      "startMs": 24630,
+      "endMs": 24795,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1528,8 +1528,8 @@
     },
     {
       "id": "s1638",
-      "startMs": 24800,
-      "endMs": 24925,
+      "startMs": 24805,
+      "endMs": 24905,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1542,8 +1542,8 @@
     },
     {
       "id": "s1639",
-      "startMs": 24925,
-      "endMs": 25050,
+      "startMs": 24910,
+      "endMs": 25035,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1556,8 +1556,8 @@
     },
     {
       "id": "s1640",
-      "startMs": 25050,
-      "endMs": 25175,
+      "startMs": 25055,
+      "endMs": 25165,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1570,8 +1570,8 @@
     },
     {
       "id": "s1641",
-      "startMs": 25175,
-      "endMs": 25300,
+      "startMs": 25165,
+      "endMs": 25285,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1584,8 +1584,8 @@
     },
     {
       "id": "s1642",
-      "startMs": 25300,
-      "endMs": 25425,
+      "startMs": 25290,
+      "endMs": 25380,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1598,8 +1598,8 @@
     },
     {
       "id": "s1643",
-      "startMs": 25425,
-      "endMs": 25550,
+      "startMs": 25385,
+      "endMs": 25505,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1612,8 +1612,8 @@
     },
     {
       "id": "s1644",
-      "startMs": 25550,
-      "endMs": 25675,
+      "startMs": 25515,
+      "endMs": 25605,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1626,8 +1626,8 @@
     },
     {
       "id": "s1645",
-      "startMs": 25675,
-      "endMs": 25800,
+      "startMs": 25610,
+      "endMs": 25725,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1640,8 +1640,8 @@
     },
     {
       "id": "s1646",
-      "startMs": 25800,
-      "endMs": 25925,
+      "startMs": 25740,
+      "endMs": 25850,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1654,8 +1654,8 @@
     },
     {
       "id": "s1647",
-      "startMs": 25925,
-      "endMs": 26050,
+      "startMs": 25855,
+      "endMs": 26020,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1668,8 +1668,8 @@
     },
     {
       "id": "s1648",
-      "startMs": 26050,
-      "endMs": 26175,
+      "startMs": 26030,
+      "endMs": 26130,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1682,8 +1682,8 @@
     },
     {
       "id": "s1649",
-      "startMs": 26175,
-      "endMs": 26300,
+      "startMs": 26135,
+      "endMs": 26275,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1696,8 +1696,8 @@
     },
     {
       "id": "s1650",
-      "startMs": 26300,
-      "endMs": 26425,
+      "startMs": 26285,
+      "endMs": 26405,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1710,8 +1710,8 @@
     },
     {
       "id": "s1651",
-      "startMs": 26425,
-      "endMs": 26550,
+      "startMs": 26410,
+      "endMs": 26535,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1724,8 +1724,8 @@
     },
     {
       "id": "s1652",
-      "startMs": 26550,
-      "endMs": 26675,
+      "startMs": 26540,
+      "endMs": 26645,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1738,8 +1738,8 @@
     },
     {
       "id": "s1653",
-      "startMs": 26675,
-      "endMs": 26800,
+      "startMs": 26650,
+      "endMs": 26765,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1752,8 +1752,8 @@
     },
     {
       "id": "s1654",
-      "startMs": 26800,
-      "endMs": 26925,
+      "startMs": 26770,
+      "endMs": 26880,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1766,8 +1766,8 @@
     },
     {
       "id": "s1655",
-      "startMs": 26925,
-      "endMs": 27050,
+      "startMs": 26880,
+      "endMs": 27005,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2465,23 +2465,9 @@
       "required": true
     },
     {
-      "id": "s16105",
-      "startMs": 33175,
-      "endMs": 33300,
-      "kind": "note",
-      "label": "A3",
-      "pitches": [
-        "A3"
-      ],
-      "pitchClasses": [
-        "A"
-      ],
-      "required": true
-    },
-    {
       "id": "s16106",
       "startMs": 33300,
-      "endMs": 33425,
+      "endMs": 33410,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2494,8 +2480,8 @@
     },
     {
       "id": "s16107",
-      "startMs": 33425,
-      "endMs": 33550,
+      "startMs": 33420,
+      "endMs": 33535,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2508,8 +2494,8 @@
     },
     {
       "id": "s16108",
-      "startMs": 33550,
-      "endMs": 33675,
+      "startMs": 33565,
+      "endMs": 33685,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2522,8 +2508,8 @@
     },
     {
       "id": "s16109",
-      "startMs": 33675,
-      "endMs": 33800,
+      "startMs": 33690,
+      "endMs": 33795,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2536,8 +2522,8 @@
     },
     {
       "id": "s16110",
-      "startMs": 33800,
-      "endMs": 33925,
+      "startMs": 33810,
+      "endMs": 33940,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2550,22 +2536,8 @@
     },
     {
       "id": "s16111",
-      "startMs": 33925,
-      "endMs": 34050,
-      "kind": "note",
-      "label": "A3",
-      "pitches": [
-        "A3"
-      ],
-      "pitchClasses": [
-        "A"
-      ],
-      "required": true
-    },
-    {
-      "id": "s16112",
-      "startMs": 34050,
-      "endMs": 34175,
+      "startMs": 33955,
+      "endMs": 33995,
       "kind": "note",
       "label": "A3",
       "pitches": [

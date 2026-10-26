@@ -25,8 +25,8 @@ any number below means anything.
 | Fixture | Required | Labels | Notes | Missed | Exact | Pitch class | Onset median |
 |---|---|---|---|---|---|---|---|
 | `chords-a-bm-g-d-2x-120bpm` | **yes** | 16 | 16 | 0 | 91.7% | 100.0% | 0ms |
-| `clean-lead-120bpm` | **yes** | 43 | 42 | 2 | 82.1% | 92.9% | 46ms |
-| `power-chords-c-a-g-e-...-120bpm` | **yes** | 8 | 9 | 0 | 100.0% | 100.0% | 93ms |
+| `clean-lead-120bpm` | **yes** | 44 | 42 | 3 | 85.7% | 92.9% | 28ms |
+| `power-chords-c-a-g-e-...-120bpm` | **yes** | 8 | 9 | 0 | 100.0% | 100.0% | 54ms |
 | `cowboy-chords-...-120bpm` | no | 8 | 12 | 0 | 75.0% | 87.5% | 40ms |
 | `cowboy-chords-di-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 52ms |
 | `cowboy-chords-mic-...-140bpm` | no | 8 | 12 | 0 | 75.0% | 100.0% | 94ms |
@@ -55,7 +55,7 @@ identical. Before the engine resampled, 44.1kHz missed 43 more derivation labels
 ## What is good and what is not
 
 **Good.** Every chord fixture on every signal path finds all of its labels. Onset timing is well
-inside its gates — of the 24 takes that score it, eleven have a median absolute error under
+inside its gates — of the 24 takes that score it, twelve have a median absolute error under
 25ms and the worst is 94ms against a 120ms limit. Pitch class on the required lead fixture is
 92.9%.
 

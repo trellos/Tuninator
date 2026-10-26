@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.970s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +80ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): p1c1q1-p1c1q4 move to 4.036, 4.533, 5.039 and 5.523s (from 4.085, 4.595, 5.080, 5.575), onto the note sounding. The rest of this take is unchanged; its labels' offsets to the sound vary stroke by stroke and are left for a per-stroke pass. Tuninator was not consulted. See DECISION-064.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are the measured onsets of the DI take, one per event (count matched exactly), from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.970s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +80ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): p1c1q1-p1c1q4 move to 4.036, 4.533, 5.039 and 5.523s (from 4.085, 4.595, 5.080, 5.575), onto the note sounding. The rest of this take is unchanged; its labels' offsets to the sound vary stroke by stroke and are left for a per-stroke pass. Tuninator was not consulted. See DECISION-064. CORRECTED 2026-10-26 (the owner's listening pass, through an editor and listening pages that drew the recording's waveform with the labels on it; Tuninator was not used to place any label): every note of strings 3 to 6 (p3, p4, p5, p6; 80 events) moves later onto the note sounding, by +35 to +175ms (per-string medians 35, 70, 108 and 145ms), and each held note's end follows the next pick. This supersedes 'the rest of this take is unchanged' above for those strings; strings 1 and 2 are unchanged.",
   "events": [
     {
       "id": "p1c1h",
@@ -576,8 +576,8 @@
     },
     {
       "id": "p3c1h",
-      "startMs": 33955,
-      "endMs": 35955,
+      "startMs": 34000,
+      "endMs": 35900,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -590,8 +590,8 @@
     },
     {
       "id": "p3c1q1",
-      "startMs": 35975,
-      "endMs": 36470,
+      "startMs": 35990,
+      "endMs": 36460,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -604,7 +604,7 @@
     },
     {
       "id": "p3c1q2",
-      "startMs": 36470,
+      "startMs": 36485,
       "endMs": 36960,
       "kind": "note",
       "label": "G3",
@@ -618,7 +618,7 @@
     },
     {
       "id": "p3c1q3",
-      "startMs": 36960,
+      "startMs": 36985,
       "endMs": 37450,
       "kind": "note",
       "label": "G3",
@@ -632,7 +632,7 @@
     },
     {
       "id": "p3c1q4",
-      "startMs": 37450,
+      "startMs": 37485,
       "endMs": 37940,
       "kind": "note",
       "label": "G3",
@@ -646,8 +646,8 @@
     },
     {
       "id": "p3c2h",
-      "startMs": 37940,
-      "endMs": 39940,
+      "startMs": 37980,
+      "endMs": 39980,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -660,8 +660,8 @@
     },
     {
       "id": "p3c2q1",
-      "startMs": 39965,
-      "endMs": 40460,
+      "startMs": 40000,
+      "endMs": 40495,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -674,8 +674,8 @@
     },
     {
       "id": "p3c2q2",
-      "startMs": 40460,
-      "endMs": 40955,
+      "startMs": 40495,
+      "endMs": 40990,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -688,8 +688,8 @@
     },
     {
       "id": "p3c2q3",
-      "startMs": 40955,
-      "endMs": 41445,
+      "startMs": 40990,
+      "endMs": 41480,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -702,8 +702,8 @@
     },
     {
       "id": "p3c2q4",
-      "startMs": 41445,
-      "endMs": 41935,
+      "startMs": 41480,
+      "endMs": 41970,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -716,8 +716,8 @@
     },
     {
       "id": "p3c3h",
-      "startMs": 41935,
-      "endMs": 43935,
+      "startMs": 41970,
+      "endMs": 43970,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -730,8 +730,8 @@
     },
     {
       "id": "p3c3q1",
-      "startMs": 43960,
-      "endMs": 44460,
+      "startMs": 43995,
+      "endMs": 44495,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -744,8 +744,8 @@
     },
     {
       "id": "p3c3q2",
-      "startMs": 44480,
-      "endMs": 44980,
+      "startMs": 44515,
+      "endMs": 45015,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -758,8 +758,8 @@
     },
     {
       "id": "p3c3q3",
-      "startMs": 44985,
-      "endMs": 45465,
+      "startMs": 45020,
+      "endMs": 45500,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -772,8 +772,8 @@
     },
     {
       "id": "p3c3q4",
-      "startMs": 45465,
-      "endMs": 45965,
+      "startMs": 45500,
+      "endMs": 46000,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -786,8 +786,8 @@
     },
     {
       "id": "p3c4h",
-      "startMs": 45965,
-      "endMs": 47955,
+      "startMs": 46000,
+      "endMs": 47990,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -800,8 +800,8 @@
     },
     {
       "id": "p3c4q1",
-      "startMs": 47955,
-      "endMs": 48455,
+      "startMs": 48020,
+      "endMs": 48485,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -814,8 +814,8 @@
     },
     {
       "id": "p3c4q2",
-      "startMs": 48455,
-      "endMs": 48940,
+      "startMs": 48510,
+      "endMs": 48970,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -828,8 +828,8 @@
     },
     {
       "id": "p3c4q3",
-      "startMs": 48940,
-      "endMs": 49425,
+      "startMs": 49005,
+      "endMs": 49440,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -842,8 +842,8 @@
     },
     {
       "id": "p3c4q4",
-      "startMs": 49425,
-      "endMs": 49910,
+      "startMs": 49495,
+      "endMs": 49980,
       "kind": "note",
       "label": "G3",
       "pitches": [
@@ -856,7 +856,7 @@
     },
     {
       "id": "p4c1h",
-      "startMs": 49910,
+      "startMs": 49985,
       "endMs": 51910,
       "kind": "note",
       "label": "C4",
@@ -870,8 +870,8 @@
     },
     {
       "id": "p4c1q1",
-      "startMs": 51965,
-      "endMs": 52460,
+      "startMs": 52050,
+      "endMs": 52490,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -884,8 +884,8 @@
     },
     {
       "id": "p4c1q2",
-      "startMs": 52460,
-      "endMs": 52910,
+      "startMs": 52525,
+      "endMs": 52930,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -898,8 +898,8 @@
     },
     {
       "id": "p4c1q3",
-      "startMs": 52910,
-      "endMs": 53410,
+      "startMs": 52975,
+      "endMs": 53460,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -912,8 +912,8 @@
     },
     {
       "id": "p4c1q4",
-      "startMs": 53415,
-      "endMs": 53895,
+      "startMs": 53480,
+      "endMs": 53935,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -926,8 +926,8 @@
     },
     {
       "id": "p4c2h",
-      "startMs": 53895,
-      "endMs": 55895,
+      "startMs": 53965,
+      "endMs": 55965,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -940,8 +940,8 @@
     },
     {
       "id": "p4c2q1",
-      "startMs": 55910,
-      "endMs": 56410,
+      "startMs": 55980,
+      "endMs": 56480,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -954,8 +954,8 @@
     },
     {
       "id": "p4c2q2",
-      "startMs": 56420,
-      "endMs": 56905,
+      "startMs": 56490,
+      "endMs": 56975,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -968,8 +968,8 @@
     },
     {
       "id": "p4c2q3",
-      "startMs": 56905,
-      "endMs": 57385,
+      "startMs": 56975,
+      "endMs": 57455,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -982,8 +982,8 @@
     },
     {
       "id": "p4c2q4",
-      "startMs": 57385,
-      "endMs": 57885,
+      "startMs": 57455,
+      "endMs": 57955,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -996,8 +996,8 @@
     },
     {
       "id": "p4c3h",
-      "startMs": 57890,
-      "endMs": 59890,
+      "startMs": 57960,
+      "endMs": 59960,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1010,8 +1010,8 @@
     },
     {
       "id": "p4c3q1",
-      "startMs": 59910,
-      "endMs": 60410,
+      "startMs": 59980,
+      "endMs": 60480,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1024,8 +1024,8 @@
     },
     {
       "id": "p4c3q2",
-      "startMs": 60435,
-      "endMs": 60935,
+      "startMs": 60505,
+      "endMs": 61005,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1038,8 +1038,8 @@
     },
     {
       "id": "p4c3q3",
-      "startMs": 60955,
-      "endMs": 61450,
+      "startMs": 61025,
+      "endMs": 61520,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1052,8 +1052,8 @@
     },
     {
       "id": "p4c3q4",
-      "startMs": 61450,
-      "endMs": 61930,
+      "startMs": 61520,
+      "endMs": 62000,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1066,8 +1066,8 @@
     },
     {
       "id": "p4c4h",
-      "startMs": 61930,
-      "endMs": 63900,
+      "startMs": 62000,
+      "endMs": 63970,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1080,8 +1080,8 @@
     },
     {
       "id": "p4c4q1",
-      "startMs": 63900,
-      "endMs": 64400,
+      "startMs": 63995,
+      "endMs": 64445,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1094,8 +1094,8 @@
     },
     {
       "id": "p4c4q2",
-      "startMs": 64420,
-      "endMs": 64920,
+      "startMs": 64505,
+      "endMs": 64975,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1108,8 +1108,8 @@
     },
     {
       "id": "p4c4q3",
-      "startMs": 64925,
-      "endMs": 65415,
+      "startMs": 65020,
+      "endMs": 65480,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1122,8 +1122,8 @@
     },
     {
       "id": "p4c4q4",
-      "startMs": 65415,
-      "endMs": 65915,
+      "startMs": 65525,
+      "endMs": 66025,
       "kind": "note",
       "label": "C4",
       "pitches": [
@@ -1136,7 +1136,7 @@
     },
     {
       "id": "p5c1h",
-      "startMs": 65970,
+      "startMs": 66070,
       "endMs": 67915,
       "kind": "note",
       "label": "G4",
@@ -1150,8 +1150,8 @@
     },
     {
       "id": "p5c1q1",
-      "startMs": 67915,
-      "endMs": 68415,
+      "startMs": 68025,
+      "endMs": 68455,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1164,8 +1164,8 @@
     },
     {
       "id": "p5c1q2",
-      "startMs": 68420,
-      "endMs": 68900,
+      "startMs": 68510,
+      "endMs": 68965,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1178,8 +1178,8 @@
     },
     {
       "id": "p5c1q3",
-      "startMs": 68900,
-      "endMs": 69400,
+      "startMs": 68995,
+      "endMs": 69495,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1192,8 +1192,8 @@
     },
     {
       "id": "p5c1q4",
-      "startMs": 69405,
-      "endMs": 69895,
+      "startMs": 69505,
+      "endMs": 69975,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1206,8 +1206,8 @@
     },
     {
       "id": "p5c2h",
-      "startMs": 69895,
-      "endMs": 71875,
+      "startMs": 69990,
+      "endMs": 71970,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1220,8 +1220,8 @@
     },
     {
       "id": "p5c2q1",
-      "startMs": 71875,
-      "endMs": 72375,
+      "startMs": 71975,
+      "endMs": 72475,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1234,8 +1234,8 @@
     },
     {
       "id": "p5c2q2",
-      "startMs": 72375,
-      "endMs": 72875,
+      "startMs": 72475,
+      "endMs": 72975,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1248,8 +1248,8 @@
     },
     {
       "id": "p5c2q3",
-      "startMs": 72880,
-      "endMs": 73365,
+      "startMs": 72980,
+      "endMs": 73465,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1262,8 +1262,8 @@
     },
     {
       "id": "p5c2q4",
-      "startMs": 73365,
-      "endMs": 73855,
+      "startMs": 73465,
+      "endMs": 73955,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1276,8 +1276,8 @@
     },
     {
       "id": "p5c3h",
-      "startMs": 73855,
-      "endMs": 75855,
+      "startMs": 73955,
+      "endMs": 75955,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1290,8 +1290,8 @@
     },
     {
       "id": "p5c3q1",
-      "startMs": 75895,
-      "endMs": 76395,
+      "startMs": 75995,
+      "endMs": 76495,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1304,8 +1304,8 @@
     },
     {
       "id": "p5c3q2",
-      "startMs": 76405,
-      "endMs": 76875,
+      "startMs": 76505,
+      "endMs": 76975,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1318,8 +1318,8 @@
     },
     {
       "id": "p5c3q3",
-      "startMs": 76875,
-      "endMs": 77375,
+      "startMs": 77000,
+      "endMs": 77475,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1332,8 +1332,8 @@
     },
     {
       "id": "p5c3q4",
-      "startMs": 77380,
-      "endMs": 77880,
+      "startMs": 77495,
+      "endMs": 77980,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1346,8 +1346,8 @@
     },
     {
       "id": "p5c4h",
-      "startMs": 77885,
-      "endMs": 79885,
+      "startMs": 78010,
+      "endMs": 79985,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1360,8 +1360,8 @@
     },
     {
       "id": "p5c4q1",
-      "startMs": 79890,
-      "endMs": 80390,
+      "startMs": 80005,
+      "endMs": 80485,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1374,8 +1374,8 @@
     },
     {
       "id": "p5c4q2",
-      "startMs": 80405,
-      "endMs": 80875,
+      "startMs": 80520,
+      "endMs": 80970,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1388,8 +1388,8 @@
     },
     {
       "id": "p5c4q3",
-      "startMs": 80875,
-      "endMs": 81375,
+      "startMs": 81000,
+      "endMs": 81465,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1402,8 +1402,8 @@
     },
     {
       "id": "p5c4q4",
-      "startMs": 81375,
-      "endMs": 81875,
+      "startMs": 81500,
+      "endMs": 81975,
       "kind": "note",
       "label": "G4",
       "pitches": [
@@ -1416,8 +1416,8 @@
     },
     {
       "id": "p6c1h",
-      "startMs": 81895,
-      "endMs": 83860,
+      "startMs": 82030,
+      "endMs": 83875,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1430,8 +1430,8 @@
     },
     {
       "id": "p6c1q1",
-      "startMs": 83860,
-      "endMs": 84355,
+      "startMs": 84005,
+      "endMs": 84410,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1444,8 +1444,8 @@
     },
     {
       "id": "p6c1q2",
-      "startMs": 84355,
-      "endMs": 84855,
+      "startMs": 84500,
+      "endMs": 84980,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1458,8 +1458,8 @@
     },
     {
       "id": "p6c1q3",
-      "startMs": 84855,
-      "endMs": 85355,
+      "startMs": 85000,
+      "endMs": 85460,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1472,8 +1472,8 @@
     },
     {
       "id": "p6c1q4",
-      "startMs": 85360,
-      "endMs": 85845,
+      "startMs": 85490,
+      "endMs": 85955,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1486,7 +1486,7 @@
     },
     {
       "id": "p6c2h",
-      "startMs": 85845,
+      "startMs": 85990,
       "endMs": 87845,
       "kind": "note",
       "label": "D5",
@@ -1500,8 +1500,8 @@
     },
     {
       "id": "p6c2q1",
-      "startMs": 87875,
-      "endMs": 88375,
+      "startMs": 88015,
+      "endMs": 88515,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1514,8 +1514,8 @@
     },
     {
       "id": "p6c2q2",
-      "startMs": 88380,
-      "endMs": 88880,
+      "startMs": 88520,
+      "endMs": 89020,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1528,8 +1528,8 @@
     },
     {
       "id": "p6c2q3",
-      "startMs": 88890,
-      "endMs": 89390,
+      "startMs": 89030,
+      "endMs": 89530,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1542,8 +1542,8 @@
     },
     {
       "id": "p6c2q4",
-      "startMs": 89395,
-      "endMs": 89880,
+      "startMs": 89535,
+      "endMs": 90020,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1556,8 +1556,8 @@
     },
     {
       "id": "p6c3h",
-      "startMs": 89880,
-      "endMs": 91880,
+      "startMs": 90020,
+      "endMs": 92020,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1570,8 +1570,8 @@
     },
     {
       "id": "p6c3q1",
-      "startMs": 92045,
-      "endMs": 92450,
+      "startMs": 92220,
+      "endMs": 92540,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1584,8 +1584,8 @@
     },
     {
       "id": "p6c3q2",
-      "startMs": 92450,
-      "endMs": 92890,
+      "startMs": 92590,
+      "endMs": 93000,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1598,8 +1598,8 @@
     },
     {
       "id": "p6c3q3",
-      "startMs": 92890,
-      "endMs": 93345,
+      "startMs": 93035,
+      "endMs": 93465,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1612,8 +1612,8 @@
     },
     {
       "id": "p6c3q4",
-      "startMs": 93345,
-      "endMs": 93845,
+      "startMs": 93490,
+      "endMs": 93960,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1626,8 +1626,8 @@
     },
     {
       "id": "p6c4h",
-      "startMs": 93855,
-      "endMs": 95855,
+      "startMs": 94005,
+      "endMs": 95995,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1640,8 +1640,8 @@
     },
     {
       "id": "p6c4q1",
-      "startMs": 95865,
-      "endMs": 96365,
+      "startMs": 96015,
+      "endMs": 96475,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1654,8 +1654,8 @@
     },
     {
       "id": "p6c4q2",
-      "startMs": 96365,
-      "endMs": 96845,
+      "startMs": 96515,
+      "endMs": 96945,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1668,8 +1668,8 @@
     },
     {
       "id": "p6c4q3",
-      "startMs": 96845,
-      "endMs": 97325,
+      "startMs": 96995,
+      "endMs": 97440,
       "kind": "note",
       "label": "D5",
       "pitches": [
@@ -1682,8 +1682,8 @@
     },
     {
       "id": "p6c4q4",
-      "startMs": 97325,
-      "endMs": 97825,
+      "startMs": 97485,
+      "endMs": 97975,
       "kind": "note",
       "label": "D5",
       "pitches": [

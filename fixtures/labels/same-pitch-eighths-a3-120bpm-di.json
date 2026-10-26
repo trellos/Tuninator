@@ -12,7 +12,7 @@
     "B3",
     "E4"
   ],
-  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. RE-TIMED by scripts/retime-gridded-labels.ts: each section's picks located in the DI audio by taking the N most prominent envelope peaks, N being the section's own label count, and assigning them in time order. No threshold and no detector output is involved. The grid is gone from these sections; the count is unchanged. CORRECTED 2026-09-14 (second listening pass): the player listened to the sections named here and gave every pick attack time he heard; those times are applied verbatim to the nearest label and outrank the automated re-timing. Tuninator was not consulted. Sections 19.0-20.8s and 33.3-34.0s. e870 (grid 19.230s) is removed: no pick under it. Two very weak picks at 19.131s and 19.599s are deliberately NOT labelled - the player calls them bad playing and says missing them is fine. s160 (19.875s) is a sixteenth played before the section's nominal start; s16113 (33.955s) is a slight final pick. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): The 33 grid-placeholder labels in 20.6-33.3s were each listened to. s166 moves 20.613 -> 20.611s and s1614 21.605 -> 21.617s. s1697 had no pick under its grid position (31.980s); the pick the owner hears is at 32.117s, after s1698 (32.048s), so s1697 moves there and the events are re-sorted by time (the ids s1697/s1698 now run out of numeric order). The other 30 placeholders stay on their grid times, confirmed by ear. Tuninator was not consulted. See DECISION-064. CORRECTED 2026-09-24 (the owner's fourth listening pass, on a page where he dragged, added and deleted picks over 17.1-20.0s): e863 17.493 -> 17.481s, e864 17.768 -> 17.741s, e866 18.298 -> 18.287s, e868 18.765 -> 18.742s; four picks the labels lacked are added, e865b 18.153s, e866b 18.362s, e867b 18.620s and e868b 18.852s; the two weak picks near 19.13s and 19.60s, left out on 2026-09-14 as bad playing, are added at his times 19.127s (e869b) and 19.611s (e871b) with required false: he calls them optional, so the matcher lets them absorb a Note and scores them neither as a match nor as a miss. Ends in the stretch re-chained to the next start. Tuninator was not consulted.",
+  "timingNotes": "PROVISIONAL, generated not hand-annotated - review before relying on it. Structure is the player's own description of what he played; onsets are a fixed subdivision grid anchored on the first measured onset, from a plain RMS envelope written for this purpose - Tuninator was not used to place any label. Anchor 1.985s. Pitches confirmed by autocorrelation. See docs/SAME-PITCH-MATERIAL.md. Calibrated +20ms so the median offset to verify-fixtures.ts independent attack search is ~0, matching the rest of the corpus. CORRECTED 2026-09-14 by the player's own listening pass: he listened to each point below and reported what he heard. Moves are his stated onset times; removals are grid positions he confirmed have no pick under them. This is human annotation, not detector output - Tuninator was not consulted. See docs/SAME-PITCH-MATERIAL.md. RE-TIMED by scripts/retime-gridded-labels.ts: each section's picks located in the DI audio by taking the N most prominent envelope peaks, N being the section's own label count, and assigning them in time order. No threshold and no detector output is involved. The grid is gone from these sections; the count is unchanged. CORRECTED 2026-09-14 (second listening pass): the player listened to the sections named here and gave every pick attack time he heard; those times are applied verbatim to the nearest label and outrank the automated re-timing. Tuninator was not consulted. Sections 19.0-20.8s and 33.3-34.0s. e870 (grid 19.230s) is removed: no pick under it. Two very weak picks at 19.131s and 19.599s are deliberately NOT labelled - the player calls them bad playing and says missing them is fine. s160 (19.875s) is a sixteenth played before the section's nominal start; s16113 (33.955s) is a slight final pick. CORRECTED 2026-09-23 (the owner's third listening pass, through a listening page that drew each clip's envelope with the labels on it): The 33 grid-placeholder labels in 20.6-33.3s were each listened to. s166 moves 20.613 -> 20.611s and s1614 21.605 -> 21.617s. s1697 had no pick under its grid position (31.980s); the pick the owner hears is at 32.117s, after s1698 (32.048s), so s1697 moves there and the events are re-sorted by time (the ids s1697/s1698 now run out of numeric order). The other 30 placeholders stay on their grid times, confirmed by ear. Tuninator was not consulted. See DECISION-064. CORRECTED 2026-09-24 (the owner's fourth listening pass, on a page where he dragged, added and deleted picks over 17.1-20.0s): e863 17.493 -> 17.481s, e864 17.768 -> 17.741s, e866 18.298 -> 18.287s, e868 18.765 -> 18.742s; four picks the labels lacked are added, e865b 18.153s, e866b 18.362s, e867b 18.620s and e868b 18.852s; the two weak picks near 19.13s and 19.60s, left out on 2026-09-14 as bad playing, are added at his times 19.127s (e869b) and 19.611s (e871b) with required false: he calls them optional, so the matcher lets them absorb a Note and scores them neither as a match nor as a miss. Ends in the stretch re-chained to the next start. Tuninator was not consulted. CORRECTED 2026-10-26 (the owner's listening pass, through an editor and listening pages that drew the recording's waveform with the labels on it; Tuninator was not used to place any label): s1632-s1656 (24.0-27.0s) take the start and end times of the amped twin's s1631-s1655 as the owner re-timed them onto the picks; s16108-s16113 are re-timed and s16107 is removed at the end of the take (33.2-34.0s).",
   "events": [
     {
       "id": "e81",
@@ -1542,8 +1542,8 @@
     },
     {
       "id": "s1632",
-      "startMs": 23900,
-      "endMs": 24045,
+      "startMs": 23915,
+      "endMs": 24040,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1557,7 +1557,7 @@
     {
       "id": "s1633",
       "startMs": 24045,
-      "endMs": 24173,
+      "endMs": 24150,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1570,8 +1570,8 @@
     },
     {
       "id": "s1634",
-      "startMs": 24173,
-      "endMs": 24270,
+      "startMs": 24155,
+      "endMs": 24260,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1584,8 +1584,8 @@
     },
     {
       "id": "s1635",
-      "startMs": 24270,
-      "endMs": 24355,
+      "startMs": 24275,
+      "endMs": 24370,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1598,8 +1598,8 @@
     },
     {
       "id": "s1636",
-      "startMs": 24355,
-      "endMs": 24538,
+      "startMs": 24380,
+      "endMs": 24505,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1612,8 +1612,8 @@
     },
     {
       "id": "s1637",
-      "startMs": 24538,
-      "endMs": 24605,
+      "startMs": 24515,
+      "endMs": 24625,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1626,8 +1626,8 @@
     },
     {
       "id": "s1638",
-      "startMs": 24605,
-      "endMs": 24798,
+      "startMs": 24630,
+      "endMs": 24795,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1640,8 +1640,8 @@
     },
     {
       "id": "s1639",
-      "startMs": 24798,
-      "endMs": 24908,
+      "startMs": 24805,
+      "endMs": 24905,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1654,8 +1654,8 @@
     },
     {
       "id": "s1640",
-      "startMs": 24908,
-      "endMs": 24980,
+      "startMs": 24910,
+      "endMs": 25035,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1668,8 +1668,8 @@
     },
     {
       "id": "s1641",
-      "startMs": 24980,
-      "endMs": 25070,
+      "startMs": 25055,
+      "endMs": 25165,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1682,8 +1682,8 @@
     },
     {
       "id": "s1642",
-      "startMs": 25070,
-      "endMs": 25230,
+      "startMs": 25165,
+      "endMs": 25285,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1696,8 +1696,8 @@
     },
     {
       "id": "s1643",
-      "startMs": 25230,
-      "endMs": 25308,
+      "startMs": 25290,
+      "endMs": 25380,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1710,8 +1710,8 @@
     },
     {
       "id": "s1644",
-      "startMs": 25308,
-      "endMs": 25513,
+      "startMs": 25385,
+      "endMs": 25505,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1724,7 +1724,7 @@
     },
     {
       "id": "s1645",
-      "startMs": 25513,
+      "startMs": 25515,
       "endMs": 25605,
       "kind": "note",
       "label": "A3",
@@ -1738,8 +1738,8 @@
     },
     {
       "id": "s1646",
-      "startMs": 25605,
-      "endMs": 25738,
+      "startMs": 25610,
+      "endMs": 25725,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1752,8 +1752,8 @@
     },
     {
       "id": "s1647",
-      "startMs": 25738,
-      "endMs": 25855,
+      "startMs": 25740,
+      "endMs": 25850,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1767,7 +1767,7 @@
     {
       "id": "s1648",
       "startMs": 25855,
-      "endMs": 26033,
+      "endMs": 26020,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1780,8 +1780,8 @@
     },
     {
       "id": "s1649",
-      "startMs": 26033,
-      "endMs": 26105,
+      "startMs": 26030,
+      "endMs": 26130,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1794,8 +1794,8 @@
     },
     {
       "id": "s1650",
-      "startMs": 26105,
-      "endMs": 26285,
+      "startMs": 26135,
+      "endMs": 26275,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1809,7 +1809,7 @@
     {
       "id": "s1651",
       "startMs": 26285,
-      "endMs": 26355,
+      "endMs": 26405,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1822,8 +1822,8 @@
     },
     {
       "id": "s1652",
-      "startMs": 26355,
-      "endMs": 26420,
+      "startMs": 26410,
+      "endMs": 26535,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1836,8 +1836,8 @@
     },
     {
       "id": "s1653",
-      "startMs": 26420,
-      "endMs": 26540,
+      "startMs": 26540,
+      "endMs": 26645,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1850,8 +1850,8 @@
     },
     {
       "id": "s1654",
-      "startMs": 26540,
-      "endMs": 26780,
+      "startMs": 26650,
+      "endMs": 26765,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1864,8 +1864,8 @@
     },
     {
       "id": "s1655",
-      "startMs": 26780,
-      "endMs": 26885,
+      "startMs": 26770,
+      "endMs": 26880,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -1878,8 +1878,8 @@
     },
     {
       "id": "s1656",
-      "startMs": 26885,
-      "endMs": 27033,
+      "startMs": 26880,
+      "endMs": 27005,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2577,23 +2577,9 @@
       "required": true
     },
     {
-      "id": "s16107",
-      "startMs": 33230,
-      "endMs": 33296,
-      "kind": "note",
-      "label": "A3",
-      "pitches": [
-        "A3"
-      ],
-      "pitchClasses": [
-        "A"
-      ],
-      "required": true
-    },
-    {
       "id": "s16108",
       "startMs": 33296,
-      "endMs": 33416,
+      "endMs": 33411,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2606,8 +2592,8 @@
     },
     {
       "id": "s16109",
-      "startMs": 33416,
-      "endMs": 33563,
+      "startMs": 33421,
+      "endMs": 33533,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2621,7 +2607,7 @@
     {
       "id": "s16110",
       "startMs": 33563,
-      "endMs": 33689,
+      "endMs": 33684,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2635,7 +2621,7 @@
     {
       "id": "s16111",
       "startMs": 33689,
-      "endMs": 33809,
+      "endMs": 33794,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2649,7 +2635,7 @@
     {
       "id": "s16112",
       "startMs": 33809,
-      "endMs": 33955,
+      "endMs": 33940,
       "kind": "note",
       "label": "A3",
       "pitches": [
@@ -2663,7 +2649,7 @@
     {
       "id": "s16113",
       "startMs": 33955,
-      "endMs": 34080,
+      "endMs": 33995,
       "kind": "note",
       "label": "A3",
       "pitches": [
