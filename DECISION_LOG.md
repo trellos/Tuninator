@@ -7,6 +7,68 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-090]: The owner's listening pass re-times six label files: clean lead, power chords, held-then-picked, same-pitch eighths A3
+* **Date:** 2026-10-26
+* **Status:** Accepted
+* **Owner:** The project owner (re-timed by ear in a label editor and decided the questions put to him on listening and review pages, 2026-10-24 to 2026-10-26; "go ahead and apply the patch", 2026-10-26); measured and applied by the agent
+* **Context:** An independent check of every take's labels against its audio
+  (numpy/scipy on the decoded audio; nothing from the engine, per §3) found
+  the timing errors concentrated in five takes. `clean-lead-120bpm`: the
+  grid labels drift from the picks, t24 is labelled B5 but B4 sounds, q7's
+  bend sounds for about 3.7s not 1.0s, and the long final B4 has no label.
+  `power-chords-c-a-g-e-c-d-fsharp-e-120bpm`: p4 sits about 930ms late and p7
+  overlaps p8 by 925ms. `held-then-picked-six-strings-120bpm`: strings 3 to 6
+  run 30 to 145ms early and the drift grows along each string.
+  `same-pitch-eighths-a3-120bpm`: the amped labels sit on a rigid 125ms grid
+  while the picks are uneven, and the DI labels differ from them. The owner
+  re-timed each by ear against the recording's waveform drawn with the labels,
+  and answered the questions the check left open on listening pages.
+* **Decision:** Apply 269 label changes across six files, as the owner set
+  them. `clean-lead-120bpm` 38: t1-t24 and s1-s12 re-timed, t24 is B4 at
+  15800-17250ms, q7 runs 6990-10695ms, new `s13` (B4, 21485-23990ms, required);
+  q6 is unchanged. The power chords 6: p3-p8 re-timed, p5 ends at 15100ms
+  where p6 starts. `held-then-picked`: DI 80 and amped 80, every note of
+  strings 3 to 6 (the amped render takes the DI's start and end times, same
+  ids; per-string medians +35, +70, +108, +145ms). `same-pitch-eighths-a3`:
+  amped 33 (s1631-s1655 and s16106-s16111 re-timed; s16105 and s16112
+  removed, the last of them over silence) and DI 32 (s1632-s1656 copy the amped
+  times in 24-27s; s16108-s16113 re-timed; s16107 removed). Not changed: the
+  pitches of t4, t10 and t16 (E5), q6, p4 stays one chord (the 12.61s noise is
+  fingers moving over the strings, not a pick). Each file's `timingNotes` gets a
+  dated CORRECTED sentence, and `docs/EVALUATION.md` is regenerated with
+  `check-readme-eval.ts --write` (two table rows and one prose count).
+* **Alternatives Considered:** (a) **Leave the labels:** p4 sits 930ms late
+  and p7 overlaps p8, inside a gated fixture. (b) **Copy the amped labels
+  onto the whole DI take:** measured worse on the DI, strong-pick starts 132
+  to 81, because the amped labels outside the two edited windows are still
+  loose. (c) **One shift for the rest of each held string:** the drift is not
+  constant, so the owner set each note by ear from a starting shift (+35 and
+  +70ms for strings 3 and 4, the measured +34 and +62ms offered for 5 and 6).
+  (d) **Split p4 at 12.61s:** he heard fingers, not a pick. (e) **Leave the
+  amped held twin alone** (as DECISION-064 and DECISION-067 did): the same times
+  take its median start offset from 16 to 8ms and remove the overlaps at its
+  string 4 and 5 seams, so it follows.
+* **Consequences:** `npm run eval` PASS, 0 required failures, before and
+  after. `clean-lead-120bpm` (required): gated pitch class 92.9% unchanged
+  against the 90% floor, gated onset median 46 to 28ms (limit 100), overall
+  onset median 53 to 32ms, confidently wrong 2 to 0, 43 to 44 labels with the
+  new `s13` missed (missed 2 to 3). Power chords (required): onset median 93
+  to 54ms (limit 120), exact 100% as before. Held DI: onset median 81 to 17ms
+  and p90 154 to 47ms, but the end error median goes 58 to 78ms, so the labels'
+  ends now sit further from where the engine ends the notes. Held amped:
+  onset median 47 to 38ms, end 68 to 63ms. Eighths A3 DI: 188 to 187 scored
+  labels. Eighths A3 amped: 183 to 181 labels, missed 9 to 6, exact 89.1% to
+  90.6%, pitch class 95.1% to 96.7%. No other fixture's numbers moved, and
+  nothing is tuned: these are derivation and calibration fixtures only, the
+  held-out 140bpm takes are untouched, and no constant changed. Still stale and
+  not edited here: the amped-minus-DI medians in AGENTS.md §3 and the label
+  counts in `docs/SAME-PITCH-MATERIAL.md` (183 and 190), and
+  `scripts/retime-gridded-labels.ts` no longer reproduces these files. The
+  two same-pitch takes still differ outside the two edited windows (about 150
+  amped labels untouched).
+
+---
+
 #### [DECISION-089]: A pick the pitch estimator renamed lends its start to the Note its pitch arrives in
 * **Date:** 2026-10-09
 * **Status:** Accepted
