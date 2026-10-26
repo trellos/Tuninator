@@ -7,6 +7,42 @@ are what keep later work from repeating them.
 
 ---
 
+#### [DECISION-091]: Door 3 re-run on the owner's corrected labels stays closed: the labels raise the rate feature, not the models
+* **Date:** 2026-10-26
+* **Status:** Rejected
+* **Owner:** The project owner asked whether the learned experiments would have done better on the labels DECISION-090 corrected, and opened the network for PyPI and zenodo.org to re-run them; measured by the agent
+* **Context:** DECISION-070 and DECISION-072 scored learned classifiers on
+  the OUTCOME target over the tuning takes, six of whose label files
+  DECISION-090 re-timed. Re-run with the scripts from commit `eccdd93`
+  unchanged (models fixed as before) at engine `2248f41` (the same `src/`
+  as `19ac9d6`), once with the labels before DECISION-090 and once after.
+  Same 1,067 gate-off rows and 854 shipped survivors both times; 28 targets
+  flip (27 on `held-then-picked-six-strings-120bpm-amped`), surplus 339 to
+  343. GuitarSet re-extracted: 107,236 rows, 2,160 renders.
+* **Decision:** **Both clauses still fail for every model; nothing is
+  wired.** Rate feature on the corpus rows 0.804 to **0.840**. Corpus
+  leave-one-take-out, old to new: logistic scalars 0.738 to 0.747, with
+  audio 0.690 to 0.701, MLP 16 0.664 to 0.694, trees probe 0.826 to 0.876
+  (median per-take gain +0.000 to +0.001). Trained on GuitarSet: logistic
+  0.751 to 0.743, with audio 0.760 to 0.752, MLP 32-16 0.803 to 0.795,
+  trees probe 0.831 to 0.866; median per-take gain +0.000 for all, the
+  amped held take's loss for the shippable models doubles (-0.15 to
+  -0.32). Beside the gate no model removes surplus at zero cost (best:
+  trees probe 11 for 4 paired, logistic 7 for 1 on the corpus).
+* **Alternatives Considered:** (a) **Reading the trees probe's corpus
+  gain (+0.026 to +0.036) as an opening:** it is a probe, not a candidate,
+  its median per-take gain is zero, and it costs paired notes beside the
+  gate. (b) **Not re-running** (the targets moved 2.6%): the owner asked
+  for the numbers.
+* **Consequences:** The corrected labels make the shipped rate feature look
+  better, and the learned models fall further behind it on the take the
+  labels moved most. DECISION-072's condition for reopening door 3 stands.
+  None of these experiments learn where a Note ends; the end-timing gap
+  DECISION-090 reports on the held DI strings 5 and 6 is a separate,
+  untested question. The bench scripts remain off `main`.
+
+---
+
 #### [DECISION-090]: The owner's listening pass re-times six label files: clean lead, power chords, held-then-picked, same-pitch eighths A3
 * **Date:** 2026-10-26
 * **Status:** Accepted
